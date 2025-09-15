@@ -1,0 +1,436 @@
+.characterSheet {
+  display: flex;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.portrait {
+  width: 80px;
+  height: 80px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+  
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.characterInfo {
+  flex: 1;
+  
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #000;
+  }
+}
+
+.basicStats {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 8px;
+  
+  .stat {
+    text-align: center;
+    
+    .label {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 2px;
+    }
+    
+    .value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #000;
+    }
+  }
+}
+
+.secondaryStats {
+  display: flex;
+  gap: 24px;
+  
+  .stat {
+    .label {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 2px;
+    }
+    
+    .value {
+      font-size: 12px;
+      color: #000;
+    }
+  }
+}
+
+.editButton {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  
+  &:hover {
+    background: #e0e0e0;
+  }
+}
+
+.topStats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  
+  .statGroup {
+    text-align: center;
+    
+    .value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #000;
+    }
+    
+    .label {
+      font-size: 9px;
+      font-weight: 500;
+      text-transform: uppercase;
+      color: #666;
+      margin-top: 2px;
+    }
+  }
+}
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 200px 1fr 300px;
+  gap: 20px;
+}
+
+.leftColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.abilityScores {
+  .abilityScore {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 16px;
+    
+    .label {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    
+    .score {
+      font-size: 16px;
+      font-weight: 600;
+      color: #000;
+      margin-bottom: 4px;
+    }
+    
+    .modifier {
+      background: #000;
+      color: #fff;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+  }
+}
+
+.savingThrows, .skills {
+  h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    color: #000;
+  }
+
+  .skillItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    
+    .proficiencyDot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid #666;
+      
+      &.proficient {
+        background: #000;
+      }
+    }
+    
+    .modifier {
+      min-width: 20px;
+      font-weight: 500;
+    }
+    
+    .name {
+      text-transform: uppercase;
+      color: #666;
+    }
+  }
+}
+
+.middleColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.combatStats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  
+  .statRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .statValue {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000;
+    }
+    
+    .statLabel {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      color: #666;
+    }
+  }
+  
+  .hitPoints {
+    text-align: center;
+    
+    .current {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000;
+    }
+    
+    .max {
+      font-size: 16px;
+      color: #666;
+    }
+    
+    .label {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      color: #666;
+      margin-top: 4px;
+    }
+  }
+}
+
+.rightColumn {
+  .classFeatures {
+    h3 {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      color: #000;
+    }
+
+    .feature {
+      margin-bottom: 16px;
+      
+      .featureHeader {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+        
+        .featureName {
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          color: #000;
+        }
+        
+        .levelBadge {
+          background: #000;
+          color: #fff;
+          border-radius: 50%;
+          width: 16px;
+          height: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: 600;
+        }
+      }
+      
+      .featureDescription {
+        font-size: 11px;
+        line-height: 1.4;
+        color: #333;
+      }
+    }
+  }
+}
+
+.weapons {
+  h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    color: #000;
+  }
+
+  .weapon {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    
+    .weaponName {
+      font-weight: 500;
+    }
+    
+    .weaponStats {
+      display: flex;
+      gap: 12px;
+      color: #666;
+    }
+  }
+}
+
+.spells {
+  h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    color: #000;
+  }
+
+  .spellStats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    text-align: center;
+    
+    .spellStat {
+      .value {
+        font-size: 16px;
+        font-weight: 600;
+        color: #000;
+      }
+      
+      .label {
+        font-size: 9px;
+        font-weight: 500;
+        text-transform: uppercase;
+        color: #666;
+        margin-top: 2px;
+      }
+    }
+  }
+  
+  .spellLevel {
+    margin-bottom: 12px;
+    
+    .levelHeader {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    
+    .spellList {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      
+      .spell {
+        background: #f0f0f0;
+        padding: 2px 6px;
+        border-radius: 2px;
+        font-size: 10px;
+      }
+    }
+  }
+}
+
+.equipment {
+  h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    color: #000;
+  }
+
+  .equipmentList {
+    .item {
+      font-size: 11px;
+      margin-bottom: 2px;
+      color: #333;
+    }
+  }
+}
