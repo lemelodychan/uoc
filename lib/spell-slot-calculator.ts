@@ -74,7 +74,13 @@ export const getSpellsKnownFromClass = (classData: ClassSpellData | null, level:
 }
 
 export const getBardicInspirationFromClass = (classData: ClassSpellData | null, level: number) => {
-  if (!classData || level < 1 || level > 20 || classData.name.toLowerCase() !== "bard") {
+  // Multiple safeguards to ensure only Bard classes get bardic inspiration
+  if (!classData || level < 1 || level > 20) {
+    return null
+  }
+
+  // Primary check: class name must be "bard"
+  if (classData.name.toLowerCase() !== "bard") {
     return null
   }
 
@@ -82,6 +88,7 @@ export const getBardicInspirationFromClass = (classData: ClassSpellData | null, 
   const uses = classData.bardic_inspiration_uses[levelIndex] || 0
   const die = classData.bardic_inspiration_die[levelIndex] || "d6"
 
+  // Additional safeguard: if uses is 0, return null (even for Bard)
   if (uses === 0) return null
 
   return {
@@ -197,6 +204,7 @@ export const fetchClassData = async (className: string, subclass?: string): Prom
       bardic_inspiration_uses: parseSpellSlotArray(data.bardic_inspiration_uses),
       bardic_inspiration_die: data.bardic_inspiration_die || [],
     }
+
 
     return classData
   } catch (error) {

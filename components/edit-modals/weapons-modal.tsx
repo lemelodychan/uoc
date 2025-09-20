@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,12 @@ interface WeaponsModalProps {
 export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModalProps) {
   const [weapons, setWeapons] = useState(character.weapons)
   const [weaponNotes, setWeaponNotes] = useState(character.weaponNotes || "")
+
+  // Sync local state with character prop when it changes
+  useEffect(() => {
+    setWeapons(character.weapons)
+    setWeaponNotes(character.weaponNotes || "")
+  }, [character.weapons, character.weaponNotes])
 
   const handleSave = () => {
     onSave({ weapons, weaponNotes })
@@ -49,8 +55,8 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
             <h3 className="text-sm font-medium mb-3">Weapons List</h3>
             <div className="space-y-3">
               {weapons.map((weapon, index) => (
-                <div key={index} className="grid grid-cols-12 items-center gap-2 p-2 border rounded">
-                  <div className="col-span-4">
+                <div key={index} className="grid grid-cols-12 items-end gap-3 p-3 border rounded-lg">
+                  <div className="col-span-4 flex flex-col gap-2">
                     <Label htmlFor={`weapon-name-${index}`} className="text-xs">
                       Name
                     </Label>
@@ -61,7 +67,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                       placeholder="Weapon name"
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-3 flex flex-col gap-2">
                     <Label htmlFor={`weapon-attack-${index}`} className="text-xs">
                       Attack Bonus
                     </Label>
@@ -72,7 +78,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                       placeholder="+5"
                     />
                   </div>
-                  <div className="col-span-4">
+                  <div className="col-span-4 flex flex-col gap-2">
                     <Label htmlFor={`weapon-damage-${index}`} className="text-xs">
                       Damage
                     </Label>
@@ -85,10 +91,10 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                   </div>
                   <div className="col-span-1">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => removeWeapon(index)}
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive w-9 h-9"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

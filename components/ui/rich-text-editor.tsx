@@ -56,6 +56,8 @@ export function RichTextEditor({ value, onChange, placeholder, rows = 6, classNa
 
   const addLineBreak = () => insertText("\n")
 
+  const minHeight = rows * 28 // approx line-height for mono text (tweakable)
+
   return (
     <div className={className}>
       <div className="flex gap-2 mb-2">
@@ -76,6 +78,7 @@ export function RichTextEditor({ value, onChange, placeholder, rows = 6, classNa
         placeholder={placeholder}
         rows={rows}
         className="font-mono text-sm"
+        style={{ minHeight }}
       />
       <div className="text-xs text-muted-foreground mt-1">
         Use **bold** for emphasis, - for bullet points, and line breaks for formatting

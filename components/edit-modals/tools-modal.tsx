@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,12 @@ interface ToolsModalProps {
 export function ToolsModal({ isOpen, onClose, character, onSave }: ToolsModalProps) {
   const [toolsProficiencies, setToolsProficiencies] = useState<ToolProficiency[]>(character.toolsProficiencies)
   const [otherTools, setOtherTools] = useState(character.otherTools)
+
+  // Sync local state with character prop when it changes
+  useEffect(() => {
+    setToolsProficiencies(character.toolsProficiencies)
+    setOtherTools(character.otherTools)
+  }, [character.toolsProficiencies, character.otherTools])
 
   const calculateToolBonusForTool = (tool: ToolProficiency): number => {
     const proficiencyBonus = Math.ceil(character.level / 4) + 1
@@ -97,7 +103,7 @@ export function ToolsModal({ isOpen, onClose, character, onSave }: ToolsModalPro
         </DialogHeader>
         <div className="grid gap-6 py-4">
           <div>
-            <Label className="text-sm font-medium mb-3 block">Tool Proficiencies</Label>
+            <Label className="text-sm font-medium mb-3 block">Other Tool & Instrument Proficiencies</Label>
             <div className="space-y-3">
               {toolsProficiencies.map((tool, index) => {
                 const isProficient = tool.proficiency === "proficient" || tool.proficiency === "expertise"
@@ -107,9 +113,9 @@ export function ToolsModal({ isOpen, onClose, character, onSave }: ToolsModalPro
                   tool.manualModifier !== undefined ? tool.manualModifier : calculateToolBonusForTool(tool)
 
                 return (
-                  <div key={index} className="flex items-center gap-2 p-3 border rounded-lg">
-                    <div className="flex gap-1">
-                      <div className="flex items-center space-x-1">
+                  <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+                    <div className="flex gap-3">
+                      <div className="flex items-center gap-1">
                         <input
                           type="checkbox"
                           id={`tool-${index}-prof`}
@@ -117,11 +123,11 @@ export function ToolsModal({ isOpen, onClose, character, onSave }: ToolsModalPro
                           onChange={(e) => updateToolProficiency(index, "proficient", e.target.checked)}
                           className="w-3 h-3 rounded border-gray-300"
                         />
-                        <Label htmlFor={`tool-${index}-prof`} className="text-xs">
-                          Prof
+                        <Label htmlFor={`tool-${index}-prof`} className="text-sm">
+                          Proficient
                         </Label>
                       </div>
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center gap-1">
                         <input
                           type="checkbox"
                           id={`tool-${index}-exp`}
@@ -129,8 +135,8 @@ export function ToolsModal({ isOpen, onClose, character, onSave }: ToolsModalPro
                           onChange={(e) => updateToolProficiency(index, "expertise", e.target.checked)}
                           className="w-3 h-3 rounded border-gray-300"
                         />
-                        <Label htmlFor={`tool-${index}-exp`} className="text-xs">
-                          Exp
+                        <Label htmlFor={`tool-${index}-exp`} className="text-sm">
+                          Expertise
                         </Label>
                       </div>
                     </div>
@@ -151,10 +157,10 @@ export function ToolsModal({ isOpen, onClose, character, onSave }: ToolsModalPro
                       />
                     </div>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => removeTool(index)}
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive w-9 h-9"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

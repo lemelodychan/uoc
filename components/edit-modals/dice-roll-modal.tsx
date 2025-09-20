@@ -1,0 +1,359 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6 } from "lucide-react"
+import type { CharacterData } from "@/lib/character-data"
+import { calculateModifier, calculateProficiencyBonus, calculateSavingThrowBonus, calculateSpellAttackBonus } from "@/lib/character-data"
+
+interface DiceRollModalProps {
+  isOpen: boolean
+  onClose: () => void
+  character: CharacterData
+  onUpdateHP: (newHP: number) => void
+}
+
+type DiceType = "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100"
+type RollType = "damage" | "weapon-atk" | "ranged-atk" | "spell" | "saving-throw" | "ability-check" | "initiative" | "healing" | "other"
+type SavingThrowType = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma"
+
+const DICE_OPTIONS: { value: DiceType; label: string; max: number }[] = [
+  { value: "d4", label: "d4", max: 4 },
+  { value: "d6", label: "d6", max: 6 },
+  { value: "d8", label: "d8", max: 8 },
+  { value: "d10", label: "d10", max: 10 },
+  { value: "d12", label: "d12", max: 12 },
+  { value: "d20", label: "d20", max: 20 },
+  { value: "d100", label: "d100", max: 100 },
+]
+
+const ROLL_TYPES: { value: RollType; label: string }[] = [
+  { value: "damage", label: "Damage" },
+  { value: "weapon-atk", label: "Weapon Attack" },
+  { value: "ranged-atk", label: "Ranged Attack" },
+  { value: "spell", label: "Spell" },
+  { value: "saving-throw", label: "Saving Throw" },
+  { value: "ability-check", label: "Ability Check" },
+  { value: "initiative", label: "Initiative" },
+  { value: "healing", label: "Healing" },
+  { value: "other", label: "Other" },
+]
+
+const SAVING_THROW_OPTIONS: { value: SavingThrowType; label: string }[] = [
+  { value: "strength", label: "Strength" },
+  { value: "dexterity", label: "Dexterity" },
+  { value: "constitution", label: "Constitution" },
+  { value: "intelligence", label: "Intelligence" },
+  { value: "wisdom", label: "Wisdom" },
+  { value: "charisma", label: "Charisma" },
+]
+
+const getDiceIcon = (diceType: DiceType) => {
+  switch (diceType) {
+    case "d4": return <Dice1 className="w-4 h-4" />
+    case "d6": return <Dice2 className="w-4 h-4" />
+    case "d8": return <Dice3 className="w-4 h-4" />
+    case "d10": return <Dice4 className="w-4 h-4" />
+    case "d12": return <Dice5 className="w-4 h-4" />
+    case "d20": return <Dice6 className="w-4 h-4" />
+    case "d100": return <Dice6 className="w-4 h-4" />
+    default: return <Dice6 className="w-4 h-4" />
+  }
+}
+
+const calculateAutoModifier = (character: CharacterData, rollType: RollType, savingThrowType?: SavingThrowType): number => {
+  const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level)
+  
+  switch (rollType) {
+    case "weapon-atk":
+    case "ranged-atk":
+      // For weapon attacks, we'd need to know which weapon, but we can provide a general STR/DEX modifier
+      // Default to STR for melee, DEX for ranged (this is a simplification)
+      return rollType === "ranged-atk" 
+        ? calculateModifier(character.dexterity) + proficiencyBonus
+        : calculateModifier(character.strength) + proficiencyBonus
+    
+    case "spell":
+      // Use spell attack bonus if available, otherwise calculate it
+      if (character.spellData?.spellAttackBonus) {
+        return character.spellData.spellAttackBonus
+      }
+      // Fallback calculation (this would need class data for full accuracy)
+      return calculateModifier(character.charisma) + proficiencyBonus
+    
+    case "saving-throw":
+      // Use the specific saving throw type if provided
+      if (savingThrowType) {
+        return calculateSavingThrowBonus(character, savingThrowType, proficiencyBonus)
+      }
+      // Default to DEX if no specific type provided
+      return calculateSavingThrowBonus(character, "dexterity", proficiencyBonus)
+    
+    case "ability-check":
+      // This would need to know which ability, default to DEX
+      return calculateModifier(character.dexterity)
+    
+    case "initiative":
+      return calculateModifier(character.dexterity)
+    
+    case "damage":
+    case "healing":
+    case "other":
+    default:
+      return 0
+  }
+}
+
+export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRollModalProps) {
+  const [diceType, setDiceType] = useState<DiceType>("d20")
+  const [numDice, setNumDice] = useState(1)
+  const [rollType, setRollType] = useState<RollType>("other")
+  const [savingThrowType, setSavingThrowType] = useState<SavingThrowType>("dexterity")
+  const [modifier, setModifier] = useState(0)
+  const [isRolling, setIsRolling] = useState(false)
+  const [result, setResult] = useState<{
+    rolls: number[]
+    total: number
+    modifier: number
+    finalTotal: number
+  } | null>(null)
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setDiceType("d20")
+      setNumDice(1)
+      setRollType("other")
+      setSavingThrowType("dexterity")
+      setModifier(0)
+      setResult(null)
+    }
+  }, [isOpen])
+
+  // Auto-calculate modifier when roll type or saving throw type changes
+  useEffect(() => {
+    if (isOpen && rollType !== "other") {
+      const autoModifier = calculateAutoModifier(character, rollType, savingThrowType)
+      setModifier(autoModifier)
+    }
+  }, [rollType, savingThrowType, character, isOpen])
+
+  const rollDice = async () => {
+    setIsRolling(true)
+    
+    // Simulate rolling animation
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    const diceConfig = DICE_OPTIONS.find(d => d.value === diceType)!
+    const rolls: number[] = []
+    
+    for (let i = 0; i < numDice; i++) {
+      rolls.push(Math.floor(Math.random() * diceConfig.max) + 1)
+    }
+    
+    const total = rolls.reduce((sum, roll) => sum + roll, 0)
+    const finalTotal = total + modifier
+    
+    setResult({
+      rolls,
+      total,
+      modifier,
+      finalTotal
+    })
+    setIsRolling(false)
+  }
+
+  const handleHPChange = (operation: 'add' | 'subtract') => {
+    if (!result) return
+    
+    const hpChange = operation === 'add' ? result.finalTotal : -result.finalTotal
+    const newHP = Math.max(0, character.currentHP + hpChange)
+    onUpdateHP(newHP)
+    onClose()
+  }
+
+  const formatRolls = (rolls: number[]) => {
+    if (rolls.length === 1) return rolls[0].toString()
+    return `[${rolls.join(', ')}] = ${rolls.reduce((sum, roll) => sum + roll, 0)}`
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {getDiceIcon(diceType)}
+            Dice Roll
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          {/* Dice Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="dice-type">Die Type</Label>
+              <Select value={diceType} onValueChange={(value: DiceType) => setDiceType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DICE_OPTIONS.map((dice) => (
+                    <SelectItem key={dice.value} value={dice.value}>
+                      <div className="flex items-center gap-2">
+                        {getDiceIcon(dice.value)}
+                        {dice.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="num-dice">Number of Dice</Label>
+              <Input
+                id="num-dice"
+                type="number"
+                min={1}
+                max={20}
+                value={numDice}
+                onChange={(e) => setNumDice(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
+          </div>
+
+          {/* Roll Type and Saving Throw Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="roll-type">Roll Type</Label>
+              <Select value={rollType} onValueChange={(value: RollType) => setRollType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLL_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {rollType === "saving-throw" && (
+              <div className="space-y-2">
+                <Label htmlFor="saving-throw-type">Saving Throw</Label>
+                <Select value={savingThrowType} onValueChange={(value: SavingThrowType) => setSavingThrowType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SAVING_THROW_OPTIONS.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* Modifier */}
+          <div className="space-y-2">
+            <Label htmlFor="modifier">
+              Modifier
+              {rollType !== "other" && (
+                <span className="text-xs text-muted-foreground ml-1">
+                  (auto-calculated)
+                </span>
+              )}
+            </Label>
+            <Input
+              id="modifier"
+              type="number"
+              value={modifier}
+              onChange={(e) => setModifier(parseInt(e.target.value) || 0)}
+              placeholder="0"
+              className={rollType !== "other" ? "bg-muted/50" : ""}
+            />
+            {rollType !== "other" && (
+              <p className="text-xs text-muted-foreground">
+                {rollType === "saving-throw" 
+                  ? `Based on your ${savingThrowType} modifier and proficiency. You can still modify manually.`
+                  : "Based on your character's stats. You can still modify manually."
+                }
+              </p>
+            )}
+          </div>
+
+          {/* Roll Button */}
+          <div className="flex justify-center pt-4">
+            <Button 
+              onClick={rollDice} 
+              disabled={isRolling}
+              className="min-w-[120px]"
+            >
+              {isRolling ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Rolling...
+                </>
+              ) : (
+                <>
+                  {getDiceIcon(diceType)}
+                  <span className="ml-2">Roll Dice</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Results */}
+          {result && (
+            <div className="space-y-4 pt-4 border-t">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary mb-2">
+                  {result.finalTotal}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {formatRolls(result.rolls)}
+                  {result.modifier !== 0 && (
+                    <span className={result.modifier > 0 ? "text-green-600" : "text-red-600"}>
+                      {result.modifier > 0 ? ` + ${result.modifier}` : ` ${result.modifier}`}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* HP Integration */}
+              {(rollType === "damage" || rollType === "healing") && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Apply to HP?</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleHPChange(rollType === "healing" ? "add" : "subtract")}
+                    className="w-full"
+                  >
+                    {rollType === "healing" ? "Add to HP" : "Subtract from HP"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

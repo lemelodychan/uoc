@@ -43,9 +43,9 @@ export function RichTextDisplay({ content, className = "" }: RichTextDisplayProp
 
           if (index === 0 || !lines[index - 1].startsWith("<li>")) {
             return (
-              <ul key={index} className="list-disc list-inside space-y-1 my-2">
+              <ul key={index} className="list-disc list-inside space-y-1 my-2 pl-1">
                 {listItems.map((item, itemIndex) => (
-                  <div key={itemIndex} dangerouslySetInnerHTML={{ __html: item }} />
+                  <li key={itemIndex} dangerouslySetInnerHTML={{ __html: item.replace(/^<li>|<\/li>$/g, '') }} />
                 ))}
               </ul>
             )

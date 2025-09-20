@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Plus, Trash2 } from "lucide-react"
 import type { CharacterData } from "@/lib/character-data"
 
@@ -18,6 +18,11 @@ interface FeatsModalProps {
 
 export function FeatsModal({ isOpen, onClose, character, onSave }: FeatsModalProps) {
   const [feats, setFeats] = useState(character.feats)
+
+  // Sync local state with character prop when it changes
+  useEffect(() => {
+    setFeats(character.feats)
+  }, [character.feats])
 
   const handleSave = () => {
     onSave({ feats })
@@ -71,10 +76,9 @@ export function FeatsModal({ isOpen, onClose, character, onSave }: FeatsModalPro
                 <Label htmlFor={`feat-desc-${index}`} className="text-xs">
                   Description
                 </Label>
-                <Textarea
-                  id={`feat-desc-${index}`}
+                <RichTextEditor
                   value={feat.description}
-                  onChange={(e) => updateFeat(index, "description", e.target.value)}
+                  onChange={(value) => updateFeat(index, "description", value)}
                   placeholder="Feat description and benefits"
                   rows={3}
                 />

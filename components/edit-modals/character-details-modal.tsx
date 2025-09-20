@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -23,6 +23,18 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
     backstory: character.backstory || "",
     notes: character.notes || "",
   })
+
+  // Sync local state with character prop when it changes
+  useEffect(() => {
+    setFormData({
+      personalityTraits: character.personalityTraits || "",
+      ideals: character.ideals || "",
+      bonds: character.bonds || "",
+      flaws: character.flaws || "",
+      backstory: character.backstory || "",
+      notes: character.notes || "",
+    })
+  }, [character.personalityTraits, character.ideals, character.bonds, character.flaws, character.backstory, character.notes])
 
   const handleSave = () => {
     onSave(formData)

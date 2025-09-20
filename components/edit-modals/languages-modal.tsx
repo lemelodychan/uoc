@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -16,6 +16,11 @@ interface LanguagesModalProps {
 
 export function LanguagesModal({ isOpen, onClose, character, onSave }: LanguagesModalProps) {
   const [languages, setLanguages] = useState(character.languages)
+
+  // Sync local state with character prop when it changes
+  useEffect(() => {
+    setLanguages(character.languages)
+  }, [character.languages])
 
   const handleSave = () => {
     onSave({ languages })
