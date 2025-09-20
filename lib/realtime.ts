@@ -29,163 +29,67 @@ export interface LongRestEventData {
 
 /**
  * Subscribe to long rest events for real-time updates
+ * DISABLED: Returns a no-op subscription to prevent websocket errors
  */
 export const subscribeToLongRestEvents = (
   onLongRestEvent: (event: LongRestEvent) => void,
   onError?: (error: any) => void
 ) => {
-  console.log("[Realtime] Subscribing to long rest events...")
+  console.log("[Realtime] Realtime functionality is disabled to prevent production errors")
   
-  const subscription = supabase
-    .channel('long_rest_events')
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'long_rest_events',
-        filter: 'status=eq.pending'
-      },
-      (payload) => {
-        console.log("[Realtime] Received long rest event:", payload)
-        onLongRestEvent(payload.new as LongRestEvent)
-      }
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'long_rest_events',
-        filter: 'status=eq.completed'
-      },
-      (payload) => {
-        console.log("[Realtime] Long rest event completed:", payload)
-        onLongRestEvent(payload.new as LongRestEvent)
-      }
-    )
-    .subscribe((status) => {
-      console.log("[Realtime] Subscription status:", status)
-      if (status === 'SUBSCRIBED') {
-        console.log("[Realtime] Successfully subscribed to long rest events")
-      } else if (status === 'CHANNEL_ERROR') {
-        console.error("[Realtime] Channel error occurred")
-        onError?.(new Error("Failed to subscribe to long rest events"))
-      }
-    })
-
-  return subscription
+  // Return a mock subscription object that does nothing
+  return {
+    unsubscribe: () => {
+      console.log("[Realtime] Mock subscription unsubscribed")
+    }
+  }
 }
 
 /**
  * Broadcast a long rest event to all connected clients
+ * DISABLED: Returns success without actually broadcasting
  */
 export const broadcastLongRestEvent = async (
   initiatedByCharacterId: string,
   selectedCharacterIds: string[],
   eventData: LongRestEventData
 ): Promise<{ success: boolean; error?: string; eventId?: string }> => {
-  try {
-    console.log("[Realtime] Broadcasting long rest event...")
-    
-    const { data, error } = await supabase
-      .from('long_rest_events')
-      .insert({
-        initiated_by_character_id: initiatedByCharacterId,
-        selected_character_ids: selectedCharacterIds,
-        event_type: 'long_rest_started',
-        event_data: eventData,
-        status: 'pending',
-        // confirmed_by_character_id and confirmed_at are intentionally omitted
-        // as they will be set when the event is confirmed
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("[Realtime] Error broadcasting long rest event:", error)
-      return { success: false, error: error.message }
-    }
-
-    console.log("[Realtime] Long rest event broadcasted successfully:", data.id)
-    return { success: true, eventId: data.id }
-  } catch (error) {
-    console.error("[Realtime] Error in broadcastLongRestEvent:", error)
-    return { success: false, error: "Failed to broadcast long rest event" }
-  }
+  console.log("[Realtime] Broadcast functionality is disabled - returning mock success")
+  return { success: true, eventId: 'mock-event-id' }
 }
 
 /**
  * Confirm a long rest event (any player can confirm)
+ * DISABLED: Returns success without actually confirming
  */
 export const confirmLongRestEvent = async (
   eventId: string,
   confirmedByCharacterId: string,
   finalEventData?: any
 ): Promise<{ success: boolean; error?: string }> => {
-  try {
-    console.log("[Realtime] Confirming long rest event:", eventId, "by character:", confirmedByCharacterId)
-    
-    const updateData: any = {
-      status: 'completed',
-      processed_at: new Date().toISOString(),
-      confirmed_by_character_id: confirmedByCharacterId,
-      confirmed_at: new Date().toISOString()
-    }
-    
-    if (finalEventData) {
-      updateData.event_data = finalEventData
-    }
-
-    const { error } = await supabase
-      .from('long_rest_events')
-      .update(updateData)
-      .eq('id', eventId)
-
-    if (error) {
-      console.error("[Realtime] Error confirming long rest event:", error)
-      return { success: false, error: error.message }
-    }
-
-    console.log("[Realtime] Long rest event confirmed successfully")
-    return { success: true }
-  } catch (error) {
-    console.error("[Realtime] Error in confirmLongRestEvent:", error)
-    return { success: false, error: "Failed to confirm long rest event" }
-  }
+  console.log("[Realtime] Confirm functionality is disabled - returning mock success")
+  return { success: true }
 }
 
 /**
  * Mark a long rest event as completed (legacy function, use confirmLongRestEvent instead)
+ * DISABLED: Returns success without actually marking as completed
  */
 export const markLongRestEventCompleted = async (
   eventId: string,
   finalEventData?: any
 ): Promise<{ success: boolean; error?: string }> => {
-  return confirmLongRestEvent(eventId, '', finalEventData)
+  console.log("[Realtime] Mark completed functionality is disabled - returning mock success")
+  return { success: true }
 }
 
 /**
  * Get recent long rest events (for debugging or history)
+ * DISABLED: Returns empty array
  */
 export const getRecentLongRestEvents = async (
   limit: number = 10
 ): Promise<{ events: LongRestEvent[]; error?: string }> => {
-  try {
-    const { data, error } = await supabase
-      .from('long_rest_events')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit)
-
-    if (error) {
-      console.error("[Realtime] Error fetching recent events:", error)
-      return { events: [], error: error.message }
-    }
-
-    return { events: data || [] }
-  } catch (error) {
-    console.error("[Realtime] Error in getRecentLongRestEvents:", error)
-    return { events: [], error: "Failed to fetch recent events" }
-  }
+  console.log("[Realtime] Get recent events functionality is disabled - returning empty array")
+  return { events: [] }
 }
