@@ -15,9 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.app",
+  title: "🎲 UOC DND 5e",
+  description: "Fiches DND 5e du girl gang ✌️",
 }
 
 export default function RootLayout({
