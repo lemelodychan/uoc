@@ -54,7 +54,7 @@ export const subscribeToLongRestEvents = (
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
-        .limit(1)
+        .limit(5) // Get more events to handle multiple pending events
 
       if (error) {
         console.error("[Realtime] Error polling for events:", error)
@@ -63,13 +63,14 @@ export const subscribeToLongRestEvents = (
       }
 
       if (data && data.length > 0) {
-        const event = data[0] as LongRestEvent
-        
-        // Only process if this is a new event we haven't seen
-        if (event.id !== lastCheckedEventId) {
-          console.log("[Realtime] Found new long rest event:", event.id)
-          lastCheckedEventId = event.id
-          onLongRestEvent(event)
+        // Process events in order, but only if we haven't seen them before
+        for (const event of data) {
+          if (event.id !== lastCheckedEventId) {
+            console.log("[Realtime] Found new long rest event:", event.id)
+            lastCheckedEventId = event.id
+            onLongRestEvent(event as LongRestEvent)
+            break // Only process one event at a time to avoid conflicts
+          }
         }
       }
     } catch (error) {
@@ -140,6 +141,28 @@ export const confirmLongRestEvent = async (
   try {
     console.log("[Realtime] Confirming long rest event:", eventId, "by character:", confirmedByCharacterId)
     
+    // First, check if the event exists and is still pending
+    const { data: existingEvent, error: fetchError } = await supabase
+      .from('long_rest_events')
+      .select('*')
+      .eq('id', eventId)
+      .single()
+
+    if (fetchError) {
+      console.error("[Realtime] Error fetching event for confirmation:", fetchError)
+      return { success: false, error: "Event not found" }
+    }
+
+    if (!existingEvent) {
+      console.error("[Realtime] Event not found:", eventId)
+      return { success: false, error: "Event not found" }
+    }
+
+    if (existingEvent.status !== 'pending') {
+      console.log("[Realtime] Event already processed:", eventId, "status:", existingEvent.status)
+      return { success: true } // Return success since it's already processed
+    }
+    
     const updateData: any = {
       status: 'completed',
       processed_at: new Date().toISOString(),
@@ -155,6 +178,7 @@ export const confirmLongRestEvent = async (
       .from('long_rest_events')
       .update(updateData)
       .eq('id', eventId)
+      .eq('status', 'pending') // Only update if still pending to prevent race conditions
 
     if (error) {
       console.error("[Realtime] Error confirming long rest event:", error)
