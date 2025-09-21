@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RichTextEditor } from "@/components/ui/rich-text-editor"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Edit } from "lucide-react"
+import { FeatEditModal } from "./feat-edit-modal"
 import type { CharacterData } from "@/lib/character-data"
+import { RichTextDisplay } from "@/components/ui/rich-text-display"
 
 interface FeatsModalProps {
   isOpen: boolean
@@ -17,29 +16,22 @@ interface FeatsModalProps {
 }
 
 export function FeatsModal({ isOpen, onClose, character, onSave }: FeatsModalProps) {
-  const [feats, setFeats] = useState(character.feats)
+  const [featEditModalOpen, setFeatEditModalOpen] = useState(false)
+  const [editingFeatIndex, setEditingFeatIndex] = useState<number | null>(null)
 
-  // Sync local state with character prop when it changes
-  useEffect(() => {
-    setFeats(character.feats)
-  }, [character.feats])
-
-  const handleSave = () => {
-    onSave({ feats })
-    onClose()
+  const handleAddFeat = () => {
+    setEditingFeatIndex(null)
+    setFeatEditModalOpen(true)
   }
 
-  const addFeat = () => {
-    setFeats([...feats, { name: "", description: "" }])
+  const handleEditFeat = (index: number) => {
+    setEditingFeatIndex(index)
+    setFeatEditModalOpen(true)
   }
 
-  const removeFeat = (index: number) => {
-    setFeats(feats.filter((_, i) => i !== index))
-  }
-
-  const updateFeat = (index: number, field: string, value: string) => {
-    const updated = feats.map((feat, i) => (i === index ? { ...feat, [field]: value } : feat))
-    setFeats(updated)
+  const handleFeatEditClose = () => {
+    setFeatEditModalOpen(false)
+    setEditingFeatIndex(null)
   }
 
   return (
@@ -48,55 +40,46 @@ export function FeatsModal({ isOpen, onClose, character, onSave }: FeatsModalPro
         <DialogHeader>
           <DialogTitle>Edit Feats</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4 max-h-96 overflow-y-auto">
-          {feats.map((feat, index) => (
-            <div key={index} className="grid gap-2 p-3 border rounded">
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <Label htmlFor={`feat-name-${index}`} className="text-xs">
-                    Name
-                  </Label>
-                  <Input
-                    id={`feat-name-${index}`}
-                    value={feat.name}
-                    onChange={(e) => updateFeat(index, "name", e.target.value)}
-                    placeholder="Feat name"
-                  />
+        <div className="grid gap-4 overflow-y-auto">
+          {character.feats.map((feat, index) => (
+            <div key={index} className="flex items-start justify-between p-3 border rounded-lg">
+              <div className="flex flex-col gap-1">
+                <div className="font-semibold text-md">{feat.name || "Unnamed Feat"}</div>
+                <div className="text-sm text-muted-foreground">
+                  <RichTextDisplay content={feat.description || "No description"} />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFeat(index)}
-                  className="text-destructive hover:text-destructive mt-5"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
               </div>
-              <div>
-                <Label htmlFor={`feat-desc-${index}`} className="text-xs">
-                  Description
-                </Label>
-                <RichTextEditor
-                  value={feat.description}
-                  onChange={(value) => updateFeat(index, "description", value)}
-                  placeholder="Feat description and benefits"
-                  rows={3}
-                />
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleEditFeat(index)}
+                className="w-9 h-9"
+              >
+                <Edit className="w-4 h-4" />
+              </Button>
             </div>
           ))}
-          <Button variant="outline" onClick={addFeat} className="w-full bg-transparent">
-            <Plus className="w-4 h-4 mr-2" />
+          {character.feats.length === 0 && (
+            <div className="text-sm text-muted-foreground text-center">
+              No feats added yet
+            </div>
+          )}
+        </div>
+        <DialogFooter className="flex flex-row items-center align-left justify-start w-full">
+          <Button variant="outline" onClick={handleAddFeat}>
+            <Plus className="w-4 h-4" />
             Add Feat
           </Button>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>Save Changes</Button>
         </DialogFooter>
       </DialogContent>
+      
+      <FeatEditModal
+        isOpen={featEditModalOpen}
+        onClose={handleFeatEditClose}
+        character={character}
+        featIndex={editingFeatIndex}
+        onSave={onSave}
+      />
     </Dialog>
   )
 }

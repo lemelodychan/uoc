@@ -23,11 +23,12 @@ import {
   UserStar,
   Skull,
   Dice5,
+  NotebookPen,
 } from "lucide-react"
 import { CharacterSidebar } from "@/components/character-sidebar"
 import { BasicInfoModal } from "@/components/edit-modals/basic-info-modal"
 import { CharacterCreationModal } from "@/components/edit-modals/character-creation-modal"
-import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, calculatePassivePerception, calculatePassiveInsight, calculateSavingThrowBonus, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, getArtificerInfusionsKnown, getArtificerMaxInfusedItems, getTotalAdditionalSpells, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData, getWarlockInvocationsKnown, type EldritchCannon } from "@/lib/character-data"
+import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, createClassBasedSkills, calculatePassivePerception, calculatePassiveInsight, calculateSavingThrowBonus, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, getArtificerInfusionsKnown, getArtificerMaxInfusedItems, getTotalAdditionalSpells, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData, getWarlockInvocationsKnown, type EldritchCannon } from "@/lib/character-data"
 import { AbilitiesModal } from "@/components/edit-modals/abilities-modal"
 import { CombatModal } from "@/components/edit-modals/combat-modal"
 import { WeaponsModal } from "@/components/edit-modals/weapons-modal"
@@ -60,11 +61,8 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadAllCharacters, testConnection, loadClassData, updatePartyStatus } from "@/lib/database"
+import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus } from "@/lib/database"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
-import {
-  testClassesTableAccess, // Only need this for testing database access
-} from "../lib/spell-slot-calculator"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 
@@ -94,6 +92,7 @@ export default function CharacterSheet() {
   const [isLoading, setIsLoading] = useState(false)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
+  const multiclassDataChangedRef = useRef<boolean>(false)
   const [featureModalOpen, setFeatureModalOpen] = useState(false)
   const [featureModalContent, setFeatureModalContent] = useState<{ title: string; description: string; needsAttunement?: boolean; maxUses?: number; dailyRecharge?: string; usesPerLongRest?: number | string; refuelingDie?: string } | null>(null)
   const [featureModalIsClassFeature, setFeatureModalIsClassFeature] = useState(false)
@@ -152,12 +151,21 @@ export default function CharacterSheet() {
 
   const activeCharacter = characters.find((c) => c.id === activeCharacterId) || characters[0]
   
+  // Debug logging for active character
+  if (activeCharacter) {
+    console.log('[DEBUG] Active character found:', {
+      id: activeCharacter.id,
+      name: activeCharacter.name,
+      classes: activeCharacter.classes,
+      savingThrowProficiencies: activeCharacter.savingThrowProficiencies
+    })
+  } else {
+    console.log('[DEBUG] No active character found')
+  }
+  
 
   const debouncedAutoSave = useCallback(async () => {
-    console.log("[v0] debouncedAutoSave called - dbConnected:", dbConnected, "activeCharacterId:", activeCharacterId)
-    
     if (!dbConnected || !activeCharacterId) {
-      console.log("[v0] Skipping auto-save - database not connected or no active character ID")
       return
     }
 
@@ -169,11 +177,8 @@ export default function CharacterSheet() {
     })
 
     if (!currentCharacter) {
-      console.log("[v0] Skipping auto-save - character not found")
       return
     }
-
-    console.log("[v0] Auto-saving character:", currentCharacter.name, "spell data:", currentCharacter.spellData)
     
     // Create toast outside of state setter
     const savingToast = toast({
@@ -188,6 +193,13 @@ export default function CharacterSheet() {
           setCharacters(prev => prev.map(char => char.id === activeCharacterId ? { ...char, id: characterId } : char))
           setActiveCharacterId(characterId)
         }
+        
+        // Reload character from database if multiclass data changed
+        if (multiclassDataChangedRef.current) {
+          multiclassDataChangedRef.current = false
+          await reloadCharacterFromDatabase(characterId || activeCharacterId)
+        }
+        
         savingToast.update({
           id: savingToast.id,
           title: "Saved!",
@@ -221,15 +233,29 @@ export default function CharacterSheet() {
   }, [debouncedAutoSave])
 
   const updateCharacter = (updates: Partial<CharacterData>, options?: { autosave?: boolean }) => {
-    console.log("[v0] updateCharacter called with updates:", updates)
     setCharacters((prev) => prev.map((char) => (char.id === activeCharacterId ? { ...char, ...updates } : char)))
     if (options?.autosave !== false) {
-      console.log("[v0] Triggering auto-save...")
       triggerAutoSave()
-    } else {
-      console.log("[v0] Auto-save suppressed for this update")
     }
   }
+
+  const reloadCharacterFromDatabase = useCallback(async (characterId: string) => {
+    try {
+      const { loadCharacter } = await import('@/lib/database')
+      const { character, error } = await loadCharacter(characterId)
+      
+      if (error) {
+        console.error("Error reloading character:", error)
+        return
+      }
+      
+      if (character) {
+        setCharacters((prev) => prev.map((char) => (char.id === characterId ? character : char)))
+      }
+    } catch (error) {
+      console.error("Error reloading character from database:", error)
+    }
+  }, [])
 
   // Spell slots are now calculated during initial character load for better performance
 
@@ -278,21 +304,16 @@ export default function CharacterSheet() {
 
   const loadFromDatabaseFirst = async () => {
     setIsInitialLoading(true)
-    console.log("[v0] Attempting to load from database first...")
 
     // Test connection first
     const { success, error } = await testConnection()
     setDbConnected(success)
 
     if (success) {
-      console.log("[v0] Database connected, loading characters...")
-      await testClassesTableAccess()
-
       try {
         const { characters: dbCharacters, error: loadError } = await loadAllCharacters()
         if (loadError) {
           console.error("Failed to load characters:", loadError)
-          console.log("[v0] Falling back to sample data due to load error")
           setCharacters(sampleCharacters)
           setActiveCharacterId("1")
           toast({
@@ -301,8 +322,6 @@ export default function CharacterSheet() {
             variant: "destructive",
           })
         } else if (dbCharacters && dbCharacters.length > 0) {
-          console.log("[v0] Successfully loaded characters from database")
-          console.log("[v0] Loaded characters with IDs:", dbCharacters.map(c => ({ id: c.id, name: c.name })))
           setCharacters(dbCharacters)
 
           const savedActiveCharacterId = loadActiveCharacterFromLocalStorage()
@@ -311,7 +330,6 @@ export default function CharacterSheet() {
               ? savedActiveCharacterId
               : dbCharacters[0].id
 
-          console.log("[v0] Setting active character ID to:", validCharacterId)
           setActiveCharacterId(validCharacterId)
           saveActiveCharacterToLocalStorage(validCharacterId)
 
@@ -321,7 +339,6 @@ export default function CharacterSheet() {
             description: `Loaded ${dbCharacters.length} character(s) from database.`,
           })
         } else {
-          console.log("[v0] No characters found in database, using sample data")
           setCharacters(sampleCharacters)
           setActiveCharacterId("1")
           toast({
@@ -340,7 +357,6 @@ export default function CharacterSheet() {
         })
       }
     } else {
-      console.log("[v0] Database connection failed, using sample data")
       setCharacters(sampleCharacters)
       setActiveCharacterId("1")
       toast({
@@ -693,7 +709,7 @@ export default function CharacterSheet() {
             const usesRestored = feat.usesPerLongRest - feat.currentUses
             if (usesRestored > 0) {
               featSpellReplenishments.push({
-                featName: feat.name,
+                featName: feat.featName,
                 usesRestored,
                 maxUses: feat.usesPerLongRest
               })
@@ -713,13 +729,6 @@ export default function CharacterSheet() {
             const maxPossibleRestore = character.hitDice.used // Number of used dice that can be restored
             const actualRestore = Math.min(diceToRestore, maxPossibleRestore)
             
-            console.log(`[Long Rest] ${character.name} hit dice:`, {
-              total: character.hitDice.total,
-              used: character.hitDice.used,
-              diceToRestore,
-              maxPossibleRestore,
-              actualRestore
-            })
             
             if (actualRestore > 0) {
               hitDiceReplenishments.diceRestored = actualRestore
@@ -731,10 +740,6 @@ export default function CharacterSheet() {
                 used: Math.max(0, character.hitDice.used - actualRestore)
               }
               
-              console.log(`[Long Rest] ${character.name} hit dice updated:`, {
-                before: { used: character.hitDice.used },
-                after: { used: updatedHitDice.used }
-              })
             }
           }
 
@@ -764,10 +769,6 @@ export default function CharacterSheet() {
         return character
       })
 
-      console.log("[Long Rest] Updating characters state:", updatedCharacters.map(c => ({
-        name: c.name,
-        hitDice: c.hitDice
-      })))
       setCharacters(updatedCharacters)
 
       // Save all updated characters to database
@@ -810,12 +811,10 @@ export default function CharacterSheet() {
   }, [characters, toast])
 
   const handleIncomingLongRestEvent = useCallback(async (event: LongRestEvent) => {
-    console.log("[Realtime] Processing incoming long rest event:", event)
     
     if (event.status === 'completed') {
       // Event was completed by another player
       if (currentLongRestEvent && currentLongRestEvent.id === event.id) {
-        console.log("[Realtime] Long rest event was completed by another player")
         setCurrentLongRestEvent(null)
         setLongRestModalOpen(false)
         
@@ -836,11 +835,9 @@ export default function CharacterSheet() {
 
     // Don't process events initiated by the current user (they're already applied locally)
     if (event.initiated_by_character_id === activeCharacter?.id) {
-      console.log("[Realtime] Ignoring own long rest event")
       return
     }
 
-    console.log("[Realtime] Opening collaborative long rest modal from another player")
     
     try {
       // Set the current event and open the modal
@@ -885,7 +882,6 @@ export default function CharacterSheet() {
     try {
       if (currentLongRestEvent) {
         // This is a confirmation of an existing long rest event
-        console.log("[Realtime] Confirming existing long rest event:", currentLongRestEvent.id)
         
         // Confirm the event
         const { success: confirmSuccess, error: confirmError } = await confirmLongRestEvent(
@@ -917,7 +913,6 @@ export default function CharacterSheet() {
         
       } else {
         // This is a new long rest initiation
-        console.log("[Realtime] Initiating new long rest event")
         
         // Prepare event data for broadcasting
         const eventData: LongRestEventData = {
@@ -971,11 +966,9 @@ export default function CharacterSheet() {
   // Set up real-time subscription for long rest events
   useEffect(() => {
     if (dbConnected) {
-      console.log("[Realtime] Setting up long rest event subscription...")
       
       const subscription = subscribeToLongRestEvents(
         (event: LongRestEvent) => {
-          console.log("[Realtime] Processing long rest event:", event)
           handleIncomingLongRestEvent(event)
         },
         (error) => {
@@ -1117,10 +1110,188 @@ export default function CharacterSheet() {
     updateCharacter({ spellData: updatedSpellData }, { autosave: true })
   }
 
-  const updateBasicInfo = (updates: Partial<CharacterData>) => {
-    updateCharacter(updates)
+  const updateBasicInfo = async (updates: Partial<CharacterData>) => {
+    const currentCharacter = characters.find((c) => c.id === activeCharacterId)
+    if (!currentCharacter) return
+
+    // Check if class or subclass changed
+    const classChanged = updates.class && updates.class !== currentCharacter.class
+    const subclassChanged = updates.subclass !== undefined && updates.subclass !== currentCharacter.subclass
+    const levelChanged = updates.level && updates.level !== currentCharacter.level
     
-    // If class or level changed, spell slots will be recalculated on next load
+    // Check if multiclass data changed
+    const multiclassChanged = updates.classes && JSON.stringify(updates.classes) !== JSON.stringify(currentCharacter.classes)
+    
+    // Set flag to trigger reload after save if multiclass data changed
+    if (multiclassChanged) {
+      multiclassDataChangedRef.current = true
+    }
+
+    // If class, subclass, level, or multiclass data changed, we need to recalculate everything
+    if (classChanged || subclassChanged || levelChanged || multiclassChanged) {
+      try {
+        // Load new class data
+        const { loadClassData } = await import('@/lib/database')
+        const { classData } = await loadClassData(updates.class || currentCharacter.class, updates.subclass)
+        
+        // Load new class features - handle both single class and multiclass
+        let classFeatures: Array<{name: string, description: string, source: string, level: number}> = []
+        
+        if (updates.classes && updates.classes.length > 0) {
+          // Load features for all classes in multiclassing
+          const { loadClassFeatures } = await import('@/lib/database')
+          const allFeatures = await Promise.all(
+            updates.classes.map(async (charClass: any) => {
+              if (charClass.class_id) {
+                const { features, error: featuresError } = await loadClassFeatures(charClass.class_id, charClass.level)
+                if (featuresError) {
+                  console.error(`Error loading class features for ${charClass.name}:`, featuresError)
+                  return []
+                }
+                return features || []
+              } else {
+                console.log(`[DEBUG] No class_id for ${charClass.name}, skipping`)
+                return []
+              }
+            })
+          )
+          // Flatten and combine all features
+          classFeatures = allFeatures.flat()
+        } else if (classData?.id) {
+          // Fallback to single class loading
+          const { loadClassFeatures } = await import('@/lib/database')
+          const { features, error: featuresError } = await loadClassFeatures(classData.id, updates.level || currentCharacter.level)
+          if (featuresError) {
+            console.error("Error loading class features:", featuresError)
+          } else {
+            classFeatures = features || []
+          }
+        }
+
+        // Calculate new spell slots
+        let newSpellSlots: any[] = []
+        if (updates.classes && updates.classes.length > 1) {
+          // Use multiclassing spell slot calculation
+          const { getMulticlassSpellSlots } = await import('@/lib/character-data')
+          newSpellSlots = getMulticlassSpellSlots(updates.classes)
+        } else if (classData) {
+          if ((updates.class || currentCharacter.class).toLowerCase() === "warlock") {
+            const { getWarlockSpellSlots } = await import('@/lib/character-data')
+            newSpellSlots = getWarlockSpellSlots(updates.level || currentCharacter.level)
+          } else {
+            const { calculateSpellSlotsFromClass } = await import('@/lib/spell-slot-calculator')
+            newSpellSlots = calculateSpellSlotsFromClass(classData, updates.level || currentCharacter.level)
+          }
+        }
+
+        // Calculate new spell values
+        const newLevel = updates.level || currentCharacter.level
+        const proficiencyBonus = Math.ceil(newLevel / 4) + 1
+        const newCharacter = { ...currentCharacter, ...updates, level: newLevel }
+        
+        const { calculateSpellAttackBonus, calculateSpellSaveDC, getSpellsKnown } = await import('@/lib/character-data')
+        const { getCantripsKnown, getBardicInspirationData, getSongOfRestData } = await import('@/lib/class-utils')
+        
+        const newSpellAttackBonus = calculateSpellAttackBonus(newCharacter, classData, proficiencyBonus)
+        const newSpellSaveDC = calculateSpellSaveDC(newCharacter, classData, proficiencyBonus)
+        const newSpellsKnown = getSpellsKnown(newCharacter, classData)
+        const newCantripsKnown = getCantripsKnown(newLevel, classData, updates.class || currentCharacter.class, newCharacter)
+        
+        // Calculate class-specific features
+        const charismaModifier = Math.floor((newCharacter.charisma - 10) / 2)
+        let bardicInspiration, songOfRest, flashOfGeniusSlot, divineSenseSlot, layOnHands, channelDivinitySlot, cleansingTouchSlot
+        
+        if (updates.classes && updates.classes.length > 1) {
+          // Use multiclass feature calculation
+          const { getMulticlassFeatures } = await import('@/lib/character-data')
+          const multiclassFeatures = await getMulticlassFeatures(newCharacter)
+          bardicInspiration = multiclassFeatures.bardicInspirationSlot
+          songOfRest = multiclassFeatures.songOfRest
+          flashOfGeniusSlot = multiclassFeatures.flashOfGeniusSlot
+          divineSenseSlot = multiclassFeatures.divineSenseSlot
+          layOnHands = multiclassFeatures.layOnHands
+          channelDivinitySlot = multiclassFeatures.channelDivinitySlot
+          cleansingTouchSlot = multiclassFeatures.cleansingTouchSlot
+        } else {
+          // Use single class feature calculation
+          bardicInspiration = getBardicInspirationData(newLevel, charismaModifier, classData)
+          songOfRest = getSongOfRestData(newLevel, classData)
+        }
+
+        // Create comprehensive updates
+        const comprehensiveUpdates: Partial<CharacterData> = {
+          ...updates,
+          class_id: classData?.id,
+          classFeatures: classFeatures,
+          savingThrowProficiencies: (classChanged || multiclassChanged) ? 
+            (updates.classes && updates.classes.length > 1 ? 
+              (await import('@/lib/character-data')).getMulticlassSavingThrowProficiencies(updates.classes) :
+              (await import('@/lib/character-data')).createClassBasedSavingThrowProficiencies(updates.class || currentCharacter.class)
+            ) :
+            currentCharacter.savingThrowProficiencies,
+          equipmentProficiencies: (classChanged || multiclassChanged) ?
+            (updates.classes && updates.classes.length > 1 ?
+              (await import('@/lib/character-data')).getMulticlassEquipmentProficiencies(updates.classes) :
+              currentCharacter.equipmentProficiencies
+            ) :
+            currentCharacter.equipmentProficiencies,
+          spellData: {
+            ...currentCharacter.spellData,
+            spellAttackBonus: newSpellAttackBonus,
+            spellSaveDC: newSpellSaveDC,
+            spellsKnown: newSpellsKnown,
+            cantripsKnown: newCantripsKnown,
+            spellSlots: newSpellSlots,
+            bardicInspirationSlot: bardicInspiration || undefined,
+            songOfRest: songOfRest || undefined,
+            flashOfGeniusSlot: flashOfGeniusSlot || undefined,
+            divineSenseSlot: divineSenseSlot || undefined,
+            layOnHands: layOnHands || undefined,
+            channelDivinitySlot: channelDivinitySlot || undefined,
+            cleansingTouchSlot: cleansingTouchSlot || undefined,
+            // Clear class-specific features when class changes
+            ...(classChanged ? {
+              eldritchInvocations: undefined,
+              mysticArcanum: undefined,
+              genieWrath: undefined,
+              elementalGift: undefined,
+              sanctuaryVessel: undefined,
+              limitedWish: undefined,
+            } : {}),
+          },
+          // Clear class-specific equipment when class changes
+          ...(classChanged ? {
+            eldritchCannon: undefined,
+            infusions: [],
+            infusionNotes: "",
+            hitDiceByClass: updates.classes && updates.classes.length > 1 ?
+              (await import('@/lib/character-data')).getHitDiceByClass(updates.classes) :
+              undefined,
+          } : {}),
+        }
+
+        updateCharacter(comprehensiveUpdates)
+        
+        toast({
+          title: "Character Updated",
+          description: classChanged ? 
+            `Class changed to ${updates.class}. All class features and calculations have been updated.` :
+            "Character information updated successfully.",
+        })
+      } catch (error) {
+        console.error("Error updating character with class data:", error)
+        // Fallback to basic update if class data loading fails
+        updateCharacter(updates)
+        toast({
+          title: "Warning",
+          description: "Character updated, but some class features may need to be refreshed.",
+          variant: "destructive",
+        })
+      }
+    } else {
+      // No class/level change, just update normally
+      updateCharacter(updates)
+    }
   }
 
   const updateSkillProficiency = (skillName: string, proficiencyType: "proficient" | "expertise", checked: boolean) => {
@@ -1209,6 +1380,21 @@ export default function CharacterSheet() {
     const { classData } = await loadClassData(characterData.class, characterData.subclass)
     const proficiencyBonus = calculateProficiencyBonus(characterData.level)
     
+    // Load class features from database
+    let classFeatures: Array<{name: string, description: string, source: string, level: number}> = []
+    if (classData?.id) {
+      console.log(`[DEBUG] handleCreateCharacter: Loading features for class_id: ${classData.id}, level: ${characterData.level}`)
+      const { features, error: featuresError } = await loadClassFeatures(classData.id, characterData.level)
+      if (featuresError) {
+        console.error("Error loading class features:", featuresError)
+      } else {
+        classFeatures = features || []
+        console.log(`[DEBUG] handleCreateCharacter: Loaded ${classFeatures.length} features for new character`)
+      }
+    } else {
+      console.log(`[DEBUG] handleCreateCharacter: No class data found for ${characterData.class} ${characterData.subclass}`)
+    }
+    
     // Create a temporary character object for calculations
     const tempCharacter: CharacterData = {
       id: newId,
@@ -1241,7 +1427,7 @@ export default function CharacterSheet() {
       weaponNotes: "",
       features: [],
       savingThrowProficiencies: createClassBasedSavingThrowProficiencies(characterData.class),
-      skills: createDefaultSkills() as any,
+      skills: createClassBasedSkills(classData?.skill_proficiencies || []) as any,
       spellData: {
         spellAttackBonus: 0,
         spellSaveDC: 8,
@@ -1254,7 +1440,7 @@ export default function CharacterSheet() {
         featSpellSlots: [],
         spells: [],
       },
-      classFeatures: [],
+      classFeatures: classFeatures,
       toolsProficiencies: [] as any,
       feats: [],
       infusions: [],
@@ -1282,6 +1468,12 @@ export default function CharacterSheet() {
         8: 0,
         9: 0,
       },
+      classes: [{
+        name: characterData.class,
+        subclass: characterData.subclass,
+        class_id: characterData.classId,
+        level: characterData.level
+      }],
     }
     
     // Calculate spell slots immediately during character creation
@@ -1360,6 +1552,25 @@ export default function CharacterSheet() {
             currentUses: 1,
             longRestCooldown: 0
           } : undefined,
+        } : {}),
+        // Add Raven Queen Warlock-specific features
+        ...(tempCharacter.class.toLowerCase() === "warlock" && tempCharacter.subclass?.toLowerCase() === "the raven queen" ? {
+          sentinelRaven: (() => {
+            const { createSentinelRaven } = require('../lib/character-data')
+            return createSentinelRaven()
+          })(),
+          soulOfTheRaven: (() => {
+            const { createSoulOfTheRaven } = require('../lib/character-data')
+            return createSoulOfTheRaven(tempCharacter.level)
+          })(),
+          ravensShield: (() => {
+            const { createRavensShield } = require('../lib/character-data')
+            return createRavensShield(tempCharacter.level)
+          })(),
+          queensRightHand: (() => {
+            const { createQueensRightHand } = require('../lib/character-data')
+            return createQueensRightHand(tempCharacter.level)
+          })(),
         } : {}),
       },
     }
@@ -1557,6 +1768,31 @@ export default function CharacterSheet() {
     triggerAutoSave()
   }
 
+  const toggleHitDie = (classIndex: number, dieIndex: number) => {
+    if (!activeCharacter.hitDiceByClass || !activeCharacter.hitDiceByClass[classIndex]) return
+
+    const hitDieClass = activeCharacter.hitDiceByClass[classIndex]
+    const currentAvailable = hitDieClass.total - hitDieClass.used
+
+    const updatedHitDiceByClass = [...activeCharacter.hitDiceByClass]
+    if (dieIndex < currentAvailable) {
+      // Mark as used
+      updatedHitDiceByClass[classIndex] = {
+        ...hitDieClass,
+        used: hitDieClass.used + 1
+      }
+    } else {
+      // Mark as available
+      updatedHitDiceByClass[classIndex] = {
+        ...hitDieClass,
+        used: Math.max(0, hitDieClass.used - 1)
+      }
+    }
+
+    updateCharacter({ hitDiceByClass: updatedHitDiceByClass })
+    triggerAutoSave()
+  }
+
   const toggleFlashOfGenius = (index: number) => {
     if (!activeCharacter || !activeCharacter.spellData.flashOfGeniusSlot) return
 
@@ -1706,7 +1942,15 @@ export default function CharacterSheet() {
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">Level {activeCharacter.level}</Badge>
                     <Badge variant="default">Proficiency {formatModifier(proficiencyBonus)}</Badge>
-                    <Badge variant="outline">{activeCharacter.class}・{activeCharacter.subclass}</Badge>
+                    <Badge variant="outline">
+                      {activeCharacter.classes && activeCharacter.classes.length > 1 ? (
+                        activeCharacter.classes.map(charClass => 
+                          `${charClass.name} ${charClass.level}`
+                        ).join(' / ')
+                      ) : (
+                        `${activeCharacter.class}・${activeCharacter.subclass}`
+                      )}
+                    </Badge>
                   </div>
                   <span className="text-sm text-muted-foreground px-1">
                     {activeCharacter.race}・{activeCharacter.background}・{activeCharacter.alignment}
@@ -1792,7 +2036,15 @@ export default function CharacterSheet() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 flex flex-col gap-2">
-                  {activeCharacter.savingThrowProficiencies.map((savingThrow) => {
+                  {(() => {
+                    console.log('[DEBUG] UI: Rendering saving throws:', activeCharacter.savingThrowProficiencies)
+                    console.log('[DEBUG] UI: Saving throws length:', activeCharacter.savingThrowProficiencies?.length)
+                    console.log('[DEBUG] UI: Active character classes:', activeCharacter.classes)
+                    if (!activeCharacter.savingThrowProficiencies || activeCharacter.savingThrowProficiencies.length === 0) {
+                      console.log('[DEBUG] UI: No saving throws found, returning empty div')
+                      return <div>No saving throws loaded</div>
+                    }
+                    return activeCharacter.savingThrowProficiencies.map((savingThrow) => {
                     const savingThrowBonus = calculateSavingThrowBonus(activeCharacter, savingThrow.ability, proficiencyBonus)
                     const abilityName = savingThrow.ability.charAt(0).toUpperCase() + savingThrow.ability.slice(1)
 
@@ -1829,7 +2081,8 @@ export default function CharacterSheet() {
                         <Badge variant="secondary">{formatModifier(savingThrowBonus)}</Badge>
                       </div>
                     )
-                  })}
+                  })
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -1923,10 +2176,10 @@ export default function CharacterSheet() {
                 <div className="space-y-3">
                   {activeCharacter.features.map((feature, index) => (
                     <div key={index} className="p-3 border rounded-lg">
-                      <div className="font-medium mb-1 flex items-center justify-between">
+                      <div className="font-medium mb-1 flex items-start justify-between">
                         <span>{feature.name}</span>
                         {getFeatureUsesPerLongRest(feature) > 0 && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 py-1">
                               {Array.from({ length: getFeatureUsesPerLongRest(feature) }, (_, i) => {
                                 const usesPer = getFeatureUsesPerLongRest(feature)
                                 const current = Math.min(usesPer, Math.max(0, feature.currentUses ?? usesPer))
@@ -1945,7 +2198,7 @@ export default function CharacterSheet() {
                                 />
                               )
                             })}
-                            <span className="text-xs text-muted-foreground ml-1">
+                            <span className="text-xs text-muted-foreground ml-1 w-5 text-right">
                               {Math.min(getFeatureUsesPerLongRest(feature), Math.max(0, feature.currentUses ?? getFeatureUsesPerLongRest(feature)))}/{getFeatureUsesPerLongRest(feature)}
                             </span>
                           </div>
@@ -2185,18 +2438,7 @@ export default function CharacterSheet() {
                     </div>
                   </div>
                 </div>
-                {/* Hit Dice */}
-                {activeCharacter.hitDice && (
-                  <div className="flex items-center gap-3 col-span-1 mb-0">
-                    <Dice5 className="w-5 h-5 text-purple-600" />
-                    <div className="flex flex-col gap-1">
-                      <div className="text-sm text-muted-foreground">Hit Dice</div>
-                      <div className="text-xl font-bold font-mono">
-                        {activeCharacter.hitDice.total - activeCharacter.hitDice.used}/{activeCharacter.hitDice.total}{activeCharacter.hitDice.dieType}
-                      </div>
-                    </div>
-                  </div>
-                )}
+
                 <div className="flex items-center gap-3 col-span-1 mb-0">
                   <Heart className="w-5 h-5 text-red-600" />
                   <div className="flex flex-col gap-1">
@@ -2252,6 +2494,52 @@ export default function CharacterSheet() {
                           if (exhaustion >= 6) effects.push("Death")
                           return effects.join(", ")
                         })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Hit Dice */}
+                {activeCharacter.hitDiceByClass && activeCharacter.hitDiceByClass.length > 0 ? (
+                  <div className="flex items-start gap-3 col-span-2 mb-0">
+                    <Dice5 className="w-5 h-10 py-2.5 text-purple-600" />
+                    <div className="flex flex-col gap-1">
+                      <div className="text-sm text-muted-foreground">Hit Dice</div>
+                      <div className="flex flex-row gap-5">
+                        {activeCharacter.hitDiceByClass.map((hitDie, classIndex) => (
+                          <div key={classIndex} className="flex flex-col gap-1">
+                            <span className="text-md font-bold font-mono">
+                              {hitDie.total - hitDie.used}/{hitDie.total}{hitDie.dieType}
+                            </span>
+                            <div className="flex gap-1">
+                              {Array.from({ length: hitDie.total }, (_, dieIndex) => {
+                                const isAvailable = dieIndex < (hitDie.total - hitDie.used)
+                                return (
+                                  <button
+                                    key={dieIndex}
+                                    onClick={() => toggleHitDie(classIndex, dieIndex)}
+                                    className={`w-3 h-3 rounded border transition-colors ${
+                                      isAvailable
+                                        ? "bg-purple-500 border-purple-500 cursor-pointer hover:bg-purple-600"
+                                        : "bg-white border-gray-300 cursor-pointer hover:border-gray-400"
+                                    }`}
+                                    title={isAvailable ? "Available" : "Used"}
+                                  />
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : activeCharacter.hitDice && (
+                  <div className="flex items-center gap-3 col-span-1 mb-0">
+                    <Dice5 className="w-5 h-5 text-purple-600" />
+                    <div className="flex flex-col gap-1">
+                      <div className="text-sm text-muted-foreground">Hit Dice</div>
+                      <div className="text-xl font-bold font-mono">
+                        {activeCharacter.hitDice.total - activeCharacter.hitDice.used}/{activeCharacter.hitDice.total}{activeCharacter.hitDice.dieType}
                       </div>
                     </div>
                   </div>
@@ -2353,9 +2641,9 @@ export default function CharacterSheet() {
                 </div>
 
                 {/* Bard Features */}
-                {activeCharacter.class.toLowerCase() === "bard" && (
+                {(activeCharacter.class.toLowerCase() === "bard" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "bard")) && (
                   <div className="flex flex-col gap-2 mb-3">
-                    <div className="text-sm font-medium">Bard Skills</div>
+                    <div className="text-sm font-medium">Bard Features</div>
                     {/* Bardic Inspiration */}
                     {activeCharacter.spellData.bardicInspirationSlot && (
                       <div className="flex items-center justify-between p-2 border rounded gap-1">
@@ -2365,7 +2653,7 @@ export default function CharacterSheet() {
                             1{activeCharacter.spellData.bardicInspirationSlot.dieType} save bonus
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           {Array.from({ length: activeCharacter.spellData.bardicInspirationSlot.usesPerRest }, (_, i) => {
                             const usedCount = activeCharacter.spellData.bardicInspirationSlot!.usesPerRest - activeCharacter.spellData.bardicInspirationSlot!.currentUses
                             const isAvailable = i < activeCharacter.spellData.bardicInspirationSlot!.currentUses
@@ -2382,7 +2670,7 @@ export default function CharacterSheet() {
                               />
                             )
                           })}
-                          <span className="text-xs text-muted-foreground ml-2">
+                          <span className="text-xs text-muted-foreground ml-2 w-5 text-right">
                             {activeCharacter.spellData.bardicInspirationSlot.currentUses}/
                             {activeCharacter.spellData.bardicInspirationSlot.usesPerRest}
                           </span>
@@ -2406,11 +2694,11 @@ export default function CharacterSheet() {
                 )}
 
                 {/* Artificer Features */}
-                {activeCharacter.class.toLowerCase() === "artificer" && (
+                {(activeCharacter.class.toLowerCase() === "artificer" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer")) && (
                   <div className="flex flex-col gap-2 mb-3">
                     <div className="text-sm font-medium">Artificer Skills</div>
                     {/* Artificer - Flash of Genius */}
-                    {activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.level >= 7 && activeCharacter.spellData.flashOfGeniusSlot && (
+                    {((activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.level >= 7) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "artificer" ? total + c.level : total, 0) >= 7)) && activeCharacter.spellData.flashOfGeniusSlot && (
                         <div className="flex items-start justify-between p-2 border rounded gap-3">
                           <div className="flex gap-1 flex-col">
                             <span className="text-sm font-medium">
@@ -2420,7 +2708,7 @@ export default function CharacterSheet() {
                               <Badge variant="secondary">{formatModifier(intelligenceMod)}</Badge> bonus to any check
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 py-1">
+                          <div className="flex items-center gap-1 py-1">
                             {Array.from({ length: activeCharacter.spellData.flashOfGeniusSlot.usesPerRest }, (_, i) => {
                               const usedCount = activeCharacter.spellData.flashOfGeniusSlot!.usesPerRest - activeCharacter.spellData.flashOfGeniusSlot!.currentUses
                               const isAvailable = i < activeCharacter.spellData.flashOfGeniusSlot!.currentUses
@@ -2437,7 +2725,7 @@ export default function CharacterSheet() {
                                 />
                               )
                             })}
-                            <span className="text-xs text-muted-foreground ml-2">
+                            <span className="text-xs text-muted-foreground ml-2 w-5 text-right">
                               {activeCharacter.spellData.flashOfGeniusSlot.currentUses}/{activeCharacter.spellData.flashOfGeniusSlot.usesPerRest}
                             </span>
                           </div>
@@ -2447,7 +2735,7 @@ export default function CharacterSheet() {
                 )}
 
                 {/* Paladin Features */}
-                {activeCharacter.class.toLowerCase() === "paladin" && (
+                {(activeCharacter.class.toLowerCase() === "paladin" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "paladin")) && (
                   <div className="flex flex-col gap-2 mb-3">
                     <div className="text-sm font-medium">Paladin Skills</div>
                     {/* Paladin - Divine Sense */}
@@ -2459,7 +2747,7 @@ export default function CharacterSheet() {
                               Detect celestials, fiends, and undead within 60 feet
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 py-1">
+                          <div className="flex items-center gap-1 py-1">
                             {Array.from({ length: activeCharacter.spellData.divineSenseSlot.usesPerRest }, (_, i) => {
                               const isAvailable = i < activeCharacter.spellData.divineSenseSlot!.currentUses
                               return (
@@ -2475,7 +2763,7 @@ export default function CharacterSheet() {
                                 />
                               )
                             })}
-                            <span className="text-xs text-muted-foreground ml-2">
+                            <span className="text-xs text-muted-foreground w-5 text-right ml-2">
                               {activeCharacter.spellData.divineSenseSlot.currentUses}/{activeCharacter.spellData.divineSenseSlot.usesPerRest}
                             </span>
                           </div>
@@ -2550,7 +2838,7 @@ export default function CharacterSheet() {
                                 />
                               )
                             })}
-                            <span className="text-xs text-muted-foreground ml-2">
+                            <span className="text-xs text-muted-foreground w-5 text-right">
                               {activeCharacter.spellData.channelDivinitySlot.currentUses}/{activeCharacter.spellData.channelDivinitySlot.usesPerRest}
                             </span>
                           </div>
@@ -2565,7 +2853,7 @@ export default function CharacterSheet() {
                               End one spell on yourself or willing creature
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 py-1">
+                          <div className="flex items-center gap-1 py-1">
                             {Array.from({ length: activeCharacter.spellData.cleansingTouchSlot.usesPerRest }, (_, i) => {
                               const isAvailable = i < activeCharacter.spellData.cleansingTouchSlot!.currentUses
                               return (
@@ -2581,7 +2869,7 @@ export default function CharacterSheet() {
                                 />
                               )
                             })}
-                            <span className="text-xs text-muted-foreground ml-2">
+                            <span className="text-xs text-muted-foreground w-5 text-right ml-2">
                               {activeCharacter.spellData.cleansingTouchSlot.currentUses}/{activeCharacter.spellData.cleansingTouchSlot.usesPerRest}
                             </span>
                           </div>
@@ -2591,7 +2879,11 @@ export default function CharacterSheet() {
                 )}
 
                 {/* Warlock Features */}
-                {activeCharacter.class.toLowerCase() === "warlock" && (
+                {(activeCharacter.class.toLowerCase() === "warlock" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "warlock")) && (
+                  (activeCharacter.spellData.genieWrath || 
+                   (activeCharacter.spellData.elementalGift && activeCharacter.level >= 6) ||
+                   (activeCharacter.spellData.sanctuaryVessel && activeCharacter.level >= 10) ||
+                   (activeCharacter.spellData.limitedWish && activeCharacter.level >= 14)) && (
                   <div className="flex flex-col gap-2 mb-3">
                     <div className="text-sm font-medium">Warlock Features</div>
                     {/* Warlock - Genie Wrath */}
@@ -2611,7 +2903,7 @@ export default function CharacterSheet() {
                       </div>
                     )}
                     {/* Warlock - Elemental Gift */}
-                    {activeCharacter.spellData.elementalGift && (
+                    {activeCharacter.spellData.elementalGift && activeCharacter.level >= 6 && (
                       <div className="flex items-start justify-between p-2 border rounded gap-1">
                         <div className="flex gap-1 flex-col">
                           <span className="text-sm font-medium">Elemental Gift</span>
@@ -2619,7 +2911,7 @@ export default function CharacterSheet() {
                             Flying speed {activeCharacter.spellData.elementalGift.flyingSpeed} ft for 10 minutes
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 py-1">
+                        <div className="flex items-center gap-1 py-1">
                           {Array.from({ length: activeCharacter.spellData.elementalGift.usesPerLongRest }, (_, i) => {
                             const isAvailable = i < activeCharacter.spellData.elementalGift!.currentUses
                             return (
@@ -2647,14 +2939,14 @@ export default function CharacterSheet() {
                               />
                             )
                           })}
-                          <span className="text-xs text-muted-foreground ml-2">
+                          <span className="text-xs text-muted-foreground w-5 text-right ml-2">
                             {activeCharacter.spellData.elementalGift.currentUses}/{activeCharacter.spellData.elementalGift.usesPerLongRest}
                           </span>
                         </div>
                       </div>
                     )}
                     {/* Warlock - Sanctuary Vessel */}
-                    {activeCharacter.spellData.sanctuaryVessel && (
+                    {activeCharacter.spellData.sanctuaryVessel && activeCharacter.level >= 10 && (
                       <div className="flex items-center justify-between p-2 border rounded">
                         <div className="flex gap-1 flex-col">
                           <span className="text-sm font-medium">Sanctuary Vessel</span>
@@ -2662,7 +2954,7 @@ export default function CharacterSheet() {
                             {activeCharacter.spellData.sanctuaryVessel.vesselType} - extradimensional space
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Badge variant="secondary" className="text-xs">
                             {activeCharacter.spellData.sanctuaryVessel.hoursRemaining}/{activeCharacter.spellData.sanctuaryVessel.maxHours} hours
                           </Badge>
@@ -2670,7 +2962,7 @@ export default function CharacterSheet() {
                       </div>
                     )}
                     {/* Warlock - Limited Wish */}
-                    {activeCharacter.spellData.limitedWish && (
+                    {activeCharacter.spellData.limitedWish && activeCharacter.level >= 14 && (
                       <div className="flex items-center justify-between p-2 border rounded">
                         <div className="flex gap-1 flex-col">
                           <span className="text-sm font-medium">Limited Wish</span>
@@ -2678,7 +2970,7 @@ export default function CharacterSheet() {
                             Cast any 6th level or lower spell
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Badge variant="secondary" className="text-xs">
                             {activeCharacter.spellData.limitedWish.currentUses}/{activeCharacter.spellData.limitedWish.usesPerLongRest} uses
                           </Badge>
@@ -2686,23 +2978,24 @@ export default function CharacterSheet() {
                       </div>
                     )}
                   </div>
+                  )
                 )}
 
 
                 {activeCharacter.spellData.spellSlots.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     <div className="text-sm font-medium">Spell Slots</div>
-                    <div className="space-y-2 flex flex-col gap-0.5">
+                    <div className="space-y-2 flex flex-col gap-0">
                       {activeCharacter.spellData.spellSlots
                         .sort((a, b) => a.level - b.level)
                         .map((slot) => (
                           <div key={slot.level} className="flex items-center justify-between p-2 border rounded">
                             <span className="text-sm font-medium">
-                              {activeCharacter.class.toLowerCase() === "warlock" && slot.level === 0 
+                              {((activeCharacter.class.toLowerCase() === "warlock" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "warlock")) && slot.level === 0) 
                                 ? "Warlock Spells" 
                                 : `Level ${slot.level}`}
                             </span>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                               {Array.from({ length: slot.total }, (_, i) => {
                                 const isAvailable = i < (slot.total - slot.used)
                                 return (
@@ -2718,7 +3011,7 @@ export default function CharacterSheet() {
                                   />
                                 )
                               })}
-                              <span className="text-xs text-muted-foreground ml-2">
+                              <span className="text-xs text-muted-foreground w-5 text-right ml-2">
                                 {slot.total - slot.used}/{slot.total}
                               </span>
                             </div>
@@ -2738,19 +3031,21 @@ export default function CharacterSheet() {
                 {activeCharacter.spellData.featSpellSlots.length > 0 && (
                   <div className="flex flex-col gap-2">
                     <div className="text-sm font-medium">Feat Spells</div>
-                    <div className="space-y-2">
-                      {activeCharacter.spellData.featSpellSlots.map((feat, featIndex) => (
-                        <div key={featIndex} className="p-3 border rounded">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium">{feat.name}</span>
-                            <div className="flex items-center gap-2">
-                              {Array.from({ length: feat.usesPerLongRest }, (_, i) => {
-                                const usedCount = feat.usesPerLongRest - feat.currentUses
-                                const isAvailable = i < feat.currentUses
+                    <div className="flex flex-col gap-2">
+                      {activeCharacter.spellData.featSpellSlots.map((featSpell, featSpellIndex) => (
+                        <div key={featSpellIndex} className="p-2 border rounded flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">{featSpell.spellName}</span>
+                              <span className="text-xs text-muted-foreground">from {featSpell.featName}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {Array.from({ length: featSpell.usesPerLongRest }, (_, i) => {
+                                const isAvailable = i < featSpell.currentUses
                                 return (
                                   <button
                                     key={i}
-                                    onClick={() => toggleFeatSpellSlot(featIndex, i)}
+                                    onClick={() => toggleFeatSpellSlot(featSpellIndex, i)}
                                     className={`w-4 h-4 rounded border-2 transition-colors ${
                                       isAvailable
                                         ? "bg-green-500 border-green-500 cursor-pointer"
@@ -2760,13 +3055,10 @@ export default function CharacterSheet() {
                                   />
                                 )
                               })}
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {feat.currentUses}/{feat.usesPerLongRest}
+                              <span className="text-xs text-muted-foreground w-5 text-right ml-2">
+                                {featSpell.currentUses}/{featSpell.usesPerLongRest}
                               </span>
                             </div>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {feat.spells.join(", ") || "No spells configured"}
                           </div>
                         </div>
                       ))}
@@ -2979,48 +3271,88 @@ export default function CharacterSheet() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {activeCharacter.classFeatures.map((feature, index) => (
-                    <div key={index} className="p-3 border rounded-lg flex flex-col gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="font-medium flex-1 min-w-0 truncate">{feature.name}</div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            Level {feature.level}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="text-sm text-muted-foreground relative flex flex-col gap-2">
-                        {feature.source?.toLowerCase() === "subclass" && activeCharacter.subclass && (
-                          <Badge variant="secondary" className="text-xs">
-                            {activeCharacter.subclass}
-                          </Badge>
+                <div className="space-y-4">
+                  {activeCharacter.classFeatures?.length > 0 ? (() => {
+                    // Group features by class
+                    const featuresByClass = new Map<string, Array<{name: string, description: string, source: string, level: number, className?: string}>>()
+                    
+                    activeCharacter.classFeatures.forEach(feature => {
+                      // Use the className from the feature, or fallback to the character's primary class
+                      const className = feature.className || activeCharacter.class
+                      
+                      if (!featuresByClass.has(className)) {
+                        featuresByClass.set(className, [])
+                      }
+                      featuresByClass.get(className)!.push(feature)
+                    })
+                    
+                    // Sort features within each class by level
+                    featuresByClass.forEach(features => {
+                      features.sort((a, b) => a.level - b.level)
+                    })
+                    
+                    // Render grouped features
+                    return Array.from(featuresByClass.entries()).map(([className, features]) => (
+                      <div key={className} className="space-y-3">
+                        {/* Class Header */}
+                        {activeCharacter.classes && activeCharacter.classes.length > 1 && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <h4 className="font-semibold text-sm text-foreground">{className} Features</h4>
+                            <Badge variant="outline" className="text-xs">
+                              {features.length}
+                            </Badge>
+                          </div>
                         )}
-                        <div className="line-clamp-2 max-h-12 overflow-hidden">
-                          <RichTextDisplay content={feature.description} className="text-sm text-muted-foreground" />
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-fit px-2 h-7 shadow-sm text-foreground"
-                          onClick={() => {
-                            setFeatureModalContent({ title: feature.name, description: feature.description })
-                            setFeatureModalIsClassFeature(true)
-                            setFeatureModalOpen(true)
-                          }}
-                        >
-                          Read more
-                        </Button>
+                        
+                        {/* Features for this class */}
+                        {features.map((feature, index) => (
+                          <div key={`${className}-${index}`} className="p-3 border rounded-lg flex flex-col gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="font-medium flex-1 min-w-0 truncate">{feature.name}</div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  Level {feature.level}
+                                </Badge>
+                                {feature.source?.toLowerCase() === "subclass" && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {feature.source}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-sm text-muted-foreground relative flex flex-col gap-2">
+                              <div className="line-clamp-2 max-h-12 overflow-hidden">
+                                <RichTextDisplay content={feature.description} className="text-sm text-muted-foreground" />
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-fit px-2 h-7 shadow-sm text-foreground"
+                                onClick={() => {
+                                  setFeatureModalContent({ title: feature.name, description: feature.description })
+                                  setFeatureModalIsClassFeature(true)
+                                  setFeatureModalOpen(true)
+                                }}
+                              >
+                                Read more
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
+                    ))
+                  })() : (
+                    <div className="text-sm text-muted-foreground text-center py-4">
+                      No class features available
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             {/* Artificer - Eldritch Cannon */}
-            {activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.subclass?.toLowerCase() === "artillerist" && (
+            {((activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.subclass?.toLowerCase() === "artillerist" && activeCharacter.level >= 3) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer" && c.subclass?.toLowerCase() === "artillerist") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "artificer" ? total + c.level : total, 0) >= 3)) && (
               <Card>
                 <CardHeader className="pb-0">
                   <div className="flex items-center justify-between">
@@ -3032,6 +3364,7 @@ export default function CharacterSheet() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => setEldritchCannonModalOpen(true)}
+                      disabled={activeCharacter.level < 3}
                     >
                       <Edit className="w-4 h-4" />
                       {activeCharacter.eldritchCannon ? "Edit" : "Create"}
@@ -3052,15 +3385,15 @@ export default function CharacterSheet() {
                         </div>
                         
                         <div className="grid grid-cols-3 gap-2 text-sm">
-                          <div className="text-center p-2 bg-muted rounded flex flex-col gap-1">
+                          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
                             <div className="text-xs text-muted-foreground">AC</div>
                             <div className="font-mono text-lg font-semibold">{activeCharacter.eldritchCannon.armorClass}</div>
                           </div>
-                          <div className="text-center p-2 bg-muted rounded flex flex-col gap-1">
+                          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
                             <div className="text-xs text-muted-foreground">Attack</div>
                             <div className="font-mono text-lg font-semibold">+{activeCharacter.eldritchCannon.attackBonus}</div>
                           </div>
-                          <div className="text-center p-2 bg-muted rounded flex flex-col gap-1">
+                          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
                             <div className="text-xs text-muted-foreground">
                               {activeCharacter.eldritchCannon.type === 'Protector' ? 'Temp HP' : 'Damage'}
                             </div>
@@ -3075,7 +3408,7 @@ export default function CharacterSheet() {
                     </div>
                   ) : (
                     <div className="text-center py-4 text-sm text-muted-foreground">
-                      No active cannon. Click "Create" to summon an Eldritch Cannon.
+                      No active cannon. Artificers gain access to Eldritch Cannons at 3rd level.
                     </div>
                   )}
                 </CardContent>
@@ -3083,7 +3416,7 @@ export default function CharacterSheet() {
             )}
             
             {/* Artificer - Infusions */}
-            {activeCharacter.class.toLowerCase() === "artificer" && (
+            {((activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.level >= 2) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "artificer" ? total + c.level : total, 0) >= 2)) && (
               <Card className="flex flex-col gap-3">
                 <CardHeader className="pb-0">
                   <div className="flex items-center justify-between">
@@ -3095,6 +3428,7 @@ export default function CharacterSheet() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => setInfusionsModalOpen(true)}
+                      disabled={activeCharacter.level < 2}
                     >
                       <Edit className="w-4 h-4" />
                       Edit
@@ -3145,7 +3479,7 @@ export default function CharacterSheet() {
                   ))}
                     {activeCharacter.infusions.length === 0 && (
                       <div className="text-center py-4 text-sm text-muted-foreground">
-                        No infusions added yet. Click "Edit Infusions" to get started.
+                        No infusions selected yet. You can choose {getArtificerInfusionsKnown(activeCharacter.level)} infusions at level {activeCharacter.level}.
                       </div>
                   )}
                 </div>
@@ -3169,7 +3503,7 @@ export default function CharacterSheet() {
             )}
 
             {/* Warlock - Eldritch Invocations */}
-            {activeCharacter.class.toLowerCase() === "warlock" && (
+            {((activeCharacter.class.toLowerCase() === "warlock" && activeCharacter.level >= 2) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "warlock") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "warlock" ? total + c.level : total, 0) >= 2)) && (
               <Card className="flex flex-col gap-3">
                 <CardHeader className="pb-0">
                   <div className="flex items-center justify-between">
@@ -3181,6 +3515,7 @@ export default function CharacterSheet() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => setEldritchInvocationsModalOpen(true)}
+                      disabled={activeCharacter.level < 2}
                     >
                       <Edit className="w-4 h-4" />
                       Edit
@@ -3225,7 +3560,7 @@ export default function CharacterSheet() {
                       ))
                     ) : (
                       <div className="text-center py-4 text-sm text-muted-foreground">
-                        No invocations known yet. Click "Edit" to add some.
+                        No invocations selected yet. You can choose {getWarlockInvocationsKnown(activeCharacter.level)} invocations at level {activeCharacter.level}.
                       </div>
                     )}
                   </div>
@@ -3394,9 +3729,12 @@ export default function CharacterSheet() {
                         />
                       )}
                       {hasContent ? (
-                        <RichTextDisplay content={note!.content as string} className="text-sm" />
+                        <div className="rounded-lg w-full border text-sm p-3 bg-muted/30 col-span-2 flex flex-col gap-3">
+                          <div className="text-md font-semibold text-black flex items-center gap-1"><NotebookPen className="w-4 h-4" />Custom notes</div>
+                          <RichTextDisplay content={note!.content as string} className="text-sm font-mono" />
+                        </div>
                       ) : (
-                        <div className="rounded-lg w-full border text-sm text-muted-foreground p-3 bg-muted/30 col-span-2">
+                        <div className="rounded-lg w-full border text-sm font-mono text-muted-foreground p-3 bg-muted/30 col-span-2">
                           No custom notes yet. Click "Edit custom notes" to add your own text or an image.
                         </div>
                       )}
@@ -3420,6 +3758,7 @@ export default function CharacterSheet() {
               <Button
                 variant="outline"
                 size="sm"
+                className="flex items-center gap-1"
                 onClick={() => {
                   const key = featureModalContent.title ?? ""
                   setFeatureNotesDraft(activeCharacter.featureNotes?.[key]?.content || "")
@@ -3427,7 +3766,7 @@ export default function CharacterSheet() {
                   setFeatureNotesModalOpen(true)
                 }}
               >
-                Edit custom notes
+                <NotebookPen className="w-4 h-4" />Edit custom notes
               </Button>
             </div>
           )}
@@ -3438,26 +3777,23 @@ export default function CharacterSheet() {
       <Dialog open={featureNotesModalOpen} onOpenChange={setFeatureNotesModalOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Edit custom notes</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><NotebookPen className="w-4 h-4" />Edit custom notes</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
-            <div>
-              <div className="text-sm font-medium mb-2">Custom notes</div>
               <RichTextEditor
                 value={featureNotesDraft}
                 onChange={setFeatureNotesDraft}
               />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Image URL (optional)</label>
-              <input
-                type="url"
-                value={featureImageDraft}
-                onChange={(e) => setFeatureImageDraft(e.target.value)}
-                className="w-full px-2 py-1 text-sm border rounded"
-                placeholder="https://example.com/image.png"
-              />
-            </div>
+              <div className="space-y-3">
+                <label className="text-xs text-muted-foreground">Image URL (optional)</label>
+                <input
+                  type="url"
+                  value={featureImageDraft}
+                  onChange={(e) => setFeatureImageDraft(e.target.value)}
+                  className="w-full px-2 py-1 text-sm border rounded"
+                  placeholder="https://example.com/image.png"
+                />
+              </div>
           </div>
           <div className="pt-3 mt-3 border-t flex items-center justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setFeatureNotesModalOpen(false)}>Cancel</Button>

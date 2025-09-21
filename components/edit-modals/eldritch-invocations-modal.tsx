@@ -10,7 +10,7 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Trash2, Plus, Edit } from "lucide-react"
-import { CharacterData, EldritchInvocation } from "@/lib/character-data"
+import { CharacterData, EldritchInvocation, getWarlockInvocationsKnown } from "@/lib/character-data"
 
 interface EldritchInvocationsModalProps {
   isOpen: boolean
@@ -101,12 +101,12 @@ export function EldritchInvocationsModal({
     setFormModalOpen(true)
   }
 
-  const maxInvocations = character.level >= 2 ? Math.floor((character.level - 2) / 2) + 2 : 0
+  const maxInvocations = getWarlockInvocationsKnown(character.level)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col gap-0">
+        <DialogHeader className="pb-3">
           <DialogTitle className="flex items-center gap-2">
             Eldritch Invocations
             <Badge variant="secondary" className="text-xs">
@@ -115,18 +115,17 @@ export function EldritchInvocationsModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+        <div className="min-h-0 overflow-y-auto flex flex-col gap-3 pr-4 pb-4">
           {/* Invocations List */}
-          <div className="space-y-3">
             {invocations.map((invocation, index) => (
-              <Card key={index}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
+              <Card key={index} className="p-3 gap-3">
+                <CardHeader className="flex items-center justify-between p-0">
                     <CardTitle className="text-lg">{invocation.name}</CardTitle>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
+                        className="p-0 h-8 w-8"
                         onClick={() => handleEditInvocation(index)}
                       >
                         <Edit className="w-4 h-4" />
@@ -134,34 +133,31 @@ export function EldritchInvocationsModal({
                       <Button
                         variant="outline"
                         size="sm"
+                        className="p-0 h-8 w-8 text-red-600"
                         onClick={() => handleDeleteInvocation(index)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
-                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                   <RichTextDisplay content={invocation.description} className="text-sm text-muted-foreground" />
                 </CardContent>
               </Card>
             ))}
-          </div>
+        </div>
 
-          {/* Add Button */}
-          <div className="flex justify-center">
+        <DialogFooter className="flex justify-between border-t pt-4">
+          <div className="flex w-full">
             <Button 
-              onClick={handleOpenAddForm} 
-              disabled={invocations.length >= maxInvocations}
-              className="w-full"
-            >
-              <Plus className="w-4 h-4 mr-2" />
+              variant="outline"
+                onClick={handleOpenAddForm} 
+                disabled={invocations.length >= maxInvocations}
+              >
+              <Plus className="w-4 h-4" />
               Add New Invocation
             </Button>
           </div>
-        </div>
-
-        <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -180,9 +176,9 @@ export function EldritchInvocationsModal({
             </DialogTitle>
           </DialogHeader>
           
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
-            <div>
-              <Label htmlFor="name">Name *</Label>
+          <div className="min-h-0 overflow-y-auto flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
+              <Label htmlFor="name">Name</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -190,8 +186,8 @@ export function EldritchInvocationsModal({
                 placeholder="e.g., Agonizing Blast"
               />
             </div>
-            <div>
-              <Label htmlFor="description">Description *</Label>
+            <div className="flex flex-col gap-3">
+              <Label htmlFor="description">Description</Label>
               <RichTextEditor
                 value={formData.description}
                 onChange={(value) => setFormData({ ...formData, description: value })}

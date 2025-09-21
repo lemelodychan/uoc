@@ -7,18 +7,16 @@ const supabase = createClient()
 
 export const testConnection = async (): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log("[v0] Testing Supabase connection...")
     const { data, error } = await supabase.from("characters").select("count", { count: "exact", head: true })
 
     if (error) {
-      console.log("[v0] Connection test failed:", error)
+      console.error("[v0] Connection test failed:", error)
       return { success: false, error: error.message }
     }
 
-    console.log("[v0] Connection test successful, character count:", data)
     return { success: true }
   } catch (error) {
-    console.log("[v0] Connection test error:", error)
+    console.error("[v0] Connection test error:", error)
     return { success: false, error: "Failed to connect to database" }
   }
 }
@@ -30,8 +28,6 @@ export const updatePartyStatus = async (
   level?: number
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log(`[v0] Updating party status for character ${characterId} to ${status}`)
-    
     const updateData: any = {
       character_id: characterId,
       status: status,
@@ -55,7 +51,6 @@ export const updatePartyStatus = async (
       return { success: false, error: error.message }
     }
 
-    console.log("[v0] Party status updated successfully")
     return { success: true }
   } catch (error) {
     console.error("[v0] Error in updatePartyStatus:", error)
@@ -114,7 +109,6 @@ export const saveCharacter = async (
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(characterId)) {
       characterId = globalThis.crypto.randomUUID()
-      console.log(`[v0] Generated new UUID for character: ${characterId}`)
     }
 
     const saveData: any = {
@@ -124,6 +118,8 @@ export const saveCharacter = async (
       class_id: character.class_id,
       subclass: character.subclass,
       level: character.level,
+      classes: character.classes || null,
+      hit_dice_by_class: character.hitDiceByClass || null,
       background: character.background,
       race: character.race,
       alignment: character.alignment,
@@ -247,14 +243,6 @@ export const saveCharacter = async (
     }
 
 
-    console.log("[v0] Attempting to save character to database:", {
-      id: saveData.id,
-      name: saveData.name,
-      spell_attack_bonus: saveData.spell_attack_bonus,
-      spell_save_dc: saveData.spell_save_dc,
-      spell_notes: saveData.spell_notes
-    })
-
     const { error } = await supabase.from("characters").upsert(saveData)
 
     if (error) {
@@ -262,7 +250,6 @@ export const saveCharacter = async (
       return { success: false, error: error.message }
     }
 
-    console.log("[v0] Character saved successfully to database")
     return { success: true, characterId }
   } catch (error) {
     console.error("Error saving character:", error)
@@ -283,19 +270,36 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       return { error: "Character not found" }
     }
 
-  // Load class features from database
+  // Load class features from database - support multiclassing
   let classFeatures: Array<{name: string, description: string, source: string, level: number}> = []
-  if (data.class_id) {
-    console.log(`[DEBUG] loadCharacter: Loading features for class_id: ${data.class_id}, level: ${data.level}`)
+  
+  if (data.classes && data.classes.length > 0) {
+    // Load features for all classes in multiclassing
+    const allFeatures = await Promise.all(
+      data.classes.map(async (charClass: any) => {
+        if (charClass.class_id) {
+          const { features, error: featuresError } = await loadClassFeatures(charClass.class_id, charClass.level)
+          if (featuresError) {
+            console.error(`Error loading class features for ${charClass.name}:`, featuresError)
+            return []
+          }
+          return features || []
+        } else {
+          console.log(`[DEBUG] No class_id for ${charClass.name}, skipping`)
+          return []
+        }
+      })
+    )
+    // Flatten and combine all features
+    classFeatures = allFeatures.flat()
+  } else if (data.class_id) {
+    // Fallback to single class loading
     const { features, error: featuresError } = await loadClassFeatures(data.class_id, data.level)
     if (featuresError) {
       console.error("Error loading class features:", featuresError)
     } else {
       classFeatures = features || []
-      console.log(`[DEBUG] loadCharacter: Loaded ${classFeatures.length} features for character ${data.name}`)
     }
-  } else {
-    console.log(`[DEBUG] loadCharacter: No class_id found for character ${data.name}`)
   }
 
     // Load class data for automatic spell calculations
@@ -303,6 +307,20 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
     const proficiencyBonus = calculateProficiencyBonus(data.level)
     
     // Create temporary character for calculations
+    // Calculate saving throw proficiencies
+    let savingThrowProficiencies
+    // TEMPORARY FIX: Force recalculation for multiclass characters to fix the missing saving throws
+    if (data.classes && data.classes.length > 1) {
+      console.log('[DEBUG] loadCharacter: FORCING multiclass saving throws recalculation for classes:', data.classes)
+      savingThrowProficiencies = (await import('./character-data')).getMulticlassSavingThrowProficiencies(data.classes)
+    } else if (data.saving_throw_proficiencies && data.saving_throw_proficiencies.length > 0) {
+      console.log('[DEBUG] loadCharacter: Using existing saving throws from database:', data.saving_throw_proficiencies)
+      savingThrowProficiencies = data.saving_throw_proficiencies
+    } else {
+      console.log('[DEBUG] loadCharacter: Using single class saving throws for:', data.class_name)
+      savingThrowProficiencies = (await import('./character-data')).createClassBasedSavingThrowProficiencies(data.class_name)
+    }
+
     const tempCharacter: CharacterData = {
       id: data.id,
       name: data.name,
@@ -310,6 +328,12 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       class_id: data.class_id,
       subclass: data.subclass,
       level: data.level,
+      classes: data.classes || [{
+        name: data.class_name,
+        subclass: data.subclass,
+        class_id: data.class_id,
+        level: data.level
+      }],
       background: data.background,
       race: data.race,
       alignment: data.alignment,
@@ -332,6 +356,7 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         used: data.hit_dice_used || 0,
         dieType: data.hit_dice_type || "d8",
       } : undefined,
+      hitDiceByClass: data.hit_dice_by_class || undefined,
       skills: data.skills && data.skills.length > 0 ? data.skills : createDefaultSkills(),
       weapons: data.weapons,
       weaponNotes: data.weapons_notes || "",
@@ -394,7 +419,7 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       feats: data.feats,
       infusions: data.infusions || [],
       infusionNotes: data.infusion_notes || "",
-      savingThrowProficiencies: data.saving_throw_proficiencies && data.saving_throw_proficiencies.length > 0 ? data.saving_throw_proficiencies : createClassBasedSavingThrowProficiencies(data.class_name),
+      savingThrowProficiencies: savingThrowProficiencies,
       bardicInspirationUsed: data.bardic_inspiration_used || 0,
       partyStatus: 'active', // Default to 'active' for single character load (will be updated separately if needed)
     }
@@ -403,17 +428,21 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
     let calculatedSpellSlots: any[] = data.spell_slots || []
     
     // If no spell slots in database, calculate them from class data
-    if (calculatedSpellSlots.length === 0 && classData) {
-      if (data.class_name.toLowerCase() === "warlock") {
-        // For Warlocks, use the special Pact Magic system
-        const { getWarlockSpellSlots } = await import('./character-data')
-        calculatedSpellSlots = getWarlockSpellSlots(data.level)
-        console.log("[DEBUG] loadCharacter: Calculated Warlock Pact Magic slots for", data.name, ":", calculatedSpellSlots)
-      } else {
-        // For other classes, use the standard spell slot calculation
-        const { calculateSpellSlotsFromClass } = await import('./spell-slot-calculator')
-        calculatedSpellSlots = calculateSpellSlotsFromClass(classData, data.level)
-        console.log("[DEBUG] loadCharacter: Calculated spell slots for", data.name, ":", calculatedSpellSlots)
+    if (calculatedSpellSlots.length === 0) {
+      if (data.classes && data.classes.length > 1) {
+        // Use multiclassing spell slot calculation
+        const { getMulticlassSpellSlots } = await import('./character-data')
+        calculatedSpellSlots = getMulticlassSpellSlots(data.classes)
+      } else if (classData) {
+        if (data.class_name.toLowerCase() === "warlock") {
+          // For Warlocks, use the special Pact Magic system
+          const { getWarlockSpellSlots } = await import('./character-data')
+          calculatedSpellSlots = getWarlockSpellSlots(data.level)
+        } else {
+          // For other classes, use the standard spell slot calculation
+          const { calculateSpellSlotsFromClass } = await import('./spell-slot-calculator')
+          calculatedSpellSlots = calculateSpellSlotsFromClass(classData, data.level)
+        }
       }
     }
     
@@ -426,7 +455,6 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         calculatedSpellSlots = calculatedSpellSlots.map((slot) => {
           return { ...slot, used: warlockUsed }
         })
-        console.log("[DEBUG] loadCharacter: Restored Warlock Pact Magic usage for", data.name, ":", calculatedSpellSlots)
       } else {
         // For other classes, use the normal level-based restoration
         calculatedSpellSlots = calculatedSpellSlots.map((slot) => {
@@ -434,76 +462,61 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
           const usedCount = Math.max(0, slot.total - unchecked)
           return { ...slot, used: usedCount }
         })
-        console.log("[DEBUG] loadCharacter: Restored spell slot usage for", data.name, ":", calculatedSpellSlots)
       }
-    } else {
-      console.log("[DEBUG] loadCharacter: No spell slots to restore for", data.name)
     }
     
     // Now calculate spell values and create final character
     const character: CharacterData = {
       ...tempCharacter,
+      classFeatures: classFeatures, // Add the loaded class features
       spellData: {
         ...tempCharacter.spellData,
         spellAttackBonus: data.spell_attack_bonus || calculateSpellAttackBonus(tempCharacter, classData, proficiencyBonus),
         spellSaveDC: data.spell_save_dc || calculateSpellSaveDC(tempCharacter, classData, proficiencyBonus),
+        cantripsKnown: data.cantrips_known || (() => {
+          const { getCantripsKnown } = require('./class-utils')
+          return getCantripsKnown(data.level, classData, data.class_name, tempCharacter)
+        })(),
         spellsKnown: getSpellsKnown(tempCharacter, classData, data.spells_known),
         spellSlots: calculatedSpellSlots, // Populate immediately
-        // Add class-specific features (Bard, Artificer, Paladin)
-        bardicInspirationSlot: (() => {
-          const bardicInspiration = getBardicInspirationData(data.level, Math.floor((data.charisma - 10) / 2), classData)
-          if (bardicInspiration && data.bardic_inspiration_used !== undefined) {
-            return {
-              ...bardicInspiration,
-              currentUses: Math.max(0, bardicInspiration.usesPerRest - (data.bardic_inspiration_used || 0))
-            }
+        // Add class-specific features (Bard, Artificer, Paladin) - use multiclass calculation if applicable
+        ...(data.classes && data.classes.length > 1 ? await (async () => {
+          const { getMulticlassFeatures } = await import('./character-data')
+          const multiclassFeatures = await getMulticlassFeatures(tempCharacter)
+          return {
+            bardicInspirationSlot: multiclassFeatures.bardicInspirationSlot || undefined,
+            songOfRest: multiclassFeatures.songOfRest || undefined,
+            flashOfGeniusSlot: multiclassFeatures.flashOfGeniusSlot || undefined,
+            divineSenseSlot: multiclassFeatures.divineSenseSlot || undefined,
+            layOnHands: multiclassFeatures.layOnHands || undefined,
+            channelDivinitySlot: multiclassFeatures.channelDivinitySlot || undefined,
+            cleansingTouchSlot: multiclassFeatures.cleansingTouchSlot || undefined,
           }
-          return bardicInspiration || undefined
-        })(),
-        songOfRest: getSongOfRestData(data.level, classData) || undefined,
-        flashOfGeniusSlot: (data.class_name?.toLowerCase() === "artificer" && data.level >= 7)
-          ? (() => {
-              const usesPerRest = Math.max(1, Math.floor((data.intelligence - 10) / 2))
-              const used = Math.max(0, Math.min(usesPerRest, data.flash_of_genius_used || 0))
-              return { 
-                usesPerRest, 
-                currentUses: usesPerRest - used,
-                replenishesOnLongRest: true
+        })() : {
+          // Single class feature calculation
+          bardicInspirationSlot: (() => {
+            const bardicInspiration = getBardicInspirationData(data.level, Math.floor((data.charisma - 10) / 2), classData)
+            if (bardicInspiration && data.bardic_inspiration_used !== undefined) {
+              return {
+                ...bardicInspiration,
+                currentUses: Math.max(0, bardicInspiration.usesPerRest - (data.bardic_inspiration_used || 0))
               }
-            })()
-          : undefined,
-        // Add Paladin-specific features with restored usage
-        divineSenseSlot: (() => {
-          const divineSense = getDivineSenseData(tempCharacter)
-          if (divineSense && data.divine_sense_used !== undefined) {
-            return {
-              ...divineSense,
-              currentUses: Math.max(0, divineSense.usesPerRest - (data.divine_sense_used || 0))
             }
-          }
-          return divineSense
-        })(),
-        layOnHands: (() => {
-          const layOnHands = getLayOnHandsData(tempCharacter)
-          if (layOnHands && data.lay_on_hands_hp_used !== undefined) {
-            return {
-              ...layOnHands,
-              currentHitPoints: Math.max(0, layOnHands.totalHitPoints - (data.lay_on_hands_hp_used || 0))
-            }
-          }
-          return layOnHands
-        })(),
-        channelDivinitySlot: (() => {
-          const channelDivinity = getChannelDivinityData(tempCharacter)
-          if (channelDivinity && data.channel_divinity_used !== undefined) {
-            return {
-              ...channelDivinity,
-              currentUses: Math.max(0, channelDivinity.usesPerRest - (data.channel_divinity_used || 0))
-            }
-          }
-          return channelDivinity
-        })(),
-        cleansingTouchSlot: getCleansingTouchData(tempCharacter),
+            return bardicInspiration || undefined
+          })(),
+          songOfRest: getSongOfRestData(data.level, classData) || undefined,
+          flashOfGeniusSlot: (data.class_name?.toLowerCase() === "artificer" && data.level >= 7)
+            ? (() => {
+                const usesPerRest = Math.max(1, Math.floor((data.intelligence - 10) / 2))
+                const used = Math.max(0, Math.min(usesPerRest, data.flash_of_genius_used || 0))
+                return { 
+                  usesPerRest, 
+                  currentUses: usesPerRest - used,
+                  replenishesOnLongRest: true
+                }
+              })()
+            : undefined,
+        }),
       },
     }
 
@@ -529,28 +542,91 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
       return { error: error.message }
     }
 
-    // Load class features for all characters
+    // Batch load class data for all unique classes
+    const uniqueClasses = [...new Set(data.map(row => `${row.class_name}-${row.subclass || ''}`))]
+    const classDataMap = new Map()
+    
+    await Promise.all(uniqueClasses.map(async (classKey) => {
+      const [className, subclass] = classKey.split('-')
+      const { classData } = await loadClassData(className, subclass || undefined)
+      if (classData) {
+        classDataMap.set(classKey, classData)
+      }
+    }))
+
+    // Batch load class features for all unique class_id + level combinations
+    // Support both single class and multiclassing
+    const uniqueClassFeatures = new Set<string>()
+    
+    data.forEach(row => {
+      if (row.classes && row.classes.length > 0) {
+        // Add multiclass features
+        row.classes.forEach((charClass: any) => {
+          if (charClass.class_id) {
+            uniqueClassFeatures.add(`${charClass.class_id}-${charClass.level}`)
+          }
+        })
+      } else if (row.class_id) {
+        // Add single class features
+        uniqueClassFeatures.add(`${row.class_id}-${row.level}`)
+      }
+    })
+    
+    const classFeaturesMap = new Map()
+    
+    await Promise.all([...uniqueClassFeatures].map(async (featureKey) => {
+      // Split on the last dash to handle UUIDs with dashes
+      const lastDashIndex = featureKey.lastIndexOf('-')
+      const classId = featureKey.substring(0, lastDashIndex)
+      const level = featureKey.substring(lastDashIndex + 1)
+      
+      const { features } = await loadClassFeatures(classId, parseInt(level))
+      if (features) {
+        classFeaturesMap.set(featureKey, features)
+      }
+    }))
+
+    // Process characters with pre-loaded data
     const charactersWithFeatures = await Promise.all(
       data.map(async (row) => {
-    // Load class features from database
+    // Get pre-loaded class features - support multiclassing
     let classFeatures: Array<{name: string, description: string, source: string, level: number}> = []
-    if (row.class_id) {
-      console.log(`[DEBUG] loadAllCharacters: Loading features for class_id: ${row.class_id}, level: ${row.level}`)
-      const { features, error: featuresError } = await loadClassFeatures(row.class_id, row.level)
-      if (featuresError) {
-        console.error("Error loading class features:", featuresError)
-      } else {
-        classFeatures = features || []
-        console.log(`[DEBUG] loadAllCharacters: Loaded ${classFeatures.length} features for character ${row.name}`)
-      }
-    } else {
-      console.log(`[DEBUG] loadAllCharacters: No class_id found for character ${row.name}`)
+    
+    if (row.classes && row.classes.length > 0) {
+      // Load features for all classes in multiclassing
+      classFeatures = row.classes
+        .map((charClass: any) => {
+          if (charClass.class_id) {
+            return classFeaturesMap.get(`${charClass.class_id}-${charClass.level}`) || []
+          }
+          return []
+        })
+        .flat()
+    } else if (row.class_id) {
+      // Fallback to single class loading
+      classFeatures = classFeaturesMap.get(`${row.class_id}-${row.level}`) || []
     }
+    
+    
 
-        // Load class data for automatic spell calculations
-        const { classData } = await loadClassData(row.class_name, row.subclass)
+        // Get pre-loaded class data
+        const classData = classDataMap.get(`${row.class_name}-${row.subclass || ''}`)
         const proficiencyBonus = calculateProficiencyBonus(row.level)
         
+        // Calculate saving throw proficiencies
+        let savingThrowProficiencies
+        // TEMPORARY FIX: Force recalculation for multiclass characters to fix the missing saving throws
+        if (row.classes && row.classes.length > 1) {
+          console.log('[DEBUG] loadAllCharacters: FORCING multiclass saving throws recalculation for classes:', row.classes)
+          savingThrowProficiencies = (await import('./character-data')).getMulticlassSavingThrowProficiencies(row.classes)
+        } else if (row.saving_throw_proficiencies && row.saving_throw_proficiencies.length > 0) {
+          console.log('[DEBUG] loadAllCharacters: Using existing saving throws from database:', row.saving_throw_proficiencies)
+          savingThrowProficiencies = row.saving_throw_proficiencies
+        } else {
+          console.log('[DEBUG] loadAllCharacters: Using single class saving throws for:', row.class_name)
+          savingThrowProficiencies = (await import('./character-data')).createClassBasedSavingThrowProficiencies(row.class_name)
+        }
+
         // Create temporary character for calculations
         const tempCharacter = {
           id: row.id,
@@ -559,6 +635,12 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           class_id: row.class_id,
           subclass: row.subclass,
           level: row.level,
+          classes: row.classes || [{
+            name: row.class_name,
+            subclass: row.subclass,
+            class_id: row.class_id,
+            level: row.level
+          }],
           background: row.background,
           race: row.race,
           alignment: row.alignment,
@@ -581,6 +663,7 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             used: row.hit_dice_used || 0,
             dieType: row.hit_dice_type || "d8",
           } : undefined,
+          hitDiceByClass: row.hit_dice_by_class || undefined,
           skills: row.skills && row.skills.length > 0 ? row.skills : createDefaultSkills(),
           weapons: row.weapons,
           weaponNotes: row.weapons_notes || "",
@@ -642,7 +725,7 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           feats: row.feats,
           infusions: row.infusions || [],
           infusionNotes: row.infusion_notes || "",
-          savingThrowProficiencies: row.saving_throw_proficiencies && row.saving_throw_proficiencies.length > 0 ? row.saving_throw_proficiencies : createClassBasedSavingThrowProficiencies(row.class_name),
+          savingThrowProficiencies: savingThrowProficiencies,
           bardicInspirationUsed: row.bardic_inspiration_used || 0,
           partyStatus: row.party_status?.status || 'active', // Default to 'active' if no status found
         }
@@ -651,17 +734,21 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
         let calculatedSpellSlots: any[] = row.spell_slots || []
         
         // If no spell slots in database, calculate them from class data
-        if (calculatedSpellSlots.length === 0 && classData) {
-          if (row.class_name.toLowerCase() === "warlock") {
-            // For Warlocks, use the special Pact Magic system
-            const { getWarlockSpellSlots } = await import('./character-data')
-            calculatedSpellSlots = getWarlockSpellSlots(row.level)
-            console.log("[DEBUG] loadAllCharacters: Calculated Warlock Pact Magic slots for", row.name, ":", calculatedSpellSlots)
-          } else {
-            // For other classes, use the standard spell slot calculation
-            const { calculateSpellSlotsFromClass } = await import('./spell-slot-calculator')
-            calculatedSpellSlots = calculateSpellSlotsFromClass(classData, row.level)
-            console.log("[DEBUG] loadAllCharacters: Calculated spell slots for", row.name, ":", calculatedSpellSlots)
+        if (calculatedSpellSlots.length === 0) {
+          if (row.classes && row.classes.length > 1) {
+            // Use multiclassing spell slot calculation
+            const { getMulticlassSpellSlots } = await import('./character-data')
+            calculatedSpellSlots = getMulticlassSpellSlots(row.classes)
+          } else if (classData) {
+            if (row.class_name.toLowerCase() === "warlock") {
+              // For Warlocks, use the special Pact Magic system
+              const { getWarlockSpellSlots } = await import('./character-data')
+              calculatedSpellSlots = getWarlockSpellSlots(row.level)
+            } else {
+              // For other classes, use the standard spell slot calculation
+              const { calculateSpellSlotsFromClass } = await import('./spell-slot-calculator')
+              calculatedSpellSlots = calculateSpellSlotsFromClass(classData, row.level)
+            }
           }
         }
         
@@ -674,7 +761,6 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             calculatedSpellSlots = calculatedSpellSlots.map((slot) => {
               return { ...slot, used: warlockUsed }
             })
-            console.log("[DEBUG] loadAllCharacters: Restored Warlock Pact Magic usage for", row.name, ":", calculatedSpellSlots)
           } else {
             // For other classes, use the normal level-based restoration
             calculatedSpellSlots = calculatedSpellSlots.map((slot) => {
@@ -682,75 +768,60 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
               const usedCount = Math.max(0, slot.total - unchecked)
               return { ...slot, used: usedCount }
             })
-            console.log("[DEBUG] loadAllCharacters: Restored spell slot usage for", row.name, ":", calculatedSpellSlots)
           }
-        } else {
-          console.log("[DEBUG] loadAllCharacters: No spell slots to restore for", row.name)
         }
 
         return {
           ...tempCharacter,
+          classFeatures: classFeatures, // Add the loaded class features
           spellData: {
             ...tempCharacter.spellData,
             spellAttackBonus: row.spell_attack_bonus || calculateSpellAttackBonus(tempCharacter, classData, proficiencyBonus),
             spellSaveDC: row.spell_save_dc || calculateSpellSaveDC(tempCharacter, classData, proficiencyBonus),
+            cantripsKnown: row.cantrips_known || (() => {
+              const { getCantripsKnown } = require('./class-utils')
+              return getCantripsKnown(row.level, classData, row.class_name, tempCharacter)
+            })(),
             spellsKnown: getSpellsKnown(tempCharacter, classData, row.spells_known),
             spellSlots: calculatedSpellSlots, // Populate immediately
-            // Add class-specific features (Bard, Artificer, Paladin)
-            bardicInspirationSlot: (() => {
-              const bardicInspiration = getBardicInspirationData(row.level, Math.floor((row.charisma - 10) / 2), classData)
-              if (bardicInspiration && row.bardic_inspiration_used !== undefined) {
-                return {
-                  ...bardicInspiration,
-                  currentUses: Math.max(0, bardicInspiration.usesPerRest - (row.bardic_inspiration_used || 0))
-                }
+            // Add class-specific features (Bard, Artificer, Paladin) - use multiclass calculation if applicable
+            ...(row.classes && row.classes.length > 1 ? await (async () => {
+              const { getMulticlassFeatures } = await import('./character-data')
+              const multiclassFeatures = await getMulticlassFeatures(tempCharacter)
+              return {
+                bardicInspirationSlot: multiclassFeatures.bardicInspirationSlot || undefined,
+                songOfRest: multiclassFeatures.songOfRest || undefined,
+                flashOfGeniusSlot: multiclassFeatures.flashOfGeniusSlot || undefined,
+                divineSenseSlot: multiclassFeatures.divineSenseSlot || undefined,
+                layOnHands: multiclassFeatures.layOnHands || undefined,
+                channelDivinitySlot: multiclassFeatures.channelDivinitySlot || undefined,
+                cleansingTouchSlot: multiclassFeatures.cleansingTouchSlot || undefined,
               }
-              return bardicInspiration || undefined
-            })(),
-            songOfRest: getSongOfRestData(row.level, classData) || undefined,
-            flashOfGeniusSlot: (row.class_name?.toLowerCase() === "artificer" && row.level >= 7)
-              ? (() => {
-                  const usesPerRest = Math.max(1, Math.floor((row.intelligence - 10) / 2))
-                  const used = Math.max(0, Math.min(usesPerRest, row.flash_of_genius_used || 0))
-                  return { 
-                    usesPerRest, 
-                    currentUses: usesPerRest - used,
-                    replenishesOnLongRest: true
+            })() : {
+              // Single class feature calculation
+              bardicInspirationSlot: (() => {
+                const bardicInspiration = getBardicInspirationData(row.level, Math.floor((row.charisma - 10) / 2), classData)
+                if (bardicInspiration && row.bardic_inspiration_used !== undefined) {
+                  return {
+                    ...bardicInspiration,
+                    currentUses: Math.max(0, bardicInspiration.usesPerRest - (row.bardic_inspiration_used || 0))
                   }
-                })()
-              : undefined,
-            // Add Paladin-specific features with restored usage
-            divineSenseSlot: (() => {
-              const divineSense = getDivineSenseData(tempCharacter)
-              if (divineSense && row.divine_sense_used !== undefined) {
-                return {
-                  ...divineSense,
-                  currentUses: Math.max(0, divineSense.usesPerRest - (row.divine_sense_used || 0))
                 }
-              }
-              return divineSense
-            })(),
-            layOnHands: (() => {
-              const layOnHands = getLayOnHandsData(tempCharacter)
-              if (layOnHands && row.lay_on_hands_hp_used !== undefined) {
-                return {
-                  ...layOnHands,
-                  currentHitPoints: Math.max(0, layOnHands.totalHitPoints - (row.lay_on_hands_hp_used || 0))
-                }
-              }
-              return layOnHands
-            })(),
-            channelDivinitySlot: (() => {
-              const channelDivinity = getChannelDivinityData(tempCharacter)
-              if (channelDivinity && row.channel_divinity_used !== undefined) {
-                return {
-                  ...channelDivinity,
-                  currentUses: Math.max(0, channelDivinity.usesPerRest - (row.channel_divinity_used || 0))
-                }
-              }
-              return channelDivinity
-            })(),
-            cleansingTouchSlot: getCleansingTouchData(tempCharacter),
+                return bardicInspiration || undefined
+              })(),
+              songOfRest: getSongOfRestData(row.level, classData) || undefined,
+              flashOfGeniusSlot: (row.class_name?.toLowerCase() === "artificer" && row.level >= 7)
+                ? (() => {
+                    const usesPerRest = Math.max(1, Math.floor((row.intelligence - 10) / 2))
+                    const used = Math.max(0, Math.min(usesPerRest, row.flash_of_genius_used || 0))
+                    return { 
+                      usesPerRest, 
+                      currentUses: usesPerRest - used,
+                      replenishesOnLongRest: true
+                    }
+                  })()
+                : undefined,
+            }),
           },
         }
       })
@@ -779,7 +850,7 @@ export const deleteCharacter = async (characterId: string): Promise<{ success: b
   }
 }
 
-export const loadClassFeatures = async (classId: string, level: number): Promise<{ features?: Array<{name: string, description: string, source: string, level: number}>; error?: string }> => {
+export const loadClassFeatures = async (classId: string, level: number, subclass?: string): Promise<{ features?: Array<{name: string, description: string, source: string, level: number}>; error?: string }> => {
   try {
     // First get the class information to check if it's a Bard
     const { data: classData, error: classError } = await supabase
@@ -793,6 +864,7 @@ export const loadClassFeatures = async (classId: string, level: number): Promise
       return { error: classError.message }
     }
 
+    // Load features for this specific class_id (could be base class or subclass)
     const { data, error } = await supabase
       .from("class_features")
       .select("*")
@@ -805,23 +877,87 @@ export const loadClassFeatures = async (classId: string, level: number): Promise
       return { error: error.message }
     }
 
-    const features = data?.map(feature => ({
+    let features = data?.map(feature => ({
       name: feature.title,
       description: feature.description,
       source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
-      level: feature.level
+      level: feature.level,
+      className: classData.name
     })) || []
 
-    // Additional safeguard: filter out Bard-specific features for non-Bard classes
-    const isBard = classData?.name?.toLowerCase() === "bard"
-    const filteredFeatures = isBard ? features : features.filter(feature => 
-      !feature.name.toLowerCase().includes("bardic inspiration") && 
-      !feature.name.toLowerCase().includes("song of rest")
-    )
+    // If this class_id only has subclass features, we need to also load base class features
+    const hasClassFeatures = features.some(f => f.source === 'Class')
+    const hasSubclassFeatures = features.some(f => f.source === 'Subclass')
     
-    console.log(`[DEBUG] loadClassFeatures: Loaded ${filteredFeatures.length} features for ${classData?.name} (class_id: ${classId})`)
+    if (hasSubclassFeatures && !hasClassFeatures) {
+      // Find the base class_id for this class name (where subclass IS NULL)
+      const { data: baseClassData, error: baseClassError } = await supabase
+        .from("classes")
+        .select("id")
+        .eq("name", classData.name)
+        .is("subclass", null) // Specifically look for the base class
+        .limit(1)
+        .single()
 
-    return { features: filteredFeatures }
+      if (!baseClassError && baseClassData) {
+        // Load base class features
+        const { data: baseFeatures, error: baseError } = await supabase
+          .from("class_features")
+          .select("*")
+          .eq("class_id", baseClassData.id)
+          .lte("level", level)
+          .order("level", { ascending: true })
+
+        if (!baseError && baseFeatures) {
+          const baseClassFeatures = baseFeatures.map(feature => ({
+            name: feature.title,
+            description: feature.description,
+            source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
+            level: feature.level,
+            className: classData.name
+          }))
+          
+          // Combine base class and subclass features
+          features = [...baseClassFeatures, ...features]
+        }
+      }
+    } else if (!hasClassFeatures && !hasSubclassFeatures) {
+      // If no features found at all, try to find the base class_id (where subclass IS NULL)
+      const { data: baseClassData, error: baseClassError } = await supabase
+        .from("classes")
+        .select("id")
+        .eq("name", classData.name)
+        .is("subclass", null) // Specifically look for the base class
+        .limit(1)
+        .single()
+
+      if (!baseClassError && baseClassData) {
+        // Load base class features
+        const { data: baseFeatures, error: baseError } = await supabase
+          .from("class_features")
+          .select("*")
+          .eq("class_id", baseClassData.id)
+          .lte("level", level)
+          .order("level", { ascending: true })
+
+        if (!baseError && baseFeatures) {
+          const baseClassFeatures = baseFeatures.map(feature => ({
+            name: feature.title,
+            description: feature.description,
+            source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
+            level: feature.level,
+            className: classData.name
+          }))
+          
+          // Use the base class features
+          features = baseClassFeatures
+        }
+      }
+    }
+
+    // Return all features for the class - no filtering needed
+    // The filtering was causing issues with multiclassing
+    return { features }
   } catch (error) {
     console.error("Error loading class features:", error)
     return { error: "Failed to load class features" }
@@ -830,8 +966,6 @@ export const loadClassFeatures = async (classId: string, level: number): Promise
 
 export const loadClassData = async (className: string, subclass?: string): Promise<{ classData?: any; error?: string }> => {
   try {
-    console.log("[DEBUG] loadClassData called for:", className, subclass)
-    
     let query = supabase
       .from("classes")
       .select("*")
@@ -839,31 +973,31 @@ export const loadClassData = async (className: string, subclass?: string): Promi
     
     if (subclass) {
       query = query.eq("subclass", subclass)
+    } else {
+      // When no subclass is specified, get the base class (subclass IS NULL)
+      query = query.is("subclass", null)
     }
 
     const { data, error } = await query
 
     if (error) {
-      console.error("[DEBUG] Error loading class data:", error)
+      console.error("Error loading class data:", error)
       return { error: error.message }
     }
 
     if (!data || data.length === 0) {
-      console.log("[DEBUG] No class data found for:", className, subclass)
       return { error: "Class not found" }
     }
 
     if (data.length > 1) {
-      console.warn("[DEBUG] Multiple class entries found for:", className, subclass, "Using the first one")
-      console.log("[DEBUG] Found entries:", data.map(d => ({ id: d.id, subclass: d.subclass, created_at: d.created_at })))
+      console.warn("Multiple class entries found for:", className, subclass, "Using the first one")
     }
 
     const classData = data[0] // Use the first entry if multiple found
-    console.log("[DEBUG] loadClassData found data for:", className, subclass, classData)
 
     return { classData }
   } catch (error) {
-    console.error("[DEBUG] Error loading class data:", error)
+    console.error("Error loading class data:", error)
     return { error: "Failed to load class data" }
   }
 }

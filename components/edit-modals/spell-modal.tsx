@@ -55,8 +55,8 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
       featSpellSlots: [
         ...prev.featSpellSlots,
         {
-          name: "New Feat",
-          spells: [],
+          spellName: "New Spell",
+          featName: "New Feat",
           usesPerLongRest: 1,
           currentUses: 1,
         },
@@ -78,34 +78,6 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
     }))
   }
 
-  const addSpellToFeat = (featIndex: number) => {
-    setSpellData((prev) => ({
-      ...prev,
-      featSpellSlots: prev.featSpellSlots.map((feat, i) =>
-        i === featIndex ? { ...feat, spells: [...feat.spells, "New Spell"] } : feat,
-      ),
-    }))
-  }
-
-  const updateFeatSpell = (featIndex: number, spellIndex: number, spellName: string) => {
-    setSpellData((prev) => ({
-      ...prev,
-      featSpellSlots: prev.featSpellSlots.map((feat, i) =>
-        i === featIndex
-          ? { ...feat, spells: feat.spells.map((spell, j) => (j === spellIndex ? spellName : spell)) }
-          : feat,
-      ),
-    }))
-  }
-
-  const removeSpellFromFeat = (featIndex: number, spellIndex: number) => {
-    setSpellData((prev) => ({
-      ...prev,
-      featSpellSlots: prev.featSpellSlots.map((feat, i) =>
-        i === featIndex ? { ...feat, spells: feat.spells.filter((_, j) => j !== spellIndex) } : feat,
-      ),
-    }))
-  }
 
 
   return (
@@ -181,14 +153,24 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
                   <div key={featIndex} className="p-4 border rounded-lg space-y-3 flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <Input
-                        placeholder="Feat name (e.g., Fey Touched)"
-                        value={feat.name}
-                        onChange={(e) => updateFeatSpellSlot(featIndex, { name: e.target.value })}
+                        placeholder="Spell name (e.g., Misty Step)"
+                        value={feat.spellName}
+                        onChange={(e) => updateFeatSpellSlot(featIndex, { spellName: e.target.value })}
                         className="flex-1"
                       />
                       <Button variant="outline" className="w-9 h-9" size="sm" onClick={() => removeFeatSpellSlot(featIndex)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium min-w-0 flex-shrink-0">From Feat:</Label>
+                      <Input
+                        placeholder="Feat name (e.g., Fey Touched)"
+                        value={feat.featName}
+                        onChange={(e) => updateFeatSpellSlot(featIndex, { featName: e.target.value })}
+                        className="flex-1"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -214,34 +196,6 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <Label className="text-sm font-semibold">Spells</Label>
-                        <Button variant="outline" className="w-9 h-9" size="sm" onClick={() => addSpellToFeat(featIndex)}>
-                          <Plus className="w-3 h-3" />
-                        </Button>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        {feat.spells.map((spell, spellIndex) => (
-                          <div key={spellIndex} className="flex items-center gap-2">
-                            <Input
-                              placeholder="Spell name"
-                              value={spell}
-                              onChange={(e) => updateFeatSpell(featIndex, spellIndex, e.target.value)}
-                              className="flex-1"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-9 h-9"
-                              onClick={() => removeSpellFromFeat(featIndex, spellIndex)}
-                            >
-                              <Trash2 className="w-3 h-3 text-destructive" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 ))}
                 {spellData.featSpellSlots.length === 0 && (

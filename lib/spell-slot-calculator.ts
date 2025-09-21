@@ -100,8 +100,6 @@ export const getBardicInspirationFromClass = (classData: ClassSpellData | null, 
 
 export const fetchClassDataById = async (classId: string): Promise<ClassSpellData | null> => {
   try {
-    console.log("[v0] Fetching class data by ID:", classId)
-
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -110,16 +108,13 @@ export const fetchClassDataById = async (classId: string): Promise<ClassSpellDat
     const { data, error } = await supabase.from("classes").select("*").eq("id", classId).single()
 
     if (error) {
-      console.error("[v0] Error fetching class data:", error)
+      console.error("Error fetching class data:", error)
       return null
     }
 
     if (!data) {
-      console.log("[v0] No class data found for ID:", classId)
       return null
     }
-
-    console.log("[v0] Found class data:", data)
 
     const parseSpellSlotArray = (arr: any): number[] => {
       if (!Array.isArray(arr)) return []
@@ -147,15 +142,13 @@ export const fetchClassDataById = async (classId: string): Promise<ClassSpellDat
 
     return classData
   } catch (error) {
-    console.error("[v0] Error in fetchClassDataById:", error)
+    console.error("Error in fetchClassDataById:", error)
     return null
   }
 }
 
 export const fetchClassData = async (className: string, subclass?: string): Promise<ClassSpellData | null> => {
   try {
-    console.log("[v0] Fetching class data for:", className, subclass)
-
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -170,16 +163,13 @@ export const fetchClassData = async (className: string, subclass?: string): Prom
     const { data, error } = await query.single()
 
     if (error) {
-      console.error("[v0] Error fetching class data:", error)
+      console.error("Error fetching class data:", error)
       return null
     }
 
     if (!data) {
-      console.log("[v0] No class data found for:", className, subclass)
       return null
     }
-
-    console.log("[v0] Found class data:", data)
 
     const parseSpellSlotArray = (arr: any): number[] => {
       if (!Array.isArray(arr)) return []
@@ -208,49 +198,8 @@ export const fetchClassData = async (className: string, subclass?: string): Prom
 
     return classData
   } catch (error) {
-    console.error("[v0] Error in fetchClassData:", error)
+    console.error("Error in fetchClassData:", error)
     return null
   }
 }
 
-export const testClassesTableAccess = async (): Promise<void> => {
-  try {
-    console.log("[v0] Testing classes table access...")
-
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    )
-
-    // Try to count all classes first
-    const { count, error: countError } = await supabase.from("classes").select("*", { count: "exact", head: true })
-
-    if (countError) {
-      console.error("[v0] Error accessing classes table:", countError)
-      console.error("[v0] This might be a Row Level Security (RLS) issue")
-      return
-    }
-
-    console.log("[v0] Classes table accessible, total count:", count)
-
-    const { data, error } = await supabase.from("classes").select("*").limit(1)
-
-    if (error) {
-      console.error("[v0] Error fetching classes:", error)
-      return
-    }
-
-    console.log("[v0] Full class data sample:", data)
-
-    if (data && data.length > 0) {
-      const firstClass = data[0]
-      console.log("[v0] Spell slot columns check:")
-      console.log("[v0] spell_slots_1:", firstClass.spell_slots_1)
-      console.log("[v0] spell_slots_2:", firstClass.spell_slots_2)
-      console.log("[v0] cantrips_known:", firstClass.cantrips_known)
-      console.log("[v0] spells_known:", firstClass.spells_known)
-    }
-  } catch (error) {
-    console.error("[v0] Exception testing classes table:", error)
-  }
-}

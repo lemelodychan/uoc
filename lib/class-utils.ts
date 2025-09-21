@@ -79,7 +79,6 @@ export function calculateProficiencyBonus(level: number): number {
 // Get max spell slots for a character based on class and level
 // DEPRECATED: Use calculateSpellSlotsFromClass from spell-slot-calculator.ts instead
 export function getMaxSpellSlots(level: number, classData?: ClassData): SpellSlot[] {
-  console.warn("[v0] getMaxSpellSlots is deprecated. Use calculateSpellSlotsFromClass instead.")
   if (!classData?.max_spell_slots) return []
 
   const levelData = classData.max_spell_slots[level.toString()]
@@ -98,22 +97,15 @@ export function getBardicInspirationData(
   charismaModifier: number,
   classData?: ClassData,
 ): BardicInspirationSlot | null {
-  console.log("[DEBUG] getBardicInspirationData called:", {
-    level,
-    charismaModifier,
-    className: classData?.name,
-    classFeatures: classData?.class_features
-  })
-
-  if (classData?.name.toLowerCase() !== "bard") {
-    console.log("[DEBUG] Not a Bard class, returning null")
+  // For multiclassing, we might not have classData, so we assume it's for a Bard
+  // The caller should ensure this is only called for Bard levels
+  if (classData && classData.name.toLowerCase() !== "bard") {
     return null
   }
 
   // For Bards, Bardic Inspiration is available from level 1, so we don't need to check level features
   // Just check if it's a Bard and level >= 1
   if (level < 1) {
-    console.log("[DEBUG] Level too low for Bardic Inspiration, returning null")
     return null
   }
 
@@ -126,23 +118,18 @@ export function getBardicInspirationData(
   // Uses per rest is typically Charisma modifier
   const usesPerRest = Math.max(1, charismaModifier)
 
-  const result = {
+  return {
     dieType,
     usesPerRest,
     currentUses: usesPerRest,
   }
-
-  console.log("[DEBUG] getBardicInspirationData returning:", result)
-  return result
 }
 
 // Get song of rest data for bards
 export function getSongOfRestData(level: number, classData?: ClassData): SongOfRest | null {
-  // Multiple safeguards to ensure only Bard classes get Song of Rest
-  if (!classData) return null
-  
-  // Primary check: class name must be "bard"
-  if (classData.name.toLowerCase() !== "bard") return null
+  // For multiclassing, we might not have classData, so we assume it's for a Bard
+  // The caller should ensure this is only called for Bard levels
+  if (classData && classData.name.toLowerCase() !== "bard") return null
   
   // Song of Rest starts at level 2
   if (level < 2) return null
@@ -160,11 +147,42 @@ export function getSongOfRestData(level: number, classData?: ClassData): SongOfR
 }
 
 // Get cantrips known based on class and level
-export function getCantripsKnown(level: number, classData?: ClassData): number {
+export function getCantripsKnown(level: number, classData?: ClassData, className?: string, character?: any): number {
+  // Handle multiclassing
+  if (character?.classes && character.classes.length > 0) {
+    return getMulticlassCantripsKnown(character)
+  }
+
+  // For Warlocks, use the Warlock-specific calculation
+  if (className?.toLowerCase() === "warlock") {
+    const { getWarlockCantripsKnown } = require('./character-data')
+    return getWarlockCantripsKnown(level)
+  }
+
   if (!classData?.spell_progression) return 0
 
   const levelData = classData.spell_progression[level.toString()]
   return levelData?.cantrips || 0
+}
+
+// Calculate cantrips known for multiclassed characters
+export function getMulticlassCantripsKnown(character: any): number {
+  const { getSpellcastingClasses, getWarlockCantripsKnown } = require('./character-data')
+  const spellcastingClasses = getSpellcastingClasses(character.classes)
+  let totalCantripsKnown = 0
+  
+  for (const charClass of spellcastingClasses) {
+    if (charClass.name.toLowerCase() === "warlock") {
+      totalCantripsKnown += getWarlockCantripsKnown(charClass.level)
+    } else {
+      // For other spellcasting classes, use a simplified calculation
+      // In practice, you'd want to load class data for each class
+      const baseCantrips = Math.max(2, Math.floor(charClass.level / 4) + 2) // Rough approximation
+      totalCantripsKnown += baseCantrips
+    }
+  }
+  
+  return totalCantripsKnown
 }
 
 // Get spells known based on class and level
@@ -191,7 +209,7 @@ export async function updateCharacterWithClassData(
       ...character.spellData,
       spellAttackBonus: calculateSpellAttackBonus(character, classData, proficiencyBonus),
       spellSaveDC: calculateSpellSaveDC(character, classData, proficiencyBonus),
-      cantripsKnown: getCantripsKnown(character.level, classData),
+      cantripsKnown: getCantripsKnown(character.level, classData, character.class),
       spellsKnown: getSpellsKnown(character, classData),
       spellSlots: calculatedSpellSlots, // Use new system
       bardicInspirationSlot: getBardicInspirationData(character.level, charismaModifier, classData),

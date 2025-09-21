@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Toggle } from "@/components/ui/toggle"
@@ -9,11 +9,14 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectLabel, SelectGroup } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, X, ChevronDown, ChevronRight, Trash2 } from "lucide-react"
+import { Plus, X, ChevronDown, ChevronRight, Trash2, BookOpen } from "lucide-react"
 import type { CharacterData, SpellData, Spell } from "@/lib/character-data"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { SpellLibraryModal, SpellLibraryModalRef } from "./spell-library-modal"
+import { SpellCreationModal } from "./spell-creation-modal"
+import { useToast } from "@/hooks/use-toast"
 
 interface SpellListModalProps {
   isOpen: boolean
@@ -37,6 +40,8 @@ const castingTimeOptions = ["1 Action", "1 Bonus Action", "1 Reaction"]
 const ritualCastingTimes = ["1 Minute", "10 Minutes", "1 Hour", "8 Hours", "12 Hours", "24 Hours"]
 
 export function SpellListModal({ isOpen, onClose, character, onSave }: SpellListModalProps) {
+  const { toast } = useToast()
+  const spellLibraryRef = useRef<SpellLibraryModalRef>(null)
   const [spells, setSpells] = useState<Spell[]>(character.spellData.spells || [])
   const [newSpell, setNewSpell] = useState<Partial<Spell>>({
     name: "",
@@ -54,6 +59,10 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
     higherLevel: "",
   })
   const [newSpellModalOpen, setNewSpellModalOpen] = useState(false)
+  const [spellLibraryModalOpen, setSpellLibraryModalOpen] = useState(false)
+  const [spellCreationModalOpen, setSpellCreationModalOpen] = useState(false)
+  const [editingSpellId, setEditingSpellId] = useState<string | null>(null)
+  const [editingSpellClasses, setEditingSpellClasses] = useState<string[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [editIndex, setEditIndex] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<string>("basic")
@@ -81,6 +90,239 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
   // Deprecated explicit save; we patch on every CRUD action.
   const handleSave = () => {
     onSave({ spells })
+  }
+
+  const handleAddSpellFromLibrary = (spell: Spell) => {
+    setSpells((prev: Spell[]) => {
+      const next = [...prev, spell]
+      onSave({ spells: next })
+      return next
+    })
+    setSpellLibraryModalOpen(false)
+  }
+
+  const handleCreateNewSpell = async (spell: Spell, classes: string[]) => {
+    try {
+      // First, save to library via API
+      const response = await fetch('/api/spells', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ spell, classes }),
+      })
+
+      if (response.ok) {
+        // Then add to character's spell list
+        setSpells((prev: Spell[]) => {
+          const next = [...prev, spell]
+          onSave({ spells: next })
+          return next
+        })
+        
+        toast({
+          title: "Spell Created",
+          description: `"${spell.name}" has been added to the library and your character's spell list.`,
+        })
+        
+        // Refresh the spell library to show the new spell
+        if (spellLibraryRef.current) {
+          spellLibraryRef.current.refreshLibrary()
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        toast({
+          title: "Failed to Save Spell",
+          description: errorData.error || "An error occurred while saving the spell to the library.",
+          variant: "destructive",
+        })
+        return // Don't add to character if library save failed
+      }
+    } catch (error) {
+      console.error('Error saving spell to library:', error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while saving the spell.",
+        variant: "destructive",
+      })
+      return // Don't add to character if library save failed
+    }
+    
+    setSpellCreationModalOpen(false)
+  }
+
+  const handleSaveToLibraryOnly = async (spell: Spell, classes: string[]) => {
+    try {
+      // Save to library via API
+      const response = await fetch('/api/spells', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ spell, classes }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Spell Saved to Library",
+          description: `"${spell.name}" has been saved to the library.`,
+        })
+        
+        // Refresh the spell library to show the new spell
+        if (spellLibraryRef.current) {
+          spellLibraryRef.current.refreshLibrary()
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        toast({
+          title: "Failed to Save Spell",
+          description: errorData.error || "An error occurred while saving the spell to the library.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error saving spell to library:', error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while saving the spell.",
+        variant: "destructive",
+      })
+    }
+    setSpellCreationModalOpen(false)
+  }
+
+  const handleEditLibrarySpell = (librarySpell: any) => {
+    // Convert library spell to character spell format for editing
+    const characterSpell: Spell = {
+      name: librarySpell.name,
+      level: librarySpell.level,
+      school: librarySpell.school,
+      isPrepared: false,
+      castingTime: librarySpell.casting_time,
+      range: librarySpell.range_area,
+      duration: librarySpell.duration,
+      components: librarySpell.components,
+      saveThrow: librarySpell.save_throw || "",
+      damage: librarySpell.damage || "",
+      tag: "",
+      description: librarySpell.description,
+      higherLevel: librarySpell.higher_levels || ""
+    }
+
+    // Store the spell ID and classes for updating
+    setEditingSpellId(librarySpell.id)
+    setEditingSpellClasses(librarySpell.classes || [])
+    // Open the spell creation modal with pre-filled data
+    setNewSpell(characterSpell)
+    setSpellCreationModalOpen(true)
+  }
+
+  const handleUpdateLibrarySpell = async (spellId: string, spell: Spell, classes: string[]) => {
+    try {
+      // Update the spell in the library
+      const response = await fetch(`/api/spells/${spellId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ spell, classes }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Spell Updated",
+          description: `"${spell.name}" has been updated in the library.`,
+        })
+        
+        // Refresh the spell library to show the updated spell
+        if (spellLibraryRef.current) {
+          spellLibraryRef.current.refreshLibrary()
+        }
+        // Clear the editing state
+        setEditingSpellId(null)
+        setEditingSpellClasses([])
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        toast({
+          title: "Failed to Update Spell",
+          description: errorData.error || "An error occurred while updating the spell.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error updating spell in library:', error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while updating the spell.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAddSpellToLibrary = async (spell: Spell) => {
+    try {
+      // Check if spell already exists in library (case insensitive)
+      const response = await fetch('/api/spells')
+      if (response.ok) {
+        const librarySpells = await response.json()
+        const exists = librarySpells.some((libSpell: any) => 
+          libSpell.name.toLowerCase() === spell.name.toLowerCase()
+        )
+
+        if (exists) {
+          toast({
+            title: "Spell Already Exists",
+            description: `"${spell.name}" is already in the library.`,
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Get character's classes for the spell (multiclass support)
+        const characterClasses = character.classes?.map(c => c.name) || [character.class]
+        
+        // Save to library
+        const saveResponse = await fetch('/api/spells', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ spell, classes: characterClasses }),
+        })
+
+        if (saveResponse.ok) {
+          toast({
+            title: "Spell Added to Library",
+            description: `"${spell.name}" has been added to the library with classes: ${characterClasses.join(', ')}.`,
+          })
+          
+          // Refresh the spell library to show the new spell
+          if (spellLibraryRef.current) {
+            spellLibraryRef.current.refreshLibrary()
+          }
+        } else {
+          const errorData = await saveResponse.json().catch(() => ({}))
+          toast({
+            title: "Failed to Add Spell",
+            description: errorData.error || "An error occurred while adding the spell to the library.",
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "Failed to Check Library",
+          description: "Could not verify if the spell already exists in the library.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error adding spell to library:', error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while adding the spell to the library.",
+        variant: "destructive",
+      })
+    }
   }
 
   const addSpell = () => {
@@ -356,44 +598,63 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
             ))}
           </Tabs>
 
-          {/* Footer with Add New Spell button */}
-          <div className="pt-4 border-t flex items-center justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setEditIndex(null)
-                setNewSpell({
-                  name: "",
-                  level: 0,
-                  school: "Abjuration",
-                  isPrepared: false,
-                  castingTime: "1 Action",
-                  range: "",
-                  duration: "",
-                  components: { v: false, s: false, m: false, material: "" },
-                  saveThrow: "",
-                  damage: "",
-                  tag: "",
-                  description: "",
-                  higherLevel: "",
-                })
-                setNewSpellModalOpen(true)
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              Add new spell
-            </Button>
+          {/* Footer with Add New Spell options */}
+          <div className="pt-4 border-t flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {spells.length} spell{spells.length !== 1 ? 's' : ''} in your list
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSpellLibraryModalOpen(true)}
+              >
+                <BookOpen className="w-4 h-4" />
+                Browse Library
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Clear any editing state when creating a new spell
+                  setEditIndex(null)
+                  setEditingSpellId(null)
+                  setEditingSpellClasses([])
+                  setNewSpell({
+                    name: "",
+                    level: 0,
+                    school: "Abjuration",
+                    isPrepared: false,
+                    castingTime: "1 Action",
+                    range: "",
+                    duration: "",
+                    components: { v: false, s: false, m: false, material: "" },
+                    saveThrow: "",
+                    damage: "",
+                    tag: "",
+                    description: "",
+                    higherLevel: "",
+                  })
+                  setNewSpellModalOpen(true)
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                Create Custom
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
     </Dialog>
     <Dialog open={newSpellModalOpen} onOpenChange={(open)=>{ if(!open){ setNewSpellModalOpen(false); } }}>
-      <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{editIndex !== null ? 'Edit Spell' : 'Add New Spell'}</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 align-start items-start justify-start">
+        
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto pr-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 align-start items-start justify-start">
           <div className="col-span-1 flex flex-col gap-2">
             <Label htmlFor="spellLevel">Level</Label>
             <Select value={newSpell.level?.toString()} onValueChange={(value)=>setNewSpell(prev=>({ ...prev, level: parseInt(value) }))}>
@@ -513,15 +774,93 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
             <Label htmlFor="higherLevel">At a Higher-Level Spell Slot</Label>
             <textarea id="higherLevel" className="w-full border rounded-md p-2 text-sm" rows={2} value={newSpell.higherLevel || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, higherLevel:e.target.value }))} />
           </div>
-          <div className="flex items-end gap-2">
-            <Button onClick={()=>{ addSpell(); setNewSpellModalOpen(false) }} className="w-full">
+          </div>
+        </div>
+
+        {/* Fixed Footer */}
+        <div className="flex justify-between items-center pt-4 border-t bg-background">
+          <Button variant="outline" onClick={()=> setNewSpellModalOpen(false)}>
+            Cancel
+          </Button>
+          <div className="flex gap-2">
+            {editIndex !== null && (
+              <Button variant="outline" onClick={() => {
+                const spellToAdd: Spell = {
+                  name: newSpell.name || "",
+                  school: newSpell.school || "Evocation",
+                  level: newSpell.level || 0,
+                  castingTime: newSpell.castingTime || "1 Action",
+                  range: newSpell.range || "",
+                  duration: newSpell.duration || "",
+                  components: newSpell.components || { v: false, s: false, m: false },
+                  damage: newSpell.damage || "",
+                  saveThrow: newSpell.saveThrow || "",
+                  description: newSpell.description || "",
+                  higherLevel: newSpell.higherLevel || "",
+                  tag: newSpell.tag || "",
+                  isPrepared: newSpell.isPrepared || false
+                }
+                handleAddSpellToLibrary(spellToAdd)
+              }}>
+                Add to Library
+              </Button>
+            )}
+            <Button onClick={()=>{ addSpell(); setNewSpellModalOpen(false) }}>
               {editIndex !== null ? 'Save Changes' : 'Add Spell'}
             </Button>
-            <Button variant="outline" onClick={()=> setNewSpellModalOpen(false)} className="w-full">Close</Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Spell Library Modal */}
+    <SpellLibraryModal
+      ref={spellLibraryRef}
+      isOpen={spellLibraryModalOpen}
+      onClose={() => setSpellLibraryModalOpen(false)}
+      character={character}
+      onAddSpell={handleAddSpellFromLibrary}
+      onCreateNewSpell={() => {
+        // Clear any editing state when creating a new spell
+        setEditingSpellId(null)
+        setEditingSpellClasses([])
+        setNewSpell({
+          name: "",
+          level: 0,
+          school: "Abjuration",
+          isPrepared: false,
+          castingTime: "1 Action",
+          range: "",
+          duration: "",
+          components: { v: false, s: false, m: false, material: "" },
+          damage: "",
+          saveThrow: "",
+          tag: "",
+          description: "",
+          higherLevel: "",
+        })
+        setSpellLibraryModalOpen(false)
+        setSpellCreationModalOpen(true)
+      }}
+      onEditSpell={handleEditLibrarySpell}
+    />
+
+    {/* Spell Creation Modal */}
+    <SpellCreationModal
+      isOpen={spellCreationModalOpen}
+      onClose={() => {
+        setSpellCreationModalOpen(false)
+        setEditingSpellId(null)
+        setEditingSpellClasses([])
+      }}
+      character={character}
+      onSave={handleCreateNewSpell}
+      onSaveToLibraryOnly={handleSaveToLibraryOnly}
+      onUpdateLibrarySpell={handleUpdateLibrarySpell}
+      initialSpellData={newSpell}
+      initialClasses={editingSpellClasses}
+      editingSpellId={editingSpellId || undefined}
+    />
     </>
   )
 }

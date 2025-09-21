@@ -33,19 +33,14 @@ export function LanguagesModal({ isOpen, onClose, character, onSave }: Languages
         <DialogHeader>
           <DialogTitle>Edit Languages</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div>
-            <Label htmlFor="languages" className="text-sm font-medium">
-              Languages
-            </Label>
-            <RichTextEditor
-              value={languages}
-              onChange={setLanguages}
-              placeholder="List languages you know (e.g., **Common**, **Elvish**, **Draconic**)..."
-              rows={6}
-              className="mt-2"
-            />
-          </div>
+        <div className="grid gap-4">
+          <RichTextEditor
+            value={languages}
+            onChange={setLanguages}
+            placeholder="List languages you know (e.g., **Common**, **Elvish**, **Draconic**)..."
+            rows={6}
+            className="mt-2"
+          />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

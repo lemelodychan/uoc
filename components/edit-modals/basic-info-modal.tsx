@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, UserX, Skull } from "lucide-react"
+import { Users, UserX, Skull, Settings } from "lucide-react"
 import type { CharacterData } from "@/lib/character-data"
+import { MulticlassModal } from "./multiclass-modal"
 
 const DND_CLASSES = {
   Artificer: ["Artillerist"],
@@ -30,6 +31,7 @@ const DND_CLASSES = {
   ],
   Warlock: [
     "The Genie",
+    "The Raven Queen",
   ],
 } as const
 
@@ -53,6 +55,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     partyStatus: character.partyStatus || 'active',
     imageUrl: character.imageUrl || "",
   })
+  const [multiclassModalOpen, setMulticlassModalOpen] = useState(false)
 
   // Sync local state with character prop when it changes
   useEffect(() => {
@@ -120,41 +123,36 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
           </div>
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="class" className="text-right">
-              Class
+              Classes
             </Label>
-            <Select value={formData.class} onValueChange={handleClassChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a class" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.keys(DND_CLASSES).map((className) => (
-                  <SelectItem key={className} value={className}>
-                    {className}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-[112px_auto] items-center gap-3">
-            <Label htmlFor="subclass" className="text-right">
-              Subclass
-            </Label>
-            <Select
-              value={formData.subclass}
-              onValueChange={(value) => setFormData({ ...formData, subclass: value })}
-              disabled={!formData.class}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={formData.class ? "Select a subclass" : "Select class first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableSubclasses.map((subclass) => (
-                  <SelectItem key={subclass} value={subclass}>
-                    {subclass}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <div className="flex-1 min-h-[40px] p-2 border rounded-md bg-background">
+                {character.classes && character.classes.length > 1 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {character.classes.map((charClass, index) => (
+                      <div key={index} className="flex items-center gap-1 px-2 py-1 bg-secondary rounded text-sm">
+                        <span>{charClass.name} {charClass.level}</span>
+                        {charClass.subclass && <span className="text-muted-foreground">・{charClass.subclass}</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-secondary rounded text-sm">
+                    <span>{formData.class} {formData.level}</span>
+                    {formData.subclass && <span className="text-muted-foreground">・{formData.subclass}</span>}
+                  </div>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMulticlassModalOpen(true)}
+                title="Configure multiclassing"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="level" className="text-right">
@@ -258,6 +256,24 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
           <Button onClick={handleSave}>Save Changes</Button>
         </DialogFooter>
       </DialogContent>
+      
+      <MulticlassModal
+        isOpen={multiclassModalOpen}
+        onClose={() => setMulticlassModalOpen(false)}
+        character={character}
+        onSave={(updates) => {
+          // Update the form data with multiclass changes
+          if (updates.classes) {
+            setFormData({
+              ...formData,
+              class: updates.class || formData.class,
+              subclass: updates.subclass || formData.subclass,
+              level: updates.level || formData.level,
+            })
+          }
+          onSave(updates)
+        }}
+      />
     </Dialog>
   )
 }

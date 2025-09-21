@@ -1,12 +1,21 @@
+export interface CharacterClass {
+  name: string
+  subclass?: string
+  class_id?: string
+  level: number
+}
+
 export interface CharacterData {
   
   id: string
   name: string
+  // Legacy single class support (for backward compatibility)
   class: string
   subclass?: string
   class_id?: string
-  subclass_id?: string
   level: number
+  // New multiclassing support
+  classes: CharacterClass[]
   background: string
   race: string
   alignment: string
@@ -28,6 +37,13 @@ export interface CharacterData {
     used: number
     dieType: string
   }
+  // Multiclassing hit dice support
+  hitDiceByClass?: Array<{
+    className: string
+    dieType: string
+    total: number
+    used: number
+  }>
   personalityTraits?: string
   ideals?: string
   bonds?: string
@@ -60,6 +76,7 @@ export interface CharacterData {
     description: string
     source: string
     level: number
+    className?: string
   }>
   toolsProficiencies: ToolProficiency[]
   equipment: string
@@ -113,6 +130,7 @@ export interface Skill {
 export interface SavingThrowProficiency {
   ability: "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma"
   proficient: boolean
+  source?: string
 }
 
 export interface ToolProficiency {
@@ -129,6 +147,15 @@ export interface EquipmentProficiencies {
   simpleWeapons: boolean
   martialWeapons: boolean
   firearms: boolean
+  handCrossbows: boolean
+  longswords: boolean
+  rapiers: boolean
+  shortswords: boolean
+  scimitars: boolean
+  lightCrossbows: boolean
+  darts: boolean
+  slings: boolean
+  quarterstaffs: boolean
 }
 
 export interface EldritchCannon {
@@ -174,8 +201,8 @@ export interface FlashOfGeniusSlot {
 }
 
 export interface FeatSpellSlot {
-  name: string // e.g., "Fey Touched", "Magic Initiate"
-  spells: string[] // spell names
+  spellName: string // e.g., "Misty Step", "Bless"
+  featName: string // e.g., "Fey Touched", "Magic Initiate"
   usesPerLongRest: number
   currentUses: number
 }
@@ -264,6 +291,28 @@ export interface SpellData {
     usesPerLongRest: number
     currentUses: number
     longRestCooldown: number
+  }
+  // Raven Queen Warlock features
+  sentinelRaven?: {
+    isActive: boolean
+    isPerched: boolean
+    currentHP: number
+    maxHP: number
+    lastCalled: string
+  }
+  soulOfTheRaven?: {
+    isMerged: boolean
+    usesPerLongRest: number
+    currentUses: number
+  }
+  ravensShield?: {
+    hasAdvantageOnDeathSaves: boolean
+    isImmuneToFrightened: boolean
+    hasNecroticResistance: boolean
+  }
+  queensRightHand?: {
+    usesPerLongRest: number
+    currentUses: number
   }
   spellNotes: string
   spells: Spell[]
@@ -357,6 +406,15 @@ export const createDefaultSkills = (): Skill[] => {
   }))
 }
 
+export const createClassBasedSkills = (classSkillProficiencies: string[] = []): Skill[] => {
+  const defaultSkillsList = createDefaultSkills()
+  
+  return defaultSkillsList.map(skill => ({
+    ...skill,
+    proficiency: classSkillProficiencies.includes(skill.name) ? "proficient" as ProficiencyLevel : "none" as ProficiencyLevel
+  }))
+}
+
 export const createDefaultSavingThrowProficiencies = (): SavingThrowProficiency[] => {
   const abilities: Array<"strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma"> = [
     "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"
@@ -440,38 +498,119 @@ export const calculateSavingThrowBonus = (
   return bonus
 }
 
-// Calculate spell save DC based on class and ability scores
+// Get the primary spellcasting ability for a class
+export const getSpellcastingAbility = (className: string): string => {
+  const spellcastingAbilities: Record<string, string> = {
+    'artificer': 'intelligence',
+    'bard': 'charisma',
+    'cleric': 'wisdom',
+    'druid': 'wisdom',
+    'paladin': 'charisma',
+    'ranger': 'wisdom',
+    'sorcerer': 'charisma',
+    'warlock': 'charisma',
+    'wizard': 'intelligence',
+    'rogue': 'intelligence', // Arcane Trickster
+    'fighter': 'intelligence', // Eldritch Knight
+    'monk': 'wisdom', // Way of the Four Elements
+    'barbarian': 'wisdom', // Path of the Totem Warrior (some features)
+  }
+  
+  return spellcastingAbilities[className.toLowerCase()] || 'charisma'
+}
+
+// Get the highest spellcasting ability modifier for multiclass characters
+export const getMulticlassSpellcastingAbilityModifier = (character: CharacterData): number => {
+  if (!character.classes || character.classes.length <= 1) {
+    // Single class - use the primary class's spellcasting ability
+    const spellcastingAbility = getSpellcastingAbility(character.class)
+    const modifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
+    console.log(`[DEBUG] Single class ${character.class}: using ${spellcastingAbility} modifier = ${modifier}`)
+    return modifier
+  }
+  
+  // Multiclass - find the highest ability modifier among spellcasting classes
+  // Define which classes are spellcasters
+  const spellcastingClasses = ['artificer', 'bard', 'cleric', 'druid', 'paladin', 'ranger', 'sorcerer', 'warlock', 'wizard']
+  
+  const characterSpellcastingClasses = character.classes.filter(charClass => 
+    spellcastingClasses.includes(charClass.name.toLowerCase())
+  )
+  
+  if (characterSpellcastingClasses.length === 0) {
+    // No spellcasting classes, return 0
+    console.log('[DEBUG] No spellcasting classes found, returning 0')
+    return 0
+  }
+  
+  // Find the highest ability modifier among all spellcasting abilities
+  let highestModifier = -10 // Start with a very low value
+  let bestClass = ''
+  let bestAbility = ''
+  
+  for (const charClass of characterSpellcastingClasses) {
+    const ability = getSpellcastingAbility(charClass.name)
+    const modifier = calculateModifier(character[ability as keyof CharacterData] as number)
+    console.log(`[DEBUG] ${charClass.name}: ${ability} modifier = ${modifier}`)
+    if (modifier > highestModifier) {
+      highestModifier = modifier
+      bestClass = charClass.name
+      bestAbility = ability
+    }
+  }
+  
+  console.log(`[DEBUG] Multiclass spellcasting: using ${bestClass}'s ${bestAbility} modifier = ${highestModifier}`)
+  return highestModifier
+}
+
+// Calculate spell save DC based on class and ability scores (multiclass-aware)
 export const calculateSpellSaveDC = (
   character: CharacterData,
   classData?: any,
   proficiencyBonus?: number
 ): number => {
-  if (!classData?.primary_ability || !Array.isArray(classData.primary_ability) || classData.primary_ability.length === 0) {
-    return 8 // Default DC if no spellcasting ability
-  }
-  
-  const spellcastingAbility = classData.primary_ability[0].toLowerCase()
-  const abilityModifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
   const profBonus = proficiencyBonus || calculateProficiencyBonus(character.level)
   
-  return 8 + abilityModifier + profBonus
+  if (character.classes && character.classes.length > 1) {
+    // Multiclass - use the highest spellcasting ability modifier
+    const abilityModifier = getMulticlassSpellcastingAbilityModifier(character)
+    return 8 + abilityModifier + profBonus
+  } else {
+    // Single class - use the primary class's spellcasting ability
+    if (!classData?.primary_ability || !Array.isArray(classData.primary_ability) || classData.primary_ability.length === 0) {
+      return 8 // Default DC if no spellcasting ability
+    }
+    
+    const spellcastingAbility = classData.primary_ability[0].toLowerCase()
+    const abilityModifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
+    
+    return 8 + abilityModifier + profBonus
+  }
 }
 
-// Calculate spell attack bonus based on class and ability scores
+// Calculate spell attack bonus based on class and ability scores (multiclass-aware)
 export const calculateSpellAttackBonus = (
   character: CharacterData,
   classData?: any,
   proficiencyBonus?: number
 ): number => {
-  if (!classData?.primary_ability || !Array.isArray(classData.primary_ability) || classData.primary_ability.length === 0) {
-    return 0 // No spell attack bonus if no spellcasting ability
-  }
-  
-  const spellcastingAbility = classData.primary_ability[0].toLowerCase()
-  const abilityModifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
   const profBonus = proficiencyBonus || calculateProficiencyBonus(character.level)
   
-  return abilityModifier + profBonus
+  if (character.classes && character.classes.length > 1) {
+    // Multiclass - use the highest spellcasting ability modifier
+    const abilityModifier = getMulticlassSpellcastingAbilityModifier(character)
+    return abilityModifier + profBonus
+  } else {
+    // Single class - use the primary class's spellcasting ability
+    if (!classData?.primary_ability || !Array.isArray(classData.primary_ability) || classData.primary_ability.length === 0) {
+      return 0 // No spell attack bonus if no spellcasting ability
+    }
+    
+    const spellcastingAbility = classData.primary_ability[0].toLowerCase()
+    const abilityModifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
+    
+    return abilityModifier + profBonus
+  }
 }
 
 // Calculate spells known for Artificers (Intelligence modifier + half artificer level, minimum 1)
@@ -495,15 +634,6 @@ export const calculatePaladinSpellsKnown = (character: CharacterData): number =>
   const charismaModifier = calculateModifier(character.charisma)
   const halfLevel = Math.floor(character.level / 2)
   const result = Math.max(1, charismaModifier + halfLevel)
-  
-  console.log("[DEBUG] calculatePaladinSpellsKnown:", {
-    class: character.class,
-    level: character.level,
-    charisma: character.charisma,
-    charismaModifier,
-    halfLevel,
-    result
-  })
   
   return result
 }
@@ -637,7 +767,9 @@ export const countUniqueFeatSpells = (character: CharacterData): number => {
   if (!character.spellData?.featSpellSlots?.length) return 0
   const set = new Set<string>()
   character.spellData.featSpellSlots.forEach(slot => {
-    slot.spells.forEach(name => set.add(name.trim().toLowerCase()))
+    if (slot.spellName) {
+      set.add(slot.spellName.trim().toLowerCase())
+    }
   })
   return set.size
 }
@@ -727,37 +859,35 @@ export const getAdditionalSpellsFromClassFeatures = (character: CharacterData): 
   return additionalSpells
 }
 
-// Get spells known based on class data or calculate for Artificers and Paladins
+// Get spells known based on class data or calculate for Artificers, Paladins, and Warlocks
 export const getSpellsKnown = (
   character: CharacterData,
   classData?: any,
   storedValue?: number
 ): number => {
-  console.log("[DEBUG] getSpellsKnown called:", {
-    class: character.class,
-    level: character.level,
-    storedValue,
-    charisma: character.charisma
-  })
-  
   // If there's a stored value (from database), use it
   if (storedValue !== undefined && storedValue !== null) {
-    console.log("[DEBUG] Using stored value:", storedValue)
     return storedValue
+  }
+  
+  // Handle multiclassing
+  if (character.classes && character.classes.length > 0) {
+    return getMulticlassSpellsKnown(character)
+  }
+  
+  // For Warlocks, use the Warlock-specific calculation
+  if (character.class.toLowerCase() === "warlock") {
+    return getWarlockSpellsKnown(character.level)
   }
   
   // For Artificers, use the dynamic calculation
   if (character.class.toLowerCase() === "artificer") {
-    const result = calculateArtificerSpellsKnown(character)
-    console.log("[DEBUG] Artificer calculation result:", result)
-    return result
+    return calculateArtificerSpellsKnown(character)
   }
   
   // For Paladins, use the dynamic calculation
   if (character.class.toLowerCase() === "paladin") {
-    const result = calculatePaladinSpellsKnown(character)
-    console.log("[DEBUG] Paladin calculation result:", result)
-    return result
+    return calculatePaladinSpellsKnown(character)
   }
   
   // For other classes, use the class data if available
@@ -777,6 +907,33 @@ export const getSpellsKnown = (
   }
   
   return 0
+}
+
+// Calculate spells known for multiclassed characters
+export const getMulticlassSpellsKnown = (character: CharacterData): number => {
+  const spellcastingClasses = getSpellcastingClasses(character.classes)
+  let totalSpellsKnown = 0
+  
+  for (const charClass of spellcastingClasses) {
+    if (charClass.name.toLowerCase() === "warlock") {
+      totalSpellsKnown += getWarlockSpellsKnown(charClass.level)
+    } else if (charClass.name.toLowerCase() === "artificer") {
+      // Create a temporary character with just this class for calculation
+      const tempCharacter = { ...character, class: charClass.name, level: charClass.level }
+      totalSpellsKnown += calculateArtificerSpellsKnown(tempCharacter)
+    } else if (charClass.name.toLowerCase() === "paladin") {
+      // Create a temporary character with just this class for calculation
+      const tempCharacter = { ...character, class: charClass.name, level: charClass.level }
+      totalSpellsKnown += calculatePaladinSpellsKnown(tempCharacter)
+    } else {
+      // For other classes, use a simplified calculation based on level
+      // This is a rough approximation - in practice, you'd want to load class data
+      const baseSpells = Math.max(2, charClass.level) // Minimum 2 spells known
+      totalSpellsKnown += baseSpells
+    }
+  }
+  
+  return totalSpellsKnown
 }
 
 export const classFeatureTemplates = {
@@ -900,6 +1057,32 @@ export const getWarlockSpellSlots = (level: number): SpellSlot[] => {
   return slots
 }
 
+// Raven Queen Warlock helper functions
+export const createSentinelRaven = () => ({
+  isActive: true,
+  isPerched: true,
+  currentHP: 1,
+  maxHP: 1,
+  lastCalled: new Date().toISOString()
+})
+
+export const createSoulOfTheRaven = (level: number) => ({
+  isMerged: false,
+  usesPerLongRest: level >= 6 ? 1 : 0,
+  currentUses: level >= 6 ? 1 : 0
+})
+
+export const createRavensShield = (level: number) => ({
+  hasAdvantageOnDeathSaves: level >= 10,
+  isImmuneToFrightened: level >= 10,
+  hasNecroticResistance: level >= 10
+})
+
+export const createQueensRightHand = (level: number) => ({
+  usesPerLongRest: level >= 14 ? 1 : 0,
+  currentUses: level >= 14 ? 1 : 0
+})
+
 export const getWarlockSpellsKnown = (level: number): number => {
   // Warlock spells known progression
   const spellsKnown = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15]
@@ -911,6 +1094,376 @@ export const getWarlockCantripsKnown = (level: number): number => {
   if (level >= 10) return 4
   if (level >= 4) return 3
   return 2
+}
+
+// Multiclassing utility functions
+export const getTotalLevel = (classes: CharacterClass[]): number => {
+  return classes.reduce((total, charClass) => total + charClass.level, 0)
+}
+
+export const getPrimaryClass = (classes: CharacterClass[]): CharacterClass | null => {
+  if (classes.length === 0) return null
+  return classes.reduce((primary, charClass) => 
+    charClass.level > primary.level ? charClass : primary
+  )
+}
+
+export const getSpellcastingClasses = (classes: CharacterClass[]): CharacterClass[] => {
+  const spellcastingClasses = ['wizard', 'sorcerer', 'warlock', 'bard', 'cleric', 'druid', 'ranger', 'paladin', 'artificer']
+  return classes.filter(charClass => 
+    spellcastingClasses.includes(charClass.name.toLowerCase())
+  )
+}
+
+export const getHitDiceByClass = (classes: CharacterClass[]): Array<{
+  className: string
+  dieType: string
+  total: number
+  used: number
+}> => {
+  const hitDieTypes: Record<string, string> = {
+    'barbarian': 'd12',
+    'fighter': 'd10',
+    'paladin': 'd10',
+    'ranger': 'd10',
+    'artificer': 'd8',
+    'bard': 'd8',
+    'cleric': 'd8',
+    'druid': 'd8',
+    'monk': 'd8',
+    'rogue': 'd8',
+    'warlock': 'd8',
+    'wizard': 'd6',
+    'sorcerer': 'd6'
+  }
+
+  return classes.map(charClass => ({
+    className: charClass.name,
+    dieType: hitDieTypes[charClass.name.toLowerCase()] || 'd8',
+    total: charClass.level,
+    used: 0 // Will be loaded from database
+  }))
+}
+
+// Get saving throw proficiencies from all classes
+export const getMulticlassSavingThrowProficiencies = (classes: CharacterClass[]): SavingThrowProficiency[] => {
+  const classSavingThrows: Record<string, string[]> = {
+    'barbarian': ['strength', 'constitution'],
+    'bard': ['dexterity', 'charisma'],
+    'cleric': ['wisdom', 'charisma'],
+    'druid': ['intelligence', 'wisdom'],
+    'fighter': ['strength', 'constitution'],
+    'monk': ['strength', 'dexterity'],
+    'paladin': ['wisdom', 'charisma'],
+    'ranger': ['strength', 'dexterity'],
+    'rogue': ['dexterity', 'intelligence'],
+    'sorcerer': ['constitution', 'charisma'],
+    'warlock': ['wisdom', 'charisma'],
+    'wizard': ['intelligence', 'wisdom'],
+    'artificer': ['constitution', 'intelligence']
+  }
+
+  // Start with all six abilities, all non-proficient
+  const allAbilities: Array<"strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma"> = [
+    "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"
+  ]
+  
+  const proficiencies: SavingThrowProficiency[] = allAbilities.map(ability => ({
+    ability,
+    proficient: false
+  }))
+
+  // Mark the appropriate ones as proficient based on classes
+  const proficientAbilities = new Set<string>()
+  
+  for (const charClass of classes) {
+    const savingThrows = classSavingThrows[charClass.name.toLowerCase()] || []
+    for (const ability of savingThrows) {
+      proficientAbilities.add(ability)
+    }
+  }
+
+  // Update the proficiencies array
+  const result = proficiencies.map(proficiency => ({
+    ...proficiency,
+    proficient: proficientAbilities.has(proficiency.ability)
+  }))
+  
+  console.log('[DEBUG] getMulticlassSavingThrowProficiencies result:', result)
+  return result
+}
+
+// Get equipment proficiencies from all classes
+export const getMulticlassEquipmentProficiencies = (classes: CharacterClass[]): EquipmentProficiencies => {
+  const classEquipment: Record<string, Partial<EquipmentProficiencies>> = {
+    'barbarian': {
+      lightArmor: true,
+      mediumArmor: true,
+      shields: true,
+      simpleWeapons: true,
+      martialWeapons: true
+    },
+    'bard': {
+      lightArmor: true,
+      simpleWeapons: true,
+      handCrossbows: true,
+      longswords: true,
+      rapiers: true,
+      shortswords: true
+    },
+    'cleric': {
+      lightArmor: true,
+      mediumArmor: true,
+      shields: true,
+      simpleWeapons: true
+    },
+    'druid': {
+      lightArmor: true,
+      mediumArmor: true,
+      shields: true,
+      simpleWeapons: true,
+      scimitars: true
+    },
+    'fighter': {
+      lightArmor: true,
+      mediumArmor: true,
+      heavyArmor: true,
+      shields: true,
+      simpleWeapons: true,
+      martialWeapons: true
+    },
+    'monk': {
+      simpleWeapons: true,
+      shortswords: true
+    },
+    'paladin': {
+      lightArmor: true,
+      mediumArmor: true,
+      heavyArmor: true,
+      shields: true,
+      simpleWeapons: true,
+      martialWeapons: true
+    },
+    'ranger': {
+      lightArmor: true,
+      mediumArmor: true,
+      shields: true,
+      simpleWeapons: true,
+      martialWeapons: true
+    },
+    'rogue': {
+      lightArmor: true,
+      simpleWeapons: true,
+      handCrossbows: true,
+      longswords: true,
+      rapiers: true,
+      shortswords: true
+    },
+    'sorcerer': {
+      simpleWeapons: true,
+      lightCrossbows: true,
+      darts: true,
+      slings: true,
+      quarterstaffs: true
+    },
+    'warlock': {
+      lightArmor: true,
+      simpleWeapons: true
+    },
+    'wizard': {
+      simpleWeapons: true,
+      lightCrossbows: true,
+      darts: true,
+      slings: true,
+      quarterstaffs: true
+    },
+    'artificer': {
+      lightArmor: true,
+      mediumArmor: true,
+      shields: true,
+      simpleWeapons: true
+    }
+  }
+
+  const proficiencies: EquipmentProficiencies = {
+    lightArmor: false,
+    mediumArmor: false,
+    heavyArmor: false,
+    shields: false,
+    simpleWeapons: false,
+    martialWeapons: false,
+    firearms: false,
+    handCrossbows: false,
+    longswords: false,
+    rapiers: false,
+    shortswords: false,
+    scimitars: false,
+    lightCrossbows: false,
+    darts: false,
+    slings: false,
+    quarterstaffs: false
+  }
+
+  // Combine proficiencies from all classes
+  for (const charClass of classes) {
+    const classProficiencies = classEquipment[charClass.name.toLowerCase()] || {}
+    for (const [key, value] of Object.entries(classProficiencies)) {
+      if (value && key in proficiencies) {
+        (proficiencies as any)[key] = true
+      }
+    }
+  }
+
+  return proficiencies
+}
+
+// Calculate multiclassing spell slots according to D&D 5e rules
+export const getMulticlassSpellSlots = (classes: CharacterClass[]): SpellSlot[] => {
+  const spellcastingClasses = getSpellcastingClasses(classes)
+  const warlockClasses = classes.filter(charClass => charClass.name.toLowerCase() === "warlock")
+  
+  // Separate Warlock levels (Pact Magic) from other spellcasting classes
+  const nonWarlockSpellcasters = spellcastingClasses.filter(charClass => charClass.name.toLowerCase() !== "warlock")
+  
+  let spellSlots: SpellSlot[] = []
+  
+  // Calculate spell slots for non-Warlock spellcasters using multiclassing table
+  if (nonWarlockSpellcasters.length > 0) {
+    const totalSpellcasterLevel = nonWarlockSpellcasters.reduce((total, charClass) => {
+      // Each class contributes its full level to spellcaster level
+      return total + charClass.level
+    }, 0)
+    
+    // Use the standard multiclassing spell slot table
+    const multiclassSpellSlots = getMulticlassSpellSlotTable(totalSpellcasterLevel)
+    spellSlots = [...multiclassSpellSlots]
+  }
+  
+  // Add Warlock Pact Magic slots separately
+  if (warlockClasses.length > 0) {
+    const totalWarlockLevel = warlockClasses.reduce((total, charClass) => total + charClass.level, 0)
+    const warlockSlots = getWarlockSpellSlots(totalWarlockLevel)
+    spellSlots = [...spellSlots, ...warlockSlots]
+  }
+  
+  return spellSlots
+}
+
+// D&D 5e multiclassing spell slot table (from Player's Handbook page 165)
+const getMulticlassSpellSlotTable = (totalLevel: number): SpellSlot[] => {
+  // Official D&D 5e Multiclass Spellcaster table
+  const multiclassSpellSlots = [
+    // Level 1: 2 first-level slots
+    [{ level: 1, total: 2, used: 0 }],
+    // Level 2: 3 first-level slots  
+    [{ level: 1, total: 3, used: 0 }],
+    // Level 3: 4 first-level, 2 second-level slots
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 2, used: 0 }],
+    // Level 4: 4 first-level, 3 second-level slots
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }],
+    // Level 5: 4 first-level, 3 second-level, 2 third-level slots
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 2, used: 0 }],
+    // Level 6: 4 first-level, 3 second-level, 3 third-level slots
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }],
+    // Level 7: 4 first-level, 3 second-level, 3 third-level, 1 fourth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 1, used: 0 }],
+    // Level 8: 4 first-level, 3 second-level, 3 third-level, 2 fourth-level slots
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 2, used: 0 }],
+    // Level 9: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 1 fifth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 1, used: 0 }],
+    // Level 10: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 2 fifth-level slots
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 2, used: 0 }],
+    // Level 11: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 2 fifth-level, 1 sixth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 2, used: 0 }, { level: 6, total: 1, used: 0 }],
+    // Level 12: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 2 fifth-level, 1 sixth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 2, used: 0 }, { level: 6, total: 1, used: 0 }],
+    // Level 13: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 2 fifth-level, 1 sixth-level, 1 seventh-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 2, used: 0 }, { level: 6, total: 1, used: 0 }, { level: 7, total: 1, used: 0 }],
+    // Level 14: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 2 fifth-level, 1 sixth-level, 1 seventh-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 2, used: 0 }, { level: 6, total: 1, used: 0 }, { level: 7, total: 1, used: 0 }],
+    // Level 15: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 2 fifth-level, 1 sixth-level, 1 seventh-level, 1 eighth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 2, used: 0 }, { level: 6, total: 1, used: 0 }, { level: 7, total: 1, used: 0 }, { level: 8, total: 1, used: 0 }],
+    // Level 16: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 2 fifth-level, 1 sixth-level, 1 seventh-level, 1 eighth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 2, used: 0 }, { level: 6, total: 1, used: 0 }, { level: 7, total: 1, used: 0 }, { level: 8, total: 1, used: 0 }],
+    // Level 17: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 2 fifth-level, 1 sixth-level, 1 seventh-level, 1 eighth-level, 1 ninth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 2, used: 0 }, { level: 6, total: 1, used: 0 }, { level: 7, total: 1, used: 0 }, { level: 8, total: 1, used: 0 }, { level: 9, total: 1, used: 0 }],
+    // Level 18: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 3 fifth-level, 1 sixth-level, 1 seventh-level, 1 eighth-level, 1 ninth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 3, used: 0 }, { level: 6, total: 1, used: 0 }, { level: 7, total: 1, used: 0 }, { level: 8, total: 1, used: 0 }, { level: 9, total: 1, used: 0 }],
+    // Level 19: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 3 fifth-level, 2 sixth-level, 1 seventh-level, 1 eighth-level, 1 ninth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 3, used: 0 }, { level: 6, total: 2, used: 0 }, { level: 7, total: 1, used: 0 }, { level: 8, total: 1, used: 0 }, { level: 9, total: 1, used: 0 }],
+    // Level 20: 4 first-level, 3 second-level, 3 third-level, 3 fourth-level, 3 fifth-level, 2 sixth-level, 2 seventh-level, 1 eighth-level, 1 ninth-level slot
+    [{ level: 1, total: 4, used: 0 }, { level: 2, total: 3, used: 0 }, { level: 3, total: 3, used: 0 }, { level: 4, total: 3, used: 0 }, { level: 5, total: 3, used: 0 }, { level: 6, total: 2, used: 0 }, { level: 7, total: 2, used: 0 }, { level: 8, total: 1, used: 0 }, { level: 9, total: 1, used: 0 }],
+  ]
+  
+  // Get the spell slots for the specified multiclass spellcaster level
+  const levelIndex = Math.min(totalLevel - 1, 19) // Convert to 0-based index, cap at 20
+  const slotsForLevel = multiclassSpellSlots[levelIndex]
+  
+  if (!slotsForLevel) {
+    return []
+  }
+  
+  // Return all the spell slots for this level
+  return slotsForLevel
+}
+
+// Get combined class features for multiclassed characters
+export const getMulticlassFeatures = async (character: CharacterData): Promise<{
+  bardicInspirationSlot?: any
+  songOfRest?: any
+  flashOfGeniusSlot?: any
+  divineSenseSlot?: any
+  layOnHands?: any
+  channelDivinitySlot?: any
+  cleansingTouchSlot?: any
+}> => {
+  const features: any = {}
+  
+  // Check for Bard features
+  const bardClasses = character.classes.filter(charClass => charClass.name.toLowerCase() === "bard")
+  if (bardClasses.length > 0) {
+    const totalBardLevel = bardClasses.reduce((total, charClass) => total + charClass.level, 0)
+    const charismaModifier = Math.floor((character.charisma - 10) / 2)
+    
+    // Import the functions we need
+    const { getBardicInspirationData, getSongOfRestData } = await import('./class-utils')
+    
+    features.bardicInspirationSlot = getBardicInspirationData(totalBardLevel, charismaModifier)
+    features.songOfRest = getSongOfRestData(totalBardLevel)
+  }
+  
+  // Check for Artificer features
+  const artificerClasses = character.classes.filter(charClass => charClass.name.toLowerCase() === "artificer")
+  if (artificerClasses.length > 0) {
+    const totalArtificerLevel = artificerClasses.reduce((total, charClass) => total + charClass.level, 0)
+    if (totalArtificerLevel >= 7) {
+      const intelligenceModifier = Math.floor((character.intelligence - 10) / 2)
+      features.flashOfGeniusSlot = {
+        usesPerRest: Math.max(1, intelligenceModifier),
+        currentUses: Math.max(1, intelligenceModifier),
+        replenishesOnLongRest: true
+      }
+    }
+  }
+  
+  // Check for Paladin features
+  const paladinClasses = character.classes.filter(charClass => charClass.name.toLowerCase() === "paladin")
+  if (paladinClasses.length > 0) {
+    const totalPaladinLevel = paladinClasses.reduce((total, charClass) => total + charClass.level, 0)
+    
+    // Import Paladin functions
+    const { getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData } = await import('./character-data')
+    
+    // Create a temporary character with Paladin level for calculations
+    const tempPaladinCharacter = { ...character, level: totalPaladinLevel }
+    
+    features.divineSenseSlot = getDivineSenseData(tempPaladinCharacter)
+    features.layOnHands = getLayOnHandsData(tempPaladinCharacter)
+    features.channelDivinitySlot = getChannelDivinityData(tempPaladinCharacter)
+    features.cleansingTouchSlot = getCleansingTouchData(tempPaladinCharacter)
+  }
+  
+  return features
 }
 
 export const getWarlockInvocationsKnown = (level: number): number => {
