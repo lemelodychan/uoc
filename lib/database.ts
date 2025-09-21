@@ -484,9 +484,15 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
           const { getMulticlassFeatures } = await import('./character-data')
           const multiclassFeatures = await getMulticlassFeatures(tempCharacter)
           return {
-            bardicInspirationSlot: multiclassFeatures.bardicInspirationSlot || undefined,
+            bardicInspirationSlot: multiclassFeatures.bardicInspirationSlot ? {
+              ...multiclassFeatures.bardicInspirationSlot,
+              currentUses: Math.max(0, multiclassFeatures.bardicInspirationSlot.usesPerRest - (data.bardic_inspiration_used || 0))
+            } : undefined,
             songOfRest: multiclassFeatures.songOfRest || undefined,
-            flashOfGeniusSlot: multiclassFeatures.flashOfGeniusSlot || undefined,
+            flashOfGeniusSlot: multiclassFeatures.flashOfGeniusSlot ? {
+              ...multiclassFeatures.flashOfGeniusSlot,
+              currentUses: Math.max(0, multiclassFeatures.flashOfGeniusSlot.usesPerRest - (data.flash_of_genius_used || 0))
+            } : undefined,
             divineSenseSlot: multiclassFeatures.divineSenseSlot || undefined,
             layOnHands: multiclassFeatures.layOnHands || undefined,
             channelDivinitySlot: multiclassFeatures.channelDivinitySlot || undefined,
@@ -789,9 +795,15 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
               const { getMulticlassFeatures } = await import('./character-data')
               const multiclassFeatures = await getMulticlassFeatures(tempCharacter)
               return {
-                bardicInspirationSlot: multiclassFeatures.bardicInspirationSlot || undefined,
+                bardicInspirationSlot: multiclassFeatures.bardicInspirationSlot ? {
+                  ...multiclassFeatures.bardicInspirationSlot,
+                  currentUses: Math.max(0, multiclassFeatures.bardicInspirationSlot.usesPerRest - (row.bardic_inspiration_used || 0))
+                } : undefined,
                 songOfRest: multiclassFeatures.songOfRest || undefined,
-                flashOfGeniusSlot: multiclassFeatures.flashOfGeniusSlot || undefined,
+                flashOfGeniusSlot: multiclassFeatures.flashOfGeniusSlot ? {
+                  ...multiclassFeatures.flashOfGeniusSlot,
+                  currentUses: Math.max(0, multiclassFeatures.flashOfGeniusSlot.usesPerRest - (row.flash_of_genius_used || 0))
+                } : undefined,
                 divineSenseSlot: multiclassFeatures.divineSenseSlot || undefined,
                 layOnHands: multiclassFeatures.layOnHands || undefined,
                 channelDivinitySlot: multiclassFeatures.channelDivinitySlot || undefined,

@@ -28,6 +28,21 @@ export function CharacterSidebar({
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
+  // Helper function to format character level and class display
+  const getCharacterLevelDisplay = (character: CharacterData): string => {
+    if (character.classes && character.classes.length > 0) {
+      // Multiclass character
+      const totalLevel = character.classes.reduce((total, cls) => total + cls.level, 0)
+      const classDisplay = character.classes
+        .map(cls => cls.name)
+        .join('/')
+      return `Level ${totalLevel} ${classDisplay}`
+    } else {
+      // Single class character
+      return `Level ${character.level} ${character.class}`
+    }
+  }
+
   // Group characters by party status and sort alphabetically within each group
   const groupedCharacters = characters.reduce((groups, character) => {
     const status = character.partyStatus || 'active'
@@ -134,7 +149,7 @@ export function CharacterSidebar({
                                     <div className="flex-1 min-w-0">
                                       <div className="font-medium text-sidebar-foreground truncate">{character.name}</div>
                                       <div className="text-xs text-sidebar-foreground/70">
-                                        Level {character.level} {character.class}
+                                        {getCharacterLevelDisplay(character)}
                                       </div>
                                     </div>
                                   )}
@@ -145,7 +160,7 @@ export function CharacterSidebar({
                           {isCollapsed && (
                             <TooltipContent side="right" className="max-w-[220px] z-99 relative">
                               <div className="text-sm font-medium mb-0.5">{character.name}</div>
-                              <div className="text-xs text-muted-foreground mb-0.5">Level {character.level} {character.class}</div>
+                              <div className="text-xs text-muted-foreground mb-0.5">{getCharacterLevelDisplay(character)}</div>
                               {character.subclass && (
                                 <div className="text-xs text-muted-foreground mb-0.5">{character.subclass}</div>
                               )}
