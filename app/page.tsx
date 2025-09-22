@@ -102,6 +102,7 @@ export default function CharacterSheet() {
   const [featureNotesModalOpen, setFeatureNotesModalOpen] = useState(false)
   const [featureNotesDraft, setFeatureNotesDraft] = useState<string>("")
   const [featureImageDraft, setFeatureImageDraft] = useState<string>("")
+  const [featureOverflowMap, setFeatureOverflowMap] = useState<Record<number, boolean>>({})
   const [portraitModalOpen, setPortraitModalOpen] = useState(false)
   const [longRestModalOpen, setLongRestModalOpen] = useState(false)
   const [currentLongRestEvent, setCurrentLongRestEvent] = useState<LongRestEvent | null>(null)
@@ -2518,28 +2519,37 @@ export default function CharacterSheet() {
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground relative">
-                        <div className="line-clamp-2 max-h-20 overflow-hidden">
+                        <div
+                          className="line-clamp-2 max-h-20 overflow-hidden"
+                          ref={(el) => {
+                            if (!el) return
+                            const isOverflowing = el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth
+                            setFeatureOverflowMap((prev) => (prev[index] === isOverflowing ? prev : { ...prev, [index]: isOverflowing }))
+                          }}
+                        >
                           <RichTextDisplay content={feature.description} className="text-xs text-muted-foreground" />
                         </div>
-                        <div className="mt-2 flex justify-start">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="px-2 h-7 shadow-sm text-foreground"
-                            onClick={() => {
-                              setFeatureModalContent({ 
-                                title: feature.name, 
-                                description: feature.description,
-                                usesPerLongRest: feature.usesPerLongRest,
-                                refuelingDie: feature.refuelingDie
-                              })
-                              setFeatureModalIsClassFeature(false)
-                              setFeatureModalOpen(true)
-                            }}
-                          >
-                            Read more
-                          </Button>
-                        </div>
+                        {featureOverflowMap[index] && (
+                          <div className="mt-2 flex justify-start">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="px-2 h-7 shadow-sm text-foreground"
+                              onClick={() => {
+                                setFeatureModalContent({ 
+                                  title: feature.name, 
+                                  description: feature.description,
+                                  usesPerLongRest: feature.usesPerLongRest,
+                                  refuelingDie: feature.refuelingDie
+                                })
+                                setFeatureModalIsClassFeature(false)
+                                setFeatureModalOpen(true)
+                              }}
+                            >
+                              Read more
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
