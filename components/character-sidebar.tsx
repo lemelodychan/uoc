@@ -62,6 +62,21 @@ export function CharacterSidebar({
         return character.campaignId === selectedCampaignId
       })
 
+	// Global status groups for "All Campaigns" view
+	const globalStatusGroups = filteredCharacters.reduce((groups, character) => {
+		const status = character.partyStatus || 'active'
+		if (!groups[status]) {
+			groups[status] = []
+		}
+		groups[status].push(character)
+		return groups
+	}, {} as Record<string, CharacterData[]>)
+
+	// Sort characters in global groups alphabetically
+	Object.keys(globalStatusGroups).forEach(status => {
+		globalStatusGroups[status].sort((a, b) => a.name.localeCompare(b.name))
+	})
+
   // Group filtered characters by campaign, then by status
   const groupedByCampaign = filteredCharacters.reduce((groups, character) => {
     const campaignId = character.campaignId || 'no-campaign'
@@ -74,6 +89,13 @@ export function CharacterSidebar({
     groups[campaignId].characters.push(character)
     return groups
   }, {} as Record<string, { campaign: Campaign | null, characters: CharacterData[] }>)
+
+	// Count characters per campaign for campaign selector labels
+	const characterCountByCampaign = characters.reduce((counts, character) => {
+		const campaignId = character.campaignId || 'no-campaign'
+		counts[campaignId] = (counts[campaignId] || 0) + 1
+		return counts
+	}, {} as Record<string, number>)
 
   // Sort characters within each campaign by status, then alphabetically
   Object.keys(groupedByCampaign).forEach(campaignId => {
@@ -117,13 +139,7 @@ export function CharacterSidebar({
         <div className="flex items-center justify-between">
           {!isCollapsed && (
             <div>
-              <h2 className="text-lg font-semibold text-sidebar-foreground">Character Sheets</h2>
-              <div className="text-xs text-muted-foreground">
-                {selectedCampaignId === "all" 
-                  ? `${characters.length} total characters`
-                  : `${filteredCharacters.length} characters`
-                }
-              </div>
+              <h2 className="text-lg font-semibold text-sidebar-foreground">🎲 UOC DND 5e</h2>
             </div>
           )}
           <Button
@@ -137,32 +153,16 @@ export function CharacterSidebar({
         </div>
       </div>
 
-      <div className="p-4 flex flex-col gap-2 flex-1 min-h-0">
-        {/* Campaign Selector */}
-        {!isCollapsed && (campaigns || []).length > 0 && (
-            <Select value={selectedCampaignId} onValueChange={onCampaignChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select campaign" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Campaigns</SelectItem>
-              {(campaigns || []).map((campaign) => (
-                <SelectItem key={campaign.id} value={campaign.id}>
-                  {campaign.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+      <div className={`flex flex-col gap-2 flex-1 min-h-0 w-full ${isCollapsed ? "p-2" : "p-4"}`}>
 
         <div className="flex gap-2 mb-4">
           <Button
             onClick={onCreateCharacter}
             className={`flex-1 bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground ${
-              isCollapsed ? "px-2" : ""
+              isCollapsed ? "px-0 h-12" : ""
             }`}
           >
-            <UserRoundPlus className="w-4 h-4" />
+            <UserRoundPlus className={`${isCollapsed ? "w-6 h-6" : "w-4 h-4"}`} />
             {!isCollapsed && <span>New Character</span>}
           </Button>
           {!isCollapsed && (
@@ -177,25 +177,114 @@ export function CharacterSidebar({
           )}
         </div>
 
+        {/* Campaign Selector */}
+        {!isCollapsed && (campaigns || []).length > 0 && (
+            <Select value={selectedCampaignId} onValueChange={onCampaignChange}>
+            <SelectTrigger className="w-full text-md font-medium pl-8 relative">
+              <BookOpen className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" />
+              <SelectValue placeholder="Select campaign" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Campaigns</SelectItem>
+              {(campaigns || []).map((campaign) => {
+                const count = characterCountByCampaign[campaign.id] || 0
+                return (
+                  <SelectItem key={campaign.id} value={campaign.id}>
+                    {campaign.name}
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+        )}
+
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-4 flex flex-col gap-2">
             {/* Campaign Filter Summary */}
-            {Object.entries(groupedByCampaign).map(([campaignId, { campaign, characters: statusGroups }]) => {
+			{selectedCampaignId === 'all' ? (
+				// Single unified status grouping for All Campaigns
+				<div className="space-y-2 flex flex-col gap-2">
+					{statusOrder.map((status) => {
+						const charactersInStatus = (globalStatusGroups as unknown as Record<string, CharacterData[]>)[status] || []
+						if (charactersInStatus.length === 0) return null
+
+						const config = statusConfig[status]
+						const IconComponent = config.icon
+
+						return (
+							<div key={`all-${status}`} className="flex flex-col gap-3 mt-2">
+								{!isCollapsed && (
+									<div className="flex items-center gap-2 ml-1 text-sm">
+										<IconComponent className="w-4 h-4" />
+										<span className="text-sm font-medium">{config.label}</span>
+										<Badge variant="secondary" className="text-[10px] bg-white border-gray-200 text-sidebar-foreground">
+											{charactersInStatus.length}
+										</Badge>
+									</div>
+								)}
+								<TooltipProvider>
+									<div className="flex flex-col gap-2 w-full">
+										{charactersInStatus.map((character: CharacterData) => (
+											<Tooltip key={character.id}>
+												<TooltipTrigger asChild>
+													<Card
+														className={`cursor-pointer transition-colors mb-0 p-0 rounded-lg ${isCollapsed ? "w-full h-14" : "w-full h-auto"} ${
+															character.id === activeCharacterId
+																? "bg-sidebar-accent border-sidebar-primary"
+																: "hover:bg-sidebar-accent/25"
+														}`}
+														onClick={() => onSelectCharacter(character.id)}
+													>
+														<CardContent className={`${isCollapsed ? "w-full h-14 p-0" : "p-3"}`}>
+															<div className={`flex ${isCollapsed ? "items-center justify-center" : "items-center gap-3"}`}>
+																<div className={`${isCollapsed ? "w-full h-14" : "w-12 h-12"} rounded-md bg-sidebar-primary/20 flex items-center justify-center overflow-hidden`}>
+																	{character.imageUrl ? (
+																		<img 
+																			src={character.imageUrl} alt={character.name} 
+																			className="w-full h-full object-cover"
+																		/>
+																	) : (
+																		<User className={`${isCollapsed ? "w-4 h-4 p-0" : "w-12 h-14 p-3"} text-sidebar-primary`} />
+																	)}
+																</div>
+																{!isCollapsed && (
+																	<div className="flex-1 min-w-0">
+																		<div className="font-medium text-sidebar-foreground truncate">{character.name}</div>
+																		<div className="text-xs text-sidebar-foreground/70">
+																			{getCharacterLevelDisplay(character)}
+																		</div>
+																	</div>
+																)}
+															</div>
+														</CardContent>
+													</Card>
+												</TooltipTrigger>
+												{isCollapsed && (
+													<TooltipContent side="right" className="max-w-[220px] z-99 relative">
+														<div className="text-sm font-medium mb-0.5">{character.name}</div>
+														<div className="text-xs text-muted-foreground mb-0.5">{getCharacterLevelDisplay(character)}</div>
+														{character.subclass && (
+															<div className="text-xs text-muted-foreground mb-0.5">{character.subclass}</div>
+														)}
+														<div className="text-xs text-muted-foreground mb-0.5">{character.partyStatus || 'active'}</div>
+													</TooltipContent>
+												)}
+											</Tooltip>
+										))}
+									</div>
+								</TooltipProvider>
+							</div>
+						)
+					})}
+				</div>
+			) : (
+				Object.entries(groupedByCampaign).map(([campaignId, { campaign, characters: statusGroups }]) => {
               const hasCharacters = Object.values(statusGroups as unknown as Record<string, CharacterData[]>).some(chars => chars.length > 0)
               if (!hasCharacters) return null
 
               return (
                 <div key={campaignId} className="space-y-2 flex flex-col gap-2">
-                  {!isCollapsed && (
-                    <div className="flex items-center gap-2 px-1">
-                      <span className="text-md font-medium">
-                        {campaign ? campaign.name : 'No Campaign'}
-                      </span>
-                      <Badge variant="secondary" className="text-xs bg-white border-gray-200">
-                        {Object.values(statusGroups).flat().length}
-                      </Badge>
-                    </div>
-                  )}
+						{/* Campaign name header removed as requested */}
                   
                   {statusOrder.map((status) => {
                     const charactersInStatus = (statusGroups as unknown as Record<string, CharacterData[]>)[status] || []
@@ -205,13 +294,14 @@ export function CharacterSidebar({
                     const IconComponent = config.icon
 
                     return (
-                      <div key={`${campaignId}-${status}`} className="flex flex-col gap-2">
+                      <div key={`${campaignId}-${status}`} className="flex flex-col gap-3 mt-2">
                         {!isCollapsed && (
-                          <div className="flex items-center gap-2 ml-1">
-                            <IconComponent className="w-4 h-4 text-sidebar-foreground/50" />
-                            <span className="text-xs font-medium text-sidebar-foreground/50">
-                              {config.label}
-                            </span>
+										      <div className="flex items-center gap-2 ml-1 text-sm">
+                            <IconComponent className="w-4 h-4" />
+                            <span className="text-sm font-medium">{config.label}</span>
+                            <Badge variant="secondary" className="text-[10px] bg-white border-gray-200 text-sidebar-foreground">
+                              {charactersInStatus.length}
+                            </Badge>
                           </div>
                         )}
                         <TooltipProvider>
@@ -266,12 +356,13 @@ export function CharacterSidebar({
                       ))}
                           </div>
                         </TooltipProvider>
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })}
+						</div>
+						)
+					})}
+					</div>
+				)
+				})
+			)}
           </div>
         </ScrollArea>
       </div>
