@@ -333,15 +333,31 @@ export default function CharacterSheet() {
 
           // Set active campaign by default
           const activeCampaign = (dbCampaigns || []).find(c => c.isActive)
+          let selectedCampaignId = "all"
           if (activeCampaign) {
+            selectedCampaignId = activeCampaign.id
             setSelectedCampaignId(activeCampaign.id)
           }
 
+          // Filter characters based on selected campaign
+          const filteredCharacters = selectedCampaignId === "all" 
+            ? dbCharacters 
+            : dbCharacters.filter(character => {
+                if (selectedCampaignId === "no-campaign") {
+                  return !character.campaignId
+                }
+                return character.campaignId === selectedCampaignId
+              })
+
           const savedActiveCharacterId = loadActiveCharacterFromLocalStorage()
-          const validCharacterId =
-            savedActiveCharacterId && dbCharacters.find((c) => c.id === savedActiveCharacterId)
-              ? savedActiveCharacterId
-              : dbCharacters[0].id
+          let validCharacterId = savedActiveCharacterId && dbCharacters.find((c) => c.id === savedActiveCharacterId)
+            ? savedActiveCharacterId
+            : null
+
+          // If saved character is not in the filtered campaign, select first character from filtered list
+          if (!validCharacterId || !filteredCharacters.find(c => c.id === validCharacterId)) {
+            validCharacterId = filteredCharacters.length > 0 ? filteredCharacters[0].id : dbCharacters[0]?.id
+          }
 
           setActiveCharacterId(validCharacterId)
           saveActiveCharacterToLocalStorage(validCharacterId)
