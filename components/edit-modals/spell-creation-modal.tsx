@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { X, Plus } from "lucide-react"
 import type { CharacterData, Spell } from "@/lib/character-data"
 
@@ -450,23 +451,19 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
+                <RichTextEditor
                   value={spellData.description}
-                  onChange={(e) => setSpellData(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(value) => setSpellData(prev => ({ ...prev, description: value }))}
                   placeholder="Enter the full spell description..."
-                  rows={4}
                 />
               </div>
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="higher-level">At Higher Levels</Label>
-                <Textarea
-                  id="higher-level"
+                <RichTextEditor
                   value={spellData.higherLevel}
-                  onChange={(e) => setSpellData(prev => ({ ...prev, higherLevel: e.target.value }))}
+                  onChange={(value) => setSpellData(prev => ({ ...prev, higherLevel: value }))}
                   placeholder="Describe what happens when cast at higher levels..."
-                  rows={2}
                 />
               </div>
             </CardContent>

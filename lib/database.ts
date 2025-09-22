@@ -1,5 +1,5 @@
 import { createClient } from "./supabase"
-import type { CharacterData } from "./character-data"
+import type { CharacterData, Campaign } from "./character-data"
 import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, calculateProficiencyBonus, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData } from "./character-data"
 import { getBardicInspirationData, getSongOfRestData } from "./class-utils"
 
@@ -174,6 +174,7 @@ export const saveCharacter = async (
       personality_traits: character.personalityTraits || "",
       backstory: character.backstory || "",
       notes: character.notes || "",
+      campaign_id: character.campaignId || null,
       updated_at: new Date().toISOString(),
     }
 
@@ -422,6 +423,7 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       savingThrowProficiencies: savingThrowProficiencies,
       bardicInspirationUsed: data.bardic_inspiration_used || 0,
       partyStatus: 'active', // Default to 'active' for single character load (will be updated separately if needed)
+      campaignId: data.campaign_id || undefined,
     }
     
     // Load spell slots from database or calculate them if not available
@@ -734,6 +736,7 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           savingThrowProficiencies: savingThrowProficiencies,
           bardicInspirationUsed: row.bardic_inspiration_used || 0,
           partyStatus: row.party_status?.status || 'active', // Default to 'active' if no status found
+          campaignId: row.campaign_id || undefined,
         }
 
         // Load spell slots from database or calculate them if not available
@@ -1031,5 +1034,185 @@ export const loadAllClasses = async (): Promise<{ classes?: Array<{id: string, n
   } catch (error) {
     console.error("Error loading classes:", error)
     return { error: "Failed to load classes" }
+  }
+}
+
+// Campaign management functions
+export const createCampaign = async (campaign: Campaign): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from("campaigns")
+      .insert([{
+        id: campaign.id,
+        name: campaign.name,
+        description: campaign.description,
+        created_at: campaign.created_at,
+        updated_at: campaign.updated_at,
+        characters: campaign.characters,
+        is_active: campaign.isActive || false
+      }])
+
+    if (error) {
+      console.error("Error creating campaign:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error creating campaign:", error)
+    return { success: false, error: "Failed to create campaign" }
+  }
+}
+
+export const loadAllCampaigns = async (): Promise<{ campaigns?: Campaign[]; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("campaigns")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error loading campaigns:", error)
+      return { error: error.message }
+    }
+
+    const campaigns = (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      characters: row.characters || [],
+      isActive: row.is_active || false
+    }))
+
+    return { campaigns }
+  } catch (error) {
+    console.error("Error loading campaigns:", error)
+    return { error: "Failed to load campaigns" }
+  }
+}
+
+export const updateCampaign = async (campaign: Campaign): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from("campaigns")
+      .update({
+        name: campaign.name,
+        description: campaign.description,
+        updated_at: campaign.updated_at,
+        characters: campaign.characters,
+        is_active: campaign.isActive || false
+      })
+      .eq("id", campaign.id)
+
+    if (error) {
+      console.error("Error updating campaign:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating campaign:", error)
+    return { success: false, error: "Failed to update campaign" }
+  }
+}
+
+export const setActiveCampaign = async (campaignId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // First, deactivate all campaigns
+    const { error: deactivateError } = await supabase
+      .from("campaigns")
+      .update({ is_active: false })
+
+    if (deactivateError) {
+      console.error("Error deactivating campaigns:", deactivateError)
+      return { success: false, error: deactivateError.message }
+    }
+
+    // Then activate the selected campaign
+    const { error } = await supabase
+      .from("campaigns")
+      .update({ is_active: true })
+      .eq("id", campaignId)
+
+    if (error) {
+      console.error("Error setting active campaign:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error setting active campaign:", error)
+    return { success: false, error: "Failed to set active campaign" }
+  }
+}
+
+export const deleteCampaign = async (campaignId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // First, remove campaign association from all characters
+    const { error: updateError } = await supabase
+      .from("characters")
+      .update({ campaign_id: null })
+      .eq("campaign_id", campaignId)
+
+    if (updateError) {
+      console.error("Error removing campaign from characters:", updateError)
+      return { success: false, error: updateError.message }
+    }
+
+    // Then delete the campaign
+    const { error } = await supabase
+      .from("campaigns")
+      .delete()
+      .eq("id", campaignId)
+
+    if (error) {
+      console.error("Error deleting campaign:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting campaign:", error)
+    return { success: false, error: "Failed to delete campaign" }
+  }
+}
+
+export const assignCharacterToCampaign = async (characterId: string, campaignId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from("characters")
+      .update({ campaign_id: campaignId })
+      .eq("id", characterId)
+
+    if (error) {
+      console.error("Error assigning character to campaign:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error assigning character to campaign:", error)
+    return { success: false, error: "Failed to assign character to campaign" }
+  }
+}
+
+export const removeCharacterFromCampaign = async (characterId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from("characters")
+      .update({ campaign_id: null })
+      .eq("id", characterId)
+
+    if (error) {
+      console.error("Error removing character from campaign:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error removing character from campaign:", error)
+    return { success: false, error: "Failed to remove character from campaign" }
   }
 }

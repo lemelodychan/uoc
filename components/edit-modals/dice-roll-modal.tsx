@@ -21,6 +21,7 @@ interface DiceRollModalProps {
 type DiceType = "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100"
 type RollType = "damage" | "weapon-atk" | "ranged-atk" | "spell" | "saving-throw" | "ability-check" | "initiative" | "healing" | "other"
 type SavingThrowType = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma"
+type SkillType = "acrobatics" | "animal-handling" | "arcana" | "athletics" | "deception" | "history" | "insight" | "intimidation" | "investigation" | "medicine" | "nature" | "perception" | "performance" | "persuasion" | "religion" | "sleight-of-hand" | "stealth" | "survival" | "other"
 
 const DICE_OPTIONS: { value: DiceType; label: string; max: number }[] = [
   { value: "d4", label: "d4", max: 4 },
@@ -53,6 +54,28 @@ const SAVING_THROW_OPTIONS: { value: SavingThrowType; label: string }[] = [
   { value: "charisma", label: "Charisma" },
 ]
 
+const SKILL_OPTIONS: { value: SkillType; label: string; ability: string }[] = [
+  { value: "acrobatics", label: "Acrobatics", ability: "dexterity" },
+  { value: "animal-handling", label: "Animal Handling", ability: "wisdom" },
+  { value: "arcana", label: "Arcana", ability: "intelligence" },
+  { value: "athletics", label: "Athletics", ability: "strength" },
+  { value: "deception", label: "Deception", ability: "charisma" },
+  { value: "history", label: "History", ability: "intelligence" },
+  { value: "insight", label: "Insight", ability: "wisdom" },
+  { value: "intimidation", label: "Intimidation", ability: "charisma" },
+  { value: "investigation", label: "Investigation", ability: "intelligence" },
+  { value: "medicine", label: "Medicine", ability: "wisdom" },
+  { value: "nature", label: "Nature", ability: "intelligence" },
+  { value: "perception", label: "Perception", ability: "wisdom" },
+  { value: "performance", label: "Performance", ability: "charisma" },
+  { value: "persuasion", label: "Persuasion", ability: "charisma" },
+  { value: "religion", label: "Religion", ability: "intelligence" },
+  { value: "sleight-of-hand", label: "Sleight of Hand", ability: "dexterity" },
+  { value: "stealth", label: "Stealth", ability: "dexterity" },
+  { value: "survival", label: "Survival", ability: "wisdom" },
+  { value: "other", label: "Other", ability: "varies" },
+]
+
 const getDiceIcon = (diceType: DiceType) => {
   switch (diceType) {
     case "d4": return <Dice1 className="w-4 h-4" />
@@ -66,7 +89,7 @@ const getDiceIcon = (diceType: DiceType) => {
   }
 }
 
-const calculateAutoModifier = (character: CharacterData, rollType: RollType, savingThrowType?: SavingThrowType): number => {
+const calculateAutoModifier = (character: CharacterData, rollType: RollType, savingThrowType?: SavingThrowType, skillType?: SkillType): number => {
   const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level)
   
   switch (rollType) {
@@ -95,8 +118,38 @@ const calculateAutoModifier = (character: CharacterData, rollType: RollType, sav
       return calculateSavingThrowBonus(character, "dexterity", proficiencyBonus)
     
     case "ability-check":
-      // This would need to know which ability, default to DEX
-      return calculateModifier(character.dexterity)
+      // Calculate skill check modifier
+      if (skillType === "other") {
+        return 0 // Will be set manually for "Other"
+      }
+      
+      // Find the skill in character's skills
+      const skill = character.skills?.find(s => {
+        const skillOption = SKILL_OPTIONS.find(opt => opt.value === skillType)
+        return skillOption && s.name === skillOption.label
+      })
+      
+      if (skill) {
+        const abilityModifier = calculateModifier(character[skill.ability])
+        const proficiencyBonus = calculateProficiencyBonus(character.level)
+        
+        let skillModifier = abilityModifier
+        if (skill.proficiency === "proficient") {
+          skillModifier += proficiencyBonus
+        } else if (skill.proficiency === "expertise") {
+          skillModifier += proficiencyBonus * 2
+        }
+        
+        return skillModifier
+      }
+      
+      // Fallback to ability modifier if skill not found
+      const skillOption = SKILL_OPTIONS.find(opt => opt.value === skillType)
+      if (skillOption && skillOption.ability !== "varies") {
+        return calculateModifier(character[skillOption.ability as keyof CharacterData] as number)
+      }
+      
+      return modifier
     
     case "initiative":
       return calculateModifier(character.dexterity)
@@ -114,6 +167,7 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
   const [numDice, setNumDice] = useState(1)
   const [rollType, setRollType] = useState<RollType>("other")
   const [savingThrowType, setSavingThrowType] = useState<SavingThrowType>("dexterity")
+  const [skillType, setSkillType] = useState<SkillType>("acrobatics")
   const [modifier, setModifier] = useState(0)
   const [isRolling, setIsRolling] = useState(false)
   const [result, setResult] = useState<{
@@ -130,18 +184,19 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
       setNumDice(1)
       setRollType("other")
       setSavingThrowType("dexterity")
+      setSkillType("acrobatics")
       setModifier(0)
       setResult(null)
     }
   }, [isOpen])
 
-  // Auto-calculate modifier when roll type or saving throw type changes
+  // Auto-calculate modifier when roll type, saving throw type, or skill type changes
   useEffect(() => {
-    if (isOpen && rollType !== "other") {
-      const autoModifier = calculateAutoModifier(character, rollType, savingThrowType)
+    if (isOpen && rollType !== "other" && !(rollType === "ability-check" && skillType === "other")) {
+      const autoModifier = calculateAutoModifier(character, rollType, savingThrowType, skillType)
       setModifier(autoModifier)
     }
-  }, [rollType, savingThrowType, character, isOpen])
+  }, [rollType, savingThrowType, skillType, character, isOpen])
 
   const rollDice = async () => {
     setIsRolling(true)
@@ -262,13 +317,31 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
                 </Select>
               </div>
             )}
+            
+            {rollType === "ability-check" && (
+              <div className="space-y-2">
+                <Label htmlFor="skill-type">Skill</Label>
+                <Select value={skillType} onValueChange={(value: SkillType) => setSkillType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SKILL_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Modifier */}
           <div className="space-y-2">
             <Label htmlFor="modifier">
               Modifier
-              {rollType !== "other" && (
+              {rollType !== "other" && !(rollType === "ability-check" && skillType === "other") && (
                 <span className="text-xs text-muted-foreground ml-1">
                   (auto-calculated)
                 </span>
@@ -280,14 +353,21 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
               value={modifier}
               onChange={(e) => setModifier(parseInt(e.target.value) || 0)}
               placeholder="0"
-              className={rollType !== "other" ? "bg-muted/50" : ""}
+              className={rollType !== "other" && !(rollType === "ability-check" && skillType === "other") ? "bg-muted/50" : ""}
             />
-            {rollType !== "other" && (
+            {rollType !== "other" && !(rollType === "ability-check" && skillType === "other") && (
               <p className="text-xs text-muted-foreground">
                 {rollType === "saving-throw" 
                   ? `Based on your ${savingThrowType} modifier and proficiency. You can still modify manually.`
+                  : rollType === "ability-check"
+                  ? `Based on your skill proficiency and ability modifier. You can still modify manually.`
                   : "Based on your character's stats. You can still modify manually."
                 }
+              </p>
+            )}
+            {rollType === "ability-check" && skillType === "other" && (
+              <p className="text-xs text-muted-foreground">
+                Enter the modifier manually for this custom skill check
               </p>
             )}
           </div>

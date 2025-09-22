@@ -1,19 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Heart, Shield, Sparkles, Users, Moon } from "lucide-react"
-import type { CharacterData } from "@/lib/character-data"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Heart, Shield, Sparkles, Users, Moon, BookOpen } from "lucide-react"
+import type { CharacterData, Campaign } from "@/lib/character-data"
 
 interface LongRestModalProps {
   isOpen: boolean
   onClose: () => void
   characters: CharacterData[]
+  campaigns?: Campaign[]
+  selectedCampaignId?: string
   onConfirmLongRest: (selectedCharacterIds: string[]) => void
   longRestEvent?: {
     id: string
@@ -29,17 +32,38 @@ export function LongRestModal({
   isOpen,
   onClose,
   characters,
+  campaigns,
+  selectedCampaignId,
   onConfirmLongRest,
   longRestEvent,
   activeCharacterId,
 }: LongRestModalProps) {
   const [selectedCharacters, setSelectedCharacters] = useState<string[]>([])
+  const [modalSelectedCampaignId, setModalSelectedCampaignId] = useState<string>("all")
 
-  // Get active party members and preselect them
-  const activePartyMembers = characters.filter(char => char.partyStatus === 'active')
+  // Filter characters based on selected campaign using useMemo to prevent infinite loops
+  const filteredCharacters = useMemo(() => {
+    if (modalSelectedCampaignId === "all") {
+      return characters
+    }
+    return characters.filter(character => {
+      if (modalSelectedCampaignId === "no-campaign") {
+        return !character.campaignId
+      }
+      return character.campaignId === modalSelectedCampaignId
+    })
+  }, [characters, modalSelectedCampaignId])
+
+  // Get active party members from filtered characters
+  const activePartyMembers = useMemo(() => {
+    return filteredCharacters.filter(char => char.partyStatus === 'active')
+  }, [filteredCharacters])
 
   useEffect(() => {
     if (isOpen) {
+      // Initialize campaign selection from sidebar
+      setModalSelectedCampaignId(selectedCampaignId || "all")
+      
       if (longRestEvent) {
         // Use the characters from the long rest event
         setSelectedCharacters(longRestEvent.selected_character_ids)
@@ -48,7 +72,25 @@ export function LongRestModal({
         setSelectedCharacters(activePartyMembers.map(char => char.id))
       }
     }
-  }, [isOpen, longRestEvent?.id]) // Only depend on isOpen and longRestEvent.id to avoid infinite loops
+  }, [isOpen, longRestEvent?.id, selectedCampaignId]) // Only depend on isOpen and longRestEvent.id to avoid infinite loops
+
+  // Handle campaign selection change
+  const handleCampaignChange = (campaignId: string) => {
+    setModalSelectedCampaignId(campaignId)
+    // Update selected characters to active party members from the new campaign
+    if (!longRestEvent) {
+      const newFilteredCharacters = campaignId === "all" 
+        ? characters 
+        : characters.filter(character => {
+            if (campaignId === "no-campaign") {
+              return !character.campaignId
+            }
+            return character.campaignId === campaignId
+          })
+      const newActivePartyMembers = newFilteredCharacters.filter(char => char.partyStatus === 'active')
+      setSelectedCharacters(newActivePartyMembers.map(char => char.id))
+    }
+  }
 
   const handleCharacterToggle = (characterId: string, checked: boolean) => {
     if (checked) {
@@ -117,6 +159,29 @@ export function LongRestModal({
         <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
           {/* Party Member Selection */}
           <div className="space-y-4">
+            {/* Campaign Selector */}
+            {!isCollaborativeLongRest && (campaigns || []).length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  Filter by Campaign
+                </label>
+                <Select value={modalSelectedCampaignId} onValueChange={handleCampaignChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select campaign" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Campaigns</SelectItem>
+                    {(campaigns || []).map((campaign) => (
+                      <SelectItem key={campaign.id} value={campaign.id}>
+                        {campaign.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Users className="w-5 h-5" />
@@ -136,12 +201,12 @@ export function LongRestModal({
 
             <ScrollArea className="h-48 border rounded-lg">
               <div className="p-4 space-y-3">
-                {activePartyMembers.map((character) => (
+                {filteredCharacters.map((character) => (
                   <div key={character.id} className="flex items-center space-x-3">
                     <Checkbox
                       id={character.id}
                       checked={selectedCharacters.includes(character.id)}
-                      disabled={isCollaborativeLongRest}
+                      disabled={isCollaborativeLongRest || false}
                       onCheckedChange={(checked) => 
                         handleCharacterToggle(character.id, checked as boolean)
                       }

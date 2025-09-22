@@ -26,9 +26,10 @@ import {
   NotebookPen,
 } from "lucide-react"
 import { CharacterSidebar } from "@/components/character-sidebar"
+import { CampaignManagementModal } from "@/components/edit-modals/campaign-management-modal"
 import { BasicInfoModal } from "@/components/edit-modals/basic-info-modal"
 import { CharacterCreationModal } from "@/components/edit-modals/character-creation-modal"
-import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, createClassBasedSkills, calculatePassivePerception, calculatePassiveInsight, calculateSavingThrowBonus, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, getArtificerInfusionsKnown, getArtificerMaxInfusedItems, getTotalAdditionalSpells, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData, getWarlockInvocationsKnown, type EldritchCannon } from "@/lib/character-data"
+import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, createClassBasedSkills, calculatePassivePerception, calculatePassiveInsight, calculateSavingThrowBonus, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, getArtificerInfusionsKnown, getArtificerMaxInfusedItems, getTotalAdditionalSpells, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData, getWarlockInvocationsKnown, type EldritchCannon, type Campaign, createCampaign } from "@/lib/character-data"
 import { AbilitiesModal } from "@/components/edit-modals/abilities-modal"
 import { CombatModal } from "@/components/edit-modals/combat-modal"
 import { WeaponsModal } from "@/components/edit-modals/weapons-modal"
@@ -61,7 +62,7 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus } from "@/lib/database"
+import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign } from "@/lib/database"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
@@ -72,6 +73,8 @@ const formatModifier = (mod: number): string => {
 
 export default function CharacterSheet() {
   const [characters, setCharacters] = useState<CharacterData[]>([])
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all")
   const [activeCharacterId, setActiveCharacterId] = useState<string>("")
   const [basicInfoModalOpen, setBasicInfoModalOpen] = useState(false)
   const [abilitiesModalOpen, setAbilitiesModalOpen] = useState(false)
@@ -106,6 +109,7 @@ export default function CharacterSheet() {
   const [eldritchCannonModalOpen, setEldritchCannonModalOpen] = useState(false)
   const [eldritchInvocationsModalOpen, setEldritchInvocationsModalOpen] = useState(false)
   const [diceRollModalOpen, setDiceRollModalOpen] = useState(false)
+  const [campaignManagementModalOpen, setCampaignManagementModalOpen] = useState(false)
   const [longRestResults, setLongRestResults] = useState<{
     characterId: string;
     characterName: string;
@@ -312,6 +316,8 @@ export default function CharacterSheet() {
     if (success) {
       try {
         const { characters: dbCharacters, error: loadError } = await loadAllCharacters()
+        const { campaigns: dbCampaigns, error: campaignLoadError } = await loadAllCampaigns()
+        
         if (loadError) {
           console.error("Failed to load characters:", loadError)
           setCharacters(sampleCharacters)
@@ -323,6 +329,13 @@ export default function CharacterSheet() {
           })
         } else if (dbCharacters && dbCharacters.length > 0) {
           setCharacters(dbCharacters)
+          setCampaigns(dbCampaigns || [])
+
+          // Set active campaign by default
+          const activeCampaign = (dbCampaigns || []).find(c => c.isActive)
+          if (activeCampaign) {
+            setSelectedCampaignId(activeCampaign.id)
+          }
 
           const savedActiveCharacterId = loadActiveCharacterFromLocalStorage()
           const validCharacterId =
@@ -378,6 +391,181 @@ export default function CharacterSheet() {
   // Dice Roll Functions
   const handleOpenDiceRoll = () => {
     setDiceRollModalOpen(true)
+  }
+
+  // Campaign Management Functions
+  const handleOpenCampaignManagement = () => {
+    setCampaignManagementModalOpen(true)
+  }
+
+  const handleCreateCampaign = async (campaign: Campaign) => {
+    try {
+      const result = await createCampaignDB(campaign)
+      if (result.success) {
+        setCampaigns(prev => [...prev, campaign])
+        toast({
+          title: "Campaign Created",
+          description: `"${campaign.name}" has been created successfully.`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to create campaign.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error creating campaign:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while creating the campaign.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateCampaign = async (campaign: Campaign) => {
+    try {
+      const result = await updateCampaignDB(campaign)
+      if (result.success) {
+        setCampaigns(prev => prev.map(c => c.id === campaign.id ? campaign : c))
+        toast({
+          title: "Campaign Updated",
+          description: `"${campaign.name}" has been updated successfully.`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update campaign.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error updating campaign:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while updating the campaign.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteCampaign = async (campaignId: string) => {
+    try {
+      const result = await deleteCampaign(campaignId)
+      if (result.success) {
+        setCampaigns(prev => prev.filter(c => c.id !== campaignId))
+        // Remove campaign association from characters
+        setCharacters(prev => prev.map(char => 
+          char.campaignId === campaignId ? { ...char, campaignId: undefined } : char
+        ))
+        toast({
+          title: "Campaign Deleted",
+          description: "Campaign has been deleted successfully.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to delete campaign.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error deleting campaign:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while deleting the campaign.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAssignCharacterToCampaign = async (characterId: string, campaignId: string) => {
+    try {
+      const result = await assignCharacterToCampaign(characterId, campaignId)
+      if (result.success) {
+        setCharacters(prev => prev.map(char => 
+          char.id === characterId ? { ...char, campaignId } : char
+        ))
+        toast({
+          title: "Character Assigned",
+          description: "Character has been assigned to the campaign.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to assign character to campaign.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error assigning character to campaign:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while assigning the character.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRemoveCharacterFromCampaign = async (characterId: string, campaignId: string) => {
+    try {
+      const result = await removeCharacterFromCampaign(characterId)
+      if (result.success) {
+        setCharacters(prev => prev.map(char => 
+          char.id === characterId ? { ...char, campaignId: undefined } : char
+        ))
+        toast({
+          title: "Character Removed",
+          description: "Character has been removed from the campaign.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to remove character from campaign.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error removing character from campaign:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while removing the character.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSetActiveCampaign = async (campaignId: string) => {
+    try {
+      const result = await setActiveCampaign(campaignId)
+      if (result.success) {
+        // Update campaigns state to reflect the new active campaign
+        setCampaigns(prev => prev.map(c => ({
+          ...c,
+          isActive: c.id === campaignId
+        })))
+        // Set the selected campaign to the active one
+        setSelectedCampaignId(campaignId)
+        toast({
+          title: "Active Campaign Set",
+          description: "The campaign has been set as active and will load by default.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to set active campaign.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error setting active campaign:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while setting the active campaign.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleUpdateHP = (newHP: number) => {
@@ -1003,6 +1191,8 @@ export default function CharacterSheet() {
     setIsLoading(true)
     try {
       const { characters: dbCharacters, error } = await loadAllCharacters()
+      const { campaigns: dbCampaigns, error: campaignLoadError } = await loadAllCampaigns()
+      
       if (error) {
         console.error("Failed to load characters:", error)
         toast({
@@ -1012,6 +1202,14 @@ export default function CharacterSheet() {
         })
       } else if (dbCharacters && dbCharacters.length > 0) {
         setCharacters(dbCharacters)
+        setCampaigns(dbCampaigns || [])
+        
+        // Set active campaign by default
+        const activeCampaign = (dbCampaigns || []).find(c => c.isActive)
+        if (activeCampaign) {
+          setSelectedCampaignId(activeCampaign.id)
+        }
+        
         const savedActiveCharacterId = loadActiveCharacterFromLocalStorage()
         const validCharacterId =
           savedActiveCharacterId && dbCharacters.find((c) => c.id === savedActiveCharacterId)
@@ -1916,11 +2114,15 @@ export default function CharacterSheet() {
     <div className="flex h-screen bg-background">
       <CharacterSidebar
         characters={characters}
+        campaigns={campaigns}
+        selectedCampaignId={selectedCampaignId}
+        onCampaignChange={setSelectedCampaignId}
         activeCharacterId={activeCharacterId}
         onSelectCharacter={setActiveCharacterIdWithStorage}
         onCreateCharacter={createNewCharacter}
         onStartLongRest={handleStartLongRest}
         onOpenDiceRoll={handleOpenDiceRoll}
+        onOpenCampaignManagement={handleOpenCampaignManagement}
       />
 
       <main className="flex-1 p-6 overflow-auto">
@@ -3848,6 +4050,8 @@ export default function CharacterSheet() {
           setCurrentLongRestEvent(null)
         }}
         characters={characters}
+        campaigns={campaigns}
+        selectedCampaignId={selectedCampaignId}
         onConfirmLongRest={handleConfirmLongRest}
         longRestEvent={currentLongRestEvent}
         activeCharacterId={activeCharacterId}
@@ -3885,6 +4089,20 @@ export default function CharacterSheet() {
         onClose={() => setDiceRollModalOpen(false)}
         character={activeCharacter}
         onUpdateHP={handleUpdateHP}
+      />
+
+      {/* Campaign Management Modal */}
+      <CampaignManagementModal
+        isOpen={campaignManagementModalOpen}
+        onClose={() => setCampaignManagementModalOpen(false)}
+        campaigns={campaigns}
+        characters={characters}
+        onCreateCampaign={handleCreateCampaign}
+        onUpdateCampaign={handleUpdateCampaign}
+        onDeleteCampaign={handleDeleteCampaign}
+        onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
+        onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
+        onSetActiveCampaign={handleSetActiveCampaign}
       />
     </div>
   )

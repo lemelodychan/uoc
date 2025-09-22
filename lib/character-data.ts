@@ -5,6 +5,16 @@ export interface CharacterClass {
   level: number
 }
 
+export interface Campaign {
+  id: string
+  name: string
+  description?: string
+  created_at: string
+  updated_at: string
+  characters: string[] // Array of character IDs
+  isActive?: boolean // Whether this is the currently active campaign
+}
+
 export interface CharacterData {
   
   id: string
@@ -117,6 +127,8 @@ export interface CharacterData {
   }
   // Party status: 'active', 'away', or 'deceased'
   partyStatus?: 'active' | 'away' | 'deceased'
+  // Campaign association
+  campaignId?: string
 }
 
 export type ProficiencyLevel = "none" | "proficient" | "expertise"
@@ -1503,6 +1515,54 @@ export const getEldritchCannonStats = (cannon: EldritchCannon) => {
     attackBonus: cannon.attackBonus,
     damage: cannon.damage
   }
+}
+
+// Campaign management functions
+export const createCampaign = (name: string, description?: string): Campaign => {
+  const now = new Date().toISOString()
+  return {
+    id: `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name,
+    description,
+    created_at: now,
+    updated_at: now,
+    characters: []
+  }
+}
+
+export const addCharacterToCampaign = (campaign: Campaign, characterId: string): Campaign => {
+  if (!campaign.characters.includes(characterId)) {
+    return {
+      ...campaign,
+      characters: [...campaign.characters, characterId],
+      updated_at: new Date().toISOString()
+    }
+  }
+  return campaign
+}
+
+export const removeCharacterFromCampaign = (campaign: Campaign, characterId: string): Campaign => {
+  return {
+    ...campaign,
+    characters: campaign.characters.filter(id => id !== characterId),
+    updated_at: new Date().toISOString()
+  }
+}
+
+export const updateCampaign = (campaign: Campaign, updates: Partial<Pick<Campaign, 'name' | 'description'>>): Campaign => {
+  return {
+    ...campaign,
+    ...updates,
+    updated_at: new Date().toISOString()
+  }
+}
+
+export const getCharactersByCampaign = (characters: CharacterData[], campaignId: string): CharacterData[] => {
+  return characters.filter(character => character.campaignId === campaignId)
+}
+
+export const getCharactersByStatus = (characters: CharacterData[], status: 'active' | 'away' | 'deceased'): CharacterData[] => {
+  return characters.filter(character => character.partyStatus === status)
 }
 
 export const sampleCharacter: CharacterData | null = null

@@ -5,26 +5,35 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Plus, User, Users, UserX, Skull, Moon, Dice6 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ChevronLeft, ChevronRight, Plus, User, UserRoundPlus, Users, UserX, Skull, Moon, Dice6, BookOpen, Settings } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import type { CharacterData } from "@/lib/character-data"
+import type { CharacterData, Campaign } from "@/lib/character-data"
 
 interface CharacterSidebarProps {
   characters: CharacterData[]
+  campaigns?: Campaign[]
+  selectedCampaignId?: string
+  onCampaignChange?: (campaignId: string) => void
   activeCharacterId: string
   onSelectCharacter: (id: string) => void
   onCreateCharacter: () => void
   onStartLongRest: () => void
   onOpenDiceRoll: () => void
+  onOpenCampaignManagement: () => void
 }
 
 export function CharacterSidebar({
   characters,
+  campaigns,
+  selectedCampaignId = "all",
+  onCampaignChange,
   activeCharacterId,
   onSelectCharacter,
   onCreateCharacter,
   onStartLongRest,
   onOpenDiceRoll,
+  onOpenCampaignManagement,
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -43,19 +52,50 @@ export function CharacterSidebar({
     }
   }
 
-  // Group characters by party status and sort alphabetically within each group
-  const groupedCharacters = characters.reduce((groups, character) => {
-    const status = character.partyStatus || 'active'
-    if (!groups[status]) {
-      groups[status] = []
-    }
-    groups[status].push(character)
-    return groups
-  }, {} as Record<string, CharacterData[]>)
+  // Filter characters based on selected campaign
+  const filteredCharacters = selectedCampaignId === "all" 
+    ? characters 
+    : characters.filter(character => {
+        if (selectedCampaignId === "no-campaign") {
+          return !character.campaignId
+        }
+        return character.campaignId === selectedCampaignId
+      })
 
-  // Sort characters alphabetically within each status group
-  Object.keys(groupedCharacters).forEach(status => {
-    groupedCharacters[status].sort((a, b) => a.name.localeCompare(b.name))
+  // Group filtered characters by campaign, then by status
+  const groupedByCampaign = filteredCharacters.reduce((groups, character) => {
+    const campaignId = character.campaignId || 'no-campaign'
+    if (!groups[campaignId]) {
+      groups[campaignId] = {
+        campaign: (campaigns || []).find(c => c.id === campaignId) || null,
+        characters: [] as CharacterData[]
+      }
+    }
+    groups[campaignId].characters.push(character)
+    return groups
+  }, {} as Record<string, { campaign: Campaign | null, characters: CharacterData[] }>)
+
+  // Sort characters within each campaign by status, then alphabetically
+  Object.keys(groupedByCampaign).forEach(campaignId => {
+    const campaignData = groupedByCampaign[campaignId]
+    const statusGroups = campaignData.characters.reduce((groups, character) => {
+      const status = character.partyStatus || 'active'
+      if (!groups[status]) {
+        groups[status] = []
+      }
+      groups[status].push(character)
+      return groups
+    }, {} as Record<string, CharacterData[]>)
+
+    // Sort characters alphabetically within each status group
+    Object.keys(statusGroups).forEach(status => {
+      statusGroups[status].sort((a, b) => a.name.localeCompare(b.name))
+    })
+
+    groupedByCampaign[campaignId] = {
+      ...campaignData,
+      characters: statusGroups as any
+    }
   })
 
   // Define status order and labels
@@ -75,7 +115,17 @@ export function CharacterSidebar({
     >
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center justify-between">
-          {!isCollapsed && <h2 className="text-lg font-semibold text-sidebar-foreground">Character Sheets</h2>}
+          {!isCollapsed && (
+            <div>
+              <h2 className="text-lg font-semibold text-sidebar-foreground">Character Sheets</h2>
+              <div className="text-xs text-muted-foreground">
+                {selectedCampaignId === "all" 
+                  ? `${characters.length} total characters`
+                  : `${filteredCharacters.length} characters`
+                }
+              </div>
+            </div>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -88,41 +138,85 @@ export function CharacterSidebar({
       </div>
 
       <div className="p-4 flex flex-col gap-2 flex-1 min-h-0">
-        <Button
-          onClick={onCreateCharacter}
-          className={`w-full mb-4 bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground ${
-            isCollapsed ? "px-2" : ""
-          }`}
-        >
-         <Plus className="w-4 h-4" />
-          {!isCollapsed && <span className="ml-2">New Character</span>}
-        </Button>
+        {/* Campaign Selector */}
+        {!isCollapsed && (campaigns || []).length > 0 && (
+            <Select value={selectedCampaignId} onValueChange={onCampaignChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select campaign" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Campaigns</SelectItem>
+              {(campaigns || []).map((campaign) => (
+                <SelectItem key={campaign.id} value={campaign.id}>
+                  {campaign.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <div className="flex gap-2 mb-4">
+          <Button
+            onClick={onCreateCharacter}
+            className={`flex-1 bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground ${
+              isCollapsed ? "px-2" : ""
+            }`}
+          >
+            <UserRoundPlus className="w-4 h-4" />
+            {!isCollapsed && <span>New Character</span>}
+          </Button>
+          {!isCollapsed && (
+            <Button
+              onClick={onOpenCampaignManagement}
+              variant="outline"
+              size="sm"
+              className="h-9"
+            >
+              <Settings className="w-4 h-4" />Edit
+            </Button>
+          )}
+        </div>
 
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-4 flex flex-col gap-2">
-            {statusOrder.map((status) => {
-              const charactersInStatus = groupedCharacters[status] || []
-              if (charactersInStatus.length === 0) return null
-
-              const config = statusConfig[status]
-              const IconComponent = config.icon
+            {/* Campaign Filter Summary */}
+            {Object.entries(groupedByCampaign).map(([campaignId, { campaign, characters: statusGroups }]) => {
+              const hasCharacters = Object.values(statusGroups as unknown as Record<string, CharacterData[]>).some(chars => chars.length > 0)
+              if (!hasCharacters) return null
 
               return (
-                <div key={status} className="space-y-2 flex flex-col gap-2">
+                <div key={campaignId} className="space-y-2 flex flex-col gap-2">
                   {!isCollapsed && (
                     <div className="flex items-center gap-2 px-1">
-                      <IconComponent className="w-4 h-4 text-sidebar-foreground/70" />
-                      <span className="text-sm font-medium text-sidebar-foreground/70">
-                        {config.label}
+                      <span className="text-md font-medium">
+                        {campaign ? campaign.name : 'No Campaign'}
                       </span>
                       <Badge variant="secondary" className="text-xs bg-white border-gray-200">
-                        {charactersInStatus.length}
+                        {Object.values(statusGroups).flat().length}
                       </Badge>
                     </div>
                   )}
-                  <TooltipProvider>
-                    <div className="space-y-2 flex flex-col gap-2 relative">
-                      {charactersInStatus.map((character) => (
+                  
+                  {statusOrder.map((status) => {
+                    const charactersInStatus = (statusGroups as unknown as Record<string, CharacterData[]>)[status] || []
+                    if (charactersInStatus.length === 0) return null
+
+                    const config = statusConfig[status]
+                    const IconComponent = config.icon
+
+                    return (
+                      <div key={`${campaignId}-${status}`} className="flex flex-col gap-2">
+                        {!isCollapsed && (
+                          <div className="flex items-center gap-2 ml-1">
+                            <IconComponent className="w-4 h-4 text-sidebar-foreground/50" />
+                            <span className="text-xs font-medium text-sidebar-foreground/50">
+                              {config.label}
+                            </span>
+                          </div>
+                        )}
+                        <TooltipProvider>
+                          <div className="space-y-1 flex flex-col gap-2">
+                      {charactersInStatus.map((character: CharacterData) => (
                         <Tooltip key={character.id}>
                           <TooltipTrigger asChild>
                             <Card
@@ -164,13 +258,17 @@ export function CharacterSidebar({
                               {character.subclass && (
                                 <div className="text-xs text-muted-foreground mb-0.5">{character.subclass}</div>
                               )}
-                              <div className="text-xs text-muted-foreground">{character.partyStatus || 'active'}</div>
+                              <div className="text-xs text-muted-foreground mb-0.5">{character.partyStatus || 'active'}</div>
+                              {campaign && <div className="text-xs text-muted-foreground">Campaign: {campaign.name}</div>}
                             </TooltipContent>
                           )}
                         </Tooltip>
                       ))}
-                    </div>
-                  </TooltipProvider>
+                          </div>
+                        </TooltipProvider>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
