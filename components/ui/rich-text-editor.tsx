@@ -11,9 +11,10 @@ interface RichTextEditorProps {
   placeholder?: string
   rows?: number
   className?: string
+  maxHeight?: number | string
 }
 
-export function RichTextEditor({ value, onChange, placeholder, rows = 6, className }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, placeholder, rows = 6, className, maxHeight }: RichTextEditorProps) {
   const [textareaRef, setTextareaRef] = useState<HTMLTextAreaElement | null>(null)
 
   const insertText = (before: string, after = "") => {
@@ -56,7 +57,11 @@ export function RichTextEditor({ value, onChange, placeholder, rows = 6, classNa
 
   const addLineBreak = () => insertText("\n")
 
-  const minHeight = rows * 28 // approx line-height for mono text (tweakable)
+  const minHeight = rows * 28 // approx line-height (tweakable)
+  const computedStyle: React.CSSProperties = {
+    minHeight,
+    ...(maxHeight ? { maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight, overflow: 'auto' } : {}),
+  }
 
   return (
     <div className={className}>
@@ -78,7 +83,7 @@ export function RichTextEditor({ value, onChange, placeholder, rows = 6, classNa
         placeholder={placeholder}
         rows={rows}
         className="font-mono text-sm"
-        style={{ minHeight }}
+        style={computedStyle}
       />
       <div className="text-xs text-muted-foreground mt-1">
         Use **bold** for emphasis, - for bullet points, and line breaks for formatting

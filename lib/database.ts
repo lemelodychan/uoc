@@ -1,5 +1,6 @@
 import { createClient } from "./supabase"
 import type { CharacterData, Campaign } from "./character-data"
+import type { ClassData, SubclassData } from "./class-utils"
 import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, calculateProficiencyBonus, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData } from "./character-data"
 import { getBardicInspirationData, getSongOfRestData } from "./class-utils"
 
@@ -1034,6 +1035,253 @@ export const loadAllClasses = async (): Promise<{ classes?: Array<{id: string, n
   } catch (error) {
     console.error("Error loading classes:", error)
     return { error: "Failed to load classes" }
+  }
+}
+
+// Admin: Classes, Subclasses, and Features Management
+export const loadClassesWithDetails = async (): Promise<{
+  classes?: Array<{
+    id: string
+    name: string
+    subclass: string | null
+    description?: string | null
+    subclass_features?: any | null
+    hit_die: number | null
+    primary_ability: string | null
+    saving_throw_proficiencies: string[] | null
+    skill_proficiencies?: any | null
+    equipment_proficiencies?: any | null
+    starting_equipment?: any | null
+    spell_slots_1?: any | null
+    spell_slots_2?: any | null
+    spell_slots_3?: any | null
+    spell_slots_4?: any | null
+    spell_slots_5?: any | null
+    spell_slots_6?: any | null
+    spell_slots_7?: any | null
+    spell_slots_8?: any | null
+    spell_slots_9?: any | null
+    cantrips_known?: number | null
+    spells_known?: number | null
+    spell_progression: any | null
+    max_spell_slots: any | null
+    class_features: any | null
+  }>
+  error?: string
+}> => {
+  try {
+    const { data, error } = await supabase
+      .from("classes")
+      .select("*")
+      .order("name", { ascending: true })
+      .order("subclass", { ascending: true })
+
+    if (error) {
+      console.error("Error loading classes with details:", error)
+      return { error: error.message }
+    }
+
+    return { classes: data || [] }
+  } catch (error) {
+    console.error("Error loading classes with details:", error)
+    return { error: "Failed to load classes" }
+  }
+}
+
+export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> => {
+  try {
+    const toStringArray = (v: any): string[] | null => {
+      if (v === undefined || v === null) return null
+      return Array.isArray(v) ? v.map((x) => String(x)) : [String(v)]
+    }
+    const toNumberArray = (v: any): number[] | null => {
+      if (v === undefined || v === null) return null
+      return Array.isArray(v) ? v.map((x) => Number(x)) : [Number(v)]
+    }
+    const toTitleArray = (v: any): string[] | null => {
+      const arr = toStringArray(v)
+      if (!arr) return null
+      return arr.map((s) => s.length ? s[0].toUpperCase() + s.slice(1).toLowerCase() : s)
+    }
+    const id = cls.id && cls.id.length > 0 ? cls.id : globalThis.crypto.randomUUID()
+    const payload: any = {
+      id,
+      name: cls.name,
+      subclass: (cls as any).subclass ?? null,
+      description: (cls as any).description ?? null,
+      hit_die: cls.hit_die ?? null,
+      // Store as an array of Title-cased strings per DB convention, e.g., ["Charisma"]
+      primary_ability: toTitleArray(cls.primary_ability),
+      saving_throw_proficiencies: toStringArray(cls.saving_throw_proficiencies),
+      skill_proficiencies: (cls as any).skill_proficiencies ?? null,
+      equipment_proficiencies: (cls as any).equipment_proficiencies ?? null,
+      starting_equipment: (cls as any).starting_equipment ?? null,
+      spell_slots_1: toNumberArray((cls as any).spell_slots_1),
+      spell_slots_2: toNumberArray((cls as any).spell_slots_2),
+      spell_slots_3: toNumberArray((cls as any).spell_slots_3),
+      spell_slots_4: toNumberArray((cls as any).spell_slots_4),
+      spell_slots_5: toNumberArray((cls as any).spell_slots_5),
+      spell_slots_6: toNumberArray((cls as any).spell_slots_6),
+      spell_slots_7: toNumberArray((cls as any).spell_slots_7),
+      spell_slots_8: toNumberArray((cls as any).spell_slots_8),
+      spell_slots_9: toNumberArray((cls as any).spell_slots_9),
+      cantrips_known: toNumberArray((cls as any).cantrips_known),
+      spells_known: toNumberArray((cls as any).spells_known),
+      // Removed legacy columns not present in DB schema: spell_progression, max_spell_slots
+      class_features: cls.class_features ?? null,
+    }
+
+    const { error } = await supabase.from("classes").upsert(payload)
+    if (error) {
+      console.error("Error upserting class:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true, id }
+  } catch (error) {
+    console.error("Error upserting class:", error)
+    return { success: false, error: "Failed to upsert class" }
+  }
+}
+
+export const loadClassById = async (id: string): Promise<{ klass?: any; error?: string }> => {
+  try {
+    const { data, error } = await supabase.from("classes").select("*").eq("id", id).single()
+    if (error) return { error: error.message }
+    return { klass: data }
+  } catch (error) {
+    console.error("Error loading class by id:", error)
+    return { error: "Failed to load class" }
+  }
+}
+
+export const loadBaseClassByName = async (name: string): Promise<{ klass?: any; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("classes")
+      .select("*")
+      .eq("name", name)
+      .is("subclass", null)
+      .single()
+    if (error) return { error: error.message }
+    return { klass: data }
+  } catch (error) {
+    console.error("Error loading base class by name:", error)
+    return { error: "Failed to load base class" }
+  }
+}
+
+export const deleteClass = async (classId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Delete features for this class id
+    const { error: featError } = await supabase.from("class_features").delete().eq("class_id", classId)
+    if (featError) {
+      console.error("Error deleting class features:", featError)
+      return { success: false, error: featError.message }
+    }
+
+    // Delete subclasses that reference this as base via same name is handled at caller level.
+    const { error } = await supabase.from("classes").delete().eq("id", classId)
+    if (error) {
+      console.error("Error deleting class:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting class:", error)
+    return { success: false, error: "Failed to delete class" }
+  }
+}
+
+export const loadFeaturesForClass = async (classId: string): Promise<{
+  features?: Array<{ id: string; class_id: string; level: number; title: string; description: string; feature_type: string; subclass_id?: string | null }>
+  error?: string
+}> => {
+  try {
+    const { data, error } = await supabase
+      .from("class_features")
+      .select("id, class_id, level, title, description, feature_type")
+      .eq("class_id", classId)
+      .order("level", { ascending: true })
+
+    if (error) {
+      console.error("Error loading class features:", error)
+      return { error: error.message }
+    }
+    return { features: (data || []).map((f: any) => ({ ...f, subclass_id: f.subclass_id ?? null })) }
+  } catch (error) {
+    console.error("Error loading class features:", error)
+    return { error: "Failed to load class features" }
+  }
+}
+
+export const loadFeaturesForBaseWithSubclasses = async (baseClassId: string, subclassIds: string[]): Promise<{
+  features?: Array<{ id: string; class_id: string; level: number; title: string; description: string; feature_type: string; subclass_id?: string | null }>
+  error?: string
+}> => {
+  try {
+    // Fetch base class features
+    const { data: base, error: baseErr } = await supabase
+      .from("class_features")
+      .select("id, class_id, level, title, description, feature_type")
+      .eq("class_id", baseClassId)
+
+    if (baseErr) return { error: baseErr.message }
+
+    let all: any[] = base || []
+
+    if (subclassIds.length > 0) {
+      // Prefer schema-agnostic: fetch subclass features by class_id IN subclassIds
+      const { data: fallbackFeats, error: fallbackErr } = await supabase
+        .from("class_features")
+        .select("id, class_id, level, title, description, feature_type")
+        .in("class_id", subclassIds)
+      if (fallbackErr) return { error: fallbackErr.message }
+      const subFeats = (fallbackFeats || []).map((f: any) => ({ ...f, subclass_id: f.class_id, feature_type: 'subclass' }))
+      all = [...all, ...subFeats]
+    }
+
+    // Normalize subtype tag
+    all.forEach(f => { if ((f as any).subclass_id) (f as any).feature_type = 'subclass' })
+
+    // Deduplicate and sort
+    const uniq = new Map<string, any>()
+    all.forEach(f => uniq.set(f.id, f))
+    const merged = Array.from(uniq.values()).sort((a,b) => a.level - b.level)
+    return { features: merged }
+  } catch (error) {
+    console.error("Error loading base+subclass features:", error)
+    return { error: "Failed to load class features" }
+  }
+}
+
+export const upsertClassFeature = async (feature: { id?: string; class_id: string; level: number; title: string; description: string; feature_type: "class" | "subclass"; subclass_id?: string | null }): Promise<{ success: boolean; id?: string; error?: string }> => {
+  try {
+    const id = feature.id && feature.id.length > 0 ? feature.id : globalThis.crypto.randomUUID()
+    const payload = { ...feature, id }
+    const { error } = await supabase.from("class_features").upsert(payload)
+    if (error) {
+      console.error("Error upserting class feature:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true, id }
+  } catch (error) {
+    console.error("Error upserting class feature:", error)
+    return { success: false, error: "Failed to upsert class feature" }
+  }
+}
+
+export const deleteClassFeature = async (featureId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase.from("class_features").delete().eq("id", featureId)
+    if (error) {
+      console.error("Error deleting class feature:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting class feature:", error)
+    return { success: false, error: "Failed to delete class feature" }
   }
 }
 
