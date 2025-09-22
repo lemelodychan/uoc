@@ -2375,11 +2375,11 @@ export default function CharacterSheet() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="flex flex-col gap-2">
                   {activeCharacter.features.map((feature, index) => (
-                    <div key={index} className="p-3 border rounded-lg">
-                      <div className="font-medium mb-1 flex items-start justify-between">
-                        <span>{feature.name}</span>
+                    <div key={index} className="p-2 border rounded flex flex-col gap-0.5">
+                      <div className="font-medium flex items-start justify-between">
+                        <span className="text-sm">{feature.name}</span>
                         {getFeatureUsesPerLongRest(feature) > 0 && (
                           <div className="flex items-center gap-1 py-1">
                               {Array.from({ length: getFeatureUsesPerLongRest(feature) }, (_, i) => {
@@ -2406,9 +2406,9 @@ export default function CharacterSheet() {
                           </div>
                         )}
                       </div>
-                      <div className="text-sm text-muted-foreground relative">
+                      <div className="text-xs text-muted-foreground relative">
                         <div className="line-clamp-2 max-h-20 overflow-hidden">
-                          <RichTextDisplay content={feature.description} className="text-sm text-muted-foreground" />
+                          <RichTextDisplay content={feature.description} className="text-xs text-muted-foreground" />
                         </div>
                         <div className="mt-2 flex justify-start">
                           <Button
@@ -2454,10 +2454,10 @@ export default function CharacterSheet() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="flex flex-col gap-2">
                   {activeCharacter.feats.map((feat, index) => (
-                    <div key={index} className="p-3 border rounded-lg flex items-center justify-between">
-                      <div className="font-medium mb-1">{feat.name}</div>
+                    <div key={index} className="p-2 border rounded-lg flex items-center justify-between">
+                      <div className="font-medium text-sm">{feat.name}</div>
                       <Button
                         variant="outline"
                         size="sm"
@@ -3388,7 +3388,7 @@ export default function CharacterSheet() {
                     <div className="text-sm font-medium">Magic Items</div>
                     <div className="flex flex-col gap-2">
                       {activeCharacter.magicItems.map((item, index) => (
-                        <div key={index} className="p-3 border rounded">
+                        <div key={index} className="p-2 border rounded">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="text-sm font-medium">{item.name || "Unnamed Magic Item"}</h4>
                             {(item.maxUses ?? 0) > 0 && (
@@ -3422,7 +3422,7 @@ export default function CharacterSheet() {
                               <div className="line-clamp-3 max-h-0 overflow-hidden">
                                 <RichTextDisplay content={item.description} className="text-xs text-muted-foreground" />
                               </div>
-                              <div className="mt-2 flex justify-start">
+                              <div className="flex justify-start">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -3912,7 +3912,7 @@ export default function CharacterSheet() {
               </div>
             )}
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-3">
             {featureModalContent && (
               <>
                 {/* Render custom notes (image + text) ABOVE the base description — only for class features */}
@@ -3922,7 +3922,7 @@ export default function CharacterSheet() {
                   const hasImage = Boolean(note?.imageUrl)
                   const hasContent = Boolean(note?.content)
                   return (
-                    <div className="space-y-3 flex flex-row gap-4">
+                    <div className="space-y-3 flex flex-col gap-1">
                       {hasImage && (
                         <img
                           src={note!.imageUrl as string}
