@@ -2147,7 +2147,7 @@ export default function CharacterSheet() {
                     <Badge variant="outline">
                       {activeCharacter.classes && activeCharacter.classes.length > 1 ? (
                         activeCharacter.classes.map(charClass => 
-                          `${charClass.name} ${charClass.level}`
+                          `${charClass.name}${charClass.subclass ? `・${charClass.subclass}` : ''} ${charClass.level}` 
                         ).join(' / ')
                       ) : (
                         `${activeCharacter.class}・${activeCharacter.subclass}`
