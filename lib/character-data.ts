@@ -69,6 +69,7 @@ export interface CharacterData {
     name: string
     attackBonus: string
     damageType: string
+    weaponProperties?: string[]
   }>
   weaponNotes: string
   features: Array<{

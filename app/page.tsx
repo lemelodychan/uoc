@@ -2282,7 +2282,7 @@ export default function CharacterSheet() {
                 <CardTitle>Saving Throws</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3 flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
                   {(() => {
                     console.log('[DEBUG] UI: Rendering saving throws:', activeCharacter.savingThrowProficiencies)
                     console.log('[DEBUG] UI: Saving throws length:', activeCharacter.savingThrowProficiencies?.length)
@@ -2885,12 +2885,24 @@ export default function CharacterSheet() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3 flex flex-col gap-0.5">
+                <div className="flex flex-col gap-2">
                   {activeCharacter.weapons.map((weapon, index) => (
-                    <div key={index} className="p-3 border rounded-lg flex flex-col gap-2">
-                      <div className="font-medium">{weapon.name}</div>
-                      <div className="text-sm text-muted-foreground flex flex-row gap-1 flex-wrap">
-                        <Badge variant="secondary">{weapon.attackBonus} ATK</Badge> <Badge variant="outline">{weapon.damageType}</Badge>
+                    <div key={index} className="p-2 border text-sm font-medium rounded flex flex-row gap-2">
+                      <div className="w-full flex flex-col gap-1">
+                        <span>{weapon.name}</span>
+                          {weapon.weaponProperties && weapon.weaponProperties.length > 0 && (
+                            <div className="flex flex-wrap gap-0 mb-1">
+                              <span className="text-xs font-normal text-muted-foreground">
+                                {weapon.weaponProperties
+                                  .map((prop, i) => (i === 0 ? prop.charAt(0).toUpperCase() + prop.slice(1) : prop))
+                                  .join(", ")}
+                              </span>
+                            </div>
+                          )}
+                          <Badge variant="outline" className="text-xs h-fit">{weapon.damageType}</Badge>
+                      </div>
+                      <div className="flex flex-col gap-1 w-fit items-end">
+                        <Badge variant="secondary" className="text-xs h-fit">{weapon.attackBonus} ATK</Badge>
                       </div>
                     </div>
                   ))}
