@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Plus, Minus, Trash2 } from "lucide-react"
 import type { CharacterData } from "@/lib/character-data"
 
@@ -32,6 +33,8 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
     hitDiceType: character.hitDice?.dieType || "d8",
     // Multiclass hit dice support
     hitDiceByClass: character.hitDiceByClass || [],
+    // Combat notes (using otherTools field)
+    combatNotes: character.otherTools || "",
   })
 
   // Sync local state with character prop when it changes
@@ -48,8 +51,9 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
       hitDiceRemaining: character.hitDice ? (character.hitDice.total - character.hitDice.used) : 0,
       hitDiceType: character.hitDice?.dieType || "d8",
       hitDiceByClass: character.hitDiceByClass || [],
+      combatNotes: character.otherTools || "",
     })
-  }, [character.armorClass, character.initiative, character.speed, character.currentHitPoints, character.maxHitPoints, character.temporaryHitPoints, character.exhaustion, character.hitDice, character.hitDiceByClass])
+  }, [character.armorClass, character.initiative, character.speed, character.currentHitPoints, character.maxHitPoints, character.temporaryHitPoints, character.exhaustion, character.hitDice, character.hitDiceByClass, character.otherTools])
 
   const addHitDieClass = () => {
     setFormData({
@@ -83,6 +87,7 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
       maxHitPoints: formData.maxHitPoints,
       temporaryHitPoints: formData.temporaryHitPoints,
       exhaustion: formData.exhaustion,
+      otherTools: formData.combatNotes,
     }
 
     // If multiclass hit dice exist, use them; otherwise use legacy single hit dice
@@ -342,6 +347,19 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Combat Notes Section */}
+          <div className="col-span-2 border-t pt-4">
+            <Label htmlFor="combatNotes" className="text-base font-medium mb-3 block">
+              Combat Notes
+            </Label>
+            <RichTextEditor
+              value={formData.combatNotes}
+              onChange={(value) => setFormData({ ...formData, combatNotes: value })}
+              placeholder="Add any combat-related notes, tactics, or special abilities..."
+              rows={4}
+            />
           </div>
         </div>
         <DialogFooter>

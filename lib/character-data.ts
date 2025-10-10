@@ -99,7 +99,13 @@ export interface CharacterData {
     currentUses?: number
   }>
   languages: string
-  otherTools: string
+  otherTools?: string
+  // Money/currency tracking
+  money?: {
+    gold: number
+    silver: number
+    copper: number
+  }
   // Equipment proficiencies (armor/weapons) tracked via checkboxes in UI
   equipmentProficiencies?: EquipmentProficiencies
   // Per-feature custom rich-text notes appended to class feature modals (keyed by feature name)

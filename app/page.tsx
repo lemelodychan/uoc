@@ -24,6 +24,7 @@ import {
   Skull,
   Dice5,
   NotebookPen,
+  Coins,
 } from "lucide-react"
 import { CharacterSidebar } from "@/components/character-sidebar"
 import { CampaignManagementModal } from "@/components/edit-modals/campaign-management-modal"
@@ -37,7 +38,7 @@ import { InfusionsModal } from "@/components/edit-modals/infusions-modal"
 import { FeaturesModal } from "@/components/edit-modals/features-modal"
 import { EquipmentModal } from "@/components/edit-modals/equipment-modal"
 import { LanguagesModal } from "@/components/edit-modals/languages-modal"
-import { ToolsModal } from "@/components/edit-modals/tools-modal"
+import { MoneyModal } from "@/components/edit-modals/money-modal"
 import { FeatsModal } from "@/components/edit-modals/feats-modal"
 import { SpellModal } from "@/components/edit-modals/spell-modal"
 import { SpellListModal } from "@/components/edit-modals/spell-list-modal"
@@ -84,7 +85,7 @@ export default function CharacterSheet() {
   const [featuresModalOpen, setFeaturesModalOpen] = useState(false)
   const [equipmentModalOpen, setEquipmentModalOpen] = useState(false)
   const [languagesModalOpen, setLanguagesModalOpen] = useState(false)
-  const [toolsModalOpen, setToolsModalOpen] = useState(false)
+  const [moneyModalOpen, setMoneyModalOpen] = useState(false)
   const [featsModalOpen, setFeatsModalOpen] = useState(false)
   const [spellModalOpen, setSpellModalOpen] = useState(false)
   const [spellListModalOpen, setSpellListModalOpen] = useState(false)
@@ -150,6 +151,52 @@ export default function CharacterSheet() {
   }[] | null>(null)
   const [longRestResultsModalOpen, setLongRestResultsModalOpen] = useState(false)
   const [skillSortMode, setSkillSortMode] = useState<'alpha' | 'ability'>('ability')
+
+  // Helper function to determine if a character has spellcasting abilities
+  const hasSpellcastingAbilities = (character: CharacterData): boolean => {
+    // Define classes that have spellcasting by default
+    const fullSpellcastingClasses = ['wizard', 'sorcerer', 'warlock', 'bard', 'cleric', 'druid', 'ranger', 'paladin', 'artificer']
+    
+    // Define subclasses that add spellcasting to non-spellcasting base classes
+    const spellcastingSubclasses = ['arcane trickster', 'eldritch knight', 'way of the four elements']
+    
+    // Check if the character has any spellcasting classes
+    if (character.classes && character.classes.length > 0) {
+      // Multiclassing - check if any class has spellcasting
+      return character.classes.some(charClass => {
+        const className = charClass.name.toLowerCase()
+        const subclassName = charClass.subclass?.toLowerCase() || ''
+        
+        // Check if it's a full spellcasting class
+        if (fullSpellcastingClasses.includes(className)) {
+          return true
+        }
+        
+        // Check if it's a subclass that adds spellcasting
+        if (spellcastingSubclasses.includes(subclassName)) {
+          return true
+        }
+        
+        return false
+      })
+    } else {
+      // Single class - check the main class and subclass
+      const className = character.class.toLowerCase()
+      const subclassName = character.subclass?.toLowerCase() || ''
+      
+      // Check if it's a full spellcasting class
+      if (fullSpellcastingClasses.includes(className)) {
+        return true
+      }
+      
+      // Check if it's a subclass that adds spellcasting
+      if (spellcastingSubclasses.includes(subclassName)) {
+        return true
+      }
+      
+      return false
+    }
+  }
 
   useEffect(() => {
     try {
@@ -1682,6 +1729,11 @@ export default function CharacterSheet() {
       magicItems: [],
       languages: "",
       otherTools: "",
+      money: {
+        gold: 0,
+        silver: 0,
+        copper: 0,
+      },
       personalityTraits: "",
       ideals: "",
       bonds: "",
@@ -2600,85 +2652,54 @@ export default function CharacterSheet() {
               </CardContent>
             </Card>
 
-            {/* Tools Proficiencies */}
+            {/* Money */}
             <Card className="flex flex-col gap-3">
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Item Proficiencies
+                    <Coins className="w-5 h-5" />
+                    Money
                   </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setToolsModalOpen(true)}>
+                  <Button variant="outline" size="sm" onClick={() => setMoneyModalOpen(true)}>
                     <Edit className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-col gap-1">
-                {/* Other Proficiencies: Equipment (Armor/Weapons) */}
-
-                <div className="flex flex-col gap-1">
-                  <div className="text-sm font-medium mb-2">Tools Proficiencies</div>
-                  <div className="flex flex-col gap-1.5">
-                  {activeCharacter.toolsProficiencies.map((tool, index) => {
-                    const toolBonus = calculateToolBonus(activeCharacter, tool)
-                    const isProficient = tool.proficiency === "proficient" || tool.proficiency === "expertise"
-                    const hasExpertise = tool.proficiency === "expertise"
-
-                    return (
-                      <div key={index} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="flex gap-1">
-                            <div className="flex items-center space-x-1">
-                              <input
-                                type="checkbox"
-                                id={`${tool.name}-prof`}
-                                checked={isProficient}
-                                onChange={(e) => updateToolProficiency(tool.name, "proficient", e.target.checked)}
-                                className="w-3 h-3 rounded border-gray-300"
-                              />
-                              <Label htmlFor={`${tool.name}-prof`} className="sr-only">
-                                Proficient
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <input
-                                type="checkbox"
-                                id={`${tool.name}-exp`}
-                                checked={hasExpertise}
-                                onChange={(e) => updateToolProficiency(tool.name, "expertise", e.target.checked)}
-                                className="w-3 h-3 rounded border-gray-300"
-                              />
-                              <Label htmlFor={`${tool.name}-exp`} className="sr-only">
-                                Expertise
-                              </Label>
-                            </div>
-                          </div>
-                          <div className="text-sm">
-                            <span>{tool.name}</span>
-                          </div>
-                        </div>
-                        {toolBonus !== 0 && (
-                          <Badge variant="secondary" className="text-xs font-mono">+{toolBonus}</Badge>
-                        )}
+              <CardContent>
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-yellow-600">Gold</div>
+                      <div className="text-lg font-semibold">
+                        {activeCharacter.money?.gold || 0}
                       </div>
-                    )
-                  })}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-gray-400">Silver</div>
+                      <div className="text-lg font-semibold">
+                        {activeCharacter.money?.silver || 0}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-orange-600">Copper</div>
+                      <div className="text-lg font-semibold">
+                        {activeCharacter.money?.copper || 0}
+                      </div>
+                    </div>
                   </div>
-                  {activeCharacter.toolsProficiencies.length === 0 && (
-                    <div className="text-sm text-muted-foreground text-center py-4">No tool proficiencies</div>
-                  )}
-                </div>
-                <div className="mt-4 pt-4 border-t">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium">Other Inventory</h4>
+                  <div className="pt-2 border-t text-center">
+                    <div className="text-sm text-muted-foreground">Total Value</div>
+                    <div className="text-lg font-semibold">
+                      {(() => {
+                        const gold = activeCharacter.money?.gold || 0
+                        const silver = activeCharacter.money?.silver || 0
+                        const copper = activeCharacter.money?.copper || 0
+                        const totalCopper = (gold * 100) + (silver * 10) + copper
+                        return (totalCopper / 100).toFixed(2)
+                      })()} Gold Pieces
+                    </div>
                   </div>
-                  <RichTextDisplay
-                    content={activeCharacter.otherTools || "No other tools or items listed"}
-                    className={
-                      !activeCharacter.otherTools ? "text-muted-foreground text-center py-2 text-sm" : "text-sm"
-                    }
-                  />
                 </div>
               </CardContent>
             </Card>
@@ -2867,6 +2888,17 @@ export default function CharacterSheet() {
                     </div>
                   </div>
                 )}
+
+                {/* Combat Notes - Only show if notes exist */}
+                {activeCharacter.otherTools && activeCharacter.otherTools.trim() !== "" && (
+                  <div className="col-span-2 pt-4 border-t">
+                    <div className="text-sm font-medium mb-2">Combat Notes</div>
+                    <RichTextDisplay
+                      content={activeCharacter.otherTools}
+                      className="text-sm"
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -2924,8 +2956,9 @@ export default function CharacterSheet() {
               </CardContent>
             </Card>
 
-            {/* Spells & Magic */}
-            <Card className="flex flex-col gap-3">
+            {/* Spells & Magic - Only show for spellcasting classes */}
+            {hasSpellcastingAbilities(activeCharacter) && (
+              <Card className="flex flex-col gap-3">
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
@@ -3415,6 +3448,7 @@ export default function CharacterSheet() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
             {/* Equipment */}
             <Card className="flex flex-col gap-3">
@@ -3512,6 +3546,60 @@ export default function CharacterSheet() {
                       ))}
                     </div>
                   </div>
+                  
+                  {/* Tools Proficiencies */}
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="text-sm font-medium mb-2">Tools Proficiencies</div>
+                    <div className="flex flex-col gap-1.5">
+                      {activeCharacter.toolsProficiencies.map((tool, index) => {
+                        const toolBonus = calculateToolBonus(activeCharacter, tool)
+                        const isProficient = tool.proficiency === "proficient" || tool.proficiency === "expertise"
+                        const hasExpertise = tool.proficiency === "expertise"
+
+                        return (
+                          <div key={index} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="flex gap-1">
+                                <div className="flex items-center space-x-1">
+                                  <input
+                                    type="checkbox"
+                                    id={`${tool.name}-prof`}
+                                    checked={isProficient}
+                                    onChange={(e) => updateToolProficiency(tool.name, "proficient", e.target.checked)}
+                                    className="w-3 h-3 rounded border-gray-300"
+                                  />
+                                  <Label htmlFor={`${tool.name}-prof`} className="sr-only">
+                                    Proficient
+                                  </Label>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <input
+                                    type="checkbox"
+                                    id={`${tool.name}-exp`}
+                                    checked={hasExpertise}
+                                    onChange={(e) => updateToolProficiency(tool.name, "expertise", e.target.checked)}
+                                    className="w-3 h-3 rounded border-gray-300"
+                                  />
+                                  <Label htmlFor={`${tool.name}-exp`} className="sr-only">
+                                    Expertise
+                                  </Label>
+                                </div>
+                              </div>
+                              <div className="text-sm">
+                                <span>{tool.name}</span>
+                              </div>
+                            </div>
+                            {toolBonus !== 0 && (
+                              <Badge variant="secondary" className="text-xs font-mono">+{toolBonus}</Badge>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {activeCharacter.toolsProficiencies.length === 0 && (
+                      <div className="text-sm text-muted-foreground text-center py-4">No tool proficiencies</div>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Magic Items */}
@@ -3600,10 +3688,53 @@ export default function CharacterSheet() {
             {/* Class Features */}
             <Card className="flex flex-col gap-3">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="w-5 h-5" />
-                  Class Features
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="w-5 h-5" />
+                    Class Features
+                  </CardTitle>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={async () => {
+                      try {
+                        const { loadClassData, loadClassFeatures } = await import('@/lib/database')
+                        const { classData } = await loadClassData(activeCharacter.class, activeCharacter.subclass)
+                        
+                        if (classData?.id) {
+                          const { features, error } = await loadClassFeatures(classData.id, activeCharacter.level)
+                          if (error) {
+                            console.error("Error refreshing class features:", error)
+                            toast({
+                              title: "Error",
+                              description: "Failed to refresh class features: " + error,
+                              variant: "destructive"
+                            })
+                          } else {
+                            const updatedCharacter = {
+                              ...activeCharacter,
+                              classFeatures: features || []
+                            }
+                            setCharacters(prev => prev.map(c => c.id === activeCharacter.id ? updatedCharacter : c))
+                            toast({
+                              title: "Success",
+                              description: "Class features refreshed successfully"
+                            })
+                          }
+                        }
+                      } catch (error) {
+                        console.error("Error refreshing features:", error)
+                        toast({
+                          title: "Error", 
+                          description: "Failed to refresh class features",
+                          variant: "destructive"
+                        })
+                      }
+                    }}
+                  >
+                    Refresh
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -3969,9 +4100,9 @@ export default function CharacterSheet() {
         character={activeCharacter}
         onSave={updateCharacter}
       />
-      <ToolsModal
-        isOpen={toolsModalOpen}
-        onClose={() => setToolsModalOpen(false)}
+      <MoneyModal
+        isOpen={moneyModalOpen}
+        onClose={() => setMoneyModalOpen(false)}
         character={activeCharacter}
         onSave={updateCharacter}
       />
