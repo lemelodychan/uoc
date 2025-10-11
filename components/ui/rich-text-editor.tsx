@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Bold, List, Type } from "lucide-react"
+import { Icon } from "@iconify/react"
 
 interface RichTextEditorProps {
   value: string
@@ -67,13 +67,13 @@ export function RichTextEditor({ value, onChange, placeholder, rows = 6, classNa
     <div className={className}>
       <div className="flex gap-2 mb-2">
         <Button type="button" variant="outline" size="sm" onClick={addBold} className="h-8 px-2 bg-transparent">
-          <Bold className="w-3 h-3" />
+          <Icon icon="lucide:bold" className="w-3 h-3" />
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={addBulletPoint} className="h-8 px-2 bg-transparent">
-          <List className="w-3 h-3" />
+          <Icon icon="lucide:list" className="w-3 h-3" />
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={addLineBreak} className="h-8 px-2 bg-transparent">
-          <Type className="w-3 h-3" />
+          <Icon icon="lucide:type" className="w-3 h-3" />
         </Button>
       </div>
       <Textarea

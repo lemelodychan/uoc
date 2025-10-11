@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { MagicItemsModal } from "./magic-items-modal"
-import { Plus, Trash2, Edit } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData, ToolProficiency } from "@/lib/character-data"
 
 interface EquipmentModalProps {
@@ -188,13 +188,13 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                       onClick={() => removeTool(index)}
                       className="text-destructive hover:text-destructive w-9 h-9"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
                   </div>
                 )
               })}
               <Button variant="outline" onClick={addTool} className="w-full bg-transparent">
-                <Plus className="w-4 h-4 mr-2" />
+                <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Tool
               </Button>
             </div>
@@ -205,7 +205,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
             <div className="flex items-center justify-between mb-3">
               <Label className="text-sm font-medium">Magic Items</Label>
               <Button variant="outline" size="sm" onClick={addMagicItem}>
-                <Plus className="w-4 h-4 mr-2" />
+                <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Magic Item
               </Button>
             </div>
@@ -228,7 +228,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                       onClick={() => editMagicItem(index)}
                       className="h-8 w-8 p-0"
                     >
-                      <Edit className="w-3 h-3" />
+                      <Icon icon="lucide:edit" className="w-3 h-3" />
                     </Button>
                     <Button
                       variant="outline"
@@ -236,7 +236,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                       onClick={() => removeMagicItem(index)}
                       className="text-destructive hover:text-destructive h-8 w-8 p-0"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Icon icon="lucide:trash-2" className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>

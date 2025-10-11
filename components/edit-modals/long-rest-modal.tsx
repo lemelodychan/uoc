@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Heart, Shield, Sparkles, Users, Moon, BookOpen } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData, Campaign } from "@/lib/character-data"
 
 interface LongRestModalProps {
@@ -116,25 +116,25 @@ export function LongRestModal({
 
   const longRestEffects = [
     {
-      icon: Heart,
+      icon: "lucide:heart",
       title: "Restore Hit Points",
       description: "All characters regain all lost hit points",
       color: "text-red-600"
     },
     {
-      icon: Sparkles,
+      icon: "lucide:sparkles",
       title: "Restore Spell Slots",
       description: "All expended spell slots are restored",
       color: "text-purple-600"
     },
     {
-      icon: Shield,
+      icon: "lucide:shield",
       title: "Restore Class Features",
       description: "All expended class features are restored",
       color: "text-blue-600"
     },
     {
-      icon: Moon,
+      icon: "lucide:moon",
       title: "Remove Exhaustion",
       description: "Reduce exhaustion level by 1",
       color: "text-gray-600"
@@ -146,7 +146,7 @@ export function LongRestModal({
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Moon className="w-5 h-5" />
+            <Icon icon="lucide:moon" className="w-5 h-5" />
             {isCollaborativeLongRest ? `Long Rest - Initiated by ${initiatorName}` : 'Start Long Rest'}
           </DialogTitle>
           {isCollaborativeLongRest && (
@@ -163,7 +163,7 @@ export function LongRestModal({
             {!isCollaborativeLongRest && (campaigns || []).length > 0 && (
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <BookOpen className="w-4 h-4" />
+                  <Icon icon="lucide:book-open" className="w-4 h-4" />
                   Filter by Campaign
                 </label>
                 <Select value={modalSelectedCampaignId} onValueChange={handleCampaignChange}>
@@ -184,7 +184,7 @@ export function LongRestModal({
 
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Users className="w-5 h-5" />
+                <Icon icon="lucide:users" className="w-5 h-5" />
                 {isCollaborativeLongRest ? 'Party Members (Selected by Initiator)' : 'Select Party Members'}
               </h3>
               {!isCollaborativeLongRest && (
@@ -220,7 +220,7 @@ export function LongRestModal({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <Users className="w-4 h-4 text-primary" />
+                          <Icon icon="lucide:users" className="w-4 h-4 text-primary" />
                         )}
                       </div>
                       <div className="flex-1">
@@ -251,11 +251,10 @@ export function LongRestModal({
             <h3 className="text-lg font-semibold">Long Rest Effects</h3>
             <div className="grid gap-3">
               {longRestEffects.map((effect, index) => {
-                const IconComponent = effect.icon
                 return (
                   <Card key={index} className="p-4">
                     <div className="flex items-start gap-3">
-                      <IconComponent className={`w-5 h-5 mt-0.5 ${effect.color}`} />
+                      <Icon icon={effect.icon} className={`w-5 h-5 mt-0.5 ${effect.color}`} />
                       <div className="flex-1">
                         <div className="font-medium">{effect.title}</div>
                         <div className="text-sm text-muted-foreground">
@@ -287,7 +286,7 @@ export function LongRestModal({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <Users className="w-4 h-4 text-primary" />
+                          <Icon icon="lucide:users" className="w-4 h-4 text-primary" />
                         )}
                       </div>
                       <div>

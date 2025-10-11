@@ -5,27 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import {
-  Edit,
-  Heart,
-  Shield,
-  Zap,
-  Footprints,
-  Sword,
-  Sparkles,
-  Star,
-  Wrench,
-  Save,
-  RefreshCw,
-  User,
-  BookOpen,
-  Globe,
-  UserStar,
-  Skull,
-  Dice5,
-  NotebookPen,
-  Coins,
-} from "lucide-react"
+import { Icon } from "@iconify/react"
 import { CharacterSidebar } from "@/components/character-sidebar"
 import { CampaignManagementModal } from "@/components/edit-modals/campaign-management-modal"
 import { BasicInfoModal } from "@/components/edit-modals/basic-info-modal"
@@ -2212,7 +2192,7 @@ export default function CharacterSheet() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <Icon icon="lucide:refresh-cw" className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-lg font-medium">Loading character data...</p>
           <p className="text-sm text-gray-600">
             {isInitialLoading ? "Connecting to database..." : "No characters available"}
@@ -2275,7 +2255,7 @@ export default function CharacterSheet() {
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setCharacterDetailsContentModalOpen(true)}>
-                  <BookOpen className="w-4 h-4" />
+                  <Icon icon="lucide:book-open" className="w-4 h-4" />
                   Character Biography
                 </Button>
 {/*                 <div
@@ -2289,11 +2269,11 @@ export default function CharacterSheet() {
                   }
                 /> */}
                 <Button variant="outline" size="sm" onClick={() => setBasicInfoModalOpen(true)}>
-                  <Edit className="w-4 h-4" />
+                  <Icon icon="lucide:edit" className="w-4 h-4" />
                   Edit
                 </Button>
 {/*                 <Button variant="outline" size="sm" onClick={loadCharactersFromDatabase} disabled={isLoading}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                  <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
                   {isLoading ? "Loading..." : "Refresh"}
                 </Button> */}
               </div>
@@ -2310,7 +2290,7 @@ export default function CharacterSheet() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Ability Scores</CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setAbilitiesModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
@@ -2546,11 +2526,11 @@ export default function CharacterSheet() {
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <UserStar className="w-5 h-5" /> 
+                    <Icon icon="lucide:user-star" className="w-5 h-5" /> 
                     Features & Traits
                   </CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setFeaturesModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
@@ -2634,11 +2614,11 @@ export default function CharacterSheet() {
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Star className="w-5 h-5" />
+                    <Icon icon="lucide:star" className="w-5 h-5" />
                     Feats
                   </CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setFeatsModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
@@ -2674,11 +2654,11 @@ export default function CharacterSheet() {
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Coins className="w-5 h-5" />
+                    <Icon icon="lucide:coins" className="w-5 h-5" />
                     Money
                   </CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setMoneyModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
@@ -2726,11 +2706,11 @@ export default function CharacterSheet() {
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Globe className="w-5 h-5" />
+                    <Icon icon="lucide:globe" className="w-5 h-5" />
                     Languages
                   </CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setLanguagesModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
@@ -2753,35 +2733,35 @@ export default function CharacterSheet() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Combat</CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setCombatModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 grid grid-cols-2 gap-4 items-start">
                 <div className="flex items-center gap-3 col-span-1 mb-0">
-                  <Shield className="w-5 h-5 text-blue-600" />
+                  <Icon icon="lucide:shield" className="w-5 h-5 text-blue-600" />
                   <div className="flex flex-col gap-1">
                     <div className="text-sm text-muted-foreground">Armor Class</div>
                     <div className="text-xl font-bold font-mono">{activeCharacter.armorClass}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 col-span-1 mb-0">
-                  <Zap className="w-5 h-5 text-yellow-600" />
+                  <Icon icon="lucide:zap" className="w-5 h-5 text-yellow-600" />
                   <div className="flex flex-col gap-1">
                     <div className="text-sm text-muted-foreground">Initiative</div>
                     <div className="text-xl font-bold font-mono">{formatModifier(activeCharacter.initiative)}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 col-span-1 mb-0">
-                  <Footprints className="w-5 h-5 text-green-600" />
+                  <Icon icon="lucide:footprints" className="w-5 h-5 text-green-600" />
                   <div className="flex flex-col gap-1">
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
                       Speed
                       {(() => {
                         const exhaustion = activeCharacter.exhaustion || 0
                         if (exhaustion >= 2) {
-                          return <Badge variant="outline" className="text-red-800 text-xs px-1 py-1"><Skull className="w-4 h-4" /></Badge>
+                          return <Badge variant="outline" className="text-red-800 text-xs px-1 py-1"><Icon icon="lucide:skull" className="w-4 h-4" /></Badge>
                         }
                         return null
                       })()}
@@ -2801,14 +2781,14 @@ export default function CharacterSheet() {
                 </div>
 
                 <div className="flex items-center gap-3 col-span-1 mb-0">
-                  <Heart className="w-5 h-5 text-red-600" />
+                  <Icon icon="lucide:heart" className="w-5 h-5 text-red-600" />
                   <div className="flex flex-col gap-1">
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
                       Hit Points
                       {(() => {
                         const exhaustion = activeCharacter.exhaustion || 0
                         if (exhaustion >= 4) {
-                          return <Badge variant="outline" className="text-red-800 text-xs px-1 py-1"><Skull className="w-4 h-4" /></Badge>
+                          return <Badge variant="outline" className="text-red-800 text-xs px-1 py-1"><Icon icon="lucide:skull" className="w-4 h-4" /></Badge>
                         }
                         return null
                       })()}
@@ -2837,7 +2817,7 @@ export default function CharacterSheet() {
                 {/* Exhaustion - only show if > 0 */}
                 {(activeCharacter.exhaustion ?? 0) > 0 && (
                   <div className="flex items-center gap-3 col-span-2 mb-0">
-                    <Skull className="w-5 h-5 text-red-800" />
+                    <Icon icon="lucide:skull" className="w-5 h-5 text-red-800" />
                     <div className="flex flex-col gap-1">
                       <div className="text-sm text-muted-foreground">Exhaustion</div>
                       <div className="text-xl font-bold font-mono text-red-800">
@@ -2863,7 +2843,7 @@ export default function CharacterSheet() {
                 {/* Hit Dice */}
                 {activeCharacter.hitDiceByClass && activeCharacter.hitDiceByClass.length > 0 ? (
                   <div className="flex items-start gap-3 col-span-2 mb-0">
-                    <Dice5 className="w-5 h-10 py-2.5 text-purple-600" />
+                    <Icon icon="lucide:dice-5" className="w-5 h-10 py-2.5 text-purple-600" />
                     <div className="flex flex-col gap-1">
                       <div className="text-sm text-muted-foreground">Hit Dice</div>
                       <div className="flex flex-row gap-5">
@@ -2896,7 +2876,7 @@ export default function CharacterSheet() {
                   </div>
                 ) : activeCharacter.hitDice && (
                   <div className="flex items-center gap-3 col-span-1 mb-0">
-                    <Dice5 className="w-5 h-5 text-purple-600" />
+                    <Icon icon="lucide:dice-5" className="w-5 h-5 text-purple-600" />
                     <div className="flex flex-col gap-1">
                       <div className="text-sm text-muted-foreground">Hit Dice</div>
                       <div className="text-xl font-bold font-mono">
@@ -2924,11 +2904,11 @@ export default function CharacterSheet() {
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Sword className="w-5 h-5" />
+                    <Icon icon="lucide:sword" className="w-5 h-5" />
                     Weapons
                   </CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setWeaponsModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
@@ -2979,11 +2959,11 @@ export default function CharacterSheet() {
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5" />
+                    <Icon icon="lucide:sparkles" className="w-5 h-5" />
                     Spells & Magic
                   </CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setSpellModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
@@ -3020,7 +3000,7 @@ export default function CharacterSheet() {
                     </div>
                   </div>
                   <Button className="w-full" variant="outline" size="sm" onClick={() => setSpellListModalOpen(true)}>
-                    <BookOpen className="w-4 h-4" />
+                    <Icon icon="lucide:book-open" className="w-4 h-4" />
                     Spell List
                   </Button>
                 </div>
@@ -3472,11 +3452,11 @@ export default function CharacterSheet() {
               <CardHeader className="pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
+                    <Icon icon="lucide:shield" className="w-5 h-5" />
                     Equipment
                   </CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setEquipmentModalOpen(true)}>
-                    <Edit className="w-4 h-4" />
+                    <Icon icon="lucide:edit" className="w-4 h-4" />
                     Edit
                   </Button>
                 </div>
@@ -3707,7 +3687,7 @@ export default function CharacterSheet() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Star className="w-5 h-5" />
+                    <Icon icon="lucide:star" className="w-5 h-5" />
                     Class Features
                   </CardTitle>
                   <Button 
@@ -3840,7 +3820,7 @@ export default function CharacterSheet() {
                 <CardHeader className="pb-0">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                      <Zap className="w-5 h-5" />
+                      <Icon icon="lucide:zap" className="w-5 h-5" />
                       Eldritch Cannon
                     </CardTitle>
                     <Button 
@@ -3849,7 +3829,7 @@ export default function CharacterSheet() {
                       onClick={() => setEldritchCannonModalOpen(true)}
                       disabled={activeCharacter.level < 3}
                     >
-                      <Edit className="w-4 h-4" />
+                      <Icon icon="lucide:edit" className="w-4 h-4" />
                       {activeCharacter.eldritchCannon ? "Edit" : "Create"}
                     </Button>
                   </div>
@@ -3904,7 +3884,7 @@ export default function CharacterSheet() {
                 <CardHeader className="pb-0">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                      <Wrench className="w-5 h-5" />
+                      <Icon icon="lucide:wrench" className="w-5 h-5" />
                       Infusions
                     </CardTitle>
                     <Button 
@@ -3913,7 +3893,7 @@ export default function CharacterSheet() {
                       onClick={() => setInfusionsModalOpen(true)}
                       disabled={activeCharacter.level < 2}
                     >
-                      <Edit className="w-4 h-4" />
+                      <Icon icon="lucide:edit" className="w-4 h-4" />
                       Edit
                     </Button>
                   </div>
@@ -3991,7 +3971,7 @@ export default function CharacterSheet() {
                 <CardHeader className="pb-0">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5" />
+                      <Icon icon="lucide:sparkles" className="w-5 h-5" />
                       Eldritch Invocations
                     </CardTitle>
                     <Button 
@@ -4000,7 +3980,7 @@ export default function CharacterSheet() {
                       onClick={() => setEldritchInvocationsModalOpen(true)}
                       disabled={activeCharacter.level < 2}
                     >
-                      <Edit className="w-4 h-4" />
+                      <Icon icon="lucide:edit" className="w-4 h-4" />
                       Edit
                     </Button>
                   </div>
@@ -4213,7 +4193,7 @@ export default function CharacterSheet() {
                       )}
                       {hasContent ? (
                         <div className="rounded-lg w-full border text-sm p-3 bg-muted/30 col-span-2 flex flex-col gap-3">
-                          <div className="text-md font-semibold text-black flex items-center gap-1"><NotebookPen className="w-4 h-4" />Custom notes</div>
+                          <div className="text-md font-semibold text-black flex items-center gap-1"><Icon icon="lucide:notebook-pen" className="w-4 h-4" />Custom notes</div>
                           <RichTextDisplay content={note!.content as string} className="text-sm font-mono" />
                         </div>
                       ) : (
@@ -4249,7 +4229,7 @@ export default function CharacterSheet() {
                   setFeatureNotesModalOpen(true)
                 }}
               >
-                <NotebookPen className="w-4 h-4" />Edit custom notes
+                <Icon icon="lucide:notebook-pen" className="w-4 h-4" />Edit custom notes
               </Button>
             </div>
           )}
@@ -4260,7 +4240,7 @@ export default function CharacterSheet() {
       <Dialog open={featureNotesModalOpen} onOpenChange={setFeatureNotesModalOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><NotebookPen className="w-4 h-4" />Edit custom notes</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Icon icon="lucide:notebook-pen" className="w-4 h-4" />Edit custom notes</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
               <RichTextEditor

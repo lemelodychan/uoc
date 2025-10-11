@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { User, LogOut, Settings } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export function AppHeader() {
@@ -111,14 +111,14 @@ export function AppHeader() {
           <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
-                <User className="w-4 h-4" />
+                <Icon icon="lucide:user" className="w-4 h-4" />
                 Profile
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
+                  <Icon icon="lucide:settings" className="w-5 h-5" />
                   Edit Profile
                 </DialogTitle>
               </DialogHeader>
@@ -167,7 +167,7 @@ export function AppHeader() {
           </Dialog>
           
           <Button variant="outline" size="sm" onClick={handleSignOut}>
-            <LogOut className="w-4 h-4" />
+            <Icon icon="lucide:log-out" className="w-4 h-4" />
             Sign Out
           </Button>
         </div>

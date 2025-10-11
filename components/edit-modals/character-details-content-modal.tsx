@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
-import { Edit, User } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 
 interface CharacterDetailsContentModalProps {
@@ -63,7 +63,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
           <h4 className="font-medium text-lg">{title}</h4>
           {!isEditing && (
             <Button variant="outline" size="sm" onClick={() => startEditing(field)}>
-              <Edit className="w-4 h-4 mr-2" />
+              <Icon icon="lucide:edit" className="w-4 h-4 mr-2" />
               Edit
             </Button>
           )}
@@ -104,7 +104,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
+            <Icon icon="lucide:user" className="w-5 h-5" />
             Character Details
           </DialogTitle>
         </DialogHeader>

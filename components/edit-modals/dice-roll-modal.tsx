@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6 } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateModifier, calculateProficiencyBonus, calculateSavingThrowBonus, calculateSpellAttackBonus } from "@/lib/character-data"
 
@@ -78,14 +78,14 @@ const SKILL_OPTIONS: { value: SkillType; label: string; ability: string }[] = [
 
 const getDiceIcon = (diceType: DiceType) => {
   switch (diceType) {
-    case "d4": return <Dice1 className="w-4 h-4" />
-    case "d6": return <Dice2 className="w-4 h-4" />
-    case "d8": return <Dice3 className="w-4 h-4" />
-    case "d10": return <Dice4 className="w-4 h-4" />
-    case "d12": return <Dice5 className="w-4 h-4" />
-    case "d20": return <Dice6 className="w-4 h-4" />
-    case "d100": return <Dice6 className="w-4 h-4" />
-    default: return <Dice6 className="w-4 h-4" />
+    case "d4": return <Icon icon="lucide:dice-1" className="w-4 h-4" />
+    case "d6": return <Icon icon="lucide:dice-2" className="w-4 h-4" />
+    case "d8": return <Icon icon="lucide:dice-3" className="w-4 h-4" />
+    case "d10": return <Icon icon="lucide:dice-4" className="w-4 h-4" />
+    case "d12": return <Icon icon="lucide:dice-5" className="w-4 h-4" />
+    case "d20": return <Icon icon="lucide:dice-6" className="w-4 h-4" />
+    case "d100": return <Icon icon="lucide:dice-6" className="w-4 h-4" />
+    default: return <Icon icon="lucide:dice-6" className="w-4 h-4" />
   }
 }
 
@@ -381,7 +381,7 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
             >
               {isRolling ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Icon icon="lucide:loader-2" className="w-4 h-4 mr-2 animate-spin" />
                   Rolling...
                 </>
               ) : (

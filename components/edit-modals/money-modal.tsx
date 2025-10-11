@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Coins } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 
 interface MoneyModalProps {
@@ -54,7 +54,7 @@ export function MoneyModal({ isOpen, onClose, character, onSave }: MoneyModalPro
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Coins className="w-5 h-5" />
+            <Icon icon="lucide:coins" className="w-5 h-5" />
             Edit Money
           </DialogTitle>
         </DialogHeader>

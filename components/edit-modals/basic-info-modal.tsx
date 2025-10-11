@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, UserX, Skull, Settings } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { MulticlassModal } from "./multiclass-modal"
 
@@ -150,7 +150,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                 onClick={() => setMulticlassModalOpen(true)}
                 title="Configure multiclassing"
               >
-                <Settings className="w-4 h-4" />
+                <Icon icon="lucide:settings" className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -229,19 +229,19 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               <SelectContent>
                 <SelectItem value="active">
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
+                    <Icon icon="lucide:users" className="w-4 h-4" />
                     Active Party
                   </div>
                 </SelectItem>
                 <SelectItem value="away">
                   <div className="flex items-center gap-2">
-                    <UserX className="w-4 h-4" />
+                    <Icon icon="lucide:user-x" className="w-4 h-4" />
                     Away
                   </div>
                 </SelectItem>
                 <SelectItem value="deceased">
                   <div className="flex items-center gap-2">
-                    <Skull className="w-4 h-4" />
+                    <Icon icon="lucide:skull" className="w-4 h-4" />
                     Deceased
                   </div>
                 </SelectItem>

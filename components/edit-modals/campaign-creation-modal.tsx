@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, User, Users } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { Campaign, CharacterData } from "@/lib/character-data"
 
 interface CampaignCreationModalProps {
@@ -135,7 +135,7 @@ export function CampaignCreationModal({
               {getCharactersInCampaign(editingCampaign.id).length > 0 ? (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Users className="w-4 h-4" /> Characters in Campaign <Badge variant="outline" className="text-xs">
+                    <Icon icon="lucide:users" className="w-4 h-4" /> Characters in Campaign <Badge variant="outline" className="text-xs">
                       {getCharactersInCampaign(editingCampaign.id).length}
                     </Badge>
                   </h4>
@@ -154,7 +154,7 @@ export function CampaignCreationModal({
                                 className="w-full h-full object-cover border rounded-md"
                               />
                             ) : (
-                              <User className="w-full h-full p-2 text-muted-foreground border rounded-md" />
+                              <Icon icon="lucide:user" className="w-full h-full p-2 text-muted-foreground border rounded-md" />
                             )}
                           </div>
                           <div>
@@ -188,7 +188,7 @@ export function CampaignCreationModal({
               {getCharactersNotInCampaign(editingCampaign.id).length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium flex items-center gap-2">
-                    <UserPlus className="w-4 h-4" />
+                    <Icon icon="lucide:user-plus" className="w-4 h-4" />
                     Add Characters
                   </h4>
                   <div className="grid grid-cols-1 gap-2">
@@ -206,7 +206,7 @@ export function CampaignCreationModal({
                                 className="w-full h-full object-cover border rounded-md"
                               />
                             ) : (
-                              <User className="w-full h-full p-2 text-muted-foreground border rounded-md" />
+                              <Icon icon="lucide:user" className="w-full h-full p-2 text-muted-foreground border rounded-md" />
                             )}
                           </div>
                           <div>

@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
-import { X, Plus } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData, Spell } from "@/lib/character-data"
 
 interface SpellCreationModalProps {
@@ -497,7 +497,7 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
                     {selectedClasses.map(className => (
                       <Badge key={className} variant="secondary" className="flex items-center gap-1">
                         {className}
-                        <X 
+                        <Icon icon="lucide:x" 
                           className="w-3 h-3 cursor-pointer" 
                           onClick={() => removeClass(className)}
                         />

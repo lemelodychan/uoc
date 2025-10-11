@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Heart, Sparkles, Star, Zap, BookOpen, Award, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Skull } from "lucide-react"
+import { Icon } from "@iconify/react"
 
 interface LongRestResultsModalProps {
   isOpen: boolean
@@ -82,7 +82,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
       <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-red-500" />
+            <Icon icon="lucide:heart" className="w-5 h-5 text-red-500" />
             Long Rest Results
           </DialogTitle>
         </DialogHeader>
@@ -96,7 +96,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
               <CardContent className="space-y-3">
                 {/* Hit Points Restored */}
                 <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border">
-                  <Heart className="w-5 h-5 text-red-500" />
+                  <Icon icon="lucide:heart" className="w-5 h-5 text-red-500" />
                   <div className="flex-1">
                     <div className="font-medium">Hit Points Restored</div>
                     <div className="text-sm text-muted-foreground">
@@ -113,7 +113,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {/* Exhaustion Reduction */}
                 {result.exhaustionReduced > 0 && (
                   <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border">
-                    <Skull className="w-5 h-5 text-red-500" />
+                    <Icon icon="lucide:skull" className="w-5 h-5 text-red-500" />
                     <div className="flex-1">
                       <div className="font-medium">Exhaustion Reduced</div>
                       <div className="text-sm text-muted-foreground">
@@ -130,7 +130,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.magicItemReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-purple-500" />
+                      <Icon icon="lucide:sparkles" className="w-4 h-4 text-purple-500" />
                       Magic Item Charges Replenished
                     </div>
                     {result.magicItemReplenishments.map((item, index) => (
@@ -176,7 +176,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.featureReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Star className="w-4 h-4 text-yellow-500" />
+                      <Icon icon="lucide:star" className="w-4 h-4 text-yellow-500" />
                       Feature Uses Replenished
                     </div>
                     {result.featureReplenishments.map((feature, index) => (
@@ -222,7 +222,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.spellSlotReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-blue-500" />
+                      <Icon icon="lucide:book-open" className="w-4 h-4 text-blue-500" />
                       Spell Slots Restored
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -247,7 +247,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.classAbilityReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-green-500" />
+                      <Icon icon="lucide:zap" className="w-4 h-4 text-green-500" />
                       Class Abilities Restored
                     </div>
                     {result.classAbilityReplenishments.map((ability, index) => (
@@ -270,7 +270,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.featSpellReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Award className="w-4 h-4 text-orange-500" />
+                      <Icon icon="lucide:award" className="w-4 h-4 text-orange-500" />
                       Feat Spells Restored
                     </div>
                     {result.featSpellReplenishments.map((feat, index) => (
@@ -293,7 +293,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.hitDiceReplenishments.diceRestored > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Dice1 className="w-4 h-4 text-indigo-500" />
+                      <Icon icon="lucide:dice-1" className="w-4 h-4 text-indigo-500" />
                       Hit Dice Restored
                     </div>
                     <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border">

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit, Trash2 } from "lucide-react"
+import { Icon } from "@iconify/react"
 import { FeatureEditModal } from "./feature-edit-modal"
 import type { CharacterData } from "@/lib/character-data"
 import { RichTextDisplay } from "../ui/rich-text-display"
@@ -56,7 +56,7 @@ export function FeaturesModal({ isOpen, onClose, character, onSave }: FeaturesMo
                   onClick={() => handleEditFeature(index)}
                   className="w-9 h-9"
                 >
-                  <Edit className="w-4 h-4" />
+                  <Icon icon="lucide:edit" className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -69,7 +69,7 @@ export function FeaturesModal({ isOpen, onClose, character, onSave }: FeaturesMo
         </div>
         <DialogFooter className="flex flex-row items-center align-left justify-start w-full">
           <Button variant="outline" onClick={handleAddFeature}>
-            <Plus className="w-4 h-4" />
+            <Icon icon="lucide:plus" className="w-4 h-4" />
             Add Feature
           </Button>
         </DialogFooter>

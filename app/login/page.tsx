@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Mail, Lock, ArrowRight } from "lucide-react"
+import { Icon } from "@iconify/react"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
@@ -124,7 +124,7 @@ function LoginForm() {
                   variant="outline"
                   disabled={!email || isLoading}
                 >
-                  <Mail className="mr-2 h-4 w-4" />
+                  <Icon icon="lucide:mail" className="mr-2 h-4 w-4" />
                   Send Magic Link
                 </Button>
                 
@@ -134,7 +134,7 @@ function LoginForm() {
                   variant="outline"
                   disabled={!email || isLoading}
                 >
-                  <Lock className="mr-2 h-4 w-4" />
+                  <Icon icon="lucide:lock" className="mr-2 h-4 w-4" />
                   Sign in with Password
                 </Button>
               </div>
@@ -168,9 +168,9 @@ function LoginForm() {
                   disabled={!email || isLoading}
                 >
                   {isLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Icon icon="lucide:loader-2" className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <Mail className="mr-2 h-4 w-4" />
+                    <Icon icon="lucide:mail" className="mr-2 h-4 w-4" />
                   )}
                   Send Magic Link
                 </Button>
@@ -217,9 +217,9 @@ function LoginForm() {
                   disabled={!email || !password || isLoading}
                 >
                   {isLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Icon icon="lucide:loader-2" className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <ArrowRight className="mr-2 h-4 w-4" />
+                    <Icon icon="lucide:arrow-right" className="mr-2 h-4 w-4" />
                   )}
                   Sign In
                 </Button>

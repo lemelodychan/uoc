@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { JsonCodeEditor } from "@/components/ui/json-code-editor"
-import { Plus, Edit, Trash2, Users, Calendar } from "lucide-react"
+import { Icon } from "@iconify/react"
 import { CampaignCreationModal } from "./campaign-creation-modal"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import type { Campaign, CharacterData } from "@/lib/character-data"
@@ -108,7 +108,7 @@ export function CampaignManagementModal({
                   className="flex-1"
                 />
                 <Button onClick={() => setShowCreateModal(true)}>
-                  <Plus className="w-4 h-4" />
+                  <Icon icon="lucide:plus" className="w-4 h-4" />
                   New Campaign
                 </Button>
               </div>
@@ -138,13 +138,13 @@ export function CampaignManagementModal({
                               )}
                               <div className="flex items-center gap-4 mt-2">
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Calendar className="w-4 h-4" />
+                                  <Icon icon="lucide:calendar" className="w-4 h-4" />
                                   Created {formatDate(campaign.created_at)}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
                                   {/* Character Summary */}
                                   <div className="flex items-center gap-2">
-                                    <Users className="w-4 h-4" />
+                                    <Icon icon="lucide:users" className="w-4 h-4" />
                                     <span className="text-xs">
                                       {campaignCharacters.length} character{campaignCharacters.length !== 1 ? 's' : ''}
                                     </span>
@@ -178,14 +178,14 @@ export function CampaignManagementModal({
                                 size="sm"
                                 onClick={() => setEditingCampaign(campaign)}
                               >
-                                <Edit className="w-4 h-4" />
+                                <Icon icon="lucide:edit" className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setDeletingCampaign(campaign)}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Icon icon="lucide:trash-2" className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
@@ -462,7 +462,7 @@ function ClassManagement() {
           max_spell_slots: {},
           class_features: {},
         } as ClassData)}>
-          <Plus className="w-4 h-4" /> New Class
+          <Icon icon="lucide:plus" className="w-4 h-4" /> New Class
         </Button>
       </div>
 
@@ -514,10 +514,10 @@ function ClassManagement() {
                         setEditingClass(cls)
                       }
                     }}>
-                      <Edit className="w-4 h-4" />
+                      <Icon icon="lucide:edit" className="w-4 h-4" />
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => removeClass(cls.id)}>
-                      <Trash2 className="w-4 h-4" />
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -660,8 +660,8 @@ function ClassManagement() {
                     <div key={sc.id} className="flex items-center justify-between p-2 pl-3 border rounded-lg">
                       <div className="text-sm font-medium">{sc.name}</div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="w-8 h-8" onClick={() => setEditingSubclass(sc)}><Edit className="w-4 h-4" /></Button>
-                        <Button variant="outline" className="text-red-600 w-8 h-8" size="sm" onClick={() => removeSubclass(sc.id)}><Trash2 className="w-4 h-4" /></Button>
+                        <Button variant="outline" size="sm" className="w-8 h-8" onClick={() => setEditingSubclass(sc)}><Icon icon="lucide:edit" className="w-4 h-4" /></Button>
+                        <Button variant="outline" className="text-red-600 w-8 h-8" size="sm" onClick={() => removeSubclass(sc.id)}><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
                       </div>
                     </div>
                   ))}
@@ -687,8 +687,8 @@ function ClassManagement() {
                             <div key={f.id} className="flex items-center justify-between p-2 pl-3 border rounded-lg">
                               <div className="text-sm font-medium">Level {f.level}: {f.title}</div>
                               <div className="flex gap-2">
-                                <Button variant="outline" size="sm" className="w-8 h-8" onClick={() => setEditingFeature({ id: f.id, class_id: detailsClassId, level: f.level, title: f.title, description: f.description, feature_type: 'class' })}><Edit className="w-4 h-4" /></Button>
-                                <Button variant="outline" className="text-red-600 w-8 h-8" size="sm" onClick={async () => { const { success } = await deleteClassFeature(f.id); if (success) setFeaturesByClass(prev => ({ ...prev, [detailsClassId]: (prev[detailsClassId] || []).filter(x => x.id !== f.id) })) }}><Trash2 className="w-4 h-4" /></Button>
+                                <Button variant="outline" size="sm" className="w-8 h-8" onClick={() => setEditingFeature({ id: f.id, class_id: detailsClassId, level: f.level, title: f.title, description: f.description, feature_type: 'class' })}><Icon icon="lucide:edit" className="w-4 h-4" /></Button>
+                                <Button variant="outline" className="text-red-600 w-8 h-8" size="sm" onClick={async () => { const { success } = await deleteClassFeature(f.id); if (success) setFeaturesByClass(prev => ({ ...prev, [detailsClassId]: (prev[detailsClassId] || []).filter(x => x.id !== f.id) })) }}><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
                               </div>
                             </div>
                           ))}
@@ -704,8 +704,8 @@ function ClassManagement() {
                                 <div key={f.id} className="flex items-center justify-between p-2 pl-3 border rounded-lg">
                                   <div className="text-sm font-medium">Level {f.level}: {f.title}</div>
                                   <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" className="w-8 h-8" onClick={() => setEditingFeature({ id: f.id, class_id: detailsClassId, subclass_id: subId, level: f.level, title: f.title, description: f.description, feature_type: 'subclass' })}><Edit className="w-4 h-4" /></Button>
-                                    <Button variant="outline" className="text-red-600 w-8 h-8" size="sm" onClick={async () => { const { success } = await deleteClassFeature(f.id); if (success) setFeaturesByClass(prev => ({ ...prev, [detailsClassId]: (prev[detailsClassId] || []).filter(x => x.id !== f.id) })) }}><Trash2 className="w-4 h-4" /></Button>
+                                    <Button variant="outline" size="sm" className="w-8 h-8" onClick={() => setEditingFeature({ id: f.id, class_id: detailsClassId, subclass_id: subId, level: f.level, title: f.title, description: f.description, feature_type: 'subclass' })}><Icon icon="lucide:edit" className="w-4 h-4" /></Button>
+                                    <Button variant="outline" className="text-red-600 w-8 h-8" size="sm" onClick={async () => { const { success } = await deleteClassFeature(f.id); if (success) setFeaturesByClass(prev => ({ ...prev, [detailsClassId]: (prev[detailsClassId] || []).filter(x => x.id !== f.id) })) }}><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
                                   </div>
                                 </div>
                               ))}
@@ -727,7 +727,7 @@ function ClassManagement() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => setEditingSubclass({ id: "", class_id: detailsClassId!, name: "", description: "", subclass_features: {} } as SubclassData)}>
-                      <Plus className="w-4 h-4" /> Add Subclass
+                      <Icon icon="lucide:plus" className="w-4 h-4" /> Add Subclass
                   </Button>
                 )}
                 {detailsTab === 'features' && detailsClassId && (
@@ -735,7 +735,7 @@ function ClassManagement() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => setEditingFeature({ class_id: detailsClassId!, level: 1, title: "", description: "", feature_type: "class" })}>
-                      <Plus className="w-4 h-4" /> Add Feature
+                      <Icon icon="lucide:plus" className="w-4 h-4" /> Add Feature
                   </Button>
                 )}
               </div>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2 } from "lucide-react"
+import { Icon } from "@iconify/react"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import type { CharacterData } from "@/lib/character-data"
 
@@ -111,7 +111,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                         onClick={() => removeWeapon(index)}
                         className="text-destructive hover:text-destructive w-9 h-9"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -143,7 +143,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                 </div>
               ))}
               <Button variant="outline" onClick={addWeapon} className="w-full bg-transparent">
-                <Plus className="w-4 h-4 mr-2" />
+                <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Weapon
               </Button>
             </div>

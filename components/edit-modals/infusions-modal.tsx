@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
-import { Plus, Trash2, Wrench } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData, Infusion } from "@/lib/character-data"
 
 interface InfusionsModalProps {
@@ -51,7 +51,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
       <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Wrench className="w-5 h-5" />
+            <Icon icon="lucide:wrench" className="w-5 h-5" />
             Edit Infusions
           </DialogTitle>
         </DialogHeader>
@@ -93,7 +93,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
                         onClick={() => removeInfusion(index)}
                         className="text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -112,7 +112,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
                 </div>
               ))}
               <Button variant="outline" onClick={addInfusion} className="w-full bg-transparent">
-                <Plus className="w-4 h-4 mr-2" />
+                <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Infusion
               </Button>
             </div>
@@ -120,7 +120,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
 
           {infusions.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
-              <Wrench className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <Icon icon="lucide:wrench" className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="text-sm">No infusions added yet.</p>
               <p className="text-xs">Click "Add Infusion" to create your first infusion.</p>
             </div>

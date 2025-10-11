@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
-import { Plus, Minus, Trash2 } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 
 interface CombatModalProps {
@@ -215,7 +215,7 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
                 onClick={addHitDieClass}
                 className="flex items-center gap-1"
               >
-                <Plus className="w-4 h-4" />
+                <Icon icon="lucide:plus" className="w-4 h-4" />
                 Add Dice
               </Button>
             </div>
@@ -289,7 +289,7 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
                       onClick={() => removeHitDieClass(index)}
                       className="text-red-600 hover:text-red-700 h-9 w-9"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
                   </div>
                 ))}

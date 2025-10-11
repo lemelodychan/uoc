@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Search, Plus, BookOpen, ChevronDown, ChevronRight, Edit } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData, Spell } from "@/lib/character-data"
 
 interface SpellLibraryModalProps {
@@ -228,7 +228,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5" />
+            <Icon icon="lucide:book-open" className="w-5 h-5" />
             Spell Library
           </DialogTitle>
           <DialogDescription>
@@ -239,7 +239,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
         {/* Search and Filters */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Icon icon="lucide:search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
                 placeholder="Search spells by name..."
                 value={searchTerm}
@@ -297,7 +297,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
 
             <div className="flex items-center justify-end gap-2 w-full">
               <Button onClick={onCreateNewSpell} variant="outline">
-                <Plus className="w-4 h-4" />
+                <Icon icon="lucide:plus" className="w-4 h-4" />
                 Add missing Spell
               </Button>
             </div>
@@ -350,9 +350,9 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                         aria-label="Toggle details"
                                       >
                                         {isOpen ? (
-                                          <ChevronDown className="w-4 h-4" />
+                                          <Icon icon="lucide:chevron-down" className="w-4 h-4" />
                                         ) : (
-                                          <ChevronRight className="w-4 h-4" />
+                                          <Icon icon="lucide:chevron-right" className="w-4 h-4" />
                                         )}
                                       </button>
                                     )}
@@ -368,7 +368,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                         onClick={() => onEditSpell(spell)}
                                         className="h-8"
                                       >
-                                        <Edit className="w-4 h-4" />
+                                        <Icon icon="lucide:edit" className="w-4 h-4" />
                                       </Button>
                                     )}
                                     <Button
@@ -381,7 +381,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                       {isSpellInCharacterList(spell) ? (
                                         <>✓ Added to list</>
                                       ) : (
-                                        <><Plus className="w-4 h-4" />Add to spell list</>
+                                        <><Icon icon="lucide:plus" className="w-4 h-4" />Add to spell list</>
                                       )}
                                     </Button>
                                   </div>

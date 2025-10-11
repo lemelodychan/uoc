@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, X, Trash2 } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData, SpellData, FeatSpellSlot } from "@/lib/character-data"
 
 interface SpellModalProps {
@@ -142,7 +142,7 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
               <div className="flex items-center justify-between gap-2 w-full">
                 <div className="text-m font-semibold w-full">Feat Spell Slots</div>
                 <Button variant="outline" size="sm" onClick={addFeatSpellSlot}>
-                  <Plus className="w-4 h-4" />
+                  <Icon icon="lucide:plus" className="w-4 h-4" />
                   Add Feat
                 </Button>
               </div>
@@ -159,7 +159,7 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
                         className="flex-1"
                       />
                       <Button variant="outline" className="w-9 h-9" size="sm" onClick={() => removeFeatSpellSlot(featIndex)}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <Icon icon="lucide:trash-2" className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
 

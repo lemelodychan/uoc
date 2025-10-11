@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, Plus, User, UserRoundPlus, Users, UserX, Skull, Moon, Dice6, BookOpen, Settings } from "lucide-react"
+import { Icon } from "@iconify/react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { CharacterData, Campaign } from "@/lib/character-data"
 
@@ -122,9 +122,9 @@ export function CharacterSidebar({
 
   // Define status order and labels
   const statusConfig = {
-    active: { label: 'Active Party', icon: Users, color: 'bg-green-100 text-green-800 border-green-200' },
-    away: { label: 'Away', icon: UserX, color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    deceased: { label: 'Deceased', icon: Skull, color: 'bg-red-100 text-red-800 border-red-200' }
+    active: { label: 'Active Party', icon: 'lucide:users', color: 'bg-green-100 text-green-800 border-green-200' },
+    away: { label: 'Away', icon: 'lucide:user-x', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+    deceased: { label: 'Deceased', icon: 'lucide:skull', color: 'bg-red-100 text-red-800 border-red-200' }
   }
 
   const statusOrder = ['active', 'away', 'deceased'] as const
@@ -143,7 +143,7 @@ export function CharacterSidebar({
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="text-sidebar-foreground hover:bg-sidebar-accent"
           >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            {isCollapsed ? <Icon icon="lucide:chevron-right" className="w-4 h-4" /> : <Icon icon="lucide:chevron-left" className="w-4 h-4" />}
           </Button>
         </div>
       </div> */}
@@ -157,7 +157,7 @@ export function CharacterSidebar({
               isCollapsed ? "px-0 h-12" : ""
             }`}
           >
-            <UserRoundPlus className={`${isCollapsed ? "w-6 h-6" : "w-4 h-4"}`} />
+            <Icon icon="lucide:user-round-plus" className={`${isCollapsed ? "w-6 h-6" : "w-4 h-4"}`} />
             {!isCollapsed && <span>New Character</span>}
           </Button>
           {!isCollapsed && (
@@ -167,7 +167,7 @@ export function CharacterSidebar({
               size="sm"
               className="h-9"
             >
-              <Settings className="w-4 h-4" />Edit
+              <Icon icon="lucide:settings" className="w-4 h-4" />Edit
             </Button>
           )}
         </div>
@@ -176,7 +176,7 @@ export function CharacterSidebar({
         {!isCollapsed && (campaigns || []).length > 0 && (
             <Select value={selectedCampaignId} onValueChange={onCampaignChange}>
             <SelectTrigger className="w-full text-md font-medium pl-8 relative">
-              <BookOpen className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" />
+              <Icon icon="lucide:book-open" className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" />
               <SelectValue placeholder="Select campaign" />
             </SelectTrigger>
             <SelectContent>
@@ -204,13 +204,12 @@ export function CharacterSidebar({
 						if (charactersInStatus.length === 0) return null
 
 						const config = statusConfig[status]
-						const IconComponent = config.icon
 
 						return (
 							<div key={`all-${status}`} className="flex flex-col gap-3 mt-2">
 								{!isCollapsed && (
 									<div className="flex items-center gap-2 ml-1 text-sm">
-										<IconComponent className="w-4 h-4" />
+										<Icon icon={config.icon} className="w-4 h-4" />
 										<span className="text-sm font-medium">{config.label}</span>
 										<Badge variant="secondary" className="text-[10px] bg-white border-gray-200 text-sidebar-foreground">
 											{charactersInStatus.length}
@@ -239,7 +238,7 @@ export function CharacterSidebar({
 																			className="w-full h-full object-cover"
 																		/>
 																	) : (
-																		<User className={`${isCollapsed ? "w-4 h-4 p-0" : "w-12 h-14 p-3"} text-sidebar-primary`} />
+																		<Icon icon="lucide:user" className={`${isCollapsed ? "w-4 h-4 p-0" : "w-12 h-14 p-3"} text-sidebar-primary`} />
 																	)}
 																</div>
 																{!isCollapsed && (
@@ -286,13 +285,12 @@ export function CharacterSidebar({
                     if (charactersInStatus.length === 0) return null
 
                     const config = statusConfig[status]
-                    const IconComponent = config.icon
 
                     return (
                       <div key={`${campaignId}-${status}`} className="flex flex-col gap-3 mt-2">
                         {!isCollapsed && (
 										      <div className="flex items-center gap-2 ml-1 text-sm">
-                            <IconComponent className="w-4 h-4" />
+                            <Icon icon={config.icon} className="w-4 h-4" />
                             <span className="text-sm font-medium">{config.label}</span>
                             <Badge variant="secondary" className="text-[10px] bg-white border-gray-200 text-sidebar-foreground">
                               {charactersInStatus.length}
@@ -321,7 +319,7 @@ export function CharacterSidebar({
                                         className="w-full h-full object-cover"
                                       />
                                     ) : (
-                                      <User className={`${isCollapsed ? "w-4 h-4" : "w-12 h-12"} text-sidebar-primary`} />
+                                      <Icon icon="lucide:user" className={`${isCollapsed ? "w-4 h-4" : "w-12 h-12"} text-sidebar-primary`} />
                                     )}
                                   </div>
                                   {!isCollapsed && (
@@ -370,7 +368,7 @@ export function CharacterSidebar({
             isCollapsed ? "px-2" : ""
           }`}
         >
-          <Dice6 className="w-4 h-4" />
+          <Icon icon="lucide:dice" className="w-4 h-4" />
           {!isCollapsed && <span className="ml-2">Dice Roll</span>}
         </Button>
         <Button
@@ -379,7 +377,7 @@ export function CharacterSidebar({
             isCollapsed ? "px-2" : ""
           }`}
         >
-          <Moon className="w-4 h-4" />
+          <Icon icon="lucide:moon" className="w-4 h-4" />
           {!isCollapsed && <span className="ml-2">Start Long Rest</span>}
         </Button>
       </div>

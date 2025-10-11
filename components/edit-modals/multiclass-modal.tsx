@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Trash2, X } from "lucide-react"
+import { Icon } from "@iconify/react"
 import { useToast } from "@/hooks/use-toast"
 import type { CharacterData, CharacterClass } from "@/lib/character-data"
 
@@ -194,7 +194,7 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
               Total Character Level: <Badge variant="secondary">{totalLevel}</Badge>
             </div>
             <Button onClick={addClass} size="sm" variant="outline">
-              <Plus className="w-4 h-4 mr-2" />
+              <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
               Add Class
             </Button>
           </div>
@@ -211,7 +211,7 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
                       variant="ghost"
                       className="text-destructive hover:text-destructive"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
                   )}
                 </div>

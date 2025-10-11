@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectLabel, SelectGroup } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, X, ChevronDown, ChevronRight, Trash2, BookOpen } from "lucide-react"
+import { Icon } from "@iconify/react"
 import type { CharacterData, SpellData, Spell } from "@/lib/character-data"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
@@ -475,9 +475,9 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                       {(spell.description || spell.higherLevel) && (
                                         <button type="button" className={`w-5 h-5 flex items-center justify-center rounded border hover:bg-accent`} onClick={() => toggleExpanded(key)} aria-label="Toggle details">
                                           {isOpen ? (
-                                            <ChevronDown className="w-4 h-4" />
+                                            <Icon icon="lucide:chevron-down" className="w-4 h-4" />
                                           ) : (
-                                            <ChevronRight className="w-4 h-4" />
+                                            <Icon icon="lucide:chevron-right" className="w-4 h-4" />
                                           )}
                                         </button>
                                       )}
@@ -491,7 +491,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                         <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => togglePrepared(spell)} variant="outline" size="sm">{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
                                       )}
                                       <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
-                                      <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-destructive hover:text-destructive w-8 h-8"><Trash2 className="w-4 h-4" /></Button>
+                                      <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-destructive hover:text-destructive w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -549,9 +549,9 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                         {(spell.description || spell.higherLevel) && (
                                           <button type="button" className={`w-5 h-5 flex items-center justify-center rounded border hover:bg-accent`} onClick={() => toggleExpanded(key)} aria-label="Toggle details">
                                             {isOpen ? (
-                                              <ChevronDown className="w-4 h-4" />
+                                              <Icon icon="lucide:chevron-down" className="w-4 h-4" />
                                             ) : (
-                                              <ChevronRight className="w-4 h-4" />
+                                              <Icon icon="lucide:chevron-right" className="w-4 h-4" />
                                             )}
                                           </button>
                                         )}
@@ -565,7 +565,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                           <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => togglePrepared(spell)} variant="outline" size="sm">{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
                                         )}
                                         <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
-                                        <Button variant="ghost" size="sm" onClick={() => removeSpell(globalIndex)} className="text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
+                                        <Button variant="ghost" size="sm" onClick={() => removeSpell(globalIndex)} className="text-destructive hover:text-destructive"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -609,7 +609,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                 size="sm"
                 onClick={() => setSpellLibraryModalOpen(true)}
               >
-                <BookOpen className="w-4 h-4" />
+                <Icon icon="lucide:book-open" className="w-4 h-4" />
                 Browse Library
               </Button>
               <Button
@@ -638,7 +638,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                   setNewSpellModalOpen(true)
                 }}
               >
-                <Plus className="w-4 h-4" />
+                <Icon icon="lucide:plus" className="w-4 h-4" />
                 Create Custom
               </Button>
             </div>

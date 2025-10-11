@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trash2, Plus } from "lucide-react"
+import { Icon } from "@iconify/react"
 import { type CharacterData, type EldritchCannon, createEldritchCannon } from "@/lib/character-data"
 
 interface EldritchCannonModalProps {
@@ -121,7 +121,7 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
               </div>
 
               <Button onClick={handleCreateCannon} className="w-full">
-                <Plus className="w-4 h-4 mr-2" />
+                <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Create Cannon
               </Button>
             </div>
@@ -138,7 +138,7 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
                       className="text-red-600"
                       onClick={handleDismissCannon}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
                       Dismiss
                     </Button>
                   </CardTitle>

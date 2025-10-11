@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import type { CharacterData } from "@/lib/character-data"
-import { Trash2 } from "lucide-react"
+import { Icon } from "@iconify/react"
 
 interface FeatureEditModalProps {
   isOpen: boolean
@@ -158,7 +158,7 @@ export function FeatureEditModal({ isOpen, onClose, character, featureIndex, onS
         <DialogFooter className="flex flex-row items-center justify-between gap-2 w-full">
           {isEditing && (
             <Button variant="outline" onClick={handleDelete} className="text-destructive hover:text-destructive">
-              <Trash2 className="w-4 h-4" />
+              <Icon icon="lucide:trash-2" className="w-4 h-4" />
               Delete
             </Button>
           )}

@@ -9,7 +9,7 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trash2, Plus, Edit } from "lucide-react"
+import { Icon } from "@iconify/react"
 import { CharacterData, EldritchInvocation, getWarlockInvocationsKnown } from "@/lib/character-data"
 
 interface EldritchInvocationsModalProps {
@@ -128,7 +128,7 @@ export function EldritchInvocationsModal({
                         className="p-0 h-8 w-8"
                         onClick={() => handleEditInvocation(index)}
                       >
-                        <Edit className="w-4 h-4" />
+                        <Icon icon="lucide:edit" className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="outline"
@@ -136,7 +136,7 @@ export function EldritchInvocationsModal({
                         className="p-0 h-8 w-8 text-red-600"
                         onClick={() => handleDeleteInvocation(index)}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
                       </Button>
                     </div>
                 </CardHeader>
@@ -154,7 +154,7 @@ export function EldritchInvocationsModal({
                 onClick={handleOpenAddForm} 
                 disabled={invocations.length >= maxInvocations}
               >
-              <Plus className="w-4 h-4" />
+              <Icon icon="lucide:plus" className="w-4 h-4" />
               Add New Invocation
             </Button>
           </div>
@@ -205,7 +205,7 @@ export function EldritchInvocationsModal({
               </Button>
             ) : (
               <Button onClick={handleAddInvocation} disabled={!formData.name.trim()}>
-                <Plus className="w-4 h-4 mr-2" />
+                <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Invocation
               </Button>
             )}
