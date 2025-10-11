@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -62,16 +62,16 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
   if (!results || results.length === 0) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+          <DialogHeader className="p-4 border-b">
             <DialogTitle>Long Rest Results</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center">
+          <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center p-4 max-h-[50vh]">
             <p className="text-muted-foreground">No results to display.</p>
           </div>
-          <div className="flex justify-end">
+          <DialogFooter className="p-4 border-t">
             <Button onClick={onClose}>Close</Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     )
@@ -79,15 +79,15 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[700px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
-            <Icon icon="lucide:heart" className="w-5 h-5 text-red-500" />
+            <Icon icon="lucide:heart" className="w-5 h-5 text-red-500 dark:text-red-400" />
             Long Rest Results
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 p-4 max-h-[50vh]">
           {results.map((result) => (
             <Card key={result.characterId}>
               <CardHeader className="pb-3">
@@ -95,8 +95,8 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
               </CardHeader>
               <CardContent className="space-y-3">
                 {/* Hit Points Restored */}
-                <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border">
-                  <Icon icon="lucide:heart" className="w-5 h-5 text-red-500" />
+                <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border">
+                  <Icon icon="lucide:heart" className="w-5 h-5 text-red-500 dark:text-red-400" />
                   <div className="flex-1">
                     <div className="font-medium">Hit Points Restored</div>
                     <div className="text-sm text-muted-foreground">
@@ -112,8 +112,8 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
 
                 {/* Exhaustion Reduction */}
                 {result.exhaustionReduced > 0 && (
-                  <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border">
-                    <Icon icon="lucide:skull" className="w-5 h-5 text-red-500" />
+                  <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border">
+                    <Icon icon="lucide:skull" className="w-5 h-5 text-red-500 dark:text-red-400" />
                     <div className="flex-1">
                       <div className="font-medium">Exhaustion Reduced</div>
                       <div className="text-sm text-muted-foreground">
@@ -130,7 +130,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.magicItemReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Icon icon="lucide:sparkles" className="w-4 h-4 text-purple-500" />
+                      <Icon icon="lucide:sparkles" className="w-4 h-4 text-purple-500 dark:text-purple-400" />
                       Magic Item Charges Replenished
                     </div>
                     {result.magicItemReplenishments.map((item, index) => (
@@ -147,9 +147,9 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                             <div className="flex items-center gap-1">
                               {(() => {
                                 const DiceIcon = getDiceIcon(6) // Default to d6 for display
-                                return <DiceIcon className="w-4 h-4 text-purple-600" />
+                                return <DiceIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                               })()}
-                              <span className="text-sm font-mono font-bold text-purple-600">
+                              <span className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
                                 {item.diceRoll}
                               </span>
                             </div>
@@ -165,7 +165,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
 
                 {/* No magic item replenishments */}
                 {result.magicItemReplenishments.length === 0 && (
-                  <div className="p-3 bg-gray-50 rounded-lg border text-center">
+                  <div className="p-3 bg-muted/50 rounded-lg border text-center">
                     <div className="text-sm text-muted-foreground">
                       No magic items with daily recharge were found
                     </div>
@@ -176,7 +176,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.featureReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Icon icon="lucide:star" className="w-4 h-4 text-yellow-500" />
+                      <Icon icon="lucide:star" className="w-4 h-4 text-yellow-500 dark:text-yellow-400" />
                       Feature Uses Replenished
                     </div>
                     {result.featureReplenishments.map((feature, index) => (
@@ -193,9 +193,9 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                             <div className="flex items-center gap-1">
                               {(() => {
                                 const DiceIcon = getDiceIcon(6) // Default to d6 for display
-                                return <DiceIcon className="w-4 h-4 text-yellow-600" />
+                                return <DiceIcon className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                               })()}
-                              <span className="text-sm font-mono font-bold text-yellow-600">
+                              <span className="text-sm font-mono font-bold text-yellow-600 dark:text-yellow-400">
                                 {feature.diceRoll}
                               </span>
                             </div>
@@ -211,7 +211,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
 
                 {/* No feature replenishments */}
                 {result.featureReplenishments.length === 0 && result.magicItemReplenishments.length > 0 && (
-                  <div className="p-3 bg-gray-50 rounded-lg border text-center">
+                  <div className="p-3 bg-muted/50 rounded-lg border text-center">
                     <div className="text-sm text-muted-foreground">
                       No features with refueling dice were found
                     </div>
@@ -222,7 +222,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.spellSlotReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Icon icon="lucide:book-open" className="w-4 h-4 text-blue-500" />
+                      <Icon icon="lucide:book-open" className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                       Spell Slots Restored
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -247,7 +247,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.classAbilityReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Icon icon="lucide:zap" className="w-4 h-4 text-green-500" />
+                      <Icon icon="lucide:zap" className="w-4 h-4 text-green-500 dark:text-green-400" />
                       Class Abilities Restored
                     </div>
                     {result.classAbilityReplenishments.map((ability, index) => (
@@ -270,7 +270,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
                 {result.featSpellReplenishments.length > 0 && (
                   <div className="space-y-2">
                     <div className="font-medium flex items-center gap-2">
-                      <Icon icon="lucide:award" className="w-4 h-4 text-orange-500" />
+                      <Icon icon="lucide:award" className="w-4 h-4 text-orange-500 dark:text-orange-400" />
                       Feat Spells Restored
                     </div>
                     {result.featSpellReplenishments.map((feat, index) => (
@@ -314,9 +314,9 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
           ))}
         </div>
 
-        <div className="flex justify-end pt-4 border-t">
+        <DialogFooter className="p-4 border-t">
           <Button onClick={onClose}>Close</Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

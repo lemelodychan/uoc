@@ -61,11 +61,11 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] h-full p-0 gap-0">
-        <DialogHeader className="p-4">
+      <DialogContent className="sm:max-w-[700px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Weapons</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-2 w-full items-start justify-start align-start p-4 pt-0 overflow-y-auto">
+        <div className="flex flex-col gap-2 w-full items-start justify-start align-start p-4 max-h-[50vh] overflow-y-auto">
             <h3 className="text-sm font-medium">Weapons List</h3>
             <div className="flex flex-col gap-3 w-full">
               {weapons.map((weapon, index) => (
@@ -109,7 +109,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                         variant="outline"
                         size="sm"
                         onClick={() => removeWeapon(index)}
-                        className="text-destructive hover:text-destructive w-9 h-9"
+                        className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-9 h-9"
                       >
                         <Icon icon="lucide:trash-2" className="w-4 h-4" />
                       </Button>
@@ -157,7 +157,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
               />
             </div>
         </div>
-        <DialogFooter className="py-4 mx-4 border-t">
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

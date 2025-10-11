@@ -107,64 +107,70 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Combat Stats</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-[144px_auto] items-center gap-3">
-            <Label htmlFor="armorClass" className="text-right">
-              Armor Class
-            </Label>
-            <Input
-              id="armorClass"
-              type="number"
-              min="1"
-              value={formData.armorClass}
-              onChange={(e) => setFormData({ ...formData, armorClass: Number.parseInt(e.target.value) || 1 })}
-              className="w-full"
-            />
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
+          <div className="p-3 border rounded-lg space-y-3 grid grid-cols-2 gap-4 items-center">
+            <h3 className="text-sm font-medium mb-0 text-muted-foreground col-span-2">Basic Combat Stats</h3>
+            <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
+              <Label htmlFor="armorClass" className="text-right">
+                Armor Class
+              </Label>
+              <Input
+                id="armorClass"
+                type="number"
+                min="1"
+                value={formData.armorClass}
+                onChange={(e) => setFormData({ ...formData, armorClass: Number.parseInt(e.target.value) || 1 })}
+                className="w-full"
+              />
+            </div>
+            <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
+              <Label htmlFor="initiative" className="text-right">
+                Initiative
+              </Label>
+              <Input
+                id="initiative"
+                type="number"
+                value={formData.initiative}
+                onChange={(e) => setFormData({ ...formData, initiative: Number.parseInt(e.target.value) || 0 })}
+                className="w-full"
+              />
+            </div>
+            <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
+              <Label htmlFor="speed" className="text-right">
+                Speed
+              </Label>
+              <Input
+                id="speed"
+                type="number"
+                min="0"
+                value={formData.speed}
+                onChange={(e) => setFormData({ ...formData, speed: Number.parseInt(e.target.value) || 0 })}
+                className="w-full"
+              />
+            </div>
+            <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
+              <Label htmlFor="exhaustion" className="text-right">
+                Exhaustion
+              </Label>
+              <Input
+                id="exhaustion"
+                type="number"
+                min="0"
+                max="6"
+                value={formData.exhaustion}
+                onChange={(e) => setFormData({ ...formData, exhaustion: Math.max(0, Math.min(6, Number.parseInt(e.target.value) || 0)) })}
+                className="w-full"
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-[144px_auto] items-center gap-3">
-            <Label htmlFor="initiative" className="text-right">
-              Initiative
-            </Label>
-            <Input
-              id="initiative"
-              type="number"
-              value={formData.initiative}
-              onChange={(e) => setFormData({ ...formData, initiative: Number.parseInt(e.target.value) || 0 })}
-              className="w-full"
-            />
-          </div>
-          <div className="grid grid-cols-[144px_auto] items-center gap-3">
-            <Label htmlFor="speed" className="text-right">
-              Speed
-            </Label>
-            <Input
-              id="speed"
-              type="number"
-              min="0"
-              value={formData.speed}
-              onChange={(e) => setFormData({ ...formData, speed: Number.parseInt(e.target.value) || 0 })}
-              className="w-full"
-            />
-          </div>
-          <div className="grid grid-cols-[144px_auto] items-center gap-3">
-            <Label htmlFor="exhaustion" className="text-right">
-              Exhaustion
-            </Label>
-            <Input
-              id="exhaustion"
-              type="number"
-              min="0"
-              max="6"
-              value={formData.exhaustion}
-              onChange={(e) => setFormData({ ...formData, exhaustion: Math.max(0, Math.min(6, Number.parseInt(e.target.value) || 0)) })}
-              className="w-full"
-            />
-          </div>
-          <div className="grid grid-cols-[144px_auto] items-center gap-3">
+          
+          <div className="p-3 border rounded-lg space-y-3 grid grid-cols-2 gap-4 items-center">
+            <h3 className="text-sm font-medium text-muted-foreground col-span-2 mb-0">Hit Points</h3>
+            <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
             <Label htmlFor="currentHitPoints" className="text-right">
               Current HP
             </Label>
@@ -176,36 +182,37 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
               onChange={(e) => setFormData({ ...formData, currentHitPoints: Number.parseInt(e.target.value) || 0 })}
               className="w-full"
             />
-          </div>
-          <div className="grid grid-cols-[144px_auto] items-center gap-3">
-            <Label htmlFor="maxHitPoints" className="text-right">
-              Max HP
-            </Label>
-            <Input
-              id="maxHitPoints"
-              type="number"
-              min="1"
-              value={formData.maxHitPoints}
-              onChange={(e) => setFormData({ ...formData, maxHitPoints: Number.parseInt(e.target.value) || 1 })}
-              className="w-full"
-            />
-          </div>
-          <div className="grid grid-cols-[144px_auto] items-center gap-3">
-            <Label htmlFor="temporaryHitPoints" className="text-right">
-              Temp HP
-            </Label>
-            <Input
-              id="temporaryHitPoints"
-              type="number"
-              min="0"
-              value={formData.temporaryHitPoints}
-              onChange={(e) => setFormData({ ...formData, temporaryHitPoints: Math.max(0, Number.parseInt(e.target.value) || 0) })}
-              className="w-full"
-            />
+            </div>
+            <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
+              <Label htmlFor="maxHitPoints" className="text-right">
+                Max HP
+              </Label>
+              <Input
+                id="maxHitPoints"
+                type="number"
+                min="1"
+                value={formData.maxHitPoints}
+                onChange={(e) => setFormData({ ...formData, maxHitPoints: Number.parseInt(e.target.value) || 1 })}
+                className="w-full"
+              />
+            </div>
+            <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
+              <Label htmlFor="temporaryHitPoints" className="text-right">
+                Temp HP
+              </Label>
+              <Input
+                id="temporaryHitPoints"
+                type="number"
+                min="0"
+                value={formData.temporaryHitPoints}
+                onChange={(e) => setFormData({ ...formData, temporaryHitPoints: Math.max(0, Number.parseInt(e.target.value) || 0) })}
+                className="w-full"
+              />
+            </div>
           </div>
 
           {/* Hit Dice Section */}
-          <div className="col-span-2 border-t pt-4">
+          <div className="p-3 border rounded-lg space-y-3">
             <div className="flex items-center justify-between mb-3">
               <Label className="text-base font-medium">Hit Dice</Label>
               <Button
@@ -287,7 +294,7 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
                       variant="outline"
                       size="sm"
                       onClick={() => removeHitDieClass(index)}
-                      className="text-red-600 hover:text-red-700 h-9 w-9"
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white h-9 w-9"
                     >
                       <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
@@ -350,7 +357,7 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
           </div>
 
           {/* Combat Notes Section */}
-          <div className="col-span-2 border-t pt-4">
+          <div className="p-3 border rounded-lg space-y-3">
             <Label htmlFor="combatNotes" className="text-base font-medium mb-3 block">
               Combat Notes
             </Label>
@@ -362,7 +369,7 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
             />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

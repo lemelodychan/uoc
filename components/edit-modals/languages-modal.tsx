@@ -29,11 +29,11 @@ export function LanguagesModal({ isOpen, onClose, character, onSave }: Languages
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Languages</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4">
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           <RichTextEditor
             value={languages}
             onChange={setLanguages}
@@ -42,7 +42,7 @@ export function LanguagesModal({ isOpen, onClose, character, onSave }: Languages
             className="mt-2"
           />
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

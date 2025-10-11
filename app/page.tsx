@@ -18,6 +18,22 @@ import { InfusionsModal } from "@/components/edit-modals/infusions-modal"
 import { FeaturesModal } from "@/components/edit-modals/features-modal"
 import { EquipmentModal } from "@/components/edit-modals/equipment-modal"
 import { LanguagesModal } from "@/components/edit-modals/languages-modal"
+import { CharacterHeader } from "@/components/character-sheet/CharacterHeader"
+import { AbilityScores } from "@/components/character-sheet/AbilityScores"
+import { SavingThrows } from "@/components/character-sheet/SavingThrows"
+import { Skills } from "@/components/character-sheet/Skills"
+import { FeaturesTraits } from "@/components/character-sheet/FeaturesTraits"
+import { Feats } from "@/components/character-sheet/Feats"
+import { Money } from "@/components/character-sheet/Money"
+import { Languages } from "@/components/character-sheet/Languages"
+import { CombatStats } from "@/components/character-sheet/CombatStats"
+import { Weapons } from "@/components/character-sheet/Weapons"
+import { Spellcasting } from "@/components/character-sheet/Spellcasting"
+import { ToolsProficiencies } from "@/components/character-sheet/ToolsProficiencies"
+import { ClassFeatures } from "@/components/character-sheet/ClassFeatures"
+import { Infusions } from "@/components/character-sheet/Infusions"
+import { EldritchInvocations } from "@/components/character-sheet/EldritchInvocations"
+import { EldritchCannon as EldritchCannonComponent } from "@/components/character-sheet/EldritchCannon"
 import { MoneyModal } from "@/components/edit-modals/money-modal"
 import { FeatsModal } from "@/components/edit-modals/feats-modal"
 import { SpellModal } from "@/components/edit-modals/spell-modal"
@@ -2163,6 +2179,65 @@ export default function CharacterSheet() {
     triggerAutoSave()
   }
 
+  // Warlock toggle functions
+
+  const toggleElementalGift = (index: number) => {
+    if (!activeCharacter || !activeCharacter.spellData.elementalGift) return
+
+    const elementalGift = activeCharacter.spellData.elementalGift
+    const isAvailable = index < (elementalGift.usesPerLongRest - elementalGift.currentUses)
+    const newCurrentUses = isAvailable ? elementalGift.currentUses + 1 : elementalGift.currentUses - 1
+
+    const updatedSpellData = {
+      ...activeCharacter.spellData,
+      elementalGift: {
+        ...elementalGift,
+        currentUses: Math.max(0, Math.min(elementalGift.usesPerLongRest, newCurrentUses)),
+      },
+    }
+
+    updateCharacter({ spellData: updatedSpellData })
+    triggerAutoSave()
+  }
+
+  const toggleSanctuaryVessel = (index: number) => {
+    if (!activeCharacter || !activeCharacter.spellData.sanctuaryVessel) return
+
+    const sanctuaryVessel = activeCharacter.spellData.sanctuaryVessel
+    const isAvailable = sanctuaryVessel.hoursRemaining > 0
+    const newHoursRemaining = isAvailable ? sanctuaryVessel.hoursRemaining - 1 : sanctuaryVessel.hoursRemaining + 1
+
+    const updatedSpellData = {
+      ...activeCharacter.spellData,
+      sanctuaryVessel: {
+        ...sanctuaryVessel,
+        hoursRemaining: Math.max(0, Math.min(sanctuaryVessel.maxHours, newHoursRemaining)),
+      },
+    }
+
+    updateCharacter({ spellData: updatedSpellData })
+    triggerAutoSave()
+  }
+
+  const toggleLimitedWish = (index: number) => {
+    if (!activeCharacter || !activeCharacter.spellData.limitedWish) return
+
+    const limitedWish = activeCharacter.spellData.limitedWish
+    const isAvailable = index < (limitedWish.usesPerLongRest - limitedWish.currentUses)
+    const newCurrentUses = isAvailable ? limitedWish.currentUses + 1 : limitedWish.currentUses - 1
+
+    const updatedSpellData = {
+      ...activeCharacter.spellData,
+      limitedWish: {
+        ...limitedWish,
+        currentUses: Math.max(0, Math.min(limitedWish.usesPerLongRest, newCurrentUses)),
+      },
+    }
+
+    updateCharacter({ spellData: updatedSpellData })
+    triggerAutoSave()
+  }
+
   const toggleSongOfRest = () => {
     if (!activeCharacter || !activeCharacter.spellData.songOfRest) return
 
@@ -2190,11 +2265,11 @@ export default function CharacterSheet() {
 
   if (isInitialLoading || !activeCharacter) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Icon icon="lucide:refresh-cw" className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-lg font-medium">Loading character data...</p>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             {isInitialLoading ? "Connecting to database..." : "No characters available"}
           </p>
         </div>
@@ -2220,1816 +2295,171 @@ export default function CharacterSheet() {
         />
 
         <main className="flex-1 p-6 overflow-auto">
-        {/* Character Header */}
-        <Card className="mb-6">
-          <CardHeader className="pb-0">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                {activeCharacter.imageUrl && (
-                  <img
-                    src={activeCharacter.imageUrl}
-                    alt="Portrait"
-                    className="w-20 h-24 rounded-lg object-cover border cursor-pointer"
-                    onClick={() => setPortraitModalOpen(true)}
-                  />
-                )}
-                <div className="flex flex-col items-between gap-2">
-                  <CardTitle className="text-2xl font-bold font-mono">{activeCharacter.name}</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">Level {activeCharacter.level}</Badge>
-                    <Badge variant="default">Proficiency {formatModifier(proficiencyBonus)}</Badge>
-                    <Badge variant="outline">
-                      {activeCharacter.classes && activeCharacter.classes.length > 1 ? (
-                        activeCharacter.classes.map(charClass => 
-                          `${charClass.name}${charClass.subclass ? `・${charClass.subclass}` : ''} ${charClass.level}` 
-                        ).join(' / ')
-                      ) : (
-                        `${activeCharacter.class}・${activeCharacter.subclass}`
-                      )}
-                    </Badge>
-                  </div>
-                  <span className="text-sm text-muted-foreground px-1">
-                    {activeCharacter.race}・{activeCharacter.background}・{activeCharacter.alignment}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCharacterDetailsContentModalOpen(true)}>
-                  <Icon icon="lucide:book-open" className="w-4 h-4" />
-                  Character Biography
-                </Button>
-{/*                 <div
-                  className={`w-2 h-2 rounded-full ${dbConnected === true ? "bg-green-500" : dbConnected === false ? "bg-red-500" : "bg-yellow-500"}`}
-                  title={
-                    dbConnected === true
-                      ? "Database Connected"
-                      : dbConnected === false
-                        ? "Database Offline"
-                        : "Connecting..."
-                  }
-                /> */}
-                <Button variant="outline" size="sm" onClick={() => setBasicInfoModalOpen(true)}>
-                  <Icon icon="lucide:edit" className="w-4 h-4" />
-                  Edit
-                </Button>
-{/*                 <Button variant="outline" size="sm" onClick={loadCharactersFromDatabase} disabled={isLoading}>
-                  <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
-                  {isLoading ? "Loading..." : "Refresh"}
-                </Button> */}
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
+          <CharacterHeader
+            character={activeCharacter}
+            proficiencyBonus={proficiencyBonus}
+            onEdit={() => setBasicInfoModalOpen(true)}
+            onOpenBiography={() => setCharacterDetailsContentModalOpen(true)}
+            onOpenPortrait={() => setPortraitModalOpen(true)}
+          />
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* COLUMN 1: Abilities, Skills, Features, Equipment, Languages */}
-          <div className="space-y-6">
-            {/* Ability Scores */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle>Ability Scores</CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setAbilitiesModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { name: "STR", fullName: "Strength", score: activeCharacter.strength, modifier: strengthMod },
-                    { name: "DEX", fullName: "Dexterity", score: activeCharacter.dexterity, modifier: dexterityMod },
-                    {
-                      name: "CON",
-                      fullName: "Constitution",
-                      score: activeCharacter.constitution,
-                      modifier: constitutionMod,
-                    },
-                    {
-                      name: "INT",
-                      fullName: "Intelligence",
-                      score: activeCharacter.intelligence,
-                      modifier: intelligenceMod,
-                    },
-                    { name: "WIS", fullName: "Wisdom", score: activeCharacter.wisdom, modifier: wisdomMod },
-                    { name: "CHA", fullName: "Charisma", score: activeCharacter.charisma, modifier: charismaMod },
-                  ].map((ability) => (
-                    <div key={ability.name} className="text-center flex flex-col items-center gap-1">
-                      <div className="text-sm text-muted-foreground">{ability.fullName}</div>
-                      <div className="text-2xl font-bold mb-2 font-mono">{ability.score}</div>
-                      <Badge variant="default">{formatModifier(ability.modifier)}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* COLUMN 1: Abilities, Skills, Features, Equipment, Languages */}
+            <div className="space-y-6">
+              <AbilityScores
+                character={activeCharacter}
+                strengthMod={strengthMod}
+                dexterityMod={dexterityMod}
+                constitutionMod={constitutionMod}
+                intelligenceMod={intelligenceMod}
+                wisdomMod={wisdomMod}
+                charismaMod={charismaMod}
+                onEdit={() => setAbilitiesModalOpen(true)}
+              />
 
-            {/* Saving Throws */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader>
-                <CardTitle>Saving Throws</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-1">
-                  {(() => {
-                    console.log('[DEBUG] UI: Rendering saving throws:', activeCharacter.savingThrowProficiencies)
-                    console.log('[DEBUG] UI: Saving throws length:', activeCharacter.savingThrowProficiencies?.length)
-                    console.log('[DEBUG] UI: Active character classes:', activeCharacter.classes)
-                    if (!activeCharacter.savingThrowProficiencies || activeCharacter.savingThrowProficiencies.length === 0) {
-                      console.log('[DEBUG] UI: No saving throws found, returning empty div')
-                      return <div>No saving throws loaded</div>
-                    }
-                    return activeCharacter.savingThrowProficiencies.map((savingThrow) => {
-                    const savingThrowBonus = calculateSavingThrowBonus(activeCharacter, savingThrow.ability, proficiencyBonus)
-                    const abilityName = savingThrow.ability.charAt(0).toUpperCase() + savingThrow.ability.slice(1)
+              <SavingThrows
+                character={activeCharacter}
+                proficiencyBonus={proficiencyBonus}
+                onUpdateSavingThrows={(savingThrowProficiencies) => updateCharacter({ savingThrowProficiencies })}
+                onTriggerAutoSave={triggerAutoSave}
+              />
 
-                    return (
-                      <div key={savingThrow.ability} className="flex items-center justify-between mb-0">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center space-x-1">
-                            <input
-                              type="checkbox"
-                              id={`${savingThrow.ability}-save`}
-                              checked={savingThrow.proficient}
-                              onChange={(e) => {
-                                const updatedSavingThrows = activeCharacter.savingThrowProficiencies.map(st =>
-                                  st.ability === savingThrow.ability
-                                    ? { ...st, proficient: e.target.checked }
-                                    : st
-                                )
-                                updateCharacter({ savingThrowProficiencies: updatedSavingThrows })
-                                triggerAutoSave()
-                              }}
-                              className="w-3 h-3 rounded border-gray-300"
-                            />
-                            <Label htmlFor={`${savingThrow.ability}-save`} className="sr-only">
-                              Proficient
-                            </Label>
-                          </div>
-                          <div className="text-sm">
-                            <span className="font-medium">{abilityName}</span>
-                            <span className="text-muted-foreground ml-1">
-                              ({savingThrow.ability.slice(0, 3).toUpperCase()})
-                            </span>
-                          </div>
-                        </div>
-                        <Badge variant="secondary">{formatModifier(savingThrowBonus)}</Badge>
-                      </div>
-                    )
-                  })
-                  })()}
-                </div>
-              </CardContent>
-            </Card>
+              <Skills
+                character={activeCharacter}
+                proficiencyBonus={proficiencyBonus}
+                skillSortMode={skillSortMode}
+                onSetSkillSortMode={setSkillSortMode}
+                onUpdateSkillProficiency={updateSkillProficiency}
+              />
 
-            {/* Skills */}
-            <Card className="flex flex-col gap-4 relative">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Skills</CardTitle>
-                  <div className="inline-flex gap-1 rounded-md bg-muted p-1 absolute right-4 top-4">
-                    <Button size="sm" className="text-xs px-2 py-1 h-6" variant={skillSortMode === 'alpha' ? 'outline' : 'ghost'} onClick={() => setSkillSortMode('alpha')}>A–Z</Button>
-                    <Button size="sm" className="text-xs px-2 py-1 h-6" variant={skillSortMode === 'ability' ? 'outline' : 'ghost'} onClick={() => setSkillSortMode('ability')}>Ability</Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-3">
-                  {skillSortMode === 'ability' ? (
-                    <>
-                      {abilityOrder.map((abilityKey) => {
-                        const group = sortedSkills.filter(s => s.ability === abilityKey)
-                        if (group.length === 0) return null
-                        const headerName = abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1)
-                        const abbr = abilityKey.slice(0, 3).toUpperCase()
-                        return (
-                          <div key={abilityKey} className="flex flex-col gap-1 border-b pb-3 last:border-b-0 last:pb-0">
-                            <div className="text-xs font-semibold text-muted-foreground">{headerName} ({abbr})</div>
-                            {group.map((skill) => {
-                              const skillBonus = calculateSkillBonus(activeCharacter, skill)
-                              const isProficient = skill.proficiency === 'proficient' || skill.proficiency === 'expertise'
-                              const hasExpertise = skill.proficiency === 'expertise'
-                              return (
-                                <div key={skill.name} className="flex items-center justify-between mb-0">
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex gap-1">
-                                      <div className="flex items-center space-x-1">
-                                        <input
-                                          type="checkbox"
-                                          id={`${skill.name}-prof`}
-                                          checked={isProficient}
-                                          onChange={(e) => updateSkillProficiency(skill.name, 'proficient', e.target.checked)}
-                                          className="w-3 h-3 rounded border-gray-300"
-                                        />
-                                        <Label htmlFor={`${skill.name}-prof`} className="sr-only">
-                                          Proficient
-                                        </Label>
-                                      </div>
-                                      <div className="flex items-center space-x-1">
-                                        <input
-                                          type="checkbox"
-                                          id={`${skill.name}-exp`}
-                                          checked={hasExpertise}
-                                          onChange={(e) => updateSkillProficiency(skill.name, 'expertise', e.target.checked)}
-                                          className="w-3 h-3 rounded border-gray-300"
-                                        />
-                                        <Label htmlFor={`${skill.name}-exp`} className="sr-only">
-                                          Expertise
-                                        </Label>
-                                      </div>
-                                    </div>
-                                    <div className="text-sm">
-                                      <span className="font-medium">{skill.name}</span>
-                                      <span className="text-muted-foreground ml-1">
-                                        ({skill.ability.slice(0, 3).toUpperCase()})
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <Badge variant="secondary">{formatModifier(skillBonus)}</Badge>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )
-                      })}
-                    </>
-                  ) : (
-                    <div className="flex flex-col gap-1 mt-2">
-                    {sortedSkills.map((skill) => {
-                      const skillBonus = calculateSkillBonus(activeCharacter, skill)
-                      const isProficient = skill.proficiency === 'proficient' || skill.proficiency === 'expertise'
-                      const hasExpertise = skill.proficiency === 'expertise'
-                      return (
-                        <div key={skill.name} className="flex items-center justify-between mb-0">
-                          <div className="flex items-center gap-3">
-                            <div className="flex gap-1">
-                              <div className="flex items-center space-x-1">
-                                <input
-                                  type="checkbox"
-                                  id={`${skill.name}-prof`}
-                                  checked={isProficient}
-                                  onChange={(e) => updateSkillProficiency(skill.name, 'proficient', e.target.checked)}
-                                  className="w-3 h-3 rounded border-gray-300"
-                                />
-                                <Label htmlFor={`${skill.name}-prof`} className="sr-only">
-                                  Proficient
-                                </Label>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <input
-                                  type="checkbox"
-                                  id={`${skill.name}-exp`}
-                                  checked={hasExpertise}
-                                  onChange={(e) => updateSkillProficiency(skill.name, 'expertise', e.target.checked)}
-                                  className="w-3 h-3 rounded border-gray-300"
-                                />
-                                <Label htmlFor={`${skill.name}-exp`} className="sr-only">
-                                  Expertise
-                                </Label>
-                              </div>
-                            </div>
-                            <div className="text-sm">
-                              <span className="font-medium">{skill.name}</span>
-                              <span className="text-muted-foreground ml-1">
-                                ({skill.ability.slice(0, 3).toUpperCase()})
-                              </span>
-                            </div>
-                          </div>
-                          <Badge variant="secondary">{formatModifier(skillBonus)}</Badge>
-                        </div>
-                      )
-                    })}
-                    </div>
-                  )}
-                </div>
+              <FeaturesTraits
+                character={activeCharacter}
+                onEdit={() => setFeaturesModalOpen(true)}
+                onToggleFeatureUse={toggleFeatureUse}
+                onOpenFeatureModal={(content) => {
+                  setFeatureModalContent(content)
+                  setFeatureModalIsClassFeature(false)
+                  setFeatureModalOpen(true)
+                }}
+              />
 
-                {/* Passive Skills Section */}
-                <div className="mt-4 pt-4 border-t flex flex-col gap-2">
-                  <div className="text-sm font-medium">Passive Skills</div>
-                  <div className="space-y- flex flex-col gap-1">
-                    <div className="flex items-center justify-between mb-0">
-                      <span className="text-sm">Passive Perception</span>
-                      <Badge variant="secondary">{passivePerception}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between mb-0">
-                      <span className="text-sm">Passive Insight</span>
-                      <Badge variant="secondary">{passiveInsight}</Badge>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <Feats
+                character={activeCharacter}
+                onEdit={() => setFeatsModalOpen(true)}
+                onOpenFeatureModal={(content) => {
+                  setFeatureModalContent(content)
+                  setFeatureModalIsClassFeature(false)
+                  setFeatureModalOpen(true)
+                }}
+              />
 
-            {/* Features & Traits */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon icon="lucide:user-star" className="w-5 h-5" /> 
-                    Features & Traits
-                  </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setFeaturesModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-2">
-                  {activeCharacter.features.map((feature, index) => (
-                    <div key={index} className="p-2 border rounded flex flex-col gap-0.5">
-                      <div className="font-medium flex items-start justify-between">
-                        <span className="text-sm">{feature.name}</span>
-                        {getFeatureUsesPerLongRest(feature) > 0 && (
-                          <div className="flex items-center gap-1 py-1">
-                              {Array.from({ length: getFeatureUsesPerLongRest(feature) }, (_, i) => {
-                                const usesPer = getFeatureUsesPerLongRest(feature)
-                                const current = Math.min(usesPer, Math.max(0, feature.currentUses ?? usesPer))
-                                const usedCount = usesPer - current
-                                const isAvailable = i < current
-                              return (
-                                <button
-                                  key={i}
-                                  onClick={() => toggleFeatureUse(index, i)}
-                                  className={`w-4 h-4 rounded border-2 transition-colors ${
-                                    isAvailable
-                                      ? "bg-blue-500 border-blue-500 cursor-pointer"
-                                      : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                  }`}
-                                  title={isAvailable ? "Available" : "Used"}
-                                />
-                              )
-                            })}
-                            <span className="text-xs text-muted-foreground ml-1 w-5 text-right">
-                              {Math.min(getFeatureUsesPerLongRest(feature), Math.max(0, feature.currentUses ?? getFeatureUsesPerLongRest(feature)))}/{getFeatureUsesPerLongRest(feature)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground relative">
-                        <div
-                          className="line-clamp-2 max-h-20 overflow-hidden"
-                          ref={(el) => {
-                            if (!el) return
-                            const isOverflowing = el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth
-                            setFeatureOverflowMap((prev) => (prev[index] === isOverflowing ? prev : { ...prev, [index]: isOverflowing }))
-                          }}
-                        >
-                          <RichTextDisplay content={feature.description} className="text-xs text-muted-foreground" />
-                        </div>
-                        {featureOverflowMap[index] && (
-                          <div className="mt-2 flex justify-start">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="px-2 h-7 shadow-sm text-foreground"
-                              onClick={() => {
-                                setFeatureModalContent({ 
-                                  title: feature.name, 
-                                  description: feature.description,
-                                  usesPerLongRest: feature.usesPerLongRest,
-                                  refuelingDie: feature.refuelingDie
-                                })
-                                setFeatureModalIsClassFeature(false)
-                                setFeatureModalOpen(true)
-                              }}
-                            >
-                              Read more
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {activeCharacter.features.length === 0 && (
-                    <div className="text-sm text-muted-foreground text-center py-4">No features or traits</div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+              <Money
+                character={activeCharacter}
+                onEdit={() => setMoneyModalOpen(true)}
+              />
 
-            {/* Feats */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon icon="lucide:star" className="w-5 h-5" />
-                    Feats
-                  </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setFeatsModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-2">
-                  {activeCharacter.feats.map((feat, index) => (
-                    <div key={index} className="p-2 border rounded-lg flex items-center justify-between">
-                      <div className="font-medium text-sm">{feat.name}</div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="px-2 h-7 shadow-sm text-foreground"
-                        onClick={() => {
-                          setFeatureModalContent({ title: feat.name, description: feat.description })
-                          setFeatureModalIsClassFeature(false)
-                          setFeatureModalOpen(true)
-                        }}
-                      >
-                        Read more
-                      </Button>
-                    </div>
-                  ))}
-                  {activeCharacter.feats.length === 0 && (
-                    <div className="text-sm text-muted-foreground text-center py-4">No feats</div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Money */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon icon="lucide:coins" className="w-5 h-5" />
-                    Money
-                  </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setMoneyModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-yellow-600">Gold</div>
-                      <div className="text-lg font-semibold">
-                        {activeCharacter.money?.gold || 0}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-gray-400">Silver</div>
-                      <div className="text-lg font-semibold">
-                        {activeCharacter.money?.silver || 0}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-orange-600">Copper</div>
-                      <div className="text-lg font-semibold">
-                        {activeCharacter.money?.copper || 0}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t text-center">
-                    <div className="text-sm text-muted-foreground">Total Value</div>
-                    <div className="text-lg font-semibold">
-                      {(() => {
-                        const gold = activeCharacter.money?.gold || 0
-                        const silver = activeCharacter.money?.silver || 0
-                        const copper = activeCharacter.money?.copper || 0
-                        const totalCopper = (gold * 100) + (silver * 10) + copper
-                        return (totalCopper / 100).toFixed(2)
-                      })()} Gold Pieces
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Languages */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon icon="lucide:globe" className="w-5 h-5" />
-                    Languages
-                  </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setLanguagesModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <RichTextDisplay
-                  content={activeCharacter.languages || "No languages listed"}
-                  className={!activeCharacter.languages ? "text-muted-foreground text-center py-4" : ""}
-                />
-              </CardContent>
-            </Card>
+              <Languages
+                character={activeCharacter}
+                onEdit={() => setLanguagesModalOpen(true)}
+              />
 
           </div>
 
           {/* COLUMN 2: Combat, Weapons, Spells, Tools Proficiencies */}
           <div className="space-y-6 flex flex-col gap-1">
-            {/* Combat Stats */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle>Combat</CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setCombatModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 grid grid-cols-2 gap-4 items-start">
-                <div className="flex items-center gap-3 col-span-1 mb-0">
-                  <Icon icon="lucide:shield" className="w-5 h-5 text-blue-600" />
-                  <div className="flex flex-col gap-1">
-                    <div className="text-sm text-muted-foreground">Armor Class</div>
-                    <div className="text-xl font-bold font-mono">{activeCharacter.armorClass}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 col-span-1 mb-0">
-                  <Icon icon="lucide:zap" className="w-5 h-5 text-yellow-600" />
-                  <div className="flex flex-col gap-1">
-                    <div className="text-sm text-muted-foreground">Initiative</div>
-                    <div className="text-xl font-bold font-mono">{formatModifier(activeCharacter.initiative)}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 col-span-1 mb-0">
-                  <Icon icon="lucide:footprints" className="w-5 h-5 text-green-600" />
-                  <div className="flex flex-col gap-1">
-                    <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      Speed
-                      {(() => {
-                        const exhaustion = activeCharacter.exhaustion || 0
-                        if (exhaustion >= 2) {
-                          return <Badge variant="outline" className="text-red-800 text-xs px-1 py-1"><Icon icon="lucide:skull" className="w-4 h-4" /></Badge>
-                        }
-                        return null
-                      })()}
-                    </div>
-                    <div className={`text-xl font-bold font-mono ${(() => {
-                      const exhaustion = activeCharacter.exhaustion || 0
-                      return exhaustion >= 2 ? "text-red-800" : ""
-                    })()}`}>
-                      {(() => {
-                        const exhaustion = activeCharacter.exhaustion || 0
-                        if (exhaustion >= 5) return "0 ft"
-                        if (exhaustion >= 2) return `${Math.floor(activeCharacter.speed / 2)} ft`
-                        return `${activeCharacter.speed} ft`
-                      })()}
-                    </div>
-                  </div>
-                </div>
+            <CombatStats
+              character={activeCharacter}
+              onEdit={() => setCombatModalOpen(true)}
+              onToggleHitDie={toggleHitDie}
+            />
 
-                <div className="flex items-center gap-3 col-span-1 mb-0">
-                  <Icon icon="lucide:heart" className="w-5 h-5 text-red-600" />
-                  <div className="flex flex-col gap-1">
-                    <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      Hit Points
-                      {(() => {
-                        const exhaustion = activeCharacter.exhaustion || 0
-                        if (exhaustion >= 4) {
-                          return <Badge variant="outline" className="text-red-800 text-xs px-1 py-1"><Icon icon="lucide:skull" className="w-4 h-4" /></Badge>
-                        }
-                        return null
-                      })()}
-                    </div>
-                    <div className={`text-xl font-bold font-mono flex items-center gap-2 ${(() => {
-                      const exhaustion = activeCharacter.exhaustion || 0
-                      return exhaustion >= 4 ? "text-red-800" : ""
-                    })()}`}>
-                      {(() => {
-                        const exhaustion = activeCharacter.exhaustion || 0
-                        const effectiveMaxHP = exhaustion >= 4 ? Math.floor(activeCharacter.maxHitPoints / 2) : activeCharacter.maxHitPoints
-                        const tempHP = (activeCharacter.temporaryHitPoints ?? 0) > 0 ? activeCharacter.temporaryHitPoints as number : 0
-                        return (
-                          <>
-                            {activeCharacter.currentHitPoints}/
-                            {effectiveMaxHP + tempHP}
-                            {tempHP > 0 && (
-                              <span className="text-green-600 text-xs font-medium">(+{tempHP})</span>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </div>
-                  </div>
-                </div>
-                {/* Exhaustion - only show if > 0 */}
-                {(activeCharacter.exhaustion ?? 0) > 0 && (
-                  <div className="flex items-center gap-3 col-span-2 mb-0">
-                    <Icon icon="lucide:skull" className="w-5 h-5 text-red-800" />
-                    <div className="flex flex-col gap-1">
-                      <div className="text-sm text-muted-foreground">Exhaustion</div>
-                      <div className="text-xl font-bold font-mono text-red-800">
-                        Level {activeCharacter.exhaustion}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {(() => {
-                          const exhaustion = activeCharacter.exhaustion || 0
-                          const effects = []
-                          if (exhaustion >= 1) effects.push("Disadvantage on ability checks")
-                          if (exhaustion >= 2) effects.push("Speed halved")
-                          if (exhaustion >= 3) effects.push("Disadvantage on attack rolls & saves")
-                          if (exhaustion >= 4) effects.push("Hit point maximum halved")
-                          if (exhaustion >= 5) effects.push("Speed reduced to 0")
-                          if (exhaustion >= 6) effects.push("Death")
-                          return effects.join(", ")
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                )}
+            <Weapons
+              character={activeCharacter}
+              onEdit={() => setWeaponsModalOpen(true)}
+            />
 
-                {/* Hit Dice */}
-                {activeCharacter.hitDiceByClass && activeCharacter.hitDiceByClass.length > 0 ? (
-                  <div className="flex items-start gap-3 col-span-2 mb-0">
-                    <Icon icon="lucide:dice-5" className="w-5 h-10 py-2.5 text-purple-600" />
-                    <div className="flex flex-col gap-1">
-                      <div className="text-sm text-muted-foreground">Hit Dice</div>
-                      <div className="flex flex-row gap-5">
-                        {activeCharacter.hitDiceByClass.map((hitDie, classIndex) => (
-                          <div key={classIndex} className="flex flex-col gap-1">
-                            <span className="text-md font-bold font-mono">
-                              {hitDie.total - hitDie.used}/{hitDie.total}{hitDie.dieType}
-                            </span>
-                            <div className="flex gap-1">
-                              {Array.from({ length: hitDie.total }, (_, dieIndex) => {
-                                const isAvailable = dieIndex < (hitDie.total - hitDie.used)
-                                return (
-                                  <button
-                                    key={dieIndex}
-                                    onClick={() => toggleHitDie(classIndex, dieIndex)}
-                                    className={`w-3 h-3 rounded border transition-colors ${
-                                      isAvailable
-                                        ? "bg-purple-500 border-purple-500 cursor-pointer hover:bg-purple-600"
-                                        : "bg-white border-gray-300 cursor-pointer hover:border-gray-400"
-                                    }`}
-                                    title={isAvailable ? "Available" : "Used"}
-                                  />
-                                )
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : activeCharacter.hitDice && (
-                  <div className="flex items-center gap-3 col-span-1 mb-0">
-                    <Icon icon="lucide:dice-5" className="w-5 h-5 text-purple-600" />
-                    <div className="flex flex-col gap-1">
-                      <div className="text-sm text-muted-foreground">Hit Dice</div>
-                      <div className="text-xl font-bold font-mono">
-                        {activeCharacter.hitDice.total - activeCharacter.hitDice.used}/{activeCharacter.hitDice.total}{activeCharacter.hitDice.dieType}
-                      </div>
-                    </div>
-                  </div>
-                )}
+            <Spellcasting
+              character={activeCharacter}
+              strengthMod={strengthMod}
+              dexterityMod={dexterityMod}
+              constitutionMod={constitutionMod}
+              intelligenceMod={intelligenceMod}
+              wisdomMod={wisdomMod}
+              charismaMod={charismaMod}
+              proficiencyBonus={proficiencyBonus}
+              onEdit={() => setSpellModalOpen(true)}
+              onOpenSpellList={() => setSpellListModalOpen(true)}
+              onToggleSpellSlot={toggleSpellSlot}
+              onToggleFeatSpellSlot={toggleFeatSpellSlot}
+              onToggleBardicInspiration={toggleBardicInspiration}
+              onToggleSongOfRest={() => {}}
+              onToggleFlashOfGenius={toggleFlashOfGenius}
+              onToggleDivineSense={toggleDivineSense}
+              onToggleChannelDivinity={toggleChannelDivinity}
+              onToggleCleansingTouch={toggleCleansingTouch}
+              onUpdateLayOnHands={(newValue) => {
+                // Update Lay on Hands used value
+                const updatedCharacter = { ...activeCharacter, layOnHandsUsed: newValue }
+                setCharacters(prev => prev.map(c => c.id === activeCharacter.id ? updatedCharacter : c))
+                triggerAutoSave()
+              }}
+              onToggleElementalGift={toggleElementalGift}
+              onToggleSanctuaryVessel={toggleSanctuaryVessel}
+              onToggleLimitedWish={toggleLimitedWish}
+              hasSpellcastingAbilities={hasSpellcastingAbilities}
+            />
 
-                {/* Combat Notes - Only show if notes exist */}
-                {activeCharacter.otherTools && activeCharacter.otherTools.trim() !== "" && (
-                  <div className="col-span-2 pt-4 border-t">
-                    <div className="text-sm font-medium mb-2">Combat Notes</div>
-                    <RichTextDisplay
-                      content={activeCharacter.otherTools}
-                      className="text-sm"
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <ToolsProficiencies
+              character={activeCharacter}
+              onEdit={() => setEquipmentModalOpen(true)}
+              onUpdateEquipmentProficiencies={(equipmentProficiencies) => updateCharacter({ equipmentProficiencies })}
+              onUpdateToolProficiency={updateToolProficiency}
+              onToggleMagicItemUse={toggleMagicItemUse}
+              onOpenFeatureModal={(content) => {
+                setFeatureModalContent(content)
+                setFeatureModalOpen(true)
+              }}
+              onTriggerAutoSave={triggerAutoSave}
+            />
 
-            {/* Weapons */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon icon="lucide:sword" className="w-5 h-5" />
-                    Weapons
-                  </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setWeaponsModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-2">
-                  {activeCharacter.weapons.map((weapon, index) => (
-                    <div key={index} className="p-2 border text-sm font-medium rounded flex flex-row gap-2">
-                      <div className="w-full flex flex-col gap-1">
-                        <span>{weapon.name}</span>
-                          {weapon.weaponProperties && weapon.weaponProperties.length > 0 && (
-                            <div className="flex flex-wrap gap-0 mb-1">
-                              <span className="text-xs font-normal text-muted-foreground">
-                                {weapon.weaponProperties
-                                  .map((prop, i) => (i === 0 ? prop.charAt(0).toUpperCase() + prop.slice(1) : prop))
-                                  .join(", ")}
-                              </span>
-                            </div>
-                          )}
-                          <Badge variant="outline" className="text-xs h-fit">{weapon.damageType}</Badge>
-                      </div>
-                      <div className="flex flex-col gap-1 w-fit items-end">
-                        <Badge variant="secondary" className="text-xs h-fit">{weapon.attackBonus} ATK</Badge>
-                      </div>
-                    </div>
-                  ))}
-                  {activeCharacter.weapons.length === 0 && (
-                    <div className="text-sm text-muted-foreground text-center py-4">No weapons equipped</div>
-                  )}
-                </div>
-                <div className="mt-4 pt-4 border-t flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium">Weapon Notes</h4>
-                  </div>
-                  <RichTextDisplay
-                    content={activeCharacter.weaponNotes || "No weapon notes"}
-                    className={
-                      !activeCharacter.weaponNotes ? "text-muted-foreground text-center py-2 text-sm" : "text-sm"
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Spells & Magic - Only show for spellcasting classes */}
-            {hasSpellcastingAbilities(activeCharacter) && (
-              <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon icon="lucide:sparkles" className="w-5 h-5" />
-                    Spells & Magic
-                  </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setSpellModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4 flex flex-col gap-2">
-                {/* Basic Spell Stats */}
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-2 gap-3 items-start">
-                    <div className="text-center p-2 border rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1">
-                      <div className="text-sm text-muted-foreground">Spell Attack</div>
-                      <div className="text-xl font-bold font-mono">
-                        {formatModifier(activeCharacter.spellData.spellAttackBonus)}
-                      </div>
-                    </div>
-                    <div className="text-center p-2 border rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1">
-                      <div className="text-sm text-muted-foreground">Spell Save DC</div>
-                      <div className="text-xl font-bold font-mono">{activeCharacter.spellData.spellSaveDC}</div>
-                    </div>
-                    <div className="text-center p-2 border rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1">
-                      <div className="text-sm text-muted-foreground">Cantrips</div>
-                      <div className="text-xl font-bold font-mono">{activeCharacter.spellData.cantripsKnown}</div>
-                    </div>
-                    <div className="text-center p-2 border rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1">
-                      <div className="text-sm text-muted-foreground">Spells</div>
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="text-xl font-bold font-mono">{activeCharacter.spellData.spellsKnown}</div>
-                        {getTotalAdditionalSpells(activeCharacter) > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{getTotalAdditionalSpells(activeCharacter)}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <Button className="w-full" variant="outline" size="sm" onClick={() => setSpellListModalOpen(true)}>
-                    <Icon icon="lucide:book-open" className="w-4 h-4" />
-                    Spell List
-                  </Button>
-                </div>
-
-                {/* Bard Features */}
-                {(activeCharacter.class.toLowerCase() === "bard" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "bard")) && (
-                  <div className="flex flex-col gap-2 mb-3">
-                    <div className="text-sm font-medium">Bard Features</div>
-                    {/* Bardic Inspiration */}
-                    {activeCharacter.spellData.bardicInspirationSlot && (
-                      <div className="flex items-center justify-between p-2 border rounded gap-1">
-                        <div className="flex gap-1 flex-col">
-                          <span className="text-sm font-medium">Bardic Inspiration</span>
-                          <span className="text-xs text-muted-foreground">
-                            1{activeCharacter.spellData.bardicInspirationSlot.dieType} save bonus
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: activeCharacter.spellData.bardicInspirationSlot.usesPerRest }, (_, i) => {
-                            const usedCount = activeCharacter.spellData.bardicInspirationSlot!.usesPerRest - activeCharacter.spellData.bardicInspirationSlot!.currentUses
-                            const isAvailable = i < activeCharacter.spellData.bardicInspirationSlot!.currentUses
-                            return (
-                              <button
-                                key={i}
-                                onClick={() => toggleBardicInspiration(i)}
-                                className={`w-4 h-4 rounded border-2 transition-colors ${
-                                  isAvailable
-                                    ? "bg-purple-500 border-purple-500 cursor-pointer"
-                                    : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                }`}
-                                title={isAvailable ? "Available" : "Used"}
-                              />
-                            )
-                          })}
-                          <span className="text-xs text-muted-foreground ml-2 w-5 text-right">
-                            {activeCharacter.spellData.bardicInspirationSlot.currentUses}/
-                            {activeCharacter.spellData.bardicInspirationSlot.usesPerRest}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    {/* Bard - Song of Rest */}
-                    {activeCharacter.spellData.songOfRest && (
-                      <div className="p-2 border rounded cursor-pointer hover:bg-gray-50 transition-colors" onClick={toggleSongOfRest}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm flex flex-col gap-1">
-                            <span className="font-medium">Song of Rest</span><span className="text-xs text-muted-foreground"> 1{activeCharacter.spellData.songOfRest.healingDie} healing</span>
-                          </span>
-                          <Badge variant={activeCharacter.spellData.songOfRest.available ? "default" : "secondary"}>
-                            {activeCharacter.spellData.songOfRest.available ? "Available" : "Used"}
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Artificer Features */}
-                {(activeCharacter.class.toLowerCase() === "artificer" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer")) && (
-                  <div className="flex flex-col gap-2 mb-3">
-                    <div className="text-sm font-medium">Artificer Skills</div>
-                    {/* Artificer - Flash of Genius */}
-                    {((activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.level >= 7) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "artificer" ? total + c.level : total, 0) >= 7)) && activeCharacter.spellData.flashOfGeniusSlot && (
-                        <div className="flex flex-col items-start justify-between p-2 border rounded gap-0">
-                          <div className="flex gap-3 justify-between align-center w-full flex-row">
-                            <span className="text-sm font-medium">
-                              Flash of Genius
-                            </span>
-                            <div className="flex items-center gap-1 py-1">
-                              {Array.from({ length: activeCharacter.spellData.flashOfGeniusSlot.usesPerRest }, (_, i) => {
-                                const usedCount = activeCharacter.spellData.flashOfGeniusSlot!.usesPerRest - activeCharacter.spellData.flashOfGeniusSlot!.currentUses
-                                const isAvailable = i < activeCharacter.spellData.flashOfGeniusSlot!.currentUses
-                                return (
-                                  <button
-                                    key={i}
-                                    onClick={() => toggleFlashOfGenius(i)}
-                                    className={`w-4 h-4 rounded border-2 transition-colors ${
-                                      isAvailable
-                                        ? "bg-blue-500 border-blue-500 cursor-pointer"
-                                        : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                    }`}
-                                    title={isAvailable ? "Available" : "Used"}
-                                  />
-                                )
-                              })}
-                              <span className="text-xs text-muted-foreground ml-2 w-5 text-right">
-                                {activeCharacter.spellData.flashOfGeniusSlot.currentUses}/{activeCharacter.spellData.flashOfGeniusSlot.usesPerRest}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            <Badge variant="secondary">{formatModifier(intelligenceMod)}</Badge> bonus to any check
-                          </span>
-                        </div>
-                      )}
-                  </div>
-                )}
-
-                {/* Paladin Features */}
-                {(activeCharacter.class.toLowerCase() === "paladin" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "paladin")) && (
-                  <div className="flex flex-col gap-2 mb-3">
-                    <div className="text-sm font-medium">Paladin Skills</div>
-                    {/* Paladin - Divine Sense */}
-                    {activeCharacter.spellData.divineSenseSlot && (
-                        <div className="flex items-start gap-1 justify-between p-2 border rounded">
-                          <div className="flex gap-1 flex-col">
-                            <span className="text-sm font-medium">Divine Sense</span>
-                            <span className="text-xs text-muted-foreground">
-                              Detect celestials, fiends, and undead within 60 feet
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 py-1">
-                            {Array.from({ length: activeCharacter.spellData.divineSenseSlot.usesPerRest }, (_, i) => {
-                              const isAvailable = i < activeCharacter.spellData.divineSenseSlot!.currentUses
-                              return (
-                                <button
-                                  key={i}
-                                  onClick={() => toggleDivineSense(i)}
-                                  className={`w-4 h-4 rounded border-2 transition-colors ${
-                                    isAvailable
-                                      ? "bg-yellow-500 border-yellow-500 cursor-pointer"
-                                      : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                  }`}
-                                  title={isAvailable ? "Available" : "Used"}
-                                />
-                              )
-                            })}
-                            <span className="text-xs text-muted-foreground w-5 text-right ml-2">
-                              {activeCharacter.spellData.divineSenseSlot.currentUses}/{activeCharacter.spellData.divineSenseSlot.usesPerRest}
-                            </span>
-                          </div>
-                        </div>
-                    )}
-                    {/* Paladin - Lay on Hands */}
-                    {activeCharacter.spellData.layOnHands && (
-                        <div className="flex items-center justify-between p-2 border rounded">
-                          <div className="flex gap-1 flex-col">
-                            <span className="text-sm font-medium">
-                              Lay on Hands
-                            </span>
-                            <span className="text-xs font-medium text-muted-foreground">
-                              Healing pool
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              max={activeCharacter.spellData.layOnHands.totalHitPoints}
-                              value={activeCharacter.spellData.layOnHands.currentHitPoints}
-                              onChange={(e) => {
-                                const newValue = Math.max(0, Math.min(activeCharacter.spellData.layOnHands!.totalHitPoints, parseInt(e.target.value) || 0))
-                                setCharacters(prev => prev.map(char => 
-                                  char.id === activeCharacter.id 
-                                    ? {
-                                        ...char,
-                                        spellData: {
-                                          ...char.spellData,
-                                          layOnHands: {
-                                            ...char.spellData.layOnHands!,
-                                            currentHitPoints: newValue
-                                          }
-                                        }
-                                      }
-                                    : char
-                                ))
-                              triggerAutoSave()
-                              }}
-                              className="w-16 px-2 py-1 text-sm border rounded text-center"
-                              title="Remaining Lay on Hands hit points"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              / {activeCharacter.spellData.layOnHands.totalHitPoints}
-                            </span>
-                          </div>
-                        </div>
-                    )}
-                    {/* Paladin - Channel Divinity */}
-                    {activeCharacter.spellData.channelDivinitySlot && (
-                        <div className="flex items-start justify-between p-2 border rounded gap-1">
-                          <div className="flex gap-1 flex-col">
-                            <span className="text-sm font-medium">Channel Divinity</span>
-                            <span className="text-xs text-muted-foreground">
-                              Sacred Oath features
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 py-1">
-                            {Array.from({ length: activeCharacter.spellData.channelDivinitySlot.usesPerRest }, (_, i) => {
-                              const isAvailable = i < activeCharacter.spellData.channelDivinitySlot!.currentUses
-                              return (
-                                <button
-                                  key={i}
-                                  onClick={() => toggleChannelDivinity(i)}
-                                  className={`w-4 h-4 rounded border-2 transition-colors ${
-                                    isAvailable
-                                      ? "bg-purple-500 border-purple-500 cursor-pointer"
-                                      : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                  }`}
-                                  title={isAvailable ? "Available" : "Used"}
-                                />
-                              )
-                            })}
-                            <span className="text-xs text-muted-foreground w-5 text-right">
-                              {activeCharacter.spellData.channelDivinitySlot.currentUses}/{activeCharacter.spellData.channelDivinitySlot.usesPerRest}
-                            </span>
-                          </div>
-                        </div>
-                    )}
-                    {/* Paladin - Cleansing Touch */}
-                    {activeCharacter.spellData.cleansingTouchSlot && (
-                      <div className="flex items-start justify-between p-2 border rounded gap-1">
-                          <div className="flex gap-1 flex-col">
-                            <span className="text-sm font-medium">Cleansing Touch</span>
-                            <span className="text-xs text-muted-foreground">
-                              End one spell on yourself or willing creature
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 py-1">
-                            {Array.from({ length: activeCharacter.spellData.cleansingTouchSlot.usesPerRest }, (_, i) => {
-                              const isAvailable = i < activeCharacter.spellData.cleansingTouchSlot!.currentUses
-                              return (
-                                <button
-                                  key={i}
-                                  onClick={() => toggleCleansingTouch(i)}
-                                  className={`w-4 h-4 rounded border-2 transition-colors ${
-                                    isAvailable
-                                      ? "bg-green-500 border-green-500 cursor-pointer"
-                                      : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                  }`}
-                                  title={isAvailable ? "Available" : "Used"}
-                                />
-                              )
-                            })}
-                            <span className="text-xs text-muted-foreground w-5 text-right ml-2">
-                              {activeCharacter.spellData.cleansingTouchSlot.currentUses}/{activeCharacter.spellData.cleansingTouchSlot.usesPerRest}
-                            </span>
-                          </div>
-                        </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Warlock Features */}
-                {(activeCharacter.class.toLowerCase() === "warlock" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "warlock")) && (
-                  (activeCharacter.spellData.genieWrath || 
-                   (activeCharacter.spellData.elementalGift && activeCharacter.level >= 6) ||
-                   (activeCharacter.spellData.sanctuaryVessel && activeCharacter.level >= 10) ||
-                   (activeCharacter.spellData.limitedWish && activeCharacter.level >= 14)) && (
-                  <div className="flex flex-col gap-2 mb-3">
-                    <div className="text-sm font-medium">Warlock Features</div>
-                    {/* Warlock - Genie Wrath */}
-                    {activeCharacter.spellData.genieWrath && (
-                      <div className="flex items-center justify-between p-2 border rounded">
-                        <div className="flex gap-1 flex-col">
-                          <span className="text-sm font-medium">Genie Wrath</span>
-                          <span className="text-xs text-muted-foreground">
-                            Extra {activeCharacter.spellData.genieWrath.damageType} damage on hit
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {activeCharacter.spellData.genieWrath.currentUses}/{activeCharacter.spellData.genieWrath.usesPerTurn} per turn
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                    {/* Warlock - Elemental Gift */}
-                    {activeCharacter.spellData.elementalGift && activeCharacter.level >= 6 && (
-                      <div className="flex items-start justify-between p-2 border rounded gap-1">
-                        <div className="flex gap-1 flex-col">
-                          <span className="text-sm font-medium">Elemental Gift</span>
-                          <span className="text-xs text-muted-foreground">
-                            Flying speed {activeCharacter.spellData.elementalGift.flyingSpeed} ft for 10 minutes
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 py-1">
-                          {Array.from({ length: activeCharacter.spellData.elementalGift.usesPerLongRest }, (_, i) => {
-                            const isAvailable = i < activeCharacter.spellData.elementalGift!.currentUses
-                            return (
-                              <button
-                                key={i}
-                                onClick={() => {
-                                  const elementalGift = activeCharacter.spellData.elementalGift!
-                                  const newCurrentUses = isAvailable ? elementalGift.currentUses - 1 : elementalGift.currentUses + 1
-                                  const updatedSpellData = {
-                                    ...activeCharacter.spellData,
-                                    elementalGift: {
-                                      ...elementalGift,
-                                      currentUses: Math.max(0, Math.min(elementalGift.usesPerLongRest, newCurrentUses))
-                                    }
-                                  }
-                                  updateCharacter({ spellData: updatedSpellData })
-                                  triggerAutoSave()
-                                }}
-                                className={`w-4 h-4 rounded border-2 transition-colors ${
-                                  isAvailable
-                                    ? "bg-orange-500 border-orange-500 cursor-pointer"
-                                    : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                }`}
-                                title={isAvailable ? "Available" : "Used"}
-                              />
-                            )
-                          })}
-                          <span className="text-xs text-muted-foreground w-5 text-right ml-2">
-                            {activeCharacter.spellData.elementalGift.currentUses}/{activeCharacter.spellData.elementalGift.usesPerLongRest}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    {/* Warlock - Sanctuary Vessel */}
-                    {activeCharacter.spellData.sanctuaryVessel && activeCharacter.level >= 10 && (
-                      <div className="flex items-center justify-between p-2 border rounded">
-                        <div className="flex gap-1 flex-col">
-                          <span className="text-sm font-medium">Sanctuary Vessel</span>
-                          <span className="text-xs text-muted-foreground">
-                            {activeCharacter.spellData.sanctuaryVessel.vesselType} - extradimensional space
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {activeCharacter.spellData.sanctuaryVessel.hoursRemaining}/{activeCharacter.spellData.sanctuaryVessel.maxHours} hours
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                    {/* Warlock - Limited Wish */}
-                    {activeCharacter.spellData.limitedWish && activeCharacter.level >= 14 && (
-                      <div className="flex items-center justify-between p-2 border rounded">
-                        <div className="flex gap-1 flex-col">
-                          <span className="text-sm font-medium">Limited Wish</span>
-                          <span className="text-xs text-muted-foreground">
-                            Cast any 6th level or lower spell
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {activeCharacter.spellData.limitedWish.currentUses}/{activeCharacter.spellData.limitedWish.usesPerLongRest} uses
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  )
-                )}
-
-
-                {activeCharacter.spellData.spellSlots.length > 0 ? (
-                  <div className="flex flex-col gap-2">
-                    <div className="text-sm font-medium">Spell Slots</div>
-                    <div className="space-y-2 flex flex-col gap-0">
-                      {activeCharacter.spellData.spellSlots
-                        .sort((a, b) => a.level - b.level)
-                        .map((slot) => (
-                          <div key={slot.level} className="flex items-center justify-between p-2 border rounded">
-                            <span className="text-sm font-medium">
-                              {((activeCharacter.class.toLowerCase() === "warlock" || activeCharacter.classes?.some(c => c.name.toLowerCase() === "warlock")) && slot.level === 0) 
-                                ? "Warlock Spells" 
-                                : `Level ${slot.level}`}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              {Array.from({ length: slot.total }, (_, i) => {
-                                const isAvailable = i < (slot.total - slot.used)
-                                return (
-                                  <button
-                                    key={i}
-                                    onClick={() => toggleSpellSlot(slot.level, i)}
-                                    className={`w-4 h-4 rounded border-2 transition-colors ${
-                                      isAvailable
-                                        ? "bg-gray-400 border-gray-400 cursor-pointer"
-                                        : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                    }`}
-                                    title={isAvailable ? "Available" : "Used"}
-                                  />
-                                )
-                              })}
-                              <span className="text-xs text-muted-foreground w-5 text-right ml-2">
-                                {slot.total - slot.used}/{slot.total}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                ) : activeCharacter.class ? (
-                  <div className="flex flex-col gap-2">
-                    <div className="text-sm font-medium">Spell Slots</div>
-                    <div className="text-sm text-muted-foreground text-center py-4">
-                      Loading spell slots for {activeCharacter.class}...
-                    </div>
-                  </div>
-                ) : null}
-
-                {activeCharacter.spellData.featSpellSlots.length > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <div className="text-sm font-medium">Feat Spells</div>
-                    <div className="flex flex-col gap-2">
-                      {activeCharacter.spellData.featSpellSlots.map((featSpell, featSpellIndex) => (
-                        <div key={featSpellIndex} className="p-2 border rounded flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{featSpell.spellName}</span>
-                              <span className="text-xs text-muted-foreground">from {featSpell.featName}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {Array.from({ length: featSpell.usesPerLongRest }, (_, i) => {
-                                const isAvailable = i < featSpell.currentUses
-                                return (
-                                  <button
-                                    key={i}
-                                    onClick={() => toggleFeatSpellSlot(featSpellIndex, i)}
-                                    className={`w-4 h-4 rounded border-2 transition-colors ${
-                                      isAvailable
-                                        ? "bg-green-500 border-green-500 cursor-pointer"
-                                        : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                    }`}
-                                    title={isAvailable ? "Available" : "Used"}
-                                  />
-                                )
-                              })}
-                              <span className="text-xs text-muted-foreground w-5 text-right ml-2">
-                                {featSpell.currentUses}/{featSpell.usesPerLongRest}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Spell Notes */}
-                <div className="pt-4 border-t flex flex-col gap-2">
-                  <div className="text-sm font-medium">Spell Notes</div>
-                  <RichTextDisplay
-                    content={activeCharacter.spellData.spellNotes || "No spell notes"}
-                    className={
-                      !activeCharacter.spellData.spellNotes
-                        ? "text-muted-foreground text-center py-2 text-sm"
-                        : "text-sm"
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            )}
-
-            {/* Equipment */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon icon="lucide:shield" className="w-5 h-5" />
-                    Equipment
-                  </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setEquipmentModalOpen(true)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-col">
-                <div className="flex flex-col gap-1 border-b pb-4 mb-4">
-                  <div className="text-sm font-medium mb-2">Equipment Proficiencies</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* Column 1 */}
-                    <div className="flex flex-col gap-2">
-                      {[
-                        { key: "lightArmor", label: "Light armour" },
-                        { key: "mediumArmor", label: "Medium armour" },
-                        { key: "heavyArmor", label: "Heavy armour" },
-                        { key: "shields", label: "Shields" },
-                      ].map((item) => (
-                        <label key={item.key} className="flex items-center gap-3 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(activeCharacter.equipmentProficiencies?.[item.key as keyof typeof activeCharacter.equipmentProficiencies])}
-                            onChange={(e) => {
-                              const value = e.target.checked
-                              setCharacters((prev) => prev.map((c) =>
-                                c.id === activeCharacter.id
-                                  ? {
-                                      ...c,
-                                      equipmentProficiencies: {
-                                        lightArmor: c.equipmentProficiencies?.lightArmor ?? false,
-                                        mediumArmor: c.equipmentProficiencies?.mediumArmor ?? false,
-                                        heavyArmor: c.equipmentProficiencies?.heavyArmor ?? false,
-                                        shields: c.equipmentProficiencies?.shields ?? false,
-                                        simpleWeapons: c.equipmentProficiencies?.simpleWeapons ?? false,
-                                        martialWeapons: c.equipmentProficiencies?.martialWeapons ?? false,
-                                        firearms: c.equipmentProficiencies?.firearms ?? false,
-                                        [item.key]: value,
-                                      } as any,
-                                    }
-                                  : c
-                              ))
-                              triggerAutoSave()
-                            }}
-                            className="w-3 h-3 rounded border-gray-300"
-                          />
-                          {item.label}
-                        </label>
-                      ))}
-                    </div>
-                    {/* Column 2 */}
-                    <div className="flex flex-col gap-2">
-                      {[
-                        { key: "simpleWeapons", label: "Simple weapons" },
-                        { key: "martialWeapons", label: "Martial weapons" },
-                        { key: "firearms", label: "Firearms" },
-                      ].map((item) => (
-                        <label key={item.key} className="flex items-center gap-3 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(activeCharacter.equipmentProficiencies?.[item.key as keyof typeof activeCharacter.equipmentProficiencies])}
-                            onChange={(e) => {
-                              const value = e.target.checked
-                              setCharacters((prev) => prev.map((c) =>
-                                c.id === activeCharacter.id
-                                  ? {
-                                      ...c,
-                                      equipmentProficiencies: {
-                                        lightArmor: c.equipmentProficiencies?.lightArmor ?? false,
-                                        mediumArmor: c.equipmentProficiencies?.mediumArmor ?? false,
-                                        heavyArmor: c.equipmentProficiencies?.heavyArmor ?? false,
-                                        shields: c.equipmentProficiencies?.shields ?? false,
-                                        simpleWeapons: c.equipmentProficiencies?.simpleWeapons ?? false,
-                                        martialWeapons: c.equipmentProficiencies?.martialWeapons ?? false,
-                                        firearms: c.equipmentProficiencies?.firearms ?? false,
-                                        [item.key]: value,
-                                      } as any,
-                                    }
-                                  : c
-                              ))
-                              triggerAutoSave()
-                            }}
-                            className="w-3 h-3 rounded border-gray-300"
-                          />
-                          {item.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Tools Proficiencies */}
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="text-sm font-medium mb-2">Tools Proficiencies</div>
-                    <div className="flex flex-col gap-1.5">
-                      {activeCharacter.toolsProficiencies.map((tool, index) => {
-                        const toolBonus = calculateToolBonus(activeCharacter, tool)
-                        const isProficient = tool.proficiency === "proficient" || tool.proficiency === "expertise"
-                        const hasExpertise = tool.proficiency === "expertise"
-
-                        return (
-                          <div key={index} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="flex gap-1">
-                                <div className="flex items-center space-x-1">
-                                  <input
-                                    type="checkbox"
-                                    id={`${tool.name}-prof`}
-                                    checked={isProficient}
-                                    onChange={(e) => updateToolProficiency(tool.name, "proficient", e.target.checked)}
-                                    className="w-3 h-3 rounded border-gray-300"
-                                  />
-                                  <Label htmlFor={`${tool.name}-prof`} className="sr-only">
-                                    Proficient
-                                  </Label>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <input
-                                    type="checkbox"
-                                    id={`${tool.name}-exp`}
-                                    checked={hasExpertise}
-                                    onChange={(e) => updateToolProficiency(tool.name, "expertise", e.target.checked)}
-                                    className="w-3 h-3 rounded border-gray-300"
-                                  />
-                                  <Label htmlFor={`${tool.name}-exp`} className="sr-only">
-                                    Expertise
-                                  </Label>
-                                </div>
-                              </div>
-                              <div className="text-sm">
-                                <span>{tool.name}</span>
-                              </div>
-                            </div>
-                            {toolBonus !== 0 && (
-                              <Badge variant="secondary" className="text-xs font-mono">+{toolBonus}</Badge>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                    {activeCharacter.toolsProficiencies.length === 0 && (
-                      <div className="text-sm text-muted-foreground text-center py-4">No tool proficiencies</div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Magic Items */}
-                {activeCharacter.magicItems && activeCharacter.magicItems.length > 0 && (
-                  <>
-                  <div className="flex flex-col gap-3 border-b pb-4 mb-4">
-                    <div className="text-sm font-medium">Magic Items</div>
-                    <div className="flex flex-col gap-2">
-                      {activeCharacter.magicItems.map((item, index) => (
-                        <div key={index} className="p-2 border rounded">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-sm font-medium">{item.name || "Unnamed Magic Item"}</h4>
-                            {(item.maxUses ?? 0) > 0 && (
-                              <div className="flex items-center gap-2">
-                                {Array.from({ length: item.maxUses! }, (_, i) => {
-                                  const maxUses = Math.max(0, item.maxUses ?? 0)
-                                  const currentUses = Math.min(maxUses, Math.max(0, item.currentUses ?? maxUses))
-                                  const usedCount = maxUses - currentUses
-                                  const isAvailable = i < currentUses
-                                  return (
-                                    <button
-                                      key={i}
-                                      onClick={() => toggleMagicItemUse(index, i)}
-                                      className={`w-4 h-4 rounded border-2 transition-colors ${
-                                        isAvailable
-                                          ? "bg-purple-500 border-purple-500 cursor-pointer"
-                                          : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                      }`}
-                                      title={isAvailable ? "Available" : "Used"}
-                                    />
-                                  )
-                                })}
-                                <span className="text-xs text-muted-foreground ml-1">
-                                  {Math.min(item.maxUses ?? 0, Math.max(0, item.currentUses ?? (item.maxUses ?? 0)))}/{item.maxUses}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          {item.description && (
-                            <div className="text-xs text-muted-foreground relative">
-                              <div className="line-clamp-3 max-h-0 overflow-hidden">
-                                <RichTextDisplay content={item.description} className="text-xs text-muted-foreground" />
-                              </div>
-                              <div className="flex justify-start">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="px-2 h-7 shadow-sm text-foreground"
-                              onClick={() => {
-                                setFeatureModalContent({ 
-                                      title: item.name || "Unnamed Magic Item", 
-                                      description: item.description,
-                                      maxUses: item.maxUses,
-                                      dailyRecharge: item.dailyRecharge
-                                    })
-                                setFeatureModalIsClassFeature(false)
-                                    setFeatureModalOpen(true)
-                                  }}
-                                >
-                                  Read more
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  </>
-                )}
-
-                {/* Equipment Notes */}
-                <div className="flex flex-col gap-1">
-                  <div className="text-sm font-medium">Equipment Inventory</div>
-                  <RichTextDisplay
-                    content={activeCharacter.equipment || "No equipment listed"}
-                      className={!activeCharacter.equipment ? "text-muted-foreground text-center py-2" : ""}
-                    />
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* COLUMN 3: Class Features, Feats */}
           <div className="space-y-6 flex flex-col gap-1">
-            {/* Class Features */}
-            <Card className="flex flex-col gap-3">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon icon="lucide:star" className="w-5 h-5" />
-                    Class Features
-                  </CardTitle>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={async () => {
-                      try {
-                        const { loadClassData, loadClassFeatures } = await import('@/lib/database')
-                        const { classData } = await loadClassData(activeCharacter.class, activeCharacter.subclass)
-                        
-                        if (classData?.id) {
-                          const { features, error } = await loadClassFeatures(classData.id, activeCharacter.level)
-                          if (error) {
-                            console.error("Error refreshing class features:", error)
-                            toast({
-                              title: "Error",
-                              description: "Failed to refresh class features: " + error,
-                              variant: "destructive"
-                            })
-                          } else {
-                            const updatedCharacter = {
-                              ...activeCharacter,
-                              classFeatures: features || []
-                            }
-                            setCharacters(prev => prev.map(c => c.id === activeCharacter.id ? updatedCharacter : c))
-                            toast({
-                              title: "Success",
-                              description: "Class features refreshed successfully"
-                            })
-                          }
-                        }
-                      } catch (error) {
-                        console.error("Error refreshing features:", error)
-                        toast({
-                          title: "Error", 
-                          description: "Failed to refresh class features",
-                          variant: "destructive"
-                        })
-                      }
-                    }}
-                  >
-                    Refresh
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {activeCharacter.classFeatures?.length > 0 ? (() => {
-                    // Group features by class
-                    const featuresByClass = new Map<string, Array<{name: string, description: string, source: string, level: number, className?: string}>>()
-                    
-                    activeCharacter.classFeatures.forEach(feature => {
-                      // Use the className from the feature, or fallback to the character's primary class
-                      const className = feature.className || activeCharacter.class
-                      
-                      if (!featuresByClass.has(className)) {
-                        featuresByClass.set(className, [])
-                      }
-                      featuresByClass.get(className)!.push(feature)
-                    })
-                    
-                    // Sort features within each class by level
-                    featuresByClass.forEach(features => {
-                      features.sort((a, b) => a.level - b.level)
-                    })
-                    
-                    // Render grouped features
-                    return Array.from(featuresByClass.entries()).map(([className, features]) => (
-                      <div key={className} className="space-y-3">
-                        {/* Class Header */}
-                        {activeCharacter.classes && activeCharacter.classes.length > 1 && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <h4 className="font-semibold text-sm text-foreground">{className} Features</h4>
-                            <Badge variant="outline" className="text-xs">
-                              {features.length}
-                            </Badge>
-                          </div>
-                        )}
-                        
-                        {/* Features for this class */}
-                        {features.map((feature, index) => (
-                          <div key={`${className}-${index}`} className="p-3 border rounded-lg flex flex-col gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="font-medium flex-1 min-w-0 truncate">{feature.name}</div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  Level {feature.level}
-                                </Badge>
-                                {feature.source?.toLowerCase() === "subclass" && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {feature.source}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
+            <ClassFeatures
+              character={activeCharacter}
+              onOpenFeatureModal={(content) => {
+                setFeatureModalContent(content)
+                setFeatureModalIsClassFeature(true)
+                setFeatureModalOpen(true)
+              }}
+              onRefreshFeatures={async () => {
+                // Refresh logic is handled in the component
+              }}
+            />
 
-                            <div className="text-sm text-muted-foreground relative flex flex-col gap-2">
-                              <div className="line-clamp-2 max-h-12 overflow-hidden">
-                                <RichTextDisplay content={feature.description} className="text-sm text-muted-foreground" />
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-fit px-2 h-7 shadow-sm text-foreground"
-                                onClick={() => {
-                                  setFeatureModalContent({ title: feature.name, description: feature.description })
-                                  setFeatureModalIsClassFeature(true)
-                                  setFeatureModalOpen(true)
-                                }}
-                              >
-                                Read more
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ))
-                  })() : (
-                    <div className="text-sm text-muted-foreground text-center py-4">
-                      No class features available
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <Infusions
+              character={activeCharacter}
+              onEdit={() => setInfusionsModalOpen(true)}
+              onOpenFeatureModal={(content) => {
+                setFeatureModalContent(content)
+                setFeatureModalOpen(true)
+              }}
+            />
 
-            {/* Artificer - Eldritch Cannon */}
-            {((activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.subclass?.toLowerCase() === "artillerist" && activeCharacter.level >= 3) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer" && c.subclass?.toLowerCase() === "artillerist") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "artificer" ? total + c.level : total, 0) >= 3)) && (
-              <Card>
-                <CardHeader className="pb-0">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Icon icon="lucide:zap" className="w-5 h-5" />
-                      Eldritch Cannon
-                    </CardTitle>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setEldritchCannonModalOpen(true)}
-                      disabled={activeCharacter.level < 3}
-                    >
-                      <Icon icon="lucide:edit" className="w-4 h-4" />
-                      {activeCharacter.eldritchCannon ? "Edit" : "Create"}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {activeCharacter.eldritchCannon ? (
-                    <div className="space-y-3">
-                      <div className="p-3 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="font-medium flex items-center gap-2">
-                            {activeCharacter.eldritchCannon.size} {activeCharacter.eldritchCannon.type}
-                            <Badge variant="outline" className="text-xs">
-                              {activeCharacter.eldritchCannon.currentHitPoints}/{activeCharacter.eldritchCannon.maxHitPoints} HP
-                            </Badge>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-2 text-sm">
-                          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
-                            <div className="text-xs text-muted-foreground">AC</div>
-                            <div className="font-mono text-lg font-semibold">{activeCharacter.eldritchCannon.armorClass}</div>
-                          </div>
-                          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
-                            <div className="text-xs text-muted-foreground">Attack</div>
-                            <div className="font-mono text-lg font-semibold">+{activeCharacter.eldritchCannon.attackBonus}</div>
-                          </div>
-                          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
-                            <div className="text-xs text-muted-foreground">
-                              {activeCharacter.eldritchCannon.type === 'Protector' ? 'Temp HP' : 'Damage'}
-                            </div>
-                            <div className="font-mono text-lg font-semibold">{activeCharacter.eldritchCannon.damage}</div>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          {activeCharacter.eldritchCannon.specialProperty}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-sm text-muted-foreground">
-                      No active cannon. Artificers gain access to Eldritch Cannons at 3rd level.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-            
-            {/* Artificer - Infusions */}
-            {((activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.level >= 2) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "artificer" ? total + c.level : total, 0) >= 2)) && (
-              <Card className="flex flex-col gap-3">
-                <CardHeader className="pb-0">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Icon icon="lucide:wrench" className="w-5 h-5" />
-                      Infusions
-                    </CardTitle>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setInfusionsModalOpen(true)}
-                      disabled={activeCharacter.level < 2}
-                    >
-                      <Icon icon="lucide:edit" className="w-4 h-4" />
-                      Edit
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                  {/* Infusion Tracking */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
-                      <div className="text-sm text-muted-foreground">Infusions Known</div>
-                      <div className="text-xl font-bold text-primary font-mono">
-                        {getArtificerInfusionsKnown(activeCharacter.level)}
-                      </div>
-                    </div>
-                    <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
-                      <div className="text-sm text-muted-foreground">Max Infused</div>
-                      <div className="text-xl font-bold text-primary font-mono">
-                        {getArtificerMaxInfusedItems(activeCharacter)}
-                      </div>
-                    </div>
-                  </div>
+            <EldritchInvocations
+              character={activeCharacter}
+              onEdit={() => setEldritchInvocationsModalOpen(true)}
+              onOpenFeatureModal={(content) => {
+                setFeatureModalContent(content)
+                setFeatureModalOpen(true)
+              }}
+            />
 
-                  {/* Infusions List */}
-                  <div className="space-y-3 flex flex-col gap-2">
-                    {activeCharacter.infusions.map((infusion, index) => (
-                      <div key={index} className="p-2 mb-0 border rounded-lg flex items-center justify-between">
-                        <h4 className="text-sm font-medium mb-0">{infusion.title || "Untitled Infusion"}</h4>
-                        {infusion.description && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="px-2 h-7 shadow-sm text-foreground"
-                          onClick={() => {
-                            setFeatureModalContent({ 
-                              title: infusion.title || "Untitled Infusion", 
-                              description: infusion.description,
-                              needsAttunement: infusion.needsAttunement
-                            })
-                            setFeatureModalIsClassFeature(false)
-                          setFeatureModalOpen(true)
-                        }}
-                      >
-                        Read more
-                      </Button>
-                        )}
-                    </div>
-                  ))}
-                    {activeCharacter.infusions.length === 0 && (
-                      <div className="text-center py-4 text-sm text-muted-foreground">
-                        No infusions selected yet. You can choose {getArtificerInfusionsKnown(activeCharacter.level)} infusions at level {activeCharacter.level}.
-                      </div>
-                  )}
-                </div>
-
-                  {/* Infusion Notes Display */}
-                  {activeCharacter.infusionNotes && (
-                    <div className="mt-2 pt-4 border-t">
-                      <div className="text-sm font-medium mb-2">Infusion Notes</div>
-                      <RichTextDisplay 
-                        content={activeCharacter.infusionNotes} 
-                        className={
-                          !activeCharacter.infusionNotes
-                            ? "text-muted-foreground text-center py-2 text-sm"
-                            : "text-sm"
-                        }
-                      />
-                    </div>
-                  )}
-              </CardContent>
-              </Card>
-            )}
-
-            {/* Warlock - Eldritch Invocations */}
-            {((activeCharacter.class.toLowerCase() === "warlock" && activeCharacter.level >= 2) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "warlock") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "warlock" ? total + c.level : total, 0) >= 2)) && (
-              <Card className="flex flex-col gap-3">
-                <CardHeader className="pb-0">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Icon icon="lucide:sparkles" className="w-5 h-5" />
-                      Eldritch Invocations
-                    </CardTitle>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setEldritchInvocationsModalOpen(true)}
-                      disabled={activeCharacter.level < 2}
-                    >
-                      <Icon icon="lucide:edit" className="w-4 h-4" />
-                      Edit
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                  {/* Invocation Tracking */}
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
-                      <div className="text-sm text-muted-foreground">Invocations Known</div>
-                      <div className="text-xl font-bold text-primary font-mono">
-                        {activeCharacter.spellData.eldritchInvocations?.length || 0}/{getWarlockInvocationsKnown(activeCharacter.level)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Invocations List */}
-                  <div className="space-y-3 flex flex-col gap-2">
-                    {activeCharacter.spellData.eldritchInvocations && activeCharacter.spellData.eldritchInvocations.length > 0 ? (
-                      activeCharacter.spellData.eldritchInvocations.map((invocation, index) => (
-                        <div key={index} className="p-2 mb-0 border rounded-lg flex items-center justify-between">
-                          <h4 className="text-sm font-medium mb-0">{invocation.name}</h4>
-                          {invocation.description && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="px-2 h-7 shadow-sm text-foreground"
-                              onClick={() => {
-                                setFeatureModalContent({ 
-                                  title: invocation.name, 
-                                  description: invocation.description
-                                })
-                                setFeatureModalIsClassFeature(false)
-                                setFeatureModalOpen(true)
-                              }}
-                            >
-                              Read more
-                            </Button>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-4 text-sm text-muted-foreground">
-                        No invocations selected yet. You can choose {getWarlockInvocationsKnown(activeCharacter.level)} invocations at level {activeCharacter.level}.
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <EldritchCannonComponent
+              character={activeCharacter}
+              onEdit={() => setEldritchCannonModalOpen(true)}
+            />
           </div>
 
         </div>
@@ -4290,7 +2720,7 @@ export default function CharacterSheet() {
       {/* Portrait Modal */}
       <Dialog open={portraitModalOpen} onOpenChange={setPortraitModalOpen}>
         <DialogContent className="relative w-auto sm:max-w-none max-h-[90vh] p-2">
-          <DialogClose className="absolute right-2 top-2 z-50 bg-white rounded shadow px-2 py-1 text-sm">Close</DialogClose>
+          <DialogClose className="absolute right-2 top-2 z-50 bg-card border border-border rounded shadow px-2 py-1 text-sm">Close</DialogClose>
           <div className="flex items-center justify-center">
             {activeCharacter.imageUrl && (
               <img

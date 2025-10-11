@@ -43,11 +43,11 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Character Details</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-6 py-4">
+        <div className="grid gap-6 p-4 max-h-[50vh] overflow-y-auto">
           <div className="space-y-2">
             <Label htmlFor="personalityTraits">Personality Traits</Label>
             <RichTextEditor
@@ -102,7 +102,7 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
             />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

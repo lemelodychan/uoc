@@ -122,9 +122,9 @@ export function CharacterSidebar({
 
   // Define status order and labels
   const statusConfig = {
-    active: { label: 'Active Party', icon: 'lucide:users', color: 'bg-green-100 text-green-800 border-green-200' },
-    away: { label: 'Away', icon: 'lucide:user-x', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    deceased: { label: 'Deceased', icon: 'lucide:skull', color: 'bg-red-100 text-red-800 border-red-200' }
+    active: { label: 'Active Party', icon: 'lucide:users', color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700' },
+    away: { label: 'Away', icon: 'lucide:user-x', color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700' },
+    deceased: { label: 'Deceased', icon: 'lucide:skull', color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700' }
   }
 
   const statusOrder = ['active', 'away', 'deceased'] as const
@@ -211,7 +211,7 @@ export function CharacterSidebar({
 									<div className="flex items-center gap-2 ml-1 text-sm">
 										<Icon icon={config.icon} className="w-4 h-4" />
 										<span className="text-sm font-medium">{config.label}</span>
-										<Badge variant="secondary" className="text-[10px] bg-white border-gray-200 text-sidebar-foreground">
+										<Badge variant="secondary" className="text-[10px] bg-card border-border text-sidebar-foreground">
 											{charactersInStatus.length}
 										</Badge>
 									</div>
@@ -292,7 +292,7 @@ export function CharacterSidebar({
 										      <div className="flex items-center gap-2 ml-1 text-sm">
                             <Icon icon={config.icon} className="w-4 h-4" />
                             <span className="text-sm font-medium">{config.label}</span>
-                            <Badge variant="secondary" className="text-[10px] bg-white border-gray-200 text-sidebar-foreground">
+                            <Badge variant="secondary" className="text-[10px] bg-card border-border text-sidebar-foreground">
                               {charactersInStatus.length}
                             </Badge>
                           </div>
@@ -324,7 +324,7 @@ export function CharacterSidebar({
                                   </div>
                                   {!isCollapsed && (
                                     <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-sidebar-foreground truncate">{character.name}</div>
+                                      <div className="font-bold font-display text-sidebar-foreground truncate">{character.name}</div>
                                       <div className="text-xs text-sidebar-foreground/70">
                                         {getCharacterLevelDisplay(character)}
                                       </div>
@@ -364,21 +364,23 @@ export function CharacterSidebar({
       <div className="p-4 border-t border-sidebar-border space-y-2">
         <Button
           onClick={onOpenDiceRoll}
-          className={`w-full bg-blue-600 hover:bg-blue-700 text-white ${
+          variant="default"
+          className={`w-full ${
             isCollapsed ? "px-2" : ""
           }`}
         >
-          <Icon icon="lucide:dice" className="w-4 h-4" />
-          {!isCollapsed && <span className="ml-2">Dice Roll</span>}
+          <Icon icon="lucide:dice-5" className="w-4 h-4" />
+          {!isCollapsed && <span>Dice Roll</span>}
         </Button>
         <Button
           onClick={onStartLongRest}
-          className={`w-full bg-green-600 hover:bg-green-700 text-white ${
+          variant="secondary"
+          className={`w-full ${
             isCollapsed ? "px-2" : ""
           }`}
         >
           <Icon icon="lucide:moon" className="w-4 h-4" />
-          {!isCollapsed && <span className="ml-2">Start Long Rest</span>}
+          {!isCollapsed && <span>Start Long Rest</span>}
         </Button>
       </div>
     </div>

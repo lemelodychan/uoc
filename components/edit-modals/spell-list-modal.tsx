@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Toggle } from "@/components/ui/toggle"
 import { Input } from "@/components/ui/input"
@@ -13,10 +13,12 @@ import { Icon } from "@iconify/react"
 import type { CharacterData, SpellData, Spell } from "@/lib/character-data"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
+import { SPELL_SCHOOL_COLORS, getCastingTimeColor } from "@/lib/color-mapping"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { SpellLibraryModal, SpellLibraryModalRef } from "./spell-library-modal"
 import { SpellCreationModal } from "./spell-creation-modal"
 import { useToast } from "@/hooks/use-toast"
+import { CardHeader, CardTitle } from "@/components/ui/card"
 
 interface SpellListModalProps {
   isOpen: boolean
@@ -67,19 +69,17 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
   const [editIndex, setEditIndex] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<string>("basic")
   
+  const getSchoolColor = (school: string) => {
+    return SPELL_SCHOOL_COLORS[school as keyof typeof SPELL_SCHOOL_COLORS] || "bg-muted text-muted-foreground"
+  }
+
   const toggleExpanded = (key: string) => {
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
   const renderCastingBadge = (castingTime?: string) => {
     if (!castingTime) return null
-    const ct = castingTime.toLowerCase()
-    let cls = ""
-    if (ct.includes("bonus")) cls = "bg-amber-500 text-white"
-    else if (ct.includes("reaction")) cls = "bg-fuchsia-600 text-white"
-    else if (ct.includes("action")) cls = "bg-emerald-600 text-white"
-    else cls = "bg-blue-600 text-white"
-    return <Badge className={cls}>{castingTime}</Badge>
+    return <Badge className={getCastingTimeColor(castingTime)}>{castingTime}</Badge>
   }
 
   // Sync local state with character prop when it changes
@@ -431,14 +431,14 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[720px] h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[720px] p-0 gap-0">
+        <DialogHeader className="p-4">
           <DialogTitle className="text-xl font-semibold">Spell List</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col flex-1 min-h-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 gap-4">
-            <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-0 min-h-[70vh] max-h-[70vh] overflow-y-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 gap-0 min-h-0">
+            <div className="flex items-center justify-between gap-4 p-4 pt-0 border-b">
               <TabsList>
                 {tabs.map((t) => (
                   <TabsTrigger key={t.id} value={t.id}>
@@ -450,11 +450,11 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
             </div>
 
             <TabsContent value="basic" className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
-              <div className="space-y-6 pr-3">
+              <div className="p-4">
                 {Object.entries(spellsByLevel)
                   .sort(([a], [b]) => parseInt(a) - parseInt(b))
                   .map(([level, levelSpells]) => (
-                    <div key={level} className="space-y-2 flex flex-col gap-1 mb-10">
+                    <div key={level} className="space-y-2 flex flex-col gap-1 mb-10 last:mb-0">
                       <h3 className="text-lg font-semibold flex items-center gap-3">
                         <span>{level === "0" ? "Cantrips" : `Level ${level}`}</span>
                         <Badge variant="outline" className="px-2 py-0.5 text-xs">{levelSpells.length}</Badge>
@@ -491,7 +491,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                         <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => togglePrepared(spell)} variant="outline" size="sm">{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
                                       )}
                                       <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
-                                      <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-destructive hover:text-destructive w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
+                                      <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -509,7 +509,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                       </div>
                                       {spell.description && (<RichTextDisplay content={spell.description} className="text-sm text-muted-foreground" />)}
                                       {spell.higherLevel && (<div className="text-xs text-muted-foreground italic mt-2">Using a Higher-Level Spell Slot: {spell.higherLevel}</div>)}
-                                      <Badge variant="secondary">School of {spell.school}</Badge>
+                                      <Badge className={getSchoolColor(spell.school)}>School of {spell.school}</Badge>
                                     </div>
                                   )}
                                 </div>
@@ -524,11 +524,11 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
 
             {tagKeys.map((tag) => (
               <TabsContent key={tag} value={`tag:${tag}`} className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
-                <div className="space-y-6 pr-3">
+                <div className="space-y-6 p-4">
                   {Object.entries(spellsByTagAndLevel[tag])
                     .sort(([a],[b]) => parseInt(a) - parseInt(b))
                     .map(([level, levelSpells]) => (
-                      <div key={`${tag}-${level}`} className="space-y-2 flex flex-col gap-1 mb-10">
+                      <div key={`${tag}-${level}`} className="flex flex-col gap-1 mb-10 last:mb-0">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <span>{level === "0" ? "Cantrips" : `Level ${level}`}</span>
                           <Badge variant="outline" className="px-2 py-0.5 text-xs">{levelSpells.length}</Badge>
@@ -565,14 +565,14 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                           <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => togglePrepared(spell)} variant="outline" size="sm">{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
                                         )}
                                         <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
-                                        <Button variant="ghost" size="sm" onClick={() => removeSpell(globalIndex)} className="text-destructive hover:text-destructive"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
+                                        <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2 flex-wrap text-xs">
                                       {renderCastingBadge(spell.castingTime)}
                                       {spell.duration && <Badge variant="secondary">{spell.duration.includes('Concentration') ? `Concentration, ${spell.duration.replace('Concentration, ', '')}` : spell.duration}</Badge>}
-                                      {spell.saveThrow && <Badge variant="outline">{spell.saveThrow} Save</Badge>}
-                                      {spell.damage && <Badge variant="outline">{spell.damage} base damage</Badge>}
+                                      {spell.saveThrow && <Badge variant="outline">{spell.saveThrow} saving throw</Badge>}
+                                      {spell.damage && <Badge variant="outline">{spell.damage} damage</Badge>}
                                     </div>
                                     {(spell.description || spell.higherLevel) && isOpen && (
                                       <div className="mt-2 flex flex-col gap-3 border-t pt-3">
@@ -583,7 +583,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                         </div>
                                         {spell.description && (<RichTextDisplay content={spell.description} className="text-sm text-muted-foreground" />)}
                                         {spell.higherLevel && (<div className="text-xs text-muted-foreground italic mt-2">Using a Higher-Level Spell Slot: {spell.higherLevel}</div>)}
-                                        <Badge variant="secondary">School of {spell.school}</Badge>
+                                        <Badge className={getSchoolColor(spell.school)}>School of {spell.school}</Badge>
                                       </div>
                                     )}
                                   </div>
@@ -597,10 +597,9 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
               </TabsContent>
             ))}
           </Tabs>
-
-          {/* Footer with Add New Spell options */}
-          <div className="pt-4 border-t flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
+        </div>
+        <DialogFooter className="p-4 border-t items-center justify-between">
+            <div className="text-sm text-muted-foreground w-full">
               {spells.length} spell{spells.length !== 1 ? 's' : ''} in your list
             </div>
             <div className="flex gap-2">
@@ -642,174 +641,198 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                 Create Custom
               </Button>
             </div>
-          </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
     <Dialog open={newSpellModalOpen} onOpenChange={(open)=>{ if(!open){ setNewSpellModalOpen(false); } }}>
-      <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[720px] p-0 gap-0">
+        <DialogHeader className="p-4 border-b pb-3">
           <DialogTitle>{editIndex !== null ? 'Edit Spell' : 'Add New Spell'}</DialogTitle>
         </DialogHeader>
         
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto pr-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 align-start items-start justify-start">
-          <div className="col-span-1 flex flex-col gap-2">
-            <Label htmlFor="spellLevel">Level</Label>
-            <Select value={newSpell.level?.toString()} onValueChange={(value)=>setNewSpell(prev=>({ ...prev, level: parseInt(value) }))}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select level" />
-              </SelectTrigger>
-              <SelectContent>
-                {[0,1,2,3,4,5,6,7,8,9].map((level) => (
-                  <SelectItem key={level} value={level.toString()}>{level===0?"Cantrip":`Level ${level}`}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-1 flex flex-col gap-2">
-            <Label htmlFor="spellSchool">School</Label>
-            <Select value={newSpell.school} onValueChange={(value)=>setNewSpell(prev=>({ ...prev, school:value }))}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select school" />
-              </SelectTrigger>
-              <SelectContent>
-                {spellSchools.map((school) => (
-                  <SelectItem key={school} value={school}>{school}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-1 md:col-span-2 h-full flex items-center">
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                type="checkbox"
-                className="w-4 h-4"
-                checked={!!newSpell.isPrepared}
-                onChange={(e)=>setNewSpell(prev=>({ ...prev, isPrepared: e.target.checked }))}
-                disabled={!newSpell.level || newSpell.level < 1}
-                id="isPrepared"
-              />
-              <Label htmlFor="isPrepared">Is Prepared</Label>
-            </div>
-          </div>
-          <div className="col-span-4 grid grid-cols-2 gap-4 flex flex-col gap-2 align-start items-start justify-start">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="spellName">Spell Name</Label>
-              <Input id="spellName" value={newSpell.name} onChange={(e)=>setNewSpell(prev=>({ ...prev, name:e.target.value }))} placeholder="Enter spell name" />
-            </div>
-          </div>
-          <div className="col-span-2 flex flex-col gap-2">
-            <Label htmlFor="castingTime">Casting Time</Label>
-            <Select
-              value={(newSpell.castingTime || "1 Action").toString()}
-              onValueChange={(value) => setNewSpell((prev) => ({ ...prev, castingTime: value }))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select casting time" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Standard</SelectLabel>
-                  {castingTimeOptions.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectSeparator />
-                <SelectGroup>
-                  <SelectLabel>Ritual Durations</SelectLabel>
-                  {ritualCastingTimes.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-2 flex flex-col gap-2">
-            <Label htmlFor="range">Range/Area</Label>
-            <Input id="range" value={newSpell.range || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, range:e.target.value }))} placeholder="30 ft." />
-          </div>
-          <div className="col-span-2 flex flex-col gap-2">
-            <Label htmlFor="duration">Duration</Label>
-            <Input id="duration" value={newSpell.duration || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, duration:e.target.value }))} placeholder="8 Hours" />
-          </div>
-          <div className="col-span-1 md:col-span-2">
-            <Label>Components</Label>
-            <div className="flex items-center gap-3 mt-1">
-              <label className="flex items-center gap-1 text-sm">
-                <input type="checkbox" className="w-4 h-4" checked={!!newSpell.components?.v} onChange={(e)=>setNewSpell(prev=>({ ...prev, components:{ ...(prev.components||{}), v:e.target.checked }}))} /> V
-              </label>
-              <label className="flex items-center gap-1 text-sm">
-                <input type="checkbox" className="w-4 h-4" checked={!!newSpell.components?.s} onChange={(e)=>setNewSpell(prev=>({ ...prev, components:{ ...(prev.components||{}), s:e.target.checked }}))} /> S
-              </label>
-              <label className="flex items-center gap-1 text-sm">
-                <input type="checkbox" className="w-4 h-4" checked={!!newSpell.components?.m} onChange={(e)=>setNewSpell(prev=>({ ...prev, components:{ ...(prev.components||{}), m:e.target.checked }}))} /> M
-              </label>
-              <Input className="max-w-xs" placeholder="Material (optional)" value={newSpell.components?.material || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, components:{ ...(prev.components||{}), material:e.target.value }}))} />
-            </div>
-          </div>
-          <div className="col-span-2 flex flex-col gap-2">
-            <Label htmlFor="damage">Damage</Label>
-            <Input id="damage" value={newSpell.damage || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, damage:e.target.value }))} placeholder="e.g., Fire, 2d8 Radiant" />
-          </div>
-          <div className="col-span-2 flex flex-col gap-2">
-            <Label htmlFor="saveThrow">Save throw</Label>
-            <Input id="saveThrow" value={newSpell.saveThrow || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, saveThrow:e.target.value }))} placeholder="Dex Save, Con Save, —" />
-          </div>
-          <div className="col-span-1 flex flex-col gap-2">
-            <Label htmlFor="tag">Special tag</Label>
-            <Input id="tag" value={newSpell.tag || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, tag:e.target.value }))} placeholder="e.g., Buff, Healing"
-            />
-          </div>
-          <div className="col-span-4 flex flex-col gap-2">
-            <Label htmlFor="description">Description</Label>
-            <RichTextEditor value={newSpell.description || ""} onChange={(value)=>setNewSpell(prev=>({ ...prev, description:value }))} rows={6} className="min-h-[224px]" />
-          </div>
-          <div className="col-span-4 flex flex-col gap-2">
-            <Label htmlFor="higherLevel">At a Higher-Level Spell Slot</Label>
-            <textarea id="higherLevel" className="w-full border rounded-md p-2 text-sm" rows={2} value={newSpell.higherLevel || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, higherLevel:e.target.value }))} />
-          </div>
-          </div>
+        <div className="flex flex-col gap-4 overflow-y-auto p-4 max-h-[500px]"> 
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-6">
+              <div className="flex flex-row gap-4">
+                <div className="flex flex-col gap-2 w-full">
+                  <div className="flex flex-col gap-3">
+                    <Label htmlFor="spellName">Spell Name</Label>
+                    <Input id="spellName" value={newSpell.name} onChange={(e)=>setNewSpell(prev=>({ ...prev, name:e.target.value }))} placeholder="Enter spell name" />
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4"
+                      checked={!!newSpell.isPrepared}
+                      onChange={(e)=>setNewSpell(prev=>({ ...prev, isPrepared: e.target.checked }))}
+                      disabled={!newSpell.level || newSpell.level < 1}
+                      id="isPrepared"
+                    />
+                    <Label htmlFor="isPrepared">Is Prepared</Label>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <Label htmlFor="spellSchool">School</Label>
+                  <Select value={newSpell.school} onValueChange={(value)=>setNewSpell(prev=>({ ...prev, school:value }))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select school" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {spellSchools.map((school) => (
+                        <SelectItem key={school} value={school}>{school}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <Label htmlFor="spellLevel">Level</Label>
+                  <Select value={newSpell.level?.toString()} onValueChange={(value)=>setNewSpell(prev=>({ ...prev, level: parseInt(value) }))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[0,1,2,3,4,5,6,7,8,9].map((level) => (
+                        <SelectItem key={level} value={level.toString()}>{level===0?"Cantrip":`Level ${level}`}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex flex-row gap-4">
+                <div className="col-span-2 flex flex-col gap-3">
+                  <Label htmlFor="castingTime">Casting Time</Label>
+                  <Select
+                    value={(newSpell.castingTime || "1 Action").toString()}
+                    onValueChange={(value) => setNewSpell((prev) => ({ ...prev, castingTime: value }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select casting time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Standard</SelectLabel>
+                        {castingTimeOptions.map((opt) => (
+                          <SelectItem key={opt} value={opt}>
+                            {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel>Ritual Durations</SelectLabel>
+                        {ritualCastingTimes.map((opt) => (
+                          <SelectItem key={opt} value={opt}>
+                            {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2 flex flex-col gap-3">
+                  <Label htmlFor="range">Range/Area</Label>
+                  <Input id="range" value={newSpell.range || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, range:e.target.value }))} placeholder="30 ft." />
+                </div>
+                <div className="col-span-2 flex flex-col gap-3">
+                  <Label htmlFor="duration">Duration</Label>
+                  <Input id="duration" value={newSpell.duration || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, duration:e.target.value }))} placeholder="8 Hours" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <Label htmlFor="tag">Special tag</Label>
+                <Input id="tag" value={newSpell.tag || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, tag:e.target.value }))} placeholder="e.g., Buff, Healing"
+                />
+              </div>
+            </CardContent>  
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Components</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" className="w-4 h-4" checked={!!newSpell.components?.v} onChange={(e)=>setNewSpell(prev=>({ ...prev, components:{ ...(prev.components||{}), v:e.target.checked }}))} /> Verbal (V)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" className="w-4 h-4" checked={!!newSpell.components?.s} onChange={(e)=>setNewSpell(prev=>({ ...prev, components:{ ...(prev.components||{}), s:e.target.checked }}))} /> Somatic (S)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4" 
+                      checked={!!newSpell.components?.m} 
+                      onChange={(e)=>setNewSpell(prev=>({ ...prev, components:{ ...(prev.components||{}), m:e.target.checked }}))} /> Material (M)
+                  </label>
+                </div>
+                <Input placeholder="Material (optional)" value={newSpell.components?.material || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, components:{ ...(prev.components||{}), material:e.target.value }}))} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Effects</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-6">
+              <div className="flex flex-row gap-4">
+                <div className="flex flex-col gap-3 w-full">
+                  <Label htmlFor="damage">Damage</Label>
+                  <Input id="damage" value={newSpell.damage || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, damage:e.target.value }))} placeholder="e.g., Fire, 2d8 Radiant" />
+                </div>
+                <div className="flex flex-col gap-3 w-full">
+                  <Label htmlFor="saveThrow">Saving Throw</Label>
+                  <Input id="saveThrow" value={newSpell.saveThrow || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, saveThrow:e.target.value }))} placeholder="Dex Save, Con Save, —" />
+                </div>
+              </div>
+              <div className="col-span-4 flex flex-col gap-3 mt-2">
+                <Label htmlFor="description">Description</Label>
+                <RichTextEditor value={newSpell.description || ""} onChange={(value)=>setNewSpell(prev=>({ ...prev, description:value }))} rows={6} className="min-h-[224px]" />
+              </div>
+              <div className="col-span-4 flex flex-col gap-3 mt-2">
+                <Label htmlFor="higherLevel">At a Higher Levels</Label>
+                <textarea id="higherLevel" className="w-full border rounded-md p-2 text-sm" rows={2} value={newSpell.higherLevel || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, higherLevel:e.target.value }))} />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Fixed Footer */}
-        <div className="flex justify-between items-center pt-4 border-t bg-background">
+        <DialogFooter className="p-4 border-t justify-between items-center">
           <Button variant="outline" onClick={()=> setNewSpellModalOpen(false)}>
-            Cancel
-          </Button>
-          <div className="flex gap-2">
-            {editIndex !== null && (
-              <Button variant="outline" onClick={() => {
-                const spellToAdd: Spell = {
-                  name: newSpell.name || "",
-                  school: newSpell.school || "Evocation",
-                  level: newSpell.level || 0,
-                  castingTime: newSpell.castingTime || "1 Action",
-                  range: newSpell.range || "",
-                  duration: newSpell.duration || "",
-                  components: newSpell.components || { v: false, s: false, m: false },
-                  damage: newSpell.damage || "",
-                  saveThrow: newSpell.saveThrow || "",
-                  description: newSpell.description || "",
-                  higherLevel: newSpell.higherLevel || "",
-                  tag: newSpell.tag || "",
-                  isPrepared: newSpell.isPrepared || false
-                }
-                handleAddSpellToLibrary(spellToAdd)
-              }}>
-                Add to Library
-              </Button>
-            )}
-            <Button onClick={()=>{ addSpell(); setNewSpellModalOpen(false) }}>
-              {editIndex !== null ? 'Save Changes' : 'Add Spell'}
+              Cancel
             </Button>
-          </div>
-        </div>
+            <div className="flex gap-2">
+              {editIndex !== null && (
+                <Button variant="outline" onClick={() => {
+                  const spellToAdd: Spell = {
+                    name: newSpell.name || "",
+                    school: newSpell.school || "Evocation",
+                    level: newSpell.level || 0,
+                    castingTime: newSpell.castingTime || "1 Action",
+                    range: newSpell.range || "",
+                    duration: newSpell.duration || "",
+                    components: newSpell.components || { v: false, s: false, m: false },
+                    damage: newSpell.damage || "",
+                    saveThrow: newSpell.saveThrow || "",
+                    description: newSpell.description || "",
+                    higherLevel: newSpell.higherLevel || "",
+                    tag: newSpell.tag || "",
+                    isPrepared: newSpell.isPrepared || false
+                  }
+                  handleAddSpellToLibrary(spellToAdd)
+                }}>
+                  Add to Library
+                </Button>
+              )}
+              <Button onClick={()=>{ addSpell(); setNewSpellModalOpen(false) }}>
+                {editIndex !== null ? 'Save Changes' : 'Add Spell'}
+              </Button>
+            </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -50,8 +50,8 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <span>Eldritch Cannon</span>
             {cannon && (
@@ -62,7 +62,7 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 p-4 max-h-[50vh]">
           {!cannon ? (
             // Create new cannon
             <div className="space-y-4">
@@ -135,7 +135,7 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-red-600"
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
                       onClick={handleDismissCannon}
                     >
                       <Icon icon="lucide:trash-2" className="w-4 h-4" />
@@ -215,14 +215,14 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
           )}
         </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button onClick={handleSave}>
             Save
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

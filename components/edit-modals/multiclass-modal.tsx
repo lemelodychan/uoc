@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -183,12 +183,12 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Multiclassing Configuration</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="space-y-4 p-4 max-h-[50vh] overflow-y-auto">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
               Total Character Level: <Badge variant="secondary">{totalLevel}</Badge>
@@ -201,15 +201,15 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
 
           {classes.map((charClass, index) => (
             <Card key={index}>
-              <CardHeader className="pb-3">
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">Class {index + 1}</CardTitle>
                   {classes.length > 1 && (
                     <Button
                       onClick={() => removeClass(index)}
                       size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive"
+                      variant="outline"
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
                     >
                       <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
@@ -217,16 +217,16 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`class-${index}`}>Class</Label>
+                <div className="flex flex-row gap-4 align-start items-start justify-start w-full">
+                  <div className="flex flex-col gap-2 w-full">
+                    <Label htmlFor={`class-${index}`} className="h-4">Class</Label>
                     <Select
                       value={charClass.name}
                       onValueChange={(value) => {
                         updateClass(index, 'name', value)
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select class" />
                       </SelectTrigger>
                       <SelectContent>
@@ -239,8 +239,60 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor={`level-${index}`}>Level</Label>
+                  {charClass.name && availableSubclasses(charClass.name).length > 0 && (
+                    <div className="flex flex-col gap-2 w-full">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 h-4">
+                          <Label htmlFor={`subclass-${index}`}>Subclass</Label>
+                          {charClass.level >= 3 && (
+                            <Badge variant="destructive" className="text-xs p-0 px-1">
+                              Req
+                            </Badge>
+                          )}
+                        </div>
+                        {charClass.subclass && charClass.level < 3 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => updateClass(index, 'subclass', '')}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      <Select
+                        value={charClass.subclass || ""}
+                        onValueChange={(value) => updateClass(index, 'subclass', value)}
+                      >
+                        <SelectTrigger className={charClass.level >= 3 && !charClass.subclass ? "border-destructive w-full" : "w-full"}>
+                          <SelectValue 
+                            placeholder={
+                              charClass.level >= 3 
+                                ? "Select subclass (required)" 
+                                : "Select subclass (optional)"
+                            } 
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableSubclasses(charClass.name).map((subclassName) => (
+                            <SelectItem key={subclassName} value={subclassName}>
+                              {subclassName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {charClass.level >= 3 && !charClass.subclass && (
+                        <p className="text-xs text-[#ce6565]">
+                          A subclass is required for this class at level 3 and above.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2 w-56">
+                    <Label htmlFor={`level-${index}`} className="h-4">Level</Label>
                     <Input
                       id={`level-${index}`}
                       type="number"
@@ -252,63 +304,6 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
                   </div>
                 </div>
 
-                {charClass.name && availableSubclasses(charClass.name).length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={`subclass-${index}`}>Subclass</Label>
-                        {charClass.level >= 3 && (
-                          <Badge variant="destructive" className="text-xs">
-                            Required
-                          </Badge>
-                        )}
-                        {charClass.level < 3 && (
-                          <Badge variant="secondary" className="text-xs">
-                            Optional
-                          </Badge>
-                        )}
-                      </div>
-                      {charClass.subclass && charClass.level < 3 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => updateClass(index, 'subclass', undefined)}
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          Clear
-                        </Button>
-                      )}
-                    </div>
-                    <Select
-                      value={charClass.subclass || ""}
-                      onValueChange={(value) => updateClass(index, 'subclass', value)}
-                    >
-                      <SelectTrigger className={charClass.level >= 3 && !charClass.subclass ? "border-destructive" : ""}>
-                        <SelectValue 
-                          placeholder={
-                            charClass.level >= 3 
-                              ? "Select subclass (required)" 
-                              : "Select subclass (optional)"
-                          } 
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableSubclasses(charClass.name).map((subclassName) => (
-                          <SelectItem key={subclassName} value={subclassName}>
-                            {subclassName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {charClass.level >= 3 && !charClass.subclass && (
-                      <p className="text-xs text-destructive">
-                        A subclass is required for this class at level 3 and above.
-                      </p>
-                    )}
-                  </div>
-                )}
-
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Hit Die:</span>
                   <Badge variant="outline">
@@ -318,16 +313,15 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
               </CardContent>
             </Card>
           ))}
-
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave}>
-              Save Multiclass Configuration
-            </Button>
-          </div>
         </div>
+        <DialogFooter className="p-4 border-t">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>
+            Save Multiclass Configuration
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

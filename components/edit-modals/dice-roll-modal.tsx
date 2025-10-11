@@ -149,7 +149,7 @@ const calculateAutoModifier = (character: CharacterData, rollType: RollType, sav
         return calculateModifier(character[skillOption.ability as keyof CharacterData] as number)
       }
       
-      return modifier
+      return 0
     
     case "initiative":
       return calculateModifier(character.dexterity)
@@ -227,7 +227,7 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
     if (!result) return
     
     const hpChange = operation === 'add' ? result.finalTotal : -result.finalTotal
-    const newHP = Math.max(0, character.currentHP + hpChange)
+    const newHP = Math.max(0, character.currentHitPoints + hpChange)
     onUpdateHP(newHP)
     onClose()
   }
@@ -239,18 +239,50 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             {getDiceIcon(diceType)}
             Dice Roll
           </DialogTitle>
         </DialogHeader>
         
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
+            {/* Results */}
+            {result && (
+            <div className="relative mb-4 border flex flex-col gap-1 align-center justify-center items-center p-4 bg-muted/50 rounded-lg">
+              <Badge variant="outline" className="text-sm absolute top-2 left-2">Results</Badge>
+                <div className="flex flex-col gap-1 align-center justify-center items-center">
+                  <span className="text-3xl font-bold text-primary">
+                    {result.finalTotal}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {formatRolls(result.rolls)}
+                    {result.modifier !== 0 && (
+                      <span className={result.modifier > 0 ? "text-green-600" : "text-red-600"}>
+                        {result.modifier > 0 ? ` + ${result.modifier}` : ` ${result.modifier}`}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {/* HP Integration */}
+                {(rollType === "damage" || rollType === "healing") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleHPChange(rollType === "healing" ? "add" : "subtract")}
+                      className="w-fit mt-2"
+                    >
+                      <Icon icon={rollType === "damage" ? "lucide:heart-crack" : "lucide:heart"} className="w-4 h-4" />
+                      {rollType === "healing" ? "Add to current HP" : "Subtract from current HP"}
+                    </Button>
+                )}
+            </div>
+          )}
+
           {/* Dice Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="flex flex-row gap-4 w-full">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="dice-type">Die Type</Label>
               <Select value={diceType} onValueChange={(value: DiceType) => setDiceType(value)}>
                 <SelectTrigger>
@@ -269,8 +301,8 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
               </Select>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="num-dice">Number of Dice</Label>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="num-dice"># of Dice</Label>
               <Input
                 id="num-dice"
                 type="number"
@@ -280,12 +312,9 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
                 onChange={(e) => setNumDice(Math.max(1, parseInt(e.target.value) || 1))}
               />
             </div>
-          </div>
 
-          {/* Roll Type and Saving Throw Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="roll-type">Roll Type</Label>
+            <div className="flex flex-col gap-2">
+              <Label htmlForspace-y-2="roll-type">Roll Type</Label>
               <Select value={rollType} onValueChange={(value: RollType) => setRollType(value)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -299,46 +328,52 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
                 </SelectContent>
               </Select>
             </div>
-            
-            {rollType === "saving-throw" && (
-              <div className="space-y-2">
-                <Label htmlFor="saving-throw-type">Saving Throw</Label>
-                <Select value={savingThrowType} onValueChange={(value: SavingThrowType) => setSavingThrowType(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SAVING_THROW_OPTIONS.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            
-            {rollType === "ability-check" && (
-              <div className="space-y-2">
-                <Label htmlFor="skill-type">Skill</Label>
-                <Select value={skillType} onValueChange={(value: SkillType) => setSkillType(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SKILL_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
 
+
+          {/* Roll Type and Saving Throw Selection */}
+          {(rollType === "saving-throw" || rollType === "ability-check") && (
+            <div className="flex flex-row gap-4 w-full">
+              {rollType === "saving-throw" && (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="saving-throw-type">Saving Throw</Label>
+                  <Select value={savingThrowType} onValueChange={(value: SavingThrowType) => setSavingThrowType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SAVING_THROW_OPTIONS.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {rollType === "ability-check" && (
+                <div className="space-y-2">
+                  <Label htmlFor="skill-type">Skill</Label>
+                  <Select value={skillType} onValueChange={(value: SkillType) => setSkillType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SKILL_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}            
+            </div>
+          )}
+
           {/* Modifier */}
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="modifier">
               Modifier
               {rollType !== "other" && !(rollType === "ability-check" && skillType === "other") && (
@@ -373,7 +408,7 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
           </div>
 
           {/* Roll Button */}
-          <div className="flex justify-center pt-4">
+          <div className="flex justify-center">
             <Button 
               onClick={rollDice} 
               disabled={isRolling}
@@ -381,58 +416,18 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
             >
               {isRolling ? (
                 <>
-                  <Icon icon="lucide:loader-2" className="w-4 h-4 mr-2 animate-spin" />
+                  <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
                   Rolling...
                 </>
               ) : (
                 <>
                   {getDiceIcon(diceType)}
-                  <span className="ml-2">Roll Dice</span>
+                  <span>Roll Dice!</span>
                 </>
               )}
             </Button>
           </div>
-
-          {/* Results */}
-          {result && (
-            <div className="space-y-4 pt-4 border-t">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary mb-2">
-                  {result.finalTotal}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {formatRolls(result.rolls)}
-                  {result.modifier !== 0 && (
-                    <span className={result.modifier > 0 ? "text-green-600" : "text-red-600"}>
-                      {result.modifier > 0 ? ` + ${result.modifier}` : ` ${result.modifier}`}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* HP Integration */}
-              {(rollType === "damage" || rollType === "healing") && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Apply to HP?</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleHPChange(rollType === "healing" ? "add" : "subtract")}
-                    className="w-full"
-                  >
-                    {rollType === "healing" ? "Add to HP" : "Subtract from HP"}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

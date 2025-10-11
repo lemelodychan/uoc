@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
@@ -101,19 +101,24 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[800px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:user" className="w-5 h-5" />
             Character Details
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 p-4 max-h-[50vh] overflow-y-auto">
           {renderSection("Personality Traits", "personalityTraits", formData.personalityTraits)}
           {renderSection("Backstory", "backstory", formData.backstory)}
           {renderSection("Notes", "notes", formData.notes)}
         </div>
+        <DialogFooter className="p-4 border-t">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -93,11 +93,11 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Basic Information</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="imageUrl" className="text-right">
               Image URL
@@ -126,18 +126,18 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               Classes
             </Label>
             <div className="flex gap-2">
-              <div className="flex-1 min-h-[40px] p-2 border rounded-md bg-background">
+              <div className="flex-1 p-1 h-[38px] border rounded-md">
                 {character.classes && character.classes.length > 1 ? (
                   <div className="flex flex-wrap gap-1">
                     {character.classes.map((charClass, index) => (
-                      <div key={index} className="flex items-center gap-1 px-2 py-1 bg-secondary rounded text-sm">
+                      <div key={index} className="flex items-center gap-1 px-2 py-1 bg-muted rounded-sm text-sm">
                         <span>{charClass.name} {charClass.level}</span>
                         {charClass.subclass && <span className="text-muted-foreground">・{charClass.subclass}</span>}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1 px-2 py-1 bg-secondary rounded text-sm">
+                  <div className="flex items-center gap-1 px-2 py-1 bg-muted rounded text-sm">
                     <span>{formData.class} {formData.level}</span>
                     {formData.subclass && <span className="text-muted-foreground">・{formData.subclass}</span>}
                   </div>
@@ -149,8 +149,9 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                 size="sm"
                 onClick={() => setMulticlassModalOpen(true)}
                 title="Configure multiclassing"
+                className="h-[38px]"
               >
-                <Icon icon="lucide:settings" className="w-4 h-4" />
+                <Icon icon="lucide:edit" className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -249,7 +250,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
             </Select>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

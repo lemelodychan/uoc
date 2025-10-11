@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Icon } from "@iconify/react"
+import { ThemeToggleSimple } from "@/components/theme-toggle-simple"
+import { LogoSVG } from "@/components/logo"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export function AppHeader() {
@@ -92,19 +94,17 @@ export function AppHeader() {
   if (!user) return null
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4">
+    <header className="bg-card border-b border-border px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-900">
-            🎲 UOC DND 5e
-          </h1>
-          <span className="text-sm text-slate-600">
+          <LogoSVG width={120} height={77} className="h-12 w-auto" />
+          <span className="text-sm text-muted-foreground">
             Character Sheets & Campaign Management
           </span>
         </div>
         
         <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-600">
+          <span className="text-sm text-muted-foreground">
             Welcome, {displayName}
           </span>
           
@@ -115,29 +115,29 @@ export function AppHeader() {
                 Profile
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
+            <DialogContent className="sm:max-w-md p-0 gap-0">
+              <DialogHeader className="p-4 border-b">
                 <DialogTitle className="flex items-center gap-2">
                   <Icon icon="lucide:settings" className="w-5 h-5" />
                   Edit Profile
                 </DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
+              <div className="flex flex-col gap-6 p-4 max-h-[70vh] overflow-y-auto">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
                     value={user.email || ''}
                     disabled
-                    className="bg-gray-50"
+                    className="bg-muted"
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Email cannot be changed
                   </p>
                 </div>
                 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="displayName">Display Name</Label>
                   <Input
                     id="displayName"
@@ -147,22 +147,21 @@ export function AppHeader() {
                     placeholder="Enter your display name"
                   />
                 </div>
-                
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsProfileOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleUpdateProfile}
-                    disabled={isLoading || !displayName.trim()}
-                  >
-                    {isLoading ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
               </div>
+              <DialogFooter className="p-4 border-t"> 
+                <Button
+                  variant="outline"
+                  onClick={() => setIsProfileOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateProfile}
+                  disabled={isLoading || !displayName.trim()}
+                >
+                  {isLoading ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
           
@@ -170,6 +169,8 @@ export function AppHeader() {
             <Icon icon="lucide:log-out" className="w-4 h-4" />
             Sign Out
           </Button>
+
+          <ThemeToggleSimple />
         </div>
       </div>
     </header>

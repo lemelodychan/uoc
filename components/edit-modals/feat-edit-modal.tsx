@@ -67,13 +67,13 @@ export function FeatEditModal({ isOpen, onClose, character, featIndex, onSave }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto gap-0 flex flex-col">
-        <DialogHeader className="pb-4">
+      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>
             {isEditing ? `Edit Feat: ${feat?.name || "Unknown"}` : "Add New Feat"}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 pb-4">
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           <div className="flex flex-col gap-2">
             <Label htmlFor="feat-name">Name</Label>
             <Input
@@ -94,16 +94,21 @@ export function FeatEditModal({ isOpen, onClose, character, featIndex, onSave }:
             />
           </div>
         </div>
-        <DialogFooter className="flex flex-row items-center justify-between gap-2 w-full">
+        <DialogFooter className="p-4 border-t">
           {isEditing && (
-            <Button variant="outline" onClick={handleDelete} className="text-destructive hover:text-destructive">
+            <Button variant="outline" onClick={handleDelete} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white">
               <Icon icon="lucide:trash-2" className="w-4 h-4" />
               Delete
             </Button>
           )}
-          <Button onClick={handleSave}>
-            {isEditing ? "Save Changes" : "Add Feat"}
-          </Button>
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              {isEditing ? "Save Changes" : "Add Feat"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -36,11 +36,11 @@ export function FeatsModal({ isOpen, onClose, character, onSave }: FeatsModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Feats</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 overflow-y-auto">
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           {character.feats.map((feat, index) => (
             <div key={index} className="flex items-start justify-between p-3 border rounded-lg">
               <div className="flex flex-col gap-1">
@@ -65,7 +65,7 @@ export function FeatsModal({ isOpen, onClose, character, onSave }: FeatsModalPro
             </div>
           )}
         </div>
-        <DialogFooter className="flex flex-row items-center align-left justify-start w-full">
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={handleAddFeat}>
             <Icon icon="lucide:plus" className="w-4 h-4" />
             Add Feat

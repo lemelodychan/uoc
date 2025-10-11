@@ -51,19 +51,17 @@ export function MoneyModal({ isOpen, onClose, character, onSave }: MoneyModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
-            <Icon icon="lucide:coins" className="w-5 h-5" />
             Edit Money
           </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-6 py-4">
+        <div className="grid gap-6 p-4 max-h-[50vh] overflow-y-auto">
           <div className="grid grid-cols-3 gap-4">
             {/* Gold */}
-            <div className="space-y-2">
+            <div className="space-y-2 p-3 border rounded-lg">
               <Label htmlFor="gold" className="text-sm font-medium flex items-center gap-2">
-                <span className="text-yellow-600">🪙</span>
                 Gold Pieces
               </Label>
               <Input
@@ -78,9 +76,8 @@ export function MoneyModal({ isOpen, onClose, character, onSave }: MoneyModalPro
             </div>
 
             {/* Silver */}
-            <div className="space-y-2">
+            <div className="space-y-2 p-3 border rounded-lg">
               <Label htmlFor="silver" className="text-sm font-medium flex items-center gap-2">
-                <span className="text-gray-400">🪙</span>
                 Silver Pieces
               </Label>
               <Input
@@ -95,9 +92,8 @@ export function MoneyModal({ isOpen, onClose, character, onSave }: MoneyModalPro
             </div>
 
             {/* Copper */}
-            <div className="space-y-2">
+            <div className="space-y-2 p-3 border rounded-lg">
               <Label htmlFor="copper" className="text-sm font-medium flex items-center gap-2">
-                <span className="text-orange-600">🪙</span>
                 Copper Pieces
               </Label>
               <Input
@@ -125,7 +121,7 @@ export function MoneyModal({ isOpen, onClose, character, onSave }: MoneyModalPro
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

@@ -122,11 +122,11 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Equipment & Tools</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4 max-h-96 overflow-y-auto">
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           {/* Tools Proficiencies Section */}
           <div>
             <Label className="text-sm font-medium mb-3 block">Tools Proficiencies</Label>
@@ -147,7 +147,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                           id={`tool-${index}-prof`}
                           checked={isProficient}
                           onChange={(e) => updateToolProficiency(index, "proficient", e.target.checked)}
-                          className="w-3 h-3 rounded border-gray-300"
+                          className="w-3 h-3 rounded border-border"
                         />
                         <Label htmlFor={`tool-${index}-prof`} className="text-sm">
                           Proficient
@@ -159,7 +159,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                           id={`tool-${index}-exp`}
                           checked={hasExpertise}
                           onChange={(e) => updateToolProficiency(index, "expertise", e.target.checked)}
-                          className="w-3 h-3 rounded border-gray-300"
+                          className="w-3 h-3 rounded border-border"
                         />
                         <Label htmlFor={`tool-${index}-exp`} className="text-sm">
                           Expertise
@@ -186,7 +186,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                       variant="outline"
                       size="sm"
                       onClick={() => removeTool(index)}
-                      className="text-destructive hover:text-destructive w-9 h-9"
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-9 h-9"
                     >
                       <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
@@ -234,7 +234,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                       variant="outline"
                       size="sm"
                       onClick={() => removeMagicItem(index)}
-                      className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white h-8 w-8 p-0"
                     >
                       <Icon icon="lucide:trash-2" className="w-3 h-3" />
                     </Button>
@@ -263,7 +263,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
             />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

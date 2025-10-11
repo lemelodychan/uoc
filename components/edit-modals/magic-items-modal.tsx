@@ -60,13 +60,13 @@ export function MagicItemsModal({ isOpen, onClose, magicItems: initialMagicItems
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>
             {editingIndex !== null && editingIndex >= 0 ? "Edit Magic Item" : "Add Magic Item"}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col w-full gap-2">
               <Label htmlFor="magic-item-name" className="text-sm">
@@ -128,7 +128,7 @@ export function MagicItemsModal({ isOpen, onClose, magicItems: initialMagicItems
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

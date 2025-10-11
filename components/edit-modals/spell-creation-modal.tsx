@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -238,15 +238,15 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[50vw] max-h-[90vh] flex flex-col" style={{ width: '50vw', maxWidth: 'none' }}>
-        <DialogHeader>
+      <DialogContent className="p-0 gap-0" style={{ width: '80vw', maxWidth: '720px' }}>
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Create New Spell</DialogTitle>
           <DialogDescription>
             Create a new spell and add it to both the library and your character's spell list
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto p-4 max-h-[70vh]">
           <div className="flex flex-col gap-4">
           {/* Basic Information */}
           <Card>
@@ -511,22 +511,21 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
           </div>
         </div>
 
-        {/* Fixed Footer */}
-        <div className="flex justify-between items-center pt-4 border-t bg-background">
+        <DialogFooter className="p-4 border-t justify-between items-center">
           <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <div className="flex gap-2">
-            {onSaveToLibraryOnly && !editingSpellId && (
-              <Button variant="outline" onClick={handleSaveToLibraryOnly}>
-                Save
-              </Button>
-            )}
-            <Button onClick={handleSave}>
-              {editingSpellId ? 'Update' : 'Save and Add to Character'}
+              Cancel
             </Button>
-          </div>
-        </div>
+            <div className="flex gap-2">
+              {onSaveToLibraryOnly && !editingSpellId && (
+                <Button variant="outline" onClick={handleSaveToLibraryOnly}>
+                  Save
+                </Button>
+              )}
+              <Button onClick={handleSave}>
+                {editingSpellId ? 'Update' : 'Save and Add to Character'}
+              </Button>
+            </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -105,8 +105,8 @@ export function EldritchInvocationsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col gap-0">
-        <DialogHeader className="pb-3">
+      <DialogContent className="sm:max-w-[800px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             Eldritch Invocations
             <Badge variant="secondary" className="text-xs">
@@ -115,7 +115,7 @@ export function EldritchInvocationsModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto flex flex-col gap-3 pr-4 pb-4">
+        <div className="min-h-0 overflow-y-auto flex flex-col gap-3 p-4 max-h-[50vh]">
           {/* Invocations List */}
             {invocations.map((invocation, index) => (
               <Card key={index} className="p-3 gap-3">
@@ -133,7 +133,7 @@ export function EldritchInvocationsModal({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="p-0 h-8 w-8 text-red-600"
+                        className="p-0 h-8 w-8 text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
                         onClick={() => handleDeleteInvocation(index)}
                       >
                         <Icon icon="lucide:trash-2" className="w-4 h-4" />
@@ -147,36 +147,36 @@ export function EldritchInvocationsModal({
             ))}
         </div>
 
-        <DialogFooter className="flex justify-between border-t pt-4">
-          <div className="flex w-full">
-            <Button 
-              variant="outline"
-                onClick={handleOpenAddForm} 
-                disabled={invocations.length >= maxInvocations}
-              >
-              <Icon icon="lucide:plus" className="w-4 h-4" />
-              Add New Invocation
+        <DialogFooter className="p-4 border-t">
+          <Button 
+            variant="outline"
+            onClick={handleOpenAddForm} 
+            disabled={invocations.length >= maxInvocations}
+          >
+            <Icon icon="lucide:plus" className="w-4 h-4" />
+            Add New Invocation
+          </Button>
+          <div className="flex gap-2 ml-auto">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              Save Changes
             </Button>
           </div>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>
-            Save Changes
-          </Button>
         </DialogFooter>
       </DialogContent>
 
       {/* Add/Edit Form Modal */}
       <Dialog open={formModalOpen} onOpenChange={setFormModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+          <DialogHeader className="p-4 border-b">
             <DialogTitle>
               {editingIndex !== null ? "Edit Invocation" : "Add New Invocation"}
             </DialogTitle>
           </DialogHeader>
           
-          <div className="min-h-0 overflow-y-auto flex flex-col gap-4">
+          <div className="min-h-0 overflow-y-auto flex flex-col gap-4 p-4 max-h-[50vh]">
             <div className="flex flex-col gap-3">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -195,7 +195,7 @@ export function EldritchInvocationsModal({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="p-4 border-t">
             <Button variant="outline" onClick={handleCancelEdit}>
               Cancel
             </Button>

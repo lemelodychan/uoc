@@ -48,14 +48,14 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[700px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:wrench" className="w-5 h-5" />
             Edit Infusions
           </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-6 py-4 max-h-[500px] overflow-y-auto">
+        <div className="grid gap-6 p-4 max-h-[50vh] overflow-y-auto">
           <div>
             <h3 className="text-sm font-medium mb-3">Infusions List</h3>
             <div className="space-y-4">
@@ -81,7 +81,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
                           id={`infusion-attunement-${index}`}
                           checked={infusion.needsAttunement}
                           onChange={(e) => updateInfusion(index, "needsAttunement", e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300"
+                          className="w-4 h-4 rounded border-border"
                         />
                         <Label htmlFor={`infusion-attunement-${index}`} className="text-xs">
                           Requires Attunement
@@ -91,7 +91,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
                         variant="ghost"
                         size="sm"
                         onClick={() => removeInfusion(index)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
                       >
                         <Icon icon="lucide:trash-2" className="w-4 h-4" />
                       </Button>
@@ -137,7 +137,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
             />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

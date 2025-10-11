@@ -141,11 +141,12 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Create New Character</DialogTitle>
         </DialogHeader>
         
+        <div className="p-4 max-h-[50vh] overflow-y-auto">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
             {error}
@@ -282,8 +283,9 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
             </Select>
           </div>
         </div>
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>

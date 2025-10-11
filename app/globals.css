@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Fonts are loaded via Next.js font optimization in layout.tsx */
+
 /* Line clamp utility */
 .line-clamp-3 {
   display: -webkit-box;
@@ -9,83 +11,237 @@
   overflow: hidden;
 }
 
-@custom-variant dark (&:is(.dark *));
+
+/* ============================================================================
+   TYPOGRAPHY
+   ========================================================================= */
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Font Families */
+  --font-display: var(--font-space-grotesk), 'Space Grotesk', sans-serif;
+  --font-body: var(--font-public-sans), 'Public Sans', sans-serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+
+  /* Font Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Font Sizes */
+  --text-xs: 0.75rem;      /* 12px */
+  --text-sm: 0.875rem;     /* 14px */
+  --text-base: 1rem;       /* 16px */
+  --text-lg: 1.125rem;     /* 18px */
+  --text-xl: 1.25rem;      /* 20px */
+  --text-2xl: 1.5rem;      /* 24px */
+  --text-3xl: 1.875rem;    /* 30px */
+  --text-4xl: 2.25rem;     /* 36px */
+  --text-5xl: 3rem;        /* 48px */
+  --text-6xl: 3.75rem;     /* 60px */
+
+  /* Line Heights */
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+  --leading-loose: 1.7;
+
+  /* Letter Spacing */
+  --tracking-tighter: -0.02em;
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+
+  /* ============================================================================
+     COLORS - LIGHT MODE (Default)
+     Theme: Warm Parchment
+     ========================================================================= */
+
+  /* Base Colors */
+  --background: #faf8f5;           /* Warm parchment background */
+  --foreground: #1a1a1a;           /* Charcoal text */
+  --card: #ffffff;                 /* White cards */
+  --card-foreground: #1a1a1a;      /* Card text */
+  --popover: #ffffff;              /* Popover background */
+  --popover-foreground: #1a1a1a;   /* Popover text */
+
+  /* Semantic Colors */
+  --primary: #9b7e4a;              /* Brass gold (darker for readability) */
+  --primary-foreground: #faf8f5;   /* Text on primary */
+  --secondary: #6b6b6b;            /* Medium gray */
+  --secondary-foreground: #ffffff; /* Text on secondary */
+  --accent: #a0654e;               /* Warm copper */
+  --accent-foreground: #ffffff;    /* Text on accent */
+  --destructive: #b94a4a;          /* Muted red */
+  --destructive-foreground: #ffffff; /* Text on destructive */
+
+  /* Muted Colors */
+  --muted: #f0ede8;                /* Warm cream */
+  --muted-foreground: #6b6b6b;     /* Muted text */
+
+  /* UI Elements */
+  --border: #e0ddd8;               /* Subtle borders */
+  --input: transparent;            /* Input border (uses border color) */
+  --input-background: #ffffff;     /* Input background */
+  --ring: #9b7e4a;                 /* Focus ring */
+  --switch-background: #e0ddd8;    /* Switch track background */
+
+  /* Sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-primary: #9b7e4a;
+  --sidebar-primary-foreground: #faf8f5;
+  --sidebar-accent: #f0ede8;
+  --sidebar-accent-foreground: #1a1a1a;
+  --sidebar-border: #e0ddd8;
+  --sidebar-ring: #9b7e4a;
+
+  /* ============================================================================
+     CHART COLORS - Light Mode
+     ========================================================================= */
+  --chart-1: #9b7e4a;              /* Primary brass */
+  --chart-2: #6b8a5a;              /* Green */
+  --chart-3: #5a6a8a;              /* Blue */
+  --chart-4: #8a5a7a;              /* Purple */
+  --chart-5: #a0654e;              /* Copper */
+
+  /* ============================================================================
+     SPACING SCALE
+     ========================================================================= */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;            /* 4px - Tight spacing */
+  --spacing-2: 0.5rem;             /* 8px - Small spacing */
+  --spacing-3: 0.75rem;            /* 12px - Default spacing */
+  --spacing-4: 1rem;               /* 16px - Medium spacing */
+  --spacing-5: 1.25rem;            /* 20px */
+  --spacing-6: 1.5rem;             /* 24px - Large spacing */
+  --spacing-8: 2rem;               /* 32px - Extra large spacing */
+  --spacing-10: 2.5rem;            /* 40px */
+  --spacing-12: 3rem;              /* 48px - Section spacing */
+  --spacing-16: 4rem;              /* 64px */
+  --spacing-20: 5rem;              /* 80px */
+  --spacing-24: 6rem;              /* 96px */
+
+  /* ============================================================================
+     BORDER RADIUS
+     ========================================================================= */
+  --radius: 0.5rem;                /* Base radius - 8px */
+  --radius-sm: 0.125rem;           /* 2px */
+  --radius-md: 0.25rem;            /* 4px */
+  --radius-lg: 0.5rem;             /* 8px */
+  --radius-xl: 0.75rem;            /* 12px */
+  --radius-2xl: 1rem;              /* 16px */
+  --radius-full: 9999px;           /* Fully rounded */
+
+  /* ============================================================================
+     SHADOWS
+     ========================================================================= */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-base: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+
+  /* Custom Glow Effect */
+  --glow-subtle: 0 0 15px rgba(155, 126, 74, 0.15);
+  --glow-primary: 0 0 20px rgba(155, 126, 74, 0.3);
+
+  /* ============================================================================
+     Z-INDEX SCALE
+     ========================================================================= */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+
+  /* ============================================================================
+     TRANSITIONS
+     ========================================================================= */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  /* Transition Timing Functions */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
 }
 
+/* ============================================================================
+   DARK MODE
+   Theme: Void Black
+   ========================================================================= */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* Base Colors */
+  --background: #0f0f0f;           /* Deep void */
+  --foreground: #e8e8e8;           /* Light gray text */
+  --card: #1a1a1a;                 /* Charcoal cards */
+  --card-foreground: #e8e8e8;      /* Card text */
+  --popover: #1a1a1a;              /* Popover background */
+  --popover-foreground: #e8e8e8;   /* Popover text */
+  
+  /* Semantic Colors */
+  --primary: #c9a870;              /* Brass gold (lighter for contrast) */
+  --primary-foreground: #1a1a1a;   /* Text on primary */
+  --secondary: #6b6b6b;            /* Warm gray */
+  --secondary-foreground: #ffffff; /* Text on secondary */
+  --accent: #b87a5a;               /* Copper */
+  --accent-foreground: #ffffff;    /* Text on accent */
+  --destructive: #c04a4a;          /* Muted red */
+  --destructive-foreground: #ffffff; /* Text on destructive */
+  
+  /* Muted Colors */
+  --muted: #262626;                /* Dark gray */
+  --muted-foreground: #a3a3a3;     /* Muted text */
+  
+  /* UI Elements */
+  --border: #333333;               /* Subtle borders */
+  --input: transparent;
+  --input-background: #1a1a1a;
+  --ring: #c9a870;
+  --switch-background: #2a2a2a;
+  
+  /* Sidebar */
+  --sidebar: #0f0f0f;
+  --sidebar-foreground: #e8e8e8;
+  --sidebar-primary: #c9a870;
+  --sidebar-primary-foreground: #1a1a1a;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #e8e8e8;
+  --sidebar-border: #333333;
+  --sidebar-ring: #c9a870;
+
+  /* ============================================================================
+     CHART COLORS - Dark Mode
+     ========================================================================= */
+  --chart-1: #c9a870;            /* Lighter brass */
+  --chart-2: #7a9b6f;            /* Lighter green */
+  --chart-3: #6f7a9b;            /* Lighter blue */
+  --chart-4: #9b6f8a;            /* Lighter purple */
+  --chart-5: #b87a5a;            /* Lighter copper */
+
+  /* Custom Glow Effect - Dark Mode */
+  --glow-primary: 0 0 20px rgba(201, 168, 112, 0.3);
+
 }
 
 @theme inline {
-  /* Added Inter and JetBrains Mono font configuration */
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-jetbrains-mono);
+  /* Font configuration */
+  --font-sans: var(--font-public-sans), 'Public Sans', sans-serif;
+  --font-display: var(--font-space-grotesk), 'Space Grotesk', sans-serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+  
+  /* Color mapping for Tailwind */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -104,16 +260,21 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-input-background: var(--input-background);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  
+  /* Border radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  
+  /* Sidebar colors */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -128,9 +289,32 @@
   * {
     @apply border-border outline-ring/50;
   }
+  
   body {
     @apply bg-background text-foreground overflow-hidden;
+    font-family: var(--font-body);
+    line-height: var(--leading-relaxed);
+  }
+  
+  /* Typography utilities */
+  .font-display {
+    font-family: var(--font-display);
+  }
+  
+  .font-body {
+    font-family: var(--font-body);
+  }
+  
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+  
+  
+  /* Smooth transitions for theme switching */
+  * {
+    transition: background-color var(--duration-base) var(--ease-in-out),
+                border-color var(--duration-base) var(--ease-in-out),
+                color var(--duration-base) var(--ease-in-out),
+                box-shadow var(--duration-base) var(--ease-in-out);
   }
 }
-
-/* Removed redundant legacy CSS styles that conflict with Tailwind */

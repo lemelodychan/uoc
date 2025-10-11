@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -92,8 +92,8 @@ export function CampaignCreationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] h-[90vh] flex flex-col gap-4">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[700px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>
             {editingCampaign ? 'Edit Campaign' : 'Create New Campaign'}
           </DialogTitle>
@@ -105,7 +105,7 @@ export function CampaignCreationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 flex-1 min-h-0">
+        <div className="flex flex-col gap-4 p-4 max-h-[50vh] overflow-y-auto">
           <div className="space-y-4 flex-shrink-0">
             <div className="space-y-2">
               <Label htmlFor="campaign-name">Campaign Name *</Label>
@@ -168,7 +168,7 @@ export function CampaignCreationModal({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-destructive h-8"
+                            className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white h-8"
                             onClick={() => onRemoveCharacterFromCampaign(character.id, editingCampaign.id)}
                           >
                             Remove
@@ -240,6 +240,14 @@ export function CampaignCreationModal({
             {editingCampaign ? 'Update Campaign' : 'Create Campaign'}
           </Button>
         </div>
+        <DialogFooter className="p-4 border-t">
+          <Button variant="outline" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!name.trim()}>
+            {editingCampaign ? 'Update Campaign' : 'Create Campaign'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -53,16 +53,16 @@ export function AbilitiesModal({ isOpen, onClose, character, onSave }: Abilities
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Ability Scores</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           {abilities.map((ability) => {
             const score = formData[ability.key]
             const modifier = calculateModifier(score)
             return (
-              <div key={ability.key} className="grid grid-cols-5 items-center gap-4">
+              <div key={ability.key} className="grid grid-cols-5 items-center gap-4 p-3 border rounded-lg">
                 <Label htmlFor={ability.key} className="text-right col-span-2">
                   {ability.label}
                 </Label>
@@ -83,7 +83,7 @@ export function AbilitiesModal({ isOpen, onClose, character, onSave }: Abilities
             )
           })}
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

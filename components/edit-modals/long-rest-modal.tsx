@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Icon } from "@iconify/react"
@@ -143,8 +143,8 @@ export function LongRestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[700px] p-0 gap-0">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:moon" className="w-5 h-5" />
             {isCollaborativeLongRest ? `Long Rest - Initiated by ${initiatorName}` : 'Start Long Rest'}
@@ -156,12 +156,12 @@ export function LongRestModal({
           )}
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 max-h-[70vh]">
           {/* Party Member Selection */}
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             {/* Campaign Selector */}
             {!isCollaborativeLongRest && (campaigns || []).length > 0 && (
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium flex items-center gap-2">
                   <Icon icon="lucide:book-open" className="w-4 h-4" />
                   Filter by Campaign
@@ -182,74 +182,75 @@ export function LongRestModal({
               </div>
             )}
 
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Icon icon="lucide:users" className="w-5 h-5" />
-                {isCollaborativeLongRest ? 'Party Members (Selected by Initiator)' : 'Select Party Members'}
-              </h3>
-              {!isCollaborativeLongRest && (
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                    Select All Active
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleSelectNone}>
-                    Select None
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <ScrollArea className="h-48 border rounded-lg">
-              <div className="p-4 space-y-3">
-                {filteredCharacters.map((character) => (
-                  <div key={character.id} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={character.id}
-                      checked={selectedCharacters.includes(character.id)}
-                      disabled={isCollaborativeLongRest || false}
-                      onCheckedChange={(checked) => 
-                        handleCharacterToggle(character.id, checked as boolean)
-                      }
-                    />
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
-                        {character.imageUrl ? (
-                          <img 
-                            src={character.imageUrl} 
-                            alt={character.name} 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Icon icon="lucide:users" className="w-4 h-4 text-primary" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{character.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Level {character.level} {character.class}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {character.currentHitPoints}/{character.maxHitPoints} HP
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {activePartyMembers.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No active party members found
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold font-display flex items-center gap-2">
+                  {isCollaborativeLongRest ? 'Party Members (Selected by Initiator)' : 'Select Party Members'}
+                </h3>
+                {!isCollaborativeLongRest && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleSelectAll}>
+                      Select All Active
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleSelectNone}>
+                      Select None
+                    </Button>
                   </div>
                 )}
               </div>
-            </ScrollArea>
+
+              <ScrollArea className="h-full border rounded-lg">
+                <div className="p-4 space-y-3">
+                  {filteredCharacters.map((character) => (
+                    <div key={character.id} className="flex items-center space-x-3">
+                      <Checkbox
+                        id={character.id}
+                        checked={selectedCharacters.includes(character.id)}
+                        disabled={isCollaborativeLongRest || false}
+                        onCheckedChange={(checked) => 
+                          handleCharacterToggle(character.id, checked as boolean)
+                        }
+                      />
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                          {character.imageUrl ? (
+                            <img 
+                              src={character.imageUrl} 
+                              alt={character.name} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Icon icon="lucide:users" className="w-4 h-4 text-primary" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{character.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Level {character.level} {character.class}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {character.currentHitPoints}/{character.maxHitPoints} HP
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {activePartyMembers.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No active party members found
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
           </div>
 
           {/* Long Rest Effects */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Long Rest Effects</h3>
-            <div className="grid gap-3">
+{/*           <div className="flex flex-col gap-2">
+            <h3 className="text-lg font-bold font-display">Long Rest Effects</h3>
+            <div className="flex flex-col gap-3">
               {longRestEffects.map((effect, index) => {
                 return (
                   <Card key={index} className="p-4">
@@ -266,15 +267,15 @@ export function LongRestModal({
                 )
               })}
             </div>
-          </div>
+          </div> */}
 
           {/* Selected Characters Summary */}
-          {selectedCharacterData.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold">
+{/*           {selectedCharacterData.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-lg font-bold font-display">
                 Characters Taking Long Rest ({selectedCharacterData.length})
               </h3>
-              <div className="grid gap-2">
+              <div className="flex flex-col gap-2">
                 {selectedCharacterData.map((character) => (
                   <div key={character.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
@@ -303,33 +304,30 @@ export function LongRestModal({
                 ))}
               </div>
             </div>
-          )}
+          )} */}
         </div>
 
-        {/* Footer */}
-        <div className="pt-4 border-t flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
+        <DialogFooter className="p-4 border-t flex items-center justify-between">
+          <div className="text-sm text-muted-foreground w-full">
             {selectedCharacterData.length} character{selectedCharacterData.length !== 1 ? 's' : ''} selected
             {isCollaborativeLongRest && (
               <span className="ml-2 text-blue-600">• Awaiting confirmation</span>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
-              {isCollaborativeLongRest ? 'Close' : 'Cancel'}
-            </Button>
-            <Button 
-              onClick={() => {
-                onConfirmLongRest(selectedCharacters)
-                onClose()
-              }}
-              disabled={selectedCharacters.length === 0}
-              className={isCollaborativeLongRest ? "bg-green-600 hover:bg-green-700" : ""}
-            >
-              {isCollaborativeLongRest ? 'Confirm & Rest for 8 Hours' : 'Start Long Rest'}
-            </Button>
-          </div>
-        </div>
+          <Button variant="outline" onClick={onClose}>
+            {isCollaborativeLongRest ? 'Close' : 'Cancel'}
+          </Button>
+          <Button 
+            onClick={() => {
+              onConfirmLongRest(selectedCharacters)
+              onClose()
+            }}
+            disabled={selectedCharacters.length === 0}
+            className={isCollaborativeLongRest ? "bg-green-600 hover:bg-green-700" : ""}
+          >
+            {isCollaborativeLongRest ? 'Confirm & Rest for 8 Hours' : 'Start Long Rest'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
