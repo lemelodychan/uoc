@@ -17,6 +17,12 @@ export function AppHeader() {
   const [displayName, setDisplayName] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  })
   const { toast } = useToast()
   const supabase = createClient()
 
@@ -70,6 +76,79 @@ export function AppHeader() {
       toast({
         title: "Error",
         description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePasswordChange = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Please fill in all password fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      // First verify the current password by attempting to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || "",
+        password: passwordData.currentPassword,
+      })
+
+      if (signInError) {
+        throw new Error("Current password is incorrect")
+      }
+
+      // If sign in successful, update the password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      })
+
+      if (updateError) {
+        throw updateError
+      }
+
+      toast({
+        title: "Password Updated",
+        description: "Your password has been changed successfully.",
+      })
+      
+      // Reset password form
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      })
+      setShowPasswordChange(false)
+    } catch (error) {
+      console.error('Error changing password:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to change password. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -147,11 +226,79 @@ export function AppHeader() {
                     placeholder="Enter your display name"
                   />
                 </div>
+
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Password</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPasswordChange(!showPasswordChange)}
+                    >
+                      {showPasswordChange ? "Cancel" : "Change Password"}
+                    </Button>
+                  </div>
+                  
+                  {showPasswordChange && (
+                    <div className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/50">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="currentPassword">Current Password</Label>
+                        <Input
+                          id="currentPassword"
+                          type="password"
+                          value={passwordData.currentPassword}
+                          onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                          placeholder="Enter current password"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="newPassword">New Password</Label>
+                        <Input
+                          id="newPassword"
+                          type="password"
+                          value={passwordData.newPassword}
+                          onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                          placeholder="Enter new password"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          value={passwordData.confirmPassword}
+                          onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          placeholder="Confirm new password"
+                        />
+                      </div>
+                      
+                      <Button
+                        type="button"
+                        onClick={handlePasswordChange}
+                        disabled={isLoading || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                        className="w-full"
+                      >
+                        {isLoading ? "Updating..." : "Update Password"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
               <DialogFooter className="p-4 border-t"> 
                 <Button
                   variant="outline"
-                  onClick={() => setIsProfileOpen(false)}
+                  onClick={() => {
+                    setIsProfileOpen(false)
+                    setShowPasswordChange(false)
+                    setPasswordData({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: ""
+                    })
+                  }}
                 >
                   Cancel
                 </Button>

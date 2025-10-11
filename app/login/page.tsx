@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Icon } from "@iconify/react"
+import { LogoSVG } from "@/components/logo"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
@@ -89,12 +90,9 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-slate-900">
-            🎲 UOC DND 5e
+          <CardTitle className="align-center justify-center flex">
+            <LogoSVG width={120} height={77} className="h-12 w-auto" />
           </CardTitle>
-          <CardDescription>
-            Sign in to access your character sheets and campaigns
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {message && (
@@ -168,9 +166,9 @@ function LoginForm() {
                   disabled={!email || isLoading}
                 >
                   {isLoading ? (
-                    <Icon icon="lucide:loader-2" className="mr-2 h-4 w-4 animate-spin" />
+                    <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Icon icon="lucide:mail" className="mr-2 h-4 w-4" />
+                    <Icon icon="lucide:mail" className="h-4 w-4" />
                   )}
                   Send Magic Link
                 </Button>
@@ -217,19 +215,15 @@ function LoginForm() {
                   disabled={!email || !password || isLoading}
                 >
                   {isLoading ? (
-                    <Icon icon="lucide:loader-2" className="mr-2 h-4 w-4 animate-spin" />
+                    <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Icon icon="lucide:arrow-right" className="mr-2 h-4 w-4" />
+                    <Icon icon="lucide:arrow-right" className="h-4 w-4" />
                   )}
                   Sign In
                 </Button>
               </div>
             </form>
           )}
-
-          <div className="text-center text-sm text-slate-600">
-            <p>Need access? Contact your admin to get invited.</p>
-          </div>
         </CardContent>
       </Card>
     </div>
