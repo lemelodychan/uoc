@@ -132,16 +132,11 @@ export function CharacterSidebar({
   return (
     <div
       className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 flex flex-col ${
-        isCollapsed ? "w-18" : "w-80"
+        isCollapsed ? "w-18" : "w-72"
       }`}
     >
-      <div className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center justify-between">
-          {!isCollapsed && (
-            <div>
-              <h2 className="text-lg font-semibold text-sidebar-foreground">🎲 UOC DND 5e</h2>
-            </div>
-          )}
+{/*       <div className="p-4 border-b border-sidebar-border">
+        <div className="flex items-center justify-end">
           <Button
             variant="ghost"
             size="sm"
@@ -151,7 +146,7 @@ export function CharacterSidebar({
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </Button>
         </div>
-      </div>
+      </div> */}
 
       <div className={`flex flex-col gap-2 flex-1 min-h-0 w-full ${isCollapsed ? "p-2" : "p-4"}`}>
 

@@ -527,6 +527,55 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
                 }
               })()
             : undefined,
+          // Paladin features
+          divineSenseSlot: (data.class_name?.toLowerCase() === "paladin")
+            ? (() => {
+                const divineSense = getDivineSenseData(tempCharacter)
+                if (divineSense && data.divine_sense_used !== undefined) {
+                  return {
+                    ...divineSense,
+                    currentUses: Math.max(0, divineSense.usesPerRest - (data.divine_sense_used || 0))
+                  }
+                }
+                return divineSense || undefined
+              })()
+            : undefined,
+          layOnHands: (data.class_name?.toLowerCase() === "paladin")
+            ? (() => {
+                const layOnHands = getLayOnHandsData(tempCharacter)
+                if (layOnHands && data.lay_on_hands_hp_used !== undefined) {
+                  return {
+                    ...layOnHands,
+                    currentHitPoints: Math.max(0, layOnHands.totalHitPoints - (data.lay_on_hands_hp_used || 0))
+                  }
+                }
+                return layOnHands || undefined
+              })()
+            : undefined,
+          channelDivinitySlot: (data.class_name?.toLowerCase() === "paladin")
+            ? (() => {
+                const channelDivinity = getChannelDivinityData(tempCharacter)
+                if (channelDivinity && data.channel_divinity_used !== undefined) {
+                  return {
+                    ...channelDivinity,
+                    currentUses: Math.max(0, channelDivinity.usesPerRest - (data.channel_divinity_used || 0))
+                  }
+                }
+                return channelDivinity || undefined
+              })()
+            : undefined,
+          cleansingTouchSlot: (data.class_name?.toLowerCase() === "paladin")
+            ? (() => {
+                const cleansingTouch = getCleansingTouchData(tempCharacter)
+                if (cleansingTouch && data.cleansing_touch_used !== undefined) {
+                  return {
+                    ...cleansingTouch,
+                    currentUses: Math.max(0, cleansingTouch.usesPerRest - (data.cleansing_touch_used || 0))
+                  }
+                }
+                return cleansingTouch || undefined
+              })()
+            : undefined,
         }),
       },
     }
@@ -838,6 +887,55 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
                       currentUses: usesPerRest - used,
                       replenishesOnLongRest: true
                     }
+                  })()
+                : undefined,
+              // Paladin features
+              divineSenseSlot: (row.class_name?.toLowerCase() === "paladin")
+                ? (() => {
+                    const divineSense = getDivineSenseData(tempCharacter)
+                    if (divineSense && row.divine_sense_used !== undefined) {
+                      return {
+                        ...divineSense,
+                        currentUses: Math.max(0, divineSense.usesPerRest - (row.divine_sense_used || 0))
+                      }
+                    }
+                    return divineSense || undefined
+                  })()
+                : undefined,
+              layOnHands: (row.class_name?.toLowerCase() === "paladin")
+                ? (() => {
+                    const layOnHands = getLayOnHandsData(tempCharacter)
+                    if (layOnHands && row.lay_on_hands_hp_used !== undefined) {
+                      return {
+                        ...layOnHands,
+                        currentHitPoints: Math.max(0, layOnHands.totalHitPoints - (row.lay_on_hands_hp_used || 0))
+                      }
+                    }
+                    return layOnHands || undefined
+                  })()
+                : undefined,
+              channelDivinitySlot: (row.class_name?.toLowerCase() === "paladin")
+                ? (() => {
+                    const channelDivinity = getChannelDivinityData(tempCharacter)
+                    if (channelDivinity && row.channel_divinity_used !== undefined) {
+                      return {
+                        ...channelDivinity,
+                        currentUses: Math.max(0, channelDivinity.usesPerRest - (row.channel_divinity_used || 0))
+                      }
+                    }
+                    return channelDivinity || undefined
+                  })()
+                : undefined,
+              cleansingTouchSlot: (row.class_name?.toLowerCase() === "paladin")
+                ? (() => {
+                    const cleansingTouch = getCleansingTouchData(tempCharacter)
+                    if (cleansingTouch && row.cleansing_touch_used !== undefined) {
+                      return {
+                        ...cleansingTouch,
+                        currentUses: Math.max(0, cleansingTouch.usesPerRest - (row.cleansing_touch_used || 0))
+                      }
+                    }
+                    return cleansingTouch || undefined
                   })()
                 : undefined,
             }),

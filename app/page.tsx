@@ -52,6 +52,7 @@ import { EldritchInvocationsModal } from "@/components/edit-modals/eldritch-invo
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { useToast } from "@/hooks/use-toast"
+import { AppHeader } from "@/components/app-header"
 import {
   sampleCharacters,
   calculateModifier,
@@ -1496,6 +1497,14 @@ export default function CharacterSheet() {
           // Use single class feature calculation
           bardicInspiration = getBardicInspirationData(newLevel, charismaModifier, classData)
           songOfRest = getSongOfRestData(newLevel, classData)
+          // Calculate paladin features for single class
+          if (updates.class?.toLowerCase() === "paladin" || currentCharacter.class.toLowerCase() === "paladin") {
+            const paladinCharacter = { ...currentCharacter, ...updates, level: newLevel }
+            divineSenseSlot = getDivineSenseData(paladinCharacter)
+            layOnHands = getLayOnHandsData(paladinCharacter)
+            channelDivinitySlot = getChannelDivinityData(paladinCharacter)
+            cleansingTouchSlot = getCleansingTouchData(paladinCharacter)
+          }
         }
 
         // Create comprehensive updates
@@ -1701,7 +1710,7 @@ export default function CharacterSheet() {
       hitDice: {
         total: characterData.level,
         used: 0,
-        dieType: "d8", // Default, will be updated based on class
+        dieType: classData?.hit_die ? `d${classData.hit_die}` : "d8", // Use actual class hit die
       },
       weapons: [],
       weaponNotes: "",
@@ -1758,6 +1767,12 @@ export default function CharacterSheet() {
         subclass: characterData.subclass,
         class_id: characterData.classId,
         level: characterData.level
+      }],
+      hitDiceByClass: [{
+        className: characterData.class,
+        dieType: classData?.hit_die ? `d${classData.hit_die}` : "d8",
+        total: characterData.level,
+        used: 0
       }],
     }
     
@@ -2208,21 +2223,23 @@ export default function CharacterSheet() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <CharacterSidebar
-        characters={characters}
-        campaigns={campaigns}
-        selectedCampaignId={selectedCampaignId}
-        onCampaignChange={setSelectedCampaignId}
-        activeCharacterId={activeCharacterId}
-        onSelectCharacter={setActiveCharacterIdWithStorage}
-        onCreateCharacter={createNewCharacter}
-        onStartLongRest={handleStartLongRest}
-        onOpenDiceRoll={handleOpenDiceRoll}
-        onOpenCampaignManagement={handleOpenCampaignManagement}
-      />
+    <div className="h-screen bg-background flex flex-col">
+      <AppHeader />
+      <div className="flex flex-1 overflow-hidden">
+        <CharacterSidebar
+          characters={characters}
+          campaigns={campaigns}
+          selectedCampaignId={selectedCampaignId}
+          onCampaignChange={setSelectedCampaignId}
+          activeCharacterId={activeCharacterId}
+          onSelectCharacter={setActiveCharacterIdWithStorage}
+          onCreateCharacter={createNewCharacter}
+          onStartLongRest={handleStartLongRest}
+          onOpenDiceRoll={handleOpenDiceRoll}
+          onOpenCampaignManagement={handleOpenCampaignManagement}
+        />
 
-      <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-6 overflow-auto">
         {/* Character Header */}
         <Card className="mb-6">
           <CardHeader className="pb-0">
@@ -3067,36 +3084,36 @@ export default function CharacterSheet() {
                     <div className="text-sm font-medium">Artificer Skills</div>
                     {/* Artificer - Flash of Genius */}
                     {((activeCharacter.class.toLowerCase() === "artificer" && activeCharacter.level >= 7) || (activeCharacter.classes?.some(c => c.name.toLowerCase() === "artificer") && activeCharacter.classes?.reduce((total, c) => c.name.toLowerCase() === "artificer" ? total + c.level : total, 0) >= 7)) && activeCharacter.spellData.flashOfGeniusSlot && (
-                        <div className="flex items-start justify-between p-2 border rounded gap-3">
-                          <div className="flex gap-1 flex-col">
+                        <div className="flex flex-col items-start justify-between p-2 border rounded gap-0">
+                          <div className="flex gap-3 justify-between align-center w-full flex-row">
                             <span className="text-sm font-medium">
                               Flash of Genius
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                              <Badge variant="secondary">{formatModifier(intelligenceMod)}</Badge> bonus to any check
-                            </span>
+                            <div className="flex items-center gap-1 py-1">
+                              {Array.from({ length: activeCharacter.spellData.flashOfGeniusSlot.usesPerRest }, (_, i) => {
+                                const usedCount = activeCharacter.spellData.flashOfGeniusSlot!.usesPerRest - activeCharacter.spellData.flashOfGeniusSlot!.currentUses
+                                const isAvailable = i < activeCharacter.spellData.flashOfGeniusSlot!.currentUses
+                                return (
+                                  <button
+                                    key={i}
+                                    onClick={() => toggleFlashOfGenius(i)}
+                                    className={`w-4 h-4 rounded border-2 transition-colors ${
+                                      isAvailable
+                                        ? "bg-blue-500 border-blue-500 cursor-pointer"
+                                        : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
+                                    }`}
+                                    title={isAvailable ? "Available" : "Used"}
+                                  />
+                                )
+                              })}
+                              <span className="text-xs text-muted-foreground ml-2 w-5 text-right">
+                                {activeCharacter.spellData.flashOfGeniusSlot.currentUses}/{activeCharacter.spellData.flashOfGeniusSlot.usesPerRest}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 py-1">
-                            {Array.from({ length: activeCharacter.spellData.flashOfGeniusSlot.usesPerRest }, (_, i) => {
-                              const usedCount = activeCharacter.spellData.flashOfGeniusSlot!.usesPerRest - activeCharacter.spellData.flashOfGeniusSlot!.currentUses
-                              const isAvailable = i < activeCharacter.spellData.flashOfGeniusSlot!.currentUses
-                              return (
-                                <button
-                                  key={i}
-                                  onClick={() => toggleFlashOfGenius(i)}
-                                  className={`w-4 h-4 rounded border-2 transition-colors ${
-                                    isAvailable
-                                      ? "bg-blue-500 border-blue-500 cursor-pointer"
-                                      : "bg-white border-gray-300 hover:border-gray-400 cursor-pointer"
-                                  }`}
-                                  title={isAvailable ? "Available" : "Used"}
-                                />
-                              )
-                            })}
-                            <span className="text-xs text-muted-foreground ml-2 w-5 text-right">
-                              {activeCharacter.spellData.flashOfGeniusSlot.currentUses}/{activeCharacter.spellData.flashOfGeniusSlot.usesPerRest}
-                            </span>
-                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            <Badge variant="secondary">{formatModifier(intelligenceMod)}</Badge> bonus to any check
+                          </span>
                         </div>
                       )}
                   </div>
@@ -3456,7 +3473,7 @@ export default function CharacterSheet() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Shield className="w-5 h-5" />
-                    Equipment & Magic Items
+                    Equipment
                   </CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setEquipmentModalOpen(true)}>
                     <Edit className="w-4 h-4" />
@@ -3911,7 +3928,7 @@ export default function CharacterSheet() {
                       </div>
                     </div>
                     <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
-                      <div className="text-sm text-muted-foreground">Max Infused Items</div>
+                      <div className="text-sm text-muted-foreground">Max Infused</div>
                       <div className="text-xl font-bold text-primary font-mono">
                         {getArtificerMaxInfusedItems(activeCharacter)}
                       </div>
@@ -4368,6 +4385,7 @@ export default function CharacterSheet() {
         onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
         onSetActiveCampaign={handleSetActiveCampaign}
       />
+      </div>
     </div>
   )
 }
