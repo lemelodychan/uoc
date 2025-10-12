@@ -105,9 +105,9 @@ export function CampaignCreationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 p-4 max-h-[50vh] overflow-y-auto">
-          <div className="space-y-4 flex-shrink-0">
-            <div className="space-y-2">
+        <div className="flex flex-col gap-4 max-h-[50vh]">
+          <div className="flex-shrink-0 flex flex-col gap-4 p-4">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="campaign-name">Campaign Name *</Label>
               <Input
                 id="campaign-name"
@@ -118,7 +118,7 @@ export function CampaignCreationModal({
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="campaign-description">Description</Label>
               <RichTextEditor
                 value={description}
@@ -130,7 +130,7 @@ export function CampaignCreationModal({
 
           {/* Character Management Section - Only show when editing existing campaign */}
           {editingCampaign && onAssignCharacterToCampaign && onRemoveCharacterFromCampaign && (
-            <div className="flex-1 overflow-y-auto space-y-4 border-t pt-4">
+            <div className="flex-1 overflow-y-auto space-y-4 border-t p-4">
               {/* Characters in Campaign */}
               {getCharactersInCampaign(editingCampaign.id).length > 0 ? (
                 <div className="space-y-2">
@@ -232,14 +232,6 @@ export function CampaignCreationModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>
-            {editingCampaign ? 'Update Campaign' : 'Create Campaign'}
-          </Button>
-        </div>
         <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={handleClose}>
             Cancel

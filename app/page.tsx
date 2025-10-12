@@ -45,6 +45,7 @@ import { LongRestModal } from "@/components/edit-modals/long-rest-modal"
 import { LongRestResultsModal } from "@/components/edit-modals/long-rest-results-modal"
 import { EldritchCannonModal } from "@/components/edit-modals/eldritch-cannon-modal"
 import { EldritchInvocationsModal } from "@/components/edit-modals/eldritch-invocations-modal"
+import { SpellLibraryModal } from "@/components/edit-modals/spell-library-modal"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { useToast } from "@/hooks/use-toast"
@@ -86,6 +87,7 @@ export default function CharacterSheet() {
   const [featsModalOpen, setFeatsModalOpen] = useState(false)
   const [spellModalOpen, setSpellModalOpen] = useState(false)
   const [spellListModalOpen, setSpellListModalOpen] = useState(false)
+  const [spellLibraryModalOpen, setSpellLibraryModalOpen] = useState(false)
   const [characterDetailsModalOpen, setCharacterDetailsModalOpen] = useState(false)
   const [characterDetailsContentModalOpen, setCharacterDetailsContentModalOpen] = useState(false)
   const [characterCreationModalOpen, setCharacterCreationModalOpen] = useState(false)
@@ -475,6 +477,21 @@ export default function CharacterSheet() {
   // Campaign Management Functions
   const handleOpenCampaignManagement = () => {
     setCampaignManagementModalOpen(true)
+  }
+
+  const handleOpenSpellLibrary = () => {
+    setSpellLibraryModalOpen(true)
+  }
+
+  const handleAddSpell = (spell: any) => {
+    if (!activeCharacter) return
+    
+    const updatedSpellData = {
+      ...activeCharacter.spellData,
+      spells: [...(activeCharacter.spellData.spells || []), spell]
+    }
+    
+    updateCharacter({ spellData: updatedSpellData })
   }
 
   const handleCreateCampaign = async (campaign: Campaign) => {
@@ -2292,6 +2309,7 @@ export default function CharacterSheet() {
           onStartLongRest={handleStartLongRest}
           onOpenDiceRoll={handleOpenDiceRoll}
           onOpenCampaignManagement={handleOpenCampaignManagement}
+          onOpenSpellLibrary={handleOpenSpellLibrary}
         />
 
         <main className="flex-1 p-6 overflow-auto">
@@ -2794,6 +2812,15 @@ export default function CharacterSheet() {
         onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
         onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
         onSetActiveCampaign={handleSetActiveCampaign}
+      />
+
+      {/* Spell Library Modal */}
+      <SpellLibraryModal
+        isOpen={spellLibraryModalOpen}
+        onClose={() => setSpellLibraryModalOpen(false)}
+        character={activeCharacter}
+        onAddSpell={handleAddSpell}
+        onCreateNewSpell={() => setSpellModalOpen(true)}
       />
       </div>
     </div>

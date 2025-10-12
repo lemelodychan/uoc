@@ -21,6 +21,7 @@ interface CharacterSidebarProps {
   onStartLongRest: () => void
   onOpenDiceRoll: () => void
   onOpenCampaignManagement: () => void
+  onOpenSpellLibrary: () => void
 }
 
 export function CharacterSidebar({
@@ -34,6 +35,7 @@ export function CharacterSidebar({
   onStartLongRest,
   onOpenDiceRoll,
   onOpenCampaignManagement,
+  onOpenSpellLibrary,
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -362,6 +364,16 @@ export function CharacterSidebar({
 
       {/* Footer with Action Buttons */}
       <div className="p-4 border-t border-sidebar-border space-y-2">
+        <Button
+          onClick={onOpenSpellLibrary}
+          variant="outline"
+          className={`w-full ${
+            isCollapsed ? "px-2" : ""
+          }`}
+        >
+          <Icon icon="lucide:book-open" className="w-4 h-4" />
+          {!isCollapsed && <span>Spell Library</span>}
+        </Button>
         <Button
           onClick={onOpenDiceRoll}
           variant="default"

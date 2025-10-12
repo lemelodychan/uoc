@@ -253,7 +253,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="p-0 gap-0"
+        className="p-0 flex flex-col gap-0"
         style={{ width: '70vw', maxWidth: 'none' }}
       >
         <DialogHeader className="p-4">
@@ -266,6 +266,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
           </DialogDescription>
         </DialogHeader>
 
+        <div className="flex flex-col gap-0 max-h-[80vh]">
           {/* Search and Filters */}
           <div className="flex flex-col gap-4 p-4 pt-0 border-b">
             <div className="flex items-center gap-4 relative">
@@ -328,7 +329,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
           </div>
 
           {/* Spells List */}
-          <div className="flex-1 p-4 overflow-y-auto max-h-[50vh]">
+          <div className="flex-1 p-4 overflow-y-auto bg-background">
             {loading ? (
               <div className="flex items-center justify-center h-32">
                 <div className="text-muted-foreground">Loading spells...</div>
@@ -361,7 +362,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                             const key = `${spell.level}-${spell.name}-${index}`
                             const isOpen = !!expanded[key]
                             return (
-                              <div key={key} className="p-3 border rounded-lg relative">
+                              <div key={key} className="p-3 border rounded-lg relative bg-card hover:bg-card/30 transition-colors">
                                 <div className="flex flex-col gap-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-2">
@@ -481,6 +482,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
               </div>
             )}
           </div>
+        </div>
 
         <DialogFooter className="p-4 border-t">
           <Button onClick={onCreateNewSpell} variant="outline">

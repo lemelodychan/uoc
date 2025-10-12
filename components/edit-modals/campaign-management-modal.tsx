@@ -85,22 +85,24 @@ export function CampaignManagementModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[960px] max-h-[70vh] p-0 gap-0">
-          <DialogHeader className="p-4 border-b">
+        <DialogContent className="sm:max-w-[960px] p-0 gap-0">
+          <DialogHeader className="p-4 pb-0">
             <DialogTitle>Management</DialogTitle>
             <DialogDescription>
               Manage campaigns, and create/edit classes, subclasses, and their features.
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col p-4 max-h-[50vh] overflow-y-auto">
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="campaigns">Campaign Management</TabsTrigger>
-              <TabsTrigger value="classes">Class Management</TabsTrigger>
-            </TabsList>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col max-h-[80vh]">
+            <div className="p-4 pb-0">
+              <TabsList className="grid grid-cols-2 w-full">
+                <TabsTrigger value="campaigns">Campaign Management</TabsTrigger>
+                <TabsTrigger value="classes">Class Management</TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="campaigns" className="flex-1 min-h-0 flex flex-col gap-4">
-              <div className="flex gap-2 flex-shrink-0">
+            <TabsContent value="campaigns" className="flex-1 min-h-0 flex flex-col gap-0">
+              <div className="flex gap-2 flex-shrink-0 border-b p-4">
                 <Input
                   placeholder="Search campaigns..."
                   value={searchTerm}
@@ -113,7 +115,7 @@ export function CampaignManagementModal({
                 </Button>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-4">
+              <div className="flex flex-col gap-4 overflow-y-auto p-4 bg-background h-[70vh]">
                 {filteredCampaigns.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     {searchTerm ? "No campaigns found matching your search." : "No campaigns created yet."}
@@ -126,7 +128,7 @@ export function CampaignManagementModal({
                     const deceasedCharacters = campaignCharacters.filter(char => char.partyStatus === 'deceased')
 
                     return (
-                      <Card key={campaign.id}>
+                      <Card key={campaign.id} className="bg-card">
                         <CardHeader>
                           <div className="flex items-start justify-between">
                             <div className="flex flex-col gap-1">
@@ -201,11 +203,7 @@ export function CampaignManagementModal({
               <ClassManagement />
             </TabsContent>
           </Tabs>
-          <DialogFooter className="p-4 border-t">
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-          </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
@@ -454,8 +452,8 @@ function ClassManagement() {
   }
 
   return (
-    <div className="flex flex-col gap-4 h-full min-h-0">
-      <div className="flex gap-2 items-center">
+    <div className="flex flex-col gap-0 h-full min-h-0">
+      <div className="flex gap-2 items-center p-4 border-b">
         <Input placeholder="Search classes..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <Button onClick={() => setEditingClass({
           id: "",
@@ -472,13 +470,13 @@ function ClassManagement() {
       </div>
 
       {classes.length === 0 ? (
-        <div className="text-sm text-muted-foreground">No classes found.</div>
+        <div className="text-sm text-muted-foreground max-h-[50vh]">No classes found.</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto pr-1">
+        <div className="flex flex-row flex-wrap justify-start items-start content-start gap-4 overflow-y-auto h-[70vh] p-4 bg-background">
         {filteredClasses.map((cls) => {
           const relatedSubclasses = subclasses.filter(sc => sc.class_id === cls.id)
           return (
-            <Card key={cls.id} className="flex flex-col gap-2">
+            <Card key={cls.id} className="flex flex-col gap-2 bg-card h-[188px] w-[calc(50%-8px)]">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col gap-1">
@@ -488,7 +486,7 @@ function ClassManagement() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={async () => {
+                    <Button variant="outline" size="sm" className="w-8 h-8" onClick={async () => {
                       // Refresh latest DB data when opening editor
                       const { klass } = await loadClassById(cls.id)
                       if (klass) {
@@ -521,15 +519,15 @@ function ClassManagement() {
                     }}>
                       <Icon icon="lucide:edit" className="w-4 h-4" />
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => removeClass(cls.id)}>
+                    <Button variant="outline" size="sm" className="w-8 h-8 text-[#ce6565] hover:bg-[#ce6565] hover:text-white" onClick={() => removeClass(cls.id)}>
                       <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-col gap-3">
+              <CardContent className="flex flex-col gap-3 flex-grow-1 h-auto">
                 {/* Features moved to details modal for performance */}
-                <div className="text-sm text-muted-foreground">{(cls as any).description || ""}</div>
+                <div className="text-sm text-muted-foreground flex-grow-1 h-auto">{(cls as any).description || ""}</div>
                 <Button variant="outline" size="sm" onClick={async () => {
                   // Open details modal; lazily ensure features are loaded
                   const cid = cls.id
@@ -557,6 +555,7 @@ function ClassManagement() {
           <DialogHeader className="sticky top-0 z-10 bg-background px-4 pt-4 pb-2 border-b shrink-0">
             <DialogTitle>{editingClass?.id ? "Edit Class" : "New Class"}</DialogTitle>
           </DialogHeader>
+
           <div className="flex-1 overflow-y-auto px-4 py-3">
             <div className="grid gap-3">
             <div className="grid gap-1">
@@ -649,17 +648,19 @@ function ClassManagement() {
 
       {/* Class Details Modal */}
       <Dialog open={detailsOpen} onOpenChange={(v) => setDetailsOpen(!!v)}>
-        <DialogContent className="sm:max-w-[720px] h-[80vh] max-h-[80vh] flex flex-col overflow-hidden p-4">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[720px] h-[80vh] max-h-[80vh] flex flex-col overflow-hidden p-0 gap-0">
+          <DialogHeader className="p-4 pb-0">
             <DialogTitle>{detailsClassName} — Details</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            <Tabs value={detailsTab} onValueChange={(v:any)=>setDetailsTab(v)} className="h-full flex flex-col">
-              <TabsList className="w-full grid grid-cols-2">
-                <TabsTrigger value="subclasses">Subclasses</TabsTrigger>
-                <TabsTrigger value="features">Class Features</TabsTrigger>
-              </TabsList>
-              <TabsContent value="subclasses" className="flex-1 overflow-y-auto py-4">
+          <div className="flex-1 overflow-hidden gap-0">
+            <Tabs value={detailsTab} onValueChange={(v:any)=>setDetailsTab(v)} className="h-full flex flex-col gap-0">
+              <div className="p-4 border-b">
+                <TabsList className="w-full grid grid-cols-2">
+                  <TabsTrigger value="subclasses">Subclasses</TabsTrigger>
+                  <TabsTrigger value="features">Class Features</TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="subclasses" className="flex-1 overflow-y-auto p-4">
                 <div className="flex flex-col gap-2">
                   {subclasses.filter(sc => sc.class_id === detailsClassId).map(sc => (
                     <div key={sc.id} className="flex items-center justify-between p-2 pl-3 border rounded-lg">
@@ -672,8 +673,8 @@ function ClassManagement() {
                   ))}
                 </div>
               </TabsContent>
-              <TabsContent value="features" className="flex-1 overflow-y-auto">
-                <div className="py-4 pr-3">
+              <TabsContent value="features" className="flex-1 overflow-y-auto p-4 gap-0">
+                <div>
                   {detailsClassId && (() => {
                     const all = (featuresByClass[detailsClassId] || []) as FeatureItem[]
                     const base = all.filter(f => !f.subclass_id).sort((a,b) => a.level - b.level)
@@ -725,7 +726,7 @@ function ClassManagement() {
             </Tabs>
           </div>
         
-          <DialogFooter className="pt-3 border-t">
+          <DialogFooter className="p-4 border-t">
               <div className="flex gap-2 justify-start items-center align-left">
                 {detailsTab === 'subclasses' && detailsClassId && (
                   <Button 
