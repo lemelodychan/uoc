@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,11 +7,11 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Icon } from "@iconify/react"
 import type { CharacterData, Campaign } from "@/lib/character-data"
-import { getAllUsers } from "@/lib/database"
 
 interface CampaignHomepageProps {
   campaign: Campaign | undefined
   characters: CharacterData[]
+  users: any[]
   onSelectCharacter: (id: string) => void
   onBackToCharacters: () => void
   onEditCampaign?: () => void
@@ -24,6 +23,7 @@ interface CampaignHomepageProps {
 export function CampaignHomepage({ 
   campaign, 
   characters, 
+  users,
   onSelectCharacter, 
   onBackToCharacters,
   onEditCampaign,
@@ -31,20 +31,6 @@ export function CampaignHomepage({
   currentUserId,
   onStartLongRest
 }: CampaignHomepageProps) {
-  const [users, setUsers] = useState<any[]>([])
-
-  // Fetch all users when component mounts
-  useEffect(() => {
-    const fetchUsers = async () => {
-      const { users: fetchedUsers, error } = await getAllUsers()
-      if (error) {
-        console.error("Failed to load users:", error)
-      } else {
-        setUsers(fetchedUsers || [])
-      }
-    }
-    fetchUsers()
-  }, [])
   // Filter characters for this campaign
   const campaignCharacters = characters.filter(char => 
     char.campaignId === campaign?.id

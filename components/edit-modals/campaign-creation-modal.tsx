@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { UserProfile } from "@/lib/user-profiles"
-import { getAllUsers, debugDatabaseState } from "@/lib/database"
 
 interface CampaignCreationModalProps {
   isOpen: boolean
@@ -20,6 +19,7 @@ interface CampaignCreationModalProps {
   onSave: (campaign: Campaign) => void
   editingCampaign?: Campaign | null
   characters?: CharacterData[]
+  users?: any[]
   onAssignCharacterToCampaign?: (characterId: string, campaignId: string) => void
   onRemoveCharacterFromCampaign?: (characterId: string, campaignId: string) => void
 }
@@ -28,16 +28,15 @@ export function CampaignCreationModal({
   isOpen, 
   onClose, 
   onSave, 
-  editingCampaign, 
-  characters = [], 
-  onAssignCharacterToCampaign, 
-  onRemoveCharacterFromCampaign 
+  editingCampaign,
+  characters = [],
+  users = [],
+  onAssignCharacterToCampaign,
+  onRemoveCharacterFromCampaign
 }: CampaignCreationModalProps) {
   const [name, setName] = useState(editingCampaign?.name || "")
   const [description, setDescription] = useState(editingCampaign?.description || "")
   const [dungeonMasterId, setDungeonMasterId] = useState(editingCampaign?.dungeonMasterId || "")
-  const [users, setUsers] = useState<UserProfile[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Update form state when editingCampaign changes
   useEffect(() => {
@@ -52,24 +51,6 @@ export function CampaignCreationModal({
     }
   }, [editingCampaign])
 
-  // Fetch users when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setLoadingUsers(true)
-      // First run debug to see what's in the database
-      debugDatabaseState().then(() => {
-        return getAllUsers()
-      }).then(({ users, error }) => {
-        if (error) {
-          console.error("Failed to load users:", error)
-        } else {
-          console.log("Loaded users:", users)
-          setUsers(users || [])
-        }
-        setLoadingUsers(false)
-      })
-    }
-  }, [isOpen])
 
   // Helper function to format character level and class display (same as sidebar)
   const getCharacterLevelDisplay = (character: CharacterData): string => {
@@ -160,7 +141,7 @@ export function CampaignCreationModal({
               <Label htmlFor="dungeon-master">Dungeon Master</Label>
               <Select value={dungeonMasterId || "none"} onValueChange={(value) => setDungeonMasterId(value === "none" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a Dungeon Master (optional)"} />
+                  <SelectValue placeholder="Select a Dungeon Master (optional)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No Dungeon Master</SelectItem>
@@ -169,7 +150,7 @@ export function CampaignCreationModal({
                       {user.displayName || `User ${user.userId.slice(0, 8)}...`}
                     </SelectItem>
                   ))}
-                  {!loadingUsers && users.length === 0 && (
+                  {users.length === 0 && (
                     <SelectItem value="no-users" disabled>
                       No users found
                     </SelectItem>

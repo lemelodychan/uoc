@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -66,7 +66,7 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign } from "@/lib/database"
+import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers } from "@/lib/database"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
@@ -76,9 +76,10 @@ const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
-export default function CharacterSheet() {
+function CharacterSheetContent() {
   const [characters, setCharacters] = useState<CharacterData[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [users, setUsers] = useState<any[]>([])
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all")
   const [activeCharacterId, setActiveCharacterId] = useState<string>("")
   const [superadminOverride, setSuperadminOverride] = useState(false)
@@ -463,6 +464,7 @@ export default function CharacterSheet() {
       try {
         const { characters: dbCharacters, error: loadError } = await loadAllCharacters()
         const { campaigns: dbCampaigns, error: campaignLoadError } = await loadAllCampaigns()
+        const { users: dbUsers, error: usersLoadError } = await getAllUsers()
         
         if (loadError) {
           console.error("Failed to load characters:", loadError)
@@ -476,6 +478,7 @@ export default function CharacterSheet() {
         } else if (dbCharacters && dbCharacters.length > 0) {
           setCharacters(dbCharacters)
           setCampaigns(dbCampaigns || [])
+          setUsers(dbUsers || [])
 
           // Set active campaign by default
           const activeCampaign = (dbCampaigns || []).find(c => c.isActive)
@@ -1403,6 +1406,7 @@ export default function CharacterSheet() {
     try {
       const { characters: dbCharacters, error } = await loadAllCharacters()
       const { campaigns: dbCampaigns, error: campaignLoadError } = await loadAllCampaigns()
+      const { users: dbUsers, error: usersLoadError } = await getAllUsers()
       
       if (error) {
         console.error("Failed to load characters:", error)
@@ -1414,6 +1418,7 @@ export default function CharacterSheet() {
       } else if (dbCharacters && dbCharacters.length > 0) {
         setCharacters(dbCharacters)
         setCampaigns(dbCampaigns || [])
+        setUsers(dbUsers || [])
         
         // Set active campaign by default
         const activeCampaign = (dbCampaigns || []).find(c => c.isActive)
@@ -2645,6 +2650,7 @@ export default function CharacterSheet() {
             <CampaignHomepage
               campaign={currentCampaign}
               characters={characters}
+              users={users}
               onSelectCharacter={(id) => {
                 setActiveCharacterId(id)
                 setCurrentView('character')
@@ -3011,6 +3017,7 @@ export default function CharacterSheet() {
         onClose={() => setCampaignManagementModalOpen(false)}
         campaigns={campaigns}
         characters={characters}
+        users={users}
         onCreateCampaign={handleCreateCampaign}
         onUpdateCampaign={handleUpdateCampaign}
         onDeleteCampaign={handleDeleteCampaign}
@@ -3029,6 +3036,7 @@ export default function CharacterSheet() {
         onSave={handleEditCampaignSave}
         editingCampaign={editingCampaign}
         characters={characters}
+        users={users}
         onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
         onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
       />
@@ -3051,5 +3059,13 @@ export default function CharacterSheet() {
       />
       </div>
     </div>
+  )
+}
+
+export default function CharacterSheet() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CharacterSheetContent />
+    </Suspense>
   )
 }

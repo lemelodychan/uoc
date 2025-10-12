@@ -18,7 +18,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
 import type { UserProfile } from "@/lib/user-profiles"
-import { getAllUsers } from "@/lib/database"
 import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById } from "@/lib/database"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -29,6 +28,7 @@ interface CampaignManagementModalProps {
   onClose: () => void
   campaigns: Campaign[]
   characters: CharacterData[]
+  users?: any[]
   onCreateCampaign: (campaign: Campaign) => void
   onUpdateCampaign: (campaign: Campaign) => void
   onDeleteCampaign: (campaignId: string) => void
@@ -42,6 +42,7 @@ export function CampaignManagementModal({
   onClose,
   campaigns,
   characters,
+  users = [],
   onCreateCampaign,
   onUpdateCampaign,
   onDeleteCampaign,
@@ -54,24 +55,11 @@ export function CampaignManagementModal({
   const [deletingCampaign, setDeletingCampaign] = useState<Campaign | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState<string>("campaigns")
-  const [users, setUsers] = useState<UserProfile[]>([])
 
   const filteredCampaigns = campaigns.filter(campaign =>
     campaign.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Load users when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      getAllUsers().then(({ users, error }) => {
-        if (error) {
-          console.error("Failed to load users:", error)
-        } else {
-          setUsers(users || [])
-        }
-      })
-    }
-  }, [isOpen])
 
   const getCharactersInCampaign = (campaignId: string) => {
     return characters.filter(char => char.campaignId === campaignId)
@@ -247,6 +235,7 @@ export function CampaignManagementModal({
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSave={handleCreateCampaign}
+        users={users}
       />
 
       {/* Campaign Edit Modal */}
@@ -256,6 +245,7 @@ export function CampaignManagementModal({
         onSave={handleUpdateCampaign}
         editingCampaign={editingCampaign}
         characters={characters}
+        users={users}
         onAssignCharacterToCampaign={onAssignCharacterToCampaign}
         onRemoveCharacterFromCampaign={onRemoveCharacterFromCampaign}
       />
