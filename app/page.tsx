@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Icon } from "@iconify/react"
 import { CharacterSidebar } from "@/components/character-sidebar"
 import { CampaignManagementModal } from "@/components/edit-modals/campaign-management-modal"
+import { CampaignCreationModal } from "@/components/edit-modals/campaign-creation-modal"
 import { BasicInfoModal } from "@/components/edit-modals/basic-info-modal"
 import { CharacterCreationModal } from "@/components/edit-modals/character-creation-modal"
 import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, createClassBasedSkills, calculatePassivePerception, calculatePassiveInsight, calculateSavingThrowBonus, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, getArtificerInfusionsKnown, getArtificerMaxInfusedItems, getTotalAdditionalSpells, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData, getWarlockInvocationsKnown, type EldritchCannon, type Campaign, createCampaign } from "@/lib/character-data"
@@ -51,6 +53,8 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { useToast } from "@/hooks/use-toast"
 import { AppHeader } from "@/components/app-header"
+import { AccessDeniedOverlay } from "@/components/access-denied-overlay"
+import { useUser } from "@/lib/user-context"
 import {
   sampleCharacters,
   calculateModifier,
@@ -62,10 +66,11 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign } from "@/lib/database"
+import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign } from "@/lib/database"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { CampaignHomepage } from "@/components/campaign-homepage"
 
 const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
@@ -76,6 +81,20 @@ export default function CharacterSheet() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all")
   const [activeCharacterId, setActiveCharacterId] = useState<string>("")
+  const [superadminOverride, setSuperadminOverride] = useState(false)
+  const [currentView, setCurrentView] = useState<'character' | 'campaign'>('character')
+  
+  // Get URL search parameters
+  const searchParams = useSearchParams()
+  
+  // Get user data from global context
+  const { user: currentUser, userProfile: currentUserProfile, isSuperadmin: isUserSuperadmin, isLoading: userLoading } = useUser()
+
+  // Debug superadmin override state changes
+  useEffect(() => {
+    console.log("🔄 superadminOverride state changed to:", superadminOverride)
+  }, [superadminOverride])
+  
   const [basicInfoModalOpen, setBasicInfoModalOpen] = useState(false)
   const [abilitiesModalOpen, setAbilitiesModalOpen] = useState(false)
   const [combatModalOpen, setCombatModalOpen] = useState(false)
@@ -113,6 +132,8 @@ export default function CharacterSheet() {
   const [diceRollModalOpen, setDiceRollModalOpen] = useState(false)
   const [levelUpModalOpen, setLevelUpModalOpen] = useState(false)
   const [campaignManagementModalOpen, setCampaignManagementModalOpen] = useState(false)
+  const [campaignCreationModalOpen, setCampaignCreationModalOpen] = useState(false)
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
   const [longRestResults, setLongRestResults] = useState<{
     characterId: string;
     characterName: string;
@@ -199,6 +220,21 @@ export default function CharacterSheet() {
     }
   }
 
+  // Get current campaign data
+  const currentCampaign = campaigns.find(c => c.id === selectedCampaignId)
+  
+  // Set initial view based on active campaign
+  useEffect(() => {
+    if (campaigns.length > 0 && selectedCampaignId === "all") {
+      // Find the active campaign
+      const activeCampaign = campaigns.find(c => c.isActive)
+      if (activeCampaign) {
+        setSelectedCampaignId(activeCampaign.id)
+        setCurrentView('campaign')
+      }
+    }
+  }, [campaigns, selectedCampaignId])
+
   useEffect(() => {
     try {
       const stored = typeof window !== 'undefined' ? localStorage.getItem('uoc.skillSortMode') : null
@@ -222,18 +258,60 @@ export default function CharacterSheet() {
 
   const activeCharacter = characters.find((c) => c.id === activeCharacterId) || characters[0]
   
-  // Debug logging for active character
+  // Access control checks
+  const canViewActiveCharacter = activeCharacter ? (
+    // Owner can always view
+    activeCharacter.userId === currentUser?.id ||
+    // Superadmin with override can view
+    (isUserSuperadmin && superadminOverride) ||
+    // Public characters can be viewed by anyone (no overlay for anyone)
+    activeCharacter.visibility === 'public'
+  ) : false
+
+  // Debug access control
   if (activeCharacter) {
-    console.log('[DEBUG] Active character found:', {
-      id: activeCharacter.id,
-      name: activeCharacter.name,
-      classes: activeCharacter.classes,
-      savingThrowProficiencies: activeCharacter.savingThrowProficiencies
+    console.log("🔍 Access control debug:", {
+      characterId: activeCharacter.id,
+      characterOwner: activeCharacter.userId,
+      currentUser: currentUser?.id,
+      currentUserProfile: currentUserProfile,
+      isOwner: activeCharacter.userId === currentUser?.id,
+      isSuperadmin: isUserSuperadmin,
+      superadminOverride,
+      canView: canViewActiveCharacter
     })
-  } else {
-    console.log('[DEBUG] No active character found')
   }
   
+  // Get current campaign DM for campaign-aware editing
+  const canEditActiveCharacter = activeCharacter ? canEditCharacterWithCampaign(
+    activeCharacter, 
+    currentUser?.id, 
+    currentCampaign?.dungeonMasterId,
+    selectedCampaignId
+  ) : false
+  
+  // Reset superadmin override when switching to a different character
+  const [previousCharacterId, setPreviousCharacterId] = useState<string>("")
+  useEffect(() => {
+    if (activeCharacterId !== previousCharacterId) {
+      setSuperadminOverride(false)
+      setPreviousCharacterId(activeCharacterId)
+    }
+  }, [activeCharacterId, previousCharacterId])
+
+  // Debug logging for active character
+  useEffect(() => {
+    if (activeCharacter) {
+      console.log('[DEBUG] Active character found:', {
+        id: activeCharacter.id,
+        name: activeCharacter.name,
+        classes: activeCharacter.classes,
+        savingThrowProficiencies: activeCharacter.savingThrowProficiencies
+      })
+    } else {
+      console.log('[DEBUG] No active character found')
+    }
+  }, [activeCharacter])
 
   const debouncedAutoSave = useCallback(async () => {
     if (!dbConnected || !activeCharacterId) {
@@ -302,6 +380,7 @@ export default function CharacterSheet() {
     }
     autoSaveTimeoutRef.current = setTimeout(debouncedAutoSave, 1000)
   }, [debouncedAutoSave])
+
 
   const updateCharacter = (updates: Partial<CharacterData>, options?: { autosave?: boolean }) => {
     setCharacters((prev) => prev.map((char) => (char.id === activeCharacterId ? { ...char, ...updates } : char)))
@@ -416,12 +495,22 @@ export default function CharacterSheet() {
                 return character.campaignId === selectedCampaignId
               })
 
+          // Check for character ID in URL parameters first
+          const characterFromUrl = searchParams.get('character')
           const savedActiveCharacterId = loadActiveCharacterFromLocalStorage()
-          let validCharacterId = savedActiveCharacterId && dbCharacters.find((c) => c.id === savedActiveCharacterId)
-            ? savedActiveCharacterId
-            : null
+          
+          let validCharacterId: string | null = null
+          
+          // Priority 1: Character from URL parameter
+          if (characterFromUrl && dbCharacters.find((c) => c.id === characterFromUrl)) {
+            validCharacterId = characterFromUrl
+          }
+          // Priority 2: Saved character from localStorage
+          else if (savedActiveCharacterId && dbCharacters.find((c) => c.id === savedActiveCharacterId)) {
+            validCharacterId = savedActiveCharacterId
+          }
 
-          // If saved character is not in the filtered campaign, select first character from filtered list
+          // If no valid character found or character is not in the filtered campaign, select first character from filtered list
           if (!validCharacterId || !filteredCharacters.find(c => c.id === validCharacterId)) {
             validCharacterId = filteredCharacters.length > 0 ? filteredCharacters[0].id : dbCharacters[0]?.id
           }
@@ -479,6 +568,30 @@ export default function CharacterSheet() {
   // Campaign Management Functions
   const handleOpenCampaignManagement = () => {
     setCampaignManagementModalOpen(true)
+  }
+
+  const handleEditCampaign = () => {
+    setEditingCampaign(currentCampaign || null)
+    setCampaignCreationModalOpen(true)
+  }
+
+  const handleEditCampaignSave = async (campaign: Campaign) => {
+    try {
+      const { error } = await updateCampaignDB(campaign)
+      if (error) {
+        console.error("Failed to update campaign:", error)
+        return
+      }
+      
+      // Update the campaigns list
+      setCampaigns(prev => prev.map(c => c.id === campaign.id ? campaign : c))
+      
+      // Close the modal
+      setCampaignCreationModalOpen(false)
+      setEditingCampaign(null)
+    } catch (error) {
+      console.error("Error updating campaign:", error)
+    }
   }
 
   const handleOpenSpellLibrary = () => {
@@ -1680,6 +1793,17 @@ export default function CharacterSheet() {
   }) => {
     const newId = (characters.length + 1).toString()
     
+    // Get current user for ownership
+    const { user, error: userError } = await getCurrentUser()
+    if (userError) {
+      toast({
+        title: "Error",
+        description: `Failed to get user information: ${userError}`,
+        variant: "destructive",
+      })
+      return
+    }
+    
     // Load class data to get primary ability for spell calculations
     const { classData } = await loadClassData(characterData.class, characterData.subclass)
     const proficiencyBonus = calculateProficiencyBonus(characterData.level)
@@ -1710,6 +1834,8 @@ export default function CharacterSheet() {
       background: characterData.background,
       race: characterData.race,
       alignment: characterData.alignment,
+      userId: user?.id,
+      visibility: 'public',
       strength: 10,
       dexterity: 10,
       constitution: 10,
@@ -2296,6 +2422,18 @@ export default function CharacterSheet() {
     )
   }
 
+  // Show loading state while user data is being loaded
+  if (userLoading) {
+    return (
+      <div className="h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="text-sm text-muted-foreground">Loading user data...</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen bg-background flex flex-col">
       <AppHeader />
@@ -2304,27 +2442,45 @@ export default function CharacterSheet() {
           characters={characters}
           campaigns={campaigns}
           selectedCampaignId={selectedCampaignId}
-          onCampaignChange={setSelectedCampaignId}
+          onCampaignChange={(id) => {
+            setSelectedCampaignId(id)
+            if (id !== "all" && id !== "no-campaign") {
+              setCurrentView('campaign')
+            } else {
+              setCurrentView('character')
+            }
+          }}
           activeCharacterId={activeCharacterId}
-          onSelectCharacter={setActiveCharacterIdWithStorage}
+          onSelectCharacter={(id) => {
+            setActiveCharacterIdWithStorage(id)
+            setCurrentView('character')
+          }}
           onCreateCharacter={createNewCharacter}
           onStartLongRest={handleStartLongRest}
           onOpenDiceRoll={handleOpenDiceRoll}
           onOpenCampaignManagement={handleOpenCampaignManagement}
           onOpenSpellLibrary={handleOpenSpellLibrary}
+          currentUserId={currentUser?.id}
+          currentView={currentView}
+          onViewChange={setCurrentView}
         />
 
-        <main className="flex-1 p-6 overflow-auto">
-          <CharacterHeader
-            character={activeCharacter}
-            proficiencyBonus={proficiencyBonus}
-            onEdit={() => setBasicInfoModalOpen(true)}
-            onOpenBiography={() => setCharacterDetailsContentModalOpen(true)}
-            onOpenPortrait={() => setPortraitModalOpen(true)}
-            onLevelUp={() => setLevelUpModalOpen(true)}
-          />
+        <main className={`flex-1 p-6 relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
+          {currentView === 'character' ? (
+            <>
+              <div className={!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}>
+                <CharacterHeader
+                  character={activeCharacter}
+                  proficiencyBonus={proficiencyBonus}
+                  onEdit={() => setBasicInfoModalOpen(true)}
+                  onOpenBiography={() => setCharacterDetailsContentModalOpen(true)}
+                  onOpenPortrait={() => setPortraitModalOpen(true)}
+                  onLevelUp={() => setLevelUpModalOpen(true)}
+                  canEdit={canEditActiveCharacter}
+                />
+              </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className={`grid grid-cols-1 xl:grid-cols-3 gap-6 ${!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}`}>
             {/* COLUMN 1: Abilities, Skills, Features, Equipment, Languages */}
             <div className="space-y-6">
               <AbilityScores
@@ -2483,7 +2639,53 @@ export default function CharacterSheet() {
             />
           </div>
 
-        </div>
+            </div>
+          </>
+          ) : (
+            <CampaignHomepage
+              campaign={currentCampaign}
+              characters={characters}
+              onSelectCharacter={(id) => {
+                setActiveCharacterId(id)
+                setCurrentView('character')
+              }}
+              onBackToCharacters={() => setCurrentView('character')}
+              onEditCampaign={handleEditCampaign}
+              onCreateCharacter={createNewCharacter}
+              currentUserId={currentUser?.id}
+              onStartLongRest={handleStartLongRest}
+            />
+          )}
+
+          {/* Access Denied Overlay - positioned relative to main content area */}
+          <AccessDeniedOverlay
+            isVisible={(() => {
+              const isVisible = currentView === 'character' && activeCharacter && !canViewActiveCharacter
+              console.log("🎭 Overlay visibility check:", {
+                currentView,
+                hasActiveCharacter: !!activeCharacter,
+                canViewActiveCharacter,
+                isVisible,
+                superadminOverride
+              })
+              return isVisible
+            })()}
+            currentUserProfile={currentUserProfile}
+            character={activeCharacter}
+            onSuperadminAccess={() => {
+              console.log("🔓 Superadmin access button clicked, setting override to true")
+              setSuperadminOverride(true)
+              // Force a re-render to see the state change
+              setTimeout(() => {
+                console.log("🔍 After setting override, current state:", {
+                  superadminOverride: true,
+                  activeCharacterId: activeCharacter?.id,
+                  isSuperadmin: isUserSuperadmin
+                })
+              }, 100)
+            }}
+          />
+
       </main>
 
       {/* Edit Modals */}
@@ -2815,6 +3017,20 @@ export default function CharacterSheet() {
         onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
         onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
         onSetActiveCampaign={handleSetActiveCampaign}
+      />
+
+      {/* Campaign Creation/Edit Modal */}
+      <CampaignCreationModal
+        isOpen={campaignCreationModalOpen}
+        onClose={() => {
+          setCampaignCreationModalOpen(false)
+          setEditingCampaign(null)
+        }}
+        onSave={handleEditCampaignSave}
+        editingCampaign={editingCampaign}
+        characters={characters}
+        onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
+        onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
       />
 
       {/* Spell Library Modal */}

@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import type { Campaign, CharacterData } from "@/lib/character-data"
+import type { UserProfile } from "@/lib/user-profiles"
+import { getAllUsers, debugDatabaseState } from "@/lib/database"
 
 interface CampaignCreationModalProps {
   isOpen: boolean
@@ -32,17 +35,41 @@ export function CampaignCreationModal({
 }: CampaignCreationModalProps) {
   const [name, setName] = useState(editingCampaign?.name || "")
   const [description, setDescription] = useState(editingCampaign?.description || "")
+  const [dungeonMasterId, setDungeonMasterId] = useState(editingCampaign?.dungeonMasterId || "")
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
 
   // Update form state when editingCampaign changes
   useEffect(() => {
     if (editingCampaign) {
       setName(editingCampaign.name || "")
       setDescription(editingCampaign.description || "")
+      setDungeonMasterId(editingCampaign.dungeonMasterId || "")
     } else {
       setName("")
       setDescription("")
+      setDungeonMasterId("")
     }
   }, [editingCampaign])
+
+  // Fetch users when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingUsers(true)
+      // First run debug to see what's in the database
+      debugDatabaseState().then(() => {
+        return getAllUsers()
+      }).then(({ users, error }) => {
+        if (error) {
+          console.error("Failed to load users:", error)
+        } else {
+          console.log("Loaded users:", users)
+          setUsers(users || [])
+        }
+        setLoadingUsers(false)
+      })
+    }
+  }, [isOpen])
 
   // Helper function to format character level and class display (same as sidebar)
   const getCharacterLevelDisplay = (character: CharacterData): string => {
@@ -77,7 +104,8 @@ export function CampaignCreationModal({
       created_at: editingCampaign?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
       characters: editingCampaign?.characters || [],
-      isActive: editingCampaign?.isActive || false // Preserve the isActive status
+      isActive: editingCampaign?.isActive || false, // Preserve the isActive status
+      dungeonMasterId: dungeonMasterId || undefined
     }
 
     onSave(campaign)
@@ -87,6 +115,7 @@ export function CampaignCreationModal({
   const handleClose = () => {
     setName("")
     setDescription("")
+    setDungeonMasterId("")
     onClose()
   }
 
@@ -105,8 +134,8 @@ export function CampaignCreationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 max-h-[50vh]">
-          <div className="flex-shrink-0 flex flex-col gap-4 p-4">
+        <div className="flex flex-col gap-0 max-h-[50vh]">
+          <div className="flex-shrink-0 flex flex-col gap-4 p-4 bg-background">
             <div className="flex flex-col gap-2">
               <Label htmlFor="campaign-name">Campaign Name *</Label>
               <Input
@@ -126,11 +155,33 @@ export function CampaignCreationModal({
                 placeholder="Enter campaign description, setting details, or notes..."
               />
             </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="dungeon-master">Dungeon Master</Label>
+              <Select value={dungeonMasterId || "none"} onValueChange={(value) => setDungeonMasterId(value === "none" ? "" : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a Dungeon Master (optional)"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Dungeon Master</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.userId} value={user.userId}>
+                      {user.displayName || `User ${user.userId.slice(0, 8)}...`}
+                    </SelectItem>
+                  ))}
+                  {!loadingUsers && users.length === 0 && (
+                    <SelectItem value="no-users" disabled>
+                      No users found
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Character Management Section - Only show when editing existing campaign */}
           {editingCampaign && onAssignCharacterToCampaign && onRemoveCharacterFromCampaign && (
-            <div className="flex-1 overflow-y-auto space-y-4 border-t p-4">
+            <div className="flex-1 overflow-y-auto space-y-4 border-t p-4 bg-background">
               {/* Characters in Campaign */}
               {getCharactersInCampaign(editingCampaign.id).length > 0 ? (
                 <div className="space-y-2">
@@ -143,7 +194,7 @@ export function CampaignCreationModal({
                     {getCharactersInCampaign(editingCampaign.id).map((character) => (
                       <div
                         key={character.id}
-                        className="flex items-center justify-between p-2 border rounded-md"
+                        className="flex items-center justify-between p-2 border bg-card rounded-lg"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-md bg-muted/20 flex items-center justify-center overflow-hidden">
@@ -195,7 +246,7 @@ export function CampaignCreationModal({
                     {getCharactersNotInCampaign(editingCampaign.id).map((character) => (
                       <div
                         key={character.id}
-                        className="flex items-center justify-between p-2 bg-muted/100 rounded-md"
+                        className="flex items-center justify-between p-2 bg-muted/100 rounded-lg border"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-md bg-muted/20 flex items-center justify-center overflow-hidden">

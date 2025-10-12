@@ -3,8 +3,257 @@ import type { CharacterData, Campaign } from "./character-data"
 import type { ClassData, SubclassData } from "./class-utils"
 import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, calculateProficiencyBonus, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData } from "./character-data"
 import { getBardicInspirationData, getSongOfRestData } from "./class-utils"
+import { isSuperadmin, canAccessPrivateSheet, canEditCharacter as canEditCharacterRole, canEditCharacterInCampaign } from "./user-roles"
+import type { UserProfile } from "./user-profiles"
 
 const supabase = createClient()
+
+export const getCurrentUser = async (): Promise<{ user?: any; error?: string }> => {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error) {
+      console.error("Error getting current user:", error)
+      return { error: error.message }
+    }
+    return { user }
+  } catch (error) {
+    console.error("Error in getCurrentUser:", error)
+    return { error: "Failed to get current user" }
+  }
+}
+
+export const getCurrentUserProfile = async (): Promise<{ profile?: UserProfile; error?: string }> => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: authError?.message || "No authenticated user" }
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single()
+
+    if (profileError) {
+      console.error("Error getting user profile:", profileError)
+      return { error: profileError.message }
+    }
+
+    return { 
+      profile: {
+        id: profile.id,
+        userId: profile.user_id,
+        displayName: profile.display_name,
+        permissionLevel: profile.permission_level,
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at
+      }
+    }
+  } catch (error) {
+    console.error("Error in getCurrentUserProfile:", error)
+    return { error: "Failed to get user profile" }
+  }
+}
+
+export const createUserProfile = async (): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: authError?.message || "No authenticated user" }
+    }
+
+    const { error } = await supabase
+      .from("user_profiles")
+      .insert([{
+        user_id: user.id,
+        display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+        permission_level: 'editor'
+      }])
+
+    if (error) {
+      console.error("Error creating user profile:", error)
+      return { error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in createUserProfile:", error)
+    return { error: "Failed to create user profile" }
+  }
+}
+
+export const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'displayName' | 'permissionLevel'>>): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { error: authError?.message || "No authenticated user" }
+    }
+
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    }
+
+    if (updates.displayName !== undefined) {
+      updateData.display_name = updates.displayName
+    }
+    if (updates.permissionLevel !== undefined) {
+      updateData.permission_level = updates.permissionLevel
+    }
+
+    const { error } = await supabase
+      .from("user_profiles")
+      .update(updateData)
+      .eq("user_id", user.id)
+
+    if (error) {
+      console.error("Error updating user profile:", error)
+      return { error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in updateUserProfile:", error)
+    return { error: "Failed to update user profile" }
+  }
+}
+
+// Debug function to check database state
+export const debugDatabaseState = async (): Promise<void> => {
+  try {
+    console.log("🔍 DEBUG: Checking database state...")
+    
+    // Check user_profiles table
+    const { data: profiles, error: profilesError } = await supabase
+      .from("user_profiles")
+      .select("*")
+    
+    console.log("📊 user_profiles table:", { profiles, profilesError })
+    
+    // Check characters table
+    const { data: characters, error: charactersError } = await supabase
+      .from("characters")
+      .select("id, name, user_id")
+    
+    console.log("📊 characters table:", { characters, charactersError })
+    
+    // Check current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    console.log("👤 Current user:", { user, userError })
+    
+  } catch (error) {
+    console.error("❌ Debug error:", error)
+  }
+}
+
+export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: string }> => {
+  try {
+    console.log("🔍 getAllUsers: Starting to fetch users...")
+    
+    // Get all user profiles
+    const { data: profiles, error: profilesError } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .order("display_name", { ascending: true })
+    
+    console.log("📊 User profiles query result:", { profiles, profilesError })
+    
+    if (profilesError) {
+      console.error("❌ Error getting user profiles:", profilesError)
+      return { error: profilesError.message }
+    }
+    
+    // If no profiles exist, try to get users from characters table
+    if (!profiles || profiles.length === 0) {
+      console.log("⚠️ No user profiles found, checking characters table...")
+      
+      // Get unique user IDs from characters table
+      const { data: characterData, error: characterError } = await supabase
+        .from("characters")
+        .select("user_id")
+        .not("user_id", "is", null)
+      
+      console.log("📊 Characters query result:", { characterData, characterError })
+      
+      if (characterError) {
+        console.error("❌ Error getting character user IDs:", characterError)
+        return { error: characterError.message }
+      }
+      
+      // Get unique user IDs
+      const userIds = [...new Set(characterData?.map(c => c.user_id).filter(Boolean) || [])]
+      console.log("🆔 Unique user IDs from characters:", userIds)
+      
+      if (userIds.length === 0) {
+        console.log("⚠️ No users found in characters table either")
+        return { users: [] }
+      }
+      
+      // Create temporary user profiles for users who have characters but no profiles
+      const tempUsers: UserProfile[] = userIds.map((userId, index) => ({
+        id: index + 1, // Temporary ID
+        userId: userId,
+        displayName: `User ${userId.slice(0, 8)}...`,
+        permissionLevel: userId === 'ea6864ba-869e-45af-9342-546e01a07464' ? 'superadmin' : 'editor' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }))
+      
+      console.log("✅ Created temporary users:", tempUsers)
+      return { users: tempUsers }
+    }
+    
+    // Convert to UserProfile format
+    const users: UserProfile[] = profiles.map(profile => ({
+      id: profile.id,
+      userId: profile.user_id,
+      displayName: profile.display_name,
+      permissionLevel: profile.permission_level,
+      createdAt: profile.created_at,
+      updatedAt: profile.updated_at
+    }))
+    
+    console.log("✅ Converted user profiles:", users)
+    return { users }
+  } catch (error) {
+    console.error("❌ Error in getAllUsers:", error)
+    return { error: "Failed to get users" }
+  }
+}
+
+export const canViewCharacter = (character: CharacterData, userId?: string): boolean => {
+  // Owner can always view
+  if (character.userId === userId) {
+    return true
+  }
+  // Public characters can be viewed by anyone
+  if (character.visibility === 'public') {
+    return true
+  }
+  // Private characters can only be viewed by owner or superadmin
+  return canAccessPrivateSheet(character.userId, userId)
+}
+
+export const canEditCharacter = (character: CharacterData, userId?: string): boolean => {
+  // Use role-based editing permissions
+  return canEditCharacterRole(character.userId, userId)
+}
+
+export const canEditCharacterWithCampaign = (
+  character: CharacterData, 
+  userId?: string, 
+  campaignDmId?: string,
+  currentCampaignId?: string
+): boolean => {
+  // Use campaign-aware editing permissions
+  return canEditCharacterInCampaign(
+    character.userId, 
+    userId, 
+    campaignDmId,
+    character.campaignId,
+    currentCampaignId
+  )
+}
 
 export const testConnection = async (): Promise<{ success: boolean; error?: string }> => {
   try {
@@ -125,6 +374,8 @@ export const saveCharacter = async (
       race: character.race,
       alignment: character.alignment,
       image_url: character.imageUrl || null,
+      user_id: character.userId || null,
+      visibility: character.visibility || 'public',
       strength: character.strength,
       dexterity: character.dexterity,
       constitution: character.constitution,
@@ -341,6 +592,8 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       race: data.race,
       alignment: data.alignment,
       imageUrl: data.image_url || undefined,
+      userId: data.user_id || undefined,
+      visibility: data.visibility || 'public',
       strength: data.strength,
       dexterity: data.dexterity,
       constitution: data.constitution,
@@ -705,6 +958,8 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           race: row.race,
           alignment: row.alignment,
           imageUrl: row.image_url || undefined,
+          userId: row.user_id || undefined,
+          visibility: row.visibility || 'public',
           strength: row.strength,
           dexterity: row.dexterity,
           constitution: row.constitution,
@@ -1398,7 +1653,8 @@ export const createCampaign = async (campaign: Campaign): Promise<{ success: boo
         created_at: campaign.created_at,
         updated_at: campaign.updated_at,
         characters: campaign.characters,
-        is_active: campaign.isActive || false
+        is_active: campaign.isActive || false,
+        dungeon_master_id: campaign.dungeonMasterId || null
       }])
 
     if (error) {
@@ -1432,7 +1688,8 @@ export const loadAllCampaigns = async (): Promise<{ campaigns?: Campaign[]; erro
       created_at: row.created_at,
       updated_at: row.updated_at,
       characters: row.characters || [],
-      isActive: row.is_active || false
+      isActive: row.is_active || false,
+      dungeonMasterId: row.dungeon_master_id || undefined
     }))
 
     return { campaigns }
@@ -1451,7 +1708,8 @@ export const updateCampaign = async (campaign: Campaign): Promise<{ success: boo
         description: campaign.description,
         updated_at: campaign.updated_at,
         characters: campaign.characters,
-        is_active: campaign.isActive || false
+        is_active: campaign.isActive || false,
+        dungeon_master_id: campaign.dungeonMasterId || null
       })
       .eq("id", campaign.id)
 

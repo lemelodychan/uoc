@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono, Space_Grotesk, Public_Sans } from "next/font/goo
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"
+import { UserProvider } from "@/lib/user-context"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -45,8 +46,10 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${publicSans.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="font-body antialiased">
         <ThemeProvider>
-          {children}
-          <Toaster />
+          <UserProvider>
+            {children}
+            <Toaster />
+          </UserProvider>
         </ThemeProvider>
       </body>
     </html>

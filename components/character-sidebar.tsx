@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Icon } from "@iconify/react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { CharacterData, Campaign } from "@/lib/character-data"
+import { canViewCharacter } from "@/lib/database"
 
 interface CharacterSidebarProps {
   characters: CharacterData[]
@@ -22,6 +23,9 @@ interface CharacterSidebarProps {
   onOpenDiceRoll: () => void
   onOpenCampaignManagement: () => void
   onOpenSpellLibrary: () => void
+  currentUserId?: string
+  currentView?: 'character' | 'campaign'
+  onViewChange?: (view: 'character' | 'campaign') => void
 }
 
 export function CharacterSidebar({
@@ -36,8 +40,14 @@ export function CharacterSidebar({
   onOpenDiceRoll,
   onOpenCampaignManagement,
   onOpenSpellLibrary,
+  currentUserId,
+  currentView = 'character',
+  onViewChange,
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
+
+  // Show all characters in sidebar, but we'll handle access control in the main view
+  const visibleCharacters = characters
 
   // Helper function to format character level and class display
   const getCharacterLevelDisplay = (character: CharacterData): string => {
@@ -56,8 +66,8 @@ export function CharacterSidebar({
 
   // Filter characters based on selected campaign
   const filteredCharacters = selectedCampaignId === "all" 
-    ? characters 
-    : characters.filter(character => {
+    ? visibleCharacters 
+    : visibleCharacters.filter(character => {
         if (selectedCampaignId === "no-campaign") {
           return !character.campaignId
         }
@@ -93,7 +103,7 @@ export function CharacterSidebar({
   }, {} as Record<string, { campaign: Campaign | null, characters: CharacterData[] }>)
 
 	// Count characters per campaign for campaign selector labels
-	const characterCountByCampaign = characters.reduce((counts, character) => {
+	const characterCountByCampaign = visibleCharacters.reduce((counts, character) => {
 		const campaignId = character.campaignId || 'no-campaign'
 		counts[campaignId] = (counts[campaignId] || 0) + 1
 		return counts
@@ -152,7 +162,41 @@ export function CharacterSidebar({
 
       <div className={`flex flex-col gap-2 flex-1 min-h-0 w-full ${isCollapsed ? "p-2" : "p-4"}`}>
 
-        <div className="flex gap-2 mb-4">
+        {/* Campaign Selector */}
+        <div className="flex items-center gap-2 mb-2">
+          {!isCollapsed && (campaigns || []).length > 0 && (
+              <Select value={selectedCampaignId} onValueChange={onCampaignChange}>
+              <SelectTrigger className="w-full text-md font-medium pl-8 relative">
+                <Icon icon="lucide:book-open" className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" />
+                <SelectValue placeholder="Select campaign" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Campaigns</SelectItem>
+                {(campaigns || []).map((campaign) => {
+                  const count = characterCountByCampaign[campaign.id] || 0
+                  return (
+                    <SelectItem key={campaign.id} value={campaign.id}>
+                      {campaign.name}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          )}
+
+          {!isCollapsed && (
+              <Button
+                onClick={onOpenCampaignManagement}
+                variant="outline"
+                size="sm"
+                className="h-9"
+              >
+                <Icon icon="lucide:settings" className="w-4 h-4" />
+              </Button>
+            )}
+        </div>
+
+        <div className="flex gap-2 mb-2">
           <Button
             onClick={onCreateCharacter}
             className={`flex-1 bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground ${
@@ -162,40 +206,27 @@ export function CharacterSidebar({
             <Icon icon="lucide:user-round-plus" className={`${isCollapsed ? "w-6 h-6" : "w-4 h-4"}`} />
             {!isCollapsed && <span>New Character</span>}
           </Button>
-          {!isCollapsed && (
-            <Button
-              onClick={onOpenCampaignManagement}
-              variant="outline"
-              size="sm"
-              className="h-9"
-            >
-              <Icon icon="lucide:settings" className="w-4 h-4" />Edit
-            </Button>
-          )}
         </div>
 
-        {/* Campaign Selector */}
-        {!isCollapsed && (campaigns || []).length > 0 && (
-            <Select value={selectedCampaignId} onValueChange={onCampaignChange}>
-            <SelectTrigger className="w-full text-md font-medium pl-8 relative">
-              <Icon icon="lucide:book-open" className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" />
-              <SelectValue placeholder="Select campaign" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Campaigns</SelectItem>
-              {(campaigns || []).map((campaign) => {
-                const count = characterCountByCampaign[campaign.id] || 0
-                return (
-                  <SelectItem key={campaign.id} value={campaign.id}>
-                    {campaign.name}
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
+        {/* Campaign Homepage Link */}
+        {!isCollapsed && selectedCampaignId && selectedCampaignId !== "all" && selectedCampaignId !== "no-campaign" && (
+          <Button
+            variant="outline"
+            className={`w-full rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 border-0 hover:text-primary ${
+              currentView === 'campaign' ? 'text-primary' : ''
+            }`}
+            onClick={() => {
+              if (currentView !== 'campaign') {
+                onViewChange?.('campaign')
+              }
+            }}
+          >
+            <Icon icon="lucide:home" className="w-4 h-4" />
+            Campaign Home
+          </Button>
         )}
 
-        <ScrollArea className="flex-1 min-h-0">
+        <ScrollArea className="flex-1 min-h-0 border-t pt-1">
           <div className="space-y-4 flex flex-col gap-2">
             {/* Campaign Filter Summary */}
 			{selectedCampaignId === 'all' ? (
@@ -225,7 +256,7 @@ export function CharacterSidebar({
 												<TooltipTrigger asChild>
 													<Card
 														className={`cursor-pointer transition-colors mb-0 p-0 rounded-lg ${isCollapsed ? "w-full h-14" : "w-full h-auto"} ${
-															character.id === activeCharacterId
+															character.id === activeCharacterId && currentView === 'character'
 																? "bg-sidebar-accent border-sidebar-primary"
 																: "hover:bg-sidebar-accent/25"
 														}`}
@@ -245,7 +276,12 @@ export function CharacterSidebar({
 																</div>
 																{!isCollapsed && (
 																	<div className="flex-1 min-w-0">
-																		<div className="font-medium text-sidebar-foreground truncate">{character.name}</div>
+																		<div className="flex items-center gap-1">
+																			<div className="font-medium text-sidebar-foreground truncate">{character.name}</div>
+																			{character.visibility === 'private' && (
+																				<Icon icon="lucide:lock" className="w-3 h-3 text-sidebar-foreground/50" />
+																			)}
+																		</div>
 																		<div className="text-xs text-sidebar-foreground/70">
 																			{getCharacterLevelDisplay(character)}
 																		</div>
@@ -263,6 +299,12 @@ export function CharacterSidebar({
 															<div className="text-xs text-muted-foreground mb-0.5">{character.subclass}</div>
 														)}
 														<div className="text-xs text-muted-foreground mb-0.5">{character.partyStatus || 'active'}</div>
+														{character.visibility === 'private' && (
+															<div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+																<Icon icon="lucide:lock" className="w-3 h-3" />
+																{character.userId === currentUserId ? 'Private (yours)' : 'Private character'}
+															</div>
+														)}
 													</TooltipContent>
 												)}
 											</Tooltip>
@@ -306,7 +348,7 @@ export function CharacterSidebar({
                           <TooltipTrigger asChild>
                             <Card
                               className={`cursor-pointer transition-colors mb-0 p-0 rounded-lg ${
-                                character.id === activeCharacterId
+                                character.id === activeCharacterId && currentView === 'character'
                                   ? "bg-sidebar-accent border-sidebar-primary"
                                   : "hover:bg-sidebar-accent/25"
                               }`}
@@ -326,7 +368,12 @@ export function CharacterSidebar({
                                   </div>
                                   {!isCollapsed && (
                                     <div className="flex-1 min-w-0">
-                                      <div className="font-bold font-display text-sidebar-foreground truncate">{character.name}</div>
+                                      <div className="flex items-center gap-1">
+                                        <div className="font-bold font-display text-sidebar-foreground truncate">{character.name}</div>
+                                        {character.visibility === 'private' && (
+                                          <Icon icon="lucide:lock" className="w-3 h-3 text-sidebar-foreground/50" />
+                                        )}
+                                      </div>
                                       <div className="text-xs text-sidebar-foreground/70">
                                         {getCharacterLevelDisplay(character)}
                                       </div>
@@ -345,6 +392,12 @@ export function CharacterSidebar({
                               )}
                               <div className="text-xs text-muted-foreground mb-0.5">{character.partyStatus || 'active'}</div>
                               {campaign && <div className="text-xs text-muted-foreground">Campaign: {campaign.name}</div>}
+                              {character.visibility === 'private' && (
+                                <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                                  <Icon icon="lucide:lock" className="w-3 h-3" />
+                                  {character.userId === currentUserId ? 'Private (yours)' : 'Private character'}
+                                </div>
+                              )}
                             </TooltipContent>
                           )}
                         </Tooltip>

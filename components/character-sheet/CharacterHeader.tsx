@@ -13,6 +13,7 @@ interface CharacterHeaderProps {
   onOpenBiography: () => void
   onOpenPortrait: () => void
   onLevelUp: () => void
+  canEdit?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -25,7 +26,8 @@ export function CharacterHeader({
   onEdit, 
   onOpenBiography, 
   onOpenPortrait,
-  onLevelUp
+  onLevelUp,
+  canEdit = true
 }: CharacterHeaderProps) {
   return (
     <Card className="mb-6">
@@ -41,7 +43,15 @@ export function CharacterHeader({
               />
             )}
             <div className="flex flex-col items-between gap-2">
-              <CardTitle className="text-3xl font-bold font-display">{character.name}</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-3xl font-bold font-display">{character.name}</CardTitle>
+                {character.visibility === 'private' && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Icon icon="lucide:lock" className="w-3 h-3" />
+                    Private
+                  </Badge>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">Level {character.level}</Badge>
                 <Badge variant="default">Proficiency {formatModifier(proficiencyBonus)}</Badge>
@@ -61,18 +71,22 @@ export function CharacterHeader({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="default" size="sm" onClick={onLevelUp}>
-              <Icon icon="lucide:trending-up" className="w-4 h-4" />
-              Level Up
-            </Button>
+            {canEdit && (
+              <Button variant="default" size="sm" onClick={onLevelUp}>
+                <Icon icon="lucide:trending-up" className="w-4 h-4" />
+                Level Up
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={onOpenBiography}>
               <Icon icon="lucide:book-open" className="w-4 h-4" />
               Biography
             </Button>
-            <Button variant="outline" size="sm" onClick={onEdit}>
-              <Icon icon="lucide:edit" className="w-4 h-4" />
-              Edit
-            </Button>
+            {canEdit && (
+              <Button variant="outline" size="sm" onClick={onEdit}>
+                <Icon icon="lucide:edit" className="w-4 h-4" />
+                Edit
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>

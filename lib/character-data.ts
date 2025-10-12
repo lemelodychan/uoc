@@ -13,6 +13,7 @@ export interface Campaign {
   updated_at: string
   characters: string[] // Array of character IDs
   isActive?: boolean // Whether this is the currently active campaign
+  dungeonMasterId?: string // ID of the user who is the Dungeon Master
 }
 
 export interface CharacterData {
@@ -29,6 +30,9 @@ export interface CharacterData {
   background: string
   race: string
   alignment: string
+  // User ownership and visibility
+  userId?: string
+  visibility: 'public' | 'private'
   strength: number
   dexterity: number
   constitution: number

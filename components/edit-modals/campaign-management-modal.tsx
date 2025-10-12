@@ -17,6 +17,8 @@ import { CampaignCreationModal } from "./campaign-creation-modal"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
+import type { UserProfile } from "@/lib/user-profiles"
+import { getAllUsers } from "@/lib/database"
 import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById } from "@/lib/database"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -52,13 +54,42 @@ export function CampaignManagementModal({
   const [deletingCampaign, setDeletingCampaign] = useState<Campaign | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState<string>("campaigns")
+  const [users, setUsers] = useState<UserProfile[]>([])
 
   const filteredCampaigns = campaigns.filter(campaign =>
     campaign.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Load users when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      getAllUsers().then(({ users, error }) => {
+        if (error) {
+          console.error("Failed to load users:", error)
+        } else {
+          setUsers(users || [])
+        }
+      })
+    }
+  }, [isOpen])
+
   const getCharactersInCampaign = (campaignId: string) => {
     return characters.filter(char => char.campaignId === campaignId)
+  }
+
+  const getDungeonMasterName = (campaign: Campaign): string => {
+    if (!campaign.dungeonMasterId) return "No DM assigned"
+    const dm = users.find(user => user.userId === campaign.dungeonMasterId)
+    return dm ? dm.displayName || `User ${dm.userId.slice(0, 8)}...` : "Unknown DM"
+  }
+
+  const getDungeonMasterBadge = (campaign: Campaign) => {
+    if (!campaign.dungeonMasterId) return null
+    const dm = users.find(user => user.userId === campaign.dungeonMasterId)
+    if (dm && dm.permissionLevel === 'superadmin') {
+      return <Badge variant="default" className="text-xs">Superadmin</Badge>
+    }
+    return null
   }
 
   const handleCreateCampaign = (campaign: Campaign) => {
@@ -142,6 +173,10 @@ export function CampaignManagementModal({
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                   <Icon icon="lucide:calendar" className="w-4 h-4" />
                                   Created {formatDate(campaign.created_at)}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Icon icon="lucide:crown" className="w-4 h-4" />
+                                  <span>{getDungeonMasterName(campaign)}</span>
                                 </div>
                                 <div className="text-xs text-muted-foreground">
                                   {/* Character Summary */}

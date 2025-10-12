@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { MulticlassModal } from "./multiclass-modal"
+import { getCurrentUser, getAllUsers } from "@/lib/database"
+import type { UserProfile } from "@/lib/user-profiles"
 
 const DND_CLASSES = {
   Artificer: ["Artillerist"],
@@ -54,8 +56,41 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     alignment: character.alignment,
     partyStatus: character.partyStatus || 'active',
     imageUrl: character.imageUrl || "",
+    visibility: character.visibility || 'public',
   })
   const [multiclassModalOpen, setMulticlassModalOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [isOwner, setIsOwner] = useState(false)
+  const [users, setUsers] = useState<UserProfile[]>([])
+
+  // Get current user and check ownership
+  useEffect(() => {
+    const getUser = async () => {
+      const { user } = await getCurrentUser()
+      setCurrentUser(user)
+      setIsOwner(user?.id === character.userId)
+    }
+    getUser()
+  }, [character.userId])
+
+  // Load users when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      getAllUsers().then(({ users, error }) => {
+        if (error) {
+          console.error("Failed to load users:", error)
+        } else {
+          setUsers(users || [])
+        }
+      })
+    }
+  }, [isOpen])
+
+  const getOwnerDisplayName = (): string => {
+    if (!character.userId) return 'No Owner'
+    const owner = users.find(user => user.userId === character.userId)
+    return owner ? owner.displayName || `User ${owner.userId.slice(0, 8)}...` : 'Unknown User'
+  }
 
   // Sync local state with character prop when it changes
   useEffect(() => {
@@ -69,8 +104,9 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
       alignment: character.alignment,
       partyStatus: character.partyStatus || 'active',
       imageUrl: character.imageUrl || "",
+      visibility: character.visibility || 'public',
     })
-  }, [character.name, character.class, character.subclass, character.level, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl])
+  }, [character.name, character.class, character.subclass, character.level, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility])
 
   const handleClassChange = (newClass: string) => {
     setFormData({
@@ -81,7 +117,10 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   }
 
   const handleSave = () => {
-    onSave(formData)
+    onSave({
+      ...formData,
+      visibility: formData.visibility
+    })
     // Also update party status if it changed
     if (onPartyStatusChange && formData.partyStatus !== character.partyStatus) {
       onPartyStatusChange(formData.partyStatus)
@@ -249,6 +288,48 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               </SelectContent>
             </Select>
           </div>
+          
+          <div className="grid grid-cols-[112px_auto] items-center gap-3">
+            <Label htmlFor="owner" className="text-right">
+              Owner
+            </Label>
+            <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted">
+              <Icon icon="lucide:user" className="w-4 h-4" />
+              <span className="text-sm text-muted-foreground">
+                {getOwnerDisplayName()}
+              </span>
+            </div>
+          </div>
+          
+          {isOwner && (
+            <div className="grid grid-cols-[112px_auto] items-center gap-3">
+              <Label htmlFor="visibility" className="text-right">
+                Visibility
+              </Label>
+              <Select
+                value={formData.visibility}
+                onValueChange={(value) => setFormData({ ...formData, visibility: value as 'public' | 'private' })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">
+                    <div className="flex items-center gap-2">
+                      <Icon icon="lucide:globe" className="w-4 h-4" />
+                      Public
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="private">
+                    <div className="flex items-center gap-2">
+                      <Icon icon="lucide:lock" className="w-4 h-4" />
+                      Private
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
