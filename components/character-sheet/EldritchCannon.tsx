@@ -42,7 +42,7 @@ export function EldritchCannon({ character, onEdit }: EldritchCannonProps) {
       <CardContent>
         {character.eldritchCannon ? (
           <div className="space-y-3">
-            <div className="p-3 border rounded-lg">
+            <div className="p-3 border rounded-lg bg-background">
               <div className="flex items-center justify-between mb-2">
                 <div className="font-medium flex items-center gap-2">
                   {character.eldritchCannon.size} {character.eldritchCannon.type}
@@ -53,15 +53,15 @@ export function EldritchCannon({ character, onEdit }: EldritchCannonProps) {
               </div>
               
               <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
+                <div className="text-center border p-2 rounded-lg flex flex-col gap-1 bg-card">
                   <div className="text-xs text-muted-foreground">AC</div>
                   <div className="font-mono text-lg font-semibold">{character.eldritchCannon.armorClass}</div>
                 </div>
-                <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
+                <div className="text-center border p-2 rounded-lg flex flex-col gap-1 bg-card">
                   <div className="text-xs text-muted-foreground">Attack</div>
                   <div className="font-mono text-lg font-semibold">+{character.eldritchCannon.attackBonus}</div>
                 </div>
-                <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
+                <div className="text-center border p-2 rounded-lg flex flex-col gap-1 bg-card">
                   <div className="text-xs text-muted-foreground">
                     {character.eldritchCannon.type === 'Protector' ? 'Temp HP' : 'Damage'}
                   </div>

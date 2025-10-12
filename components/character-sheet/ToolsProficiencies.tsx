@@ -174,11 +174,11 @@ export function ToolsProficiencies({
             <div className="text-sm font-medium">Magic Items</div>
             <div className="flex flex-col gap-2">
               {character.magicItems.map((item, index) => (
-                <div key={index} className="p-2 border rounded">
+                <div key={index} className="p-2 border rounded bg-background">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium">{item.name || "Unnamed Magic Item"}</h4>
                     {(item.maxUses ?? 0) > 0 && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         {Array.from({ length: item.maxUses! }, (_, i) => {
                           const maxUses = Math.max(0, item.maxUses ?? 0)
                           const currentUses = Math.min(maxUses, Math.max(0, item.currentUses ?? maxUses))
@@ -197,7 +197,7 @@ export function ToolsProficiencies({
                             />
                           )
                         })}
-                        <span className="text-xs text-muted-foreground ml-1">
+                        <span className="text-xs text-muted-foreground ml-2">
                           {Math.min(item.maxUses ?? 0, Math.max(0, item.currentUses ?? (item.maxUses ?? 0)))}/{item.maxUses}
                         </span>
                       </div>

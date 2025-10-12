@@ -12,6 +12,7 @@ interface CharacterHeaderProps {
   onEdit: () => void
   onOpenBiography: () => void
   onOpenPortrait: () => void
+  onLevelUp: () => void
 }
 
 const formatModifier = (mod: number): string => {
@@ -23,7 +24,8 @@ export function CharacterHeader({
   proficiencyBonus, 
   onEdit, 
   onOpenBiography, 
-  onOpenPortrait 
+  onOpenPortrait,
+  onLevelUp
 }: CharacterHeaderProps) {
   return (
     <Card className="mb-6">
@@ -59,9 +61,13 @@ export function CharacterHeader({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="default" size="sm" onClick={onLevelUp}>
+              <Icon icon="lucide:trending-up" className="w-4 h-4" />
+              Level Up
+            </Button>
             <Button variant="outline" size="sm" onClick={onOpenBiography}>
               <Icon icon="lucide:book-open" className="w-4 h-4" />
-              Character Biography
+              Biography
             </Button>
             <Button variant="outline" size="sm" onClick={onEdit}>
               <Icon icon="lucide:edit" className="w-4 h-4" />

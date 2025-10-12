@@ -22,13 +22,6 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
             <Icon icon="lucide:star" className="w-5 h-5" />
             Class Features
           </CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onRefreshFeatures}
-          >
-            Refresh
-          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -67,7 +60,7 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
                 
                 {/* Features for this class */}
                 {features.map((feature, index) => (
-                  <div key={`${className}-${index}`} className="p-3 border rounded-lg flex flex-col gap-2">
+                  <div key={`${className}-${index}`} className="p-3 border rounded-lg flex flex-col gap-2 bg-background">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="font-medium flex-1 min-w-0 truncate">{feature.name}</div>
                       <div className="flex items-center gap-2">

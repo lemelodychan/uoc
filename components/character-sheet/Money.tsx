@@ -28,20 +28,20 @@ export function Money({ character, onEdit }: MoneyProps) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div className="space-y-1">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="flex flex-col gap-1 bg-background border p-2 rounded-lg">
               <div className={`text-sm font-medium ${getCombatColor('initiative')}`}>Gold</div>
               <div className="text-lg font-semibold text-foreground">
                 {character.money?.gold || 0}
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 bg-background border p-2 rounded-lg">
               <div className="text-sm font-medium text-muted-foreground">Silver</div>
               <div className="text-lg font-semibold text-foreground">
                 {character.money?.silver || 0}
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 bg-background border p-2 rounded-lg">
               <div className="text-sm font-medium text-orange-600 dark:text-orange-400">Copper</div>
               <div className="text-lg font-semibold text-foreground">
                 {character.money?.copper || 0}

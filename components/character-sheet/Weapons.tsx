@@ -30,7 +30,7 @@ export function Weapons({ character, onEdit }: WeaponsProps) {
       <CardContent>
         <div className="flex flex-col gap-2">
           {character.weapons.map((weapon, index) => (
-            <div key={index} className="p-2 border text-sm font-medium rounded flex flex-row gap-2">
+            <div key={index} className="p-2 border text-sm font-medium rounded flex flex-row gap-2 bg-background">
               <div className="w-full flex flex-col gap-1">
                 <span>{weapon.name}</span>
                   {weapon.weaponProperties && weapon.weaponProperties.length > 0 && (

@@ -43,13 +43,13 @@ export function Infusions({ character, onEdit, onOpenFeatureModal }: InfusionsPr
       <CardContent className="flex flex-col gap-2">
         {/* Infusion Tracking */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
+          <div className="text-center p-2 border rounded-lg flex flex-col gap-1 bg-background">
             <div className="text-sm text-muted-foreground">Infusions Known</div>
             <div className="text-xl font-bold font-mono">
               {getArtificerInfusionsKnown(artificerLevel)}
             </div>
           </div>
-          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
+          <div className="text-center p-2 border rounded-lg flex flex-col gap-1 bg-background">
             <div className="text-sm text-muted-foreground">Max Infused</div>
             <div className="text-xl font-bold font-mono">
               {getArtificerMaxInfusedItems(character)}
@@ -60,7 +60,7 @@ export function Infusions({ character, onEdit, onOpenFeatureModal }: InfusionsPr
         {/* Infusions List */}
         <div className="space-y-3 flex flex-col gap-2">
           {character.infusions.map((infusion, index) => (
-            <div key={index} className="p-2 mb-0 border rounded-lg flex items-center justify-between">
+            <div key={index} className="p-2 mb-0 border rounded-lg flex items-center justify-between bg-background">
               <h4 className="text-sm font-medium mb-0">{infusion.title || "Untitled Infusion"}</h4>
               {infusion.description && (
               <Button

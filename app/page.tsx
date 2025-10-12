@@ -46,6 +46,7 @@ import { LongRestResultsModal } from "@/components/edit-modals/long-rest-results
 import { EldritchCannonModal } from "@/components/edit-modals/eldritch-cannon-modal"
 import { EldritchInvocationsModal } from "@/components/edit-modals/eldritch-invocations-modal"
 import { SpellLibraryModal } from "@/components/edit-modals/spell-library-modal"
+import { LevelUpModal } from "@/components/edit-modals/level-up-modal"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { useToast } from "@/hooks/use-toast"
@@ -110,6 +111,7 @@ export default function CharacterSheet() {
   const [eldritchCannonModalOpen, setEldritchCannonModalOpen] = useState(false)
   const [eldritchInvocationsModalOpen, setEldritchInvocationsModalOpen] = useState(false)
   const [diceRollModalOpen, setDiceRollModalOpen] = useState(false)
+  const [levelUpModalOpen, setLevelUpModalOpen] = useState(false)
   const [campaignManagementModalOpen, setCampaignManagementModalOpen] = useState(false)
   const [longRestResults, setLongRestResults] = useState<{
     characterId: string;
@@ -2319,6 +2321,7 @@ export default function CharacterSheet() {
             onEdit={() => setBasicInfoModalOpen(true)}
             onOpenBiography={() => setCharacterDetailsContentModalOpen(true)}
             onOpenPortrait={() => setPortraitModalOpen(true)}
+            onLevelUp={() => setLevelUpModalOpen(true)}
           />
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -2394,6 +2397,11 @@ export default function CharacterSheet() {
             <Weapons
               character={activeCharacter}
               onEdit={() => setWeaponsModalOpen(true)}
+            />
+
+            <EldritchCannonComponent
+              character={activeCharacter}
+              onEdit={() => setEldritchCannonModalOpen(true)}
             />
 
             <Spellcasting
@@ -2472,11 +2480,6 @@ export default function CharacterSheet() {
                 setFeatureModalContent(content)
                 setFeatureModalOpen(true)
               }}
-            />
-
-            <EldritchCannonComponent
-              character={activeCharacter}
-              onEdit={() => setEldritchCannonModalOpen(true)}
             />
           </div>
 
@@ -2821,6 +2824,14 @@ export default function CharacterSheet() {
         character={activeCharacter}
         onAddSpell={handleAddSpell}
         onCreateNewSpell={() => setSpellModalOpen(true)}
+      />
+
+      {/* Level Up Modal */}
+      <LevelUpModal
+        isOpen={levelUpModalOpen}
+        onClose={() => setLevelUpModalOpen(false)}
+        character={activeCharacter}
+        onSave={updateCharacter}
       />
       </div>
     </div>

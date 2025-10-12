@@ -104,21 +104,21 @@ export function Spellcasting({
         {/* Basic Spell Stats */}
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3 items-start">
-            <div className="text-center p-2 border rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1">
+            <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
               <div className="text-sm text-muted-foreground">Spell Attack</div>
               <div className="text-xl font-bold font-mono">
                 {formatModifier(character.spellData.spellAttackBonus)}
               </div>
             </div>
-            <div className="text-center p-2 border rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1">
+            <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
               <div className="text-sm text-muted-foreground">Spell Save DC</div>
               <div className="text-xl font-bold font-mono">{character.spellData.spellSaveDC}</div>
             </div>
-            <div className="text-center p-2 border rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1">
+            <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
               <div className="text-sm text-muted-foreground">Cantrips</div>
               <div className="text-xl font-bold font-mono">{character.spellData.cantripsKnown}</div>
             </div>
-            <div className="text-center p-2 border rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1">
+            <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
               <div className="text-sm text-muted-foreground">Spells</div>
               <div className="flex items-center justify-center gap-2">
                 <div className="text-xl font-bold font-mono">{character.spellData.spellsKnown}</div>
@@ -142,7 +142,7 @@ export function Spellcasting({
             <div className="text-sm font-medium">Bard Features</div>
             {/* Bardic Inspiration */}
             {character.spellData.bardicInspirationSlot && (
-              <div className="flex items-center justify-between p-2 border rounded gap-1">
+              <div className="flex items-center justify-between p-2 border rounded gap-1 bg-background">
                 <div className="flex gap-1 flex-col">
                   <span className="text-sm font-medium">Bardic Inspiration</span>
                   <span className="text-xs text-muted-foreground">
@@ -175,7 +175,7 @@ export function Spellcasting({
             )}
             {/* Bard - Song of Rest */}
             {character.spellData.songOfRest && (
-              <div className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors" onClick={onToggleSongOfRest}>
+              <div className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors bg-background" onClick={onToggleSongOfRest}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm flex flex-col gap-1">
                     <span className="font-medium">Song of Rest</span><span className="text-xs text-muted-foreground"> 1{character.spellData.songOfRest.healingDie} healing</span>
@@ -195,7 +195,7 @@ export function Spellcasting({
             <div className="text-sm font-medium">Artificer Skills</div>
             {/* Artificer - Flash of Genius */}
             {((character.class.toLowerCase() === "artificer" && character.level >= 7) || (character.classes?.some(c => c.name.toLowerCase() === "artificer") && character.classes?.reduce((total, c) => c.name.toLowerCase() === "artificer" ? total + c.level : total, 0) >= 7)) && character.spellData.flashOfGeniusSlot && (
-                <div className="flex flex-col items-start justify-between p-2 border rounded gap-0">
+                <div className="flex flex-col items-start justify-between p-2 border rounded gap-0 bg-background">
                   <div className="flex gap-3 justify-between align-center w-full flex-row">
                     <span className="text-sm font-medium">
                       Flash of Genius
@@ -236,7 +236,7 @@ export function Spellcasting({
             <div className="text-sm font-medium">Paladin Skills</div>
             {/* Paladin - Divine Sense */}
             {character.spellData.divineSenseSlot && (
-                <div className="flex items-start gap-1 justify-between p-2 border rounded">
+                <div className="flex items-start gap-1 justify-between p-2 border rounded bg-background">
                   <div className="flex gap-1 flex-col">
                     <span className="text-sm font-medium">Divine Sense</span>
                     <span className="text-xs text-muted-foreground">
@@ -267,7 +267,7 @@ export function Spellcasting({
             )}
             {/* Paladin - Lay on Hands */}
             {character.spellData.layOnHands && (
-                <div className="flex items-center justify-between p-2 border rounded">
+                <div className="flex items-center justify-between p-2 border rounded bg-background">
                   <div className="flex gap-1 flex-col">
                     <span className="text-sm font-medium">
                       Lay on Hands
@@ -297,7 +297,7 @@ export function Spellcasting({
             )}
             {/* Paladin - Channel Divinity */}
             {character.spellData.channelDivinitySlot && (
-                <div className="flex items-start justify-between p-2 border rounded gap-1">
+                <div className="flex items-start justify-between p-2 border rounded gap-1 bg-background">
                   <div className="flex gap-1 flex-col">
                     <span className="text-sm font-medium">Channel Divinity</span>
                     <span className="text-xs text-muted-foreground">
@@ -328,7 +328,7 @@ export function Spellcasting({
             )}
             {/* Paladin - Cleansing Touch */}
             {character.spellData.cleansingTouchSlot && (
-              <div className="flex items-start justify-between p-2 border rounded gap-1">
+              <div className="flex items-start justify-between p-2 border rounded gap-1 bg-background">
                   <div className="flex gap-1 flex-col">
                     <span className="text-sm font-medium">Cleansing Touch</span>
                     <span className="text-xs text-muted-foreground">
@@ -370,7 +370,7 @@ export function Spellcasting({
             <div className="text-sm font-medium">Warlock Features</div>
             {/* Warlock - Genie Wrath */}
             {character.spellData.genieWrath && (
-              <div className="flex items-center justify-between p-2 border rounded gap-1">
+              <div className="flex items-center justify-between p-2 border rounded gap-1 bg-background">
                 <div className="flex gap-1 flex-col">
                   <span className="text-sm font-medium">Genie's Wrath</span>
                   <span className="text-xs text-muted-foreground">
@@ -386,7 +386,7 @@ export function Spellcasting({
             )}
             {/* Warlock - Elemental Gift */}
             {character.spellData.elementalGift && (
-              <div className="flex items-center justify-between p-2 border rounded gap-1">
+              <div className="flex items-center justify-between p-2 border rounded gap-1 bg-background">
                 <div className="flex gap-1 flex-col">
                   <span className="text-sm font-medium">Elemental Gift</span>
                   <span className="text-xs text-muted-foreground">
@@ -417,7 +417,7 @@ export function Spellcasting({
             )}
             {/* Warlock - Sanctuary Vessel */}
             {character.spellData.sanctuaryVessel && (
-              <div className="flex items-center justify-between p-2 border rounded gap-1">
+              <div className="flex items-center justify-between p-2 border rounded gap-1 bg-background">
                 <div className="flex gap-1 flex-col">
                   <span className="text-sm font-medium">Sanctuary Vessel</span>
                   <span className="text-xs text-muted-foreground">
@@ -448,7 +448,7 @@ export function Spellcasting({
             )}
             {/* Warlock - Limited Wish */}
             {character.spellData.limitedWish && (
-              <div className="flex items-center justify-between p-2 border rounded gap-1">
+              <div className="flex items-center justify-between p-2 border rounded gap-1 bg-background">
                 <div className="flex gap-1 flex-col">
                   <span className="text-sm font-medium">Limited Wish</span>
                   <span className="text-xs text-muted-foreground">
@@ -486,7 +486,7 @@ export function Spellcasting({
             <div className="text-sm font-medium">Spell Slots</div>
             <div className="grid grid-cols-1 gap-2">
               {character.spellData.spellSlots.map((slot) => (
-                <div key={slot.level} className="p-2 border rounded flex items-center justify-between">
+                <div key={slot.level} className="p-2 border rounded flex items-center justify-between bg-background">
                   <div className="text-sm font-medium mb-1">Level {slot.level}</div>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: slot.total }, (_, i) => {
@@ -520,7 +520,7 @@ export function Spellcasting({
             <div className="text-sm font-medium">Feat Spell Slots</div>
             <div className="flex flex-col gap-2">
               {character.spellData.featSpellSlots.map((featSlot, featIndex) => (
-                <div key={featIndex} className="p-2 border rounded">
+                <div key={featIndex} className="p-2 border rounded bg-background">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium mb-1">{featSlot.spellName || `Feat ${featIndex + 1}`}</div>
                     <div className="flex items-center gap-1">

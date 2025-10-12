@@ -66,7 +66,7 @@ export function FeaturesTraits({
       <CardContent>
         <div className="flex flex-col gap-2">
           {character.features.map((feature, index) => (
-            <div key={index} className="p-2 border rounded flex flex-col gap-0.5">
+            <div key={index} className="p-2 border rounded flex flex-col gap-0.5 bg-background">
               <div className="font-medium flex items-start justify-between">
                 <span className="text-sm">{feature.name}</span>
                 {getFeatureUsesPerLongRest(feature, character) > 0 && (

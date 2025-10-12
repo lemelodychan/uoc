@@ -443,18 +443,18 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                 {tabs.map((t) => (
                   <TabsTrigger key={t.id} value={t.id}>
                     {t.label}
-                    <Badge variant="secondary" className="ml-2 px-1.5 py-0.5 text-[10px]">{t.count}</Badge>
+                    <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px]">{t.count}</Badge>
                   </TabsTrigger>
                 ))}
               </TabsList>
             </div>
 
-            <TabsContent value="basic" className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
+            <TabsContent value="basic" className="flex-1 min-h-0 overflow-y-auto bg-background">
               <div className="p-4">
                 {Object.entries(spellsByLevel)
                   .sort(([a], [b]) => parseInt(a) - parseInt(b))
                   .map(([level, levelSpells]) => (
-                    <div key={level} className="space-y-2 flex flex-col gap-1 mb-10 last:mb-0">
+                    <div key={level} className="space-y-2 flex flex-col gap-0 mb-10 last:mb-0">
                       <h3 className="text-lg font-semibold flex items-center gap-3">
                         <span>{level === "0" ? "Cantrips" : `Level ${level}`}</span>
                         <Badge variant="outline" className="px-2 py-0.5 text-xs">{levelSpells.length}</Badge>
@@ -468,12 +468,12 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                             const isOpen = !!expanded[key]
                             const globalIndex = spells.findIndex((s) => s === spell)
                             return (
-                              <div key={key} className={`p-3 border rounded-lg ${!spell.isPrepared && spell.level > 0 ? 'opacity-60' : ''}`}>
+                              <div key={key} className={`p-3 bg-card border rounded-lg ${!spell.isPrepared && spell.level > 0 ? 'opacity-60' : ''}`}>
                                 <div className="flex flex-col gap-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-2">
                                       {(spell.description || spell.higherLevel) && (
-                                        <button type="button" className={`w-5 h-5 flex items-center justify-center rounded border hover:bg-accent`} onClick={() => toggleExpanded(key)} aria-label="Toggle details">
+                                        <button type="button" className={`w-5 h-5 flex items-center justify-center rounded border hover:bg-muted`} onClick={() => toggleExpanded(key)} aria-label="Toggle details">
                                           {isOpen ? (
                                             <Icon icon="lucide:chevron-down" className="w-4 h-4" />
                                           ) : (
@@ -523,12 +523,12 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
             </TabsContent>
 
             {tagKeys.map((tag) => (
-              <TabsContent key={tag} value={`tag:${tag}`} className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
-                <div className="space-y-6 p-4">
+              <TabsContent key={tag} value={`tag:${tag}`} className="flex-1 min-h-0 bg-background overflow-y-auto">
+                <div className="flex flex-col p-4">
                   {Object.entries(spellsByTagAndLevel[tag])
                     .sort(([a],[b]) => parseInt(a) - parseInt(b))
                     .map(([level, levelSpells]) => (
-                      <div key={`${tag}-${level}`} className="flex flex-col gap-1 mb-10 last:mb-0">
+                      <div key={`${tag}-${level}`} className="flex flex-col gap-2 mb-10 last:mb-0">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <span>{level === "0" ? "Cantrips" : `Level ${level}`}</span>
                           <Badge variant="outline" className="px-2 py-0.5 text-xs">{levelSpells.length}</Badge>
@@ -542,12 +542,12 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                               const isOpen = !!expanded[key]
                               const globalIndex = spells.findIndex((s) => s === spell)
                               return (
-                                <div key={key} className={`p-3 border rounded-lg ${!spell.isPrepared && spell.level > 0 ? 'opacity-60' : ''}`}>
+                                <div key={key} className={`p-3 bg-card border rounded-lg ${!spell.isPrepared && spell.level > 0 ? 'opacity-60' : ''}`}>
                                   <div className="flex flex-col gap-2">
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex items-center gap-2">
                                         {(spell.description || spell.higherLevel) && (
-                                          <button type="button" className={`w-5 h-5 flex items-center justify-center rounded border hover:bg-accent`} onClick={() => toggleExpanded(key)} aria-label="Toggle details">
+                                          <button type="button" className={`w-5 h-5 flex items-center justify-center rounded border hover:bg-muted`} onClick={() => toggleExpanded(key)} aria-label="Toggle details">
                                             {isOpen ? (
                                               <Icon icon="lucide:chevron-down" className="w-4 h-4" />
                                             ) : (
@@ -651,7 +651,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
         </DialogHeader>
         
         {/* Scrollable Content */}
-        <div className="flex flex-col gap-4 overflow-y-auto p-4 max-h-[500px]"> 
+        <div className="flex flex-col gap-4 overflow-y-auto p-4 max-h-[500px] bg-background"> 
           <Card>
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
@@ -789,11 +789,11 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                   <Input id="saveThrow" value={newSpell.saveThrow || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, saveThrow:e.target.value }))} placeholder="Dex Save, Con Save, —" />
                 </div>
               </div>
-              <div className="col-span-4 flex flex-col gap-3 mt-2">
+              <div className="col-span-4 flex flex-col gap-3">
                 <Label htmlFor="description">Description</Label>
                 <RichTextEditor value={newSpell.description || ""} onChange={(value)=>setNewSpell(prev=>({ ...prev, description:value }))} rows={6} className="min-h-[224px]" />
               </div>
-              <div className="col-span-4 flex flex-col gap-3 mt-2">
+              <div className="col-span-4 flex flex-col gap-3">
                 <Label htmlFor="higherLevel">At a Higher Levels</Label>
                 <textarea id="higherLevel" className="w-full border rounded-md p-2 text-sm" rows={2} value={newSpell.higherLevel || ""} onChange={(e)=>setNewSpell(prev=>({ ...prev, higherLevel:e.target.value }))} />
               </div>

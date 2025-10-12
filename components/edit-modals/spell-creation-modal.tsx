@@ -246,7 +246,7 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-4 max-h-[70vh]">
+        <div className="flex-1 overflow-y-auto p-4 max-h-[70vh] bg-background">
           <div className="flex flex-col gap-4">
           {/* Basic Information */}
           <Card>
@@ -472,18 +472,18 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
           {/* Class Selection */}
           <Card>
             <CardHeader>
-              <CardTitle>Available Classes *</CardTitle>
+              <CardTitle className="flex items-center gap-2">Available Classes <Badge variant="secondary">Required</Badge></CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {SPELL_CLASSES.map(className => (
-                  <div key={className} className="flex items-center space-x-2">
+                  <div key={className} className="flex items-center gap-2">
                     <Checkbox
                       id={`class-${className}`}
                       checked={selectedClasses.includes(className)}
                       onCheckedChange={() => toggleClass(className)}
                     />
-                    <Label htmlFor={`class-${className}`} className="text-sm">
+                    <Label htmlFor={`class-${className}`} className="text-sm font-normal">
                       {className}
                     </Label>
                   </div>

@@ -42,9 +42,9 @@ export function EldritchInvocations({ character, onEdit, onOpenFeatureModal }: E
       <CardContent className="flex flex-col gap-2">
         {/* Invocation Tracking */}
         <div className="grid grid-cols-1 gap-4">
-          <div className="text-center p-2 border rounded-lg flex flex-col gap-1">
+          <div className="text-center p-2 border rounded-lg flex flex-col gap-1 bg-background">
             <div className="text-sm text-muted-foreground">Invocations Known</div>
-            <div className="text-xl font-bold text-primary font-mono">
+            <div className="text-xl font-bold font-mono">
               {character.spellData.eldritchInvocations?.length || 0}/{getWarlockInvocationsKnown(warlockLevel)}
             </div>
           </div>
@@ -54,7 +54,7 @@ export function EldritchInvocations({ character, onEdit, onOpenFeatureModal }: E
         <div className="space-y-3 flex flex-col gap-2">
           {character.spellData.eldritchInvocations && character.spellData.eldritchInvocations.length > 0 ? (
             character.spellData.eldritchInvocations.map((invocation, index) => (
-              <div key={index} className="p-2 mb-0 border rounded-lg flex items-center justify-between">
+              <div key={index} className="p-2 mb-0 border rounded-lg flex items-center justify-between bg-background">
                 <h4 className="text-sm font-medium mb-0">{invocation.name}</h4>
                 {invocation.description && (
                   <Button

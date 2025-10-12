@@ -29,7 +29,7 @@ export function Feats({ character, onEdit, onOpenFeatureModal }: FeatsProps) {
       <CardContent>
         <div className="flex flex-col gap-2">
           {character.feats.map((feat, index) => (
-            <div key={index} className="p-2 border rounded-lg flex items-center justify-between">
+            <div key={index} className="p-2 border rounded-lg flex items-center justify-between bg-background">
               <div className="font-medium text-sm">{feat.name}</div>
               <Button
                 variant="outline"
