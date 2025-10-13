@@ -2,10 +2,10 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import * as TablePkg from '@tiptap/extension-table'
-import * as TableRowPkg from '@tiptap/extension-table-row'
-import * as TableCellPkg from '@tiptap/extension-table-cell'
-import * as TableHeaderPkg from '@tiptap/extension-table-header'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
@@ -19,51 +19,39 @@ interface WysiwygEditorProps {
 }
 
 export function WysiwygEditor({ value, onChange, placeholder, className }: WysiwygEditorProps) {
-  const TableBase = (TablePkg as any)?.default ?? (TablePkg as any).Table ?? (TablePkg as any)
-  const TableRowBase = (TableRowPkg as any)?.default ?? (TableRowPkg as any).TableRow ?? (TableRowPkg as any)
-  const TableCellBase = (TableCellPkg as any)?.default ?? (TableCellPkg as any).TableCell ?? (TableCellPkg as any)
-  const TableHeaderBase = (TableHeaderPkg as any)?.default ?? (TableHeaderPkg as any).TableHeader ?? (TableHeaderPkg as any)
+  const TableConfigured = Table.configure({
+    resizable: true,
+    HTMLAttributes: { class: 'tiptap-table' },
+  })
 
-  const Table = typeof (TableBase as any)?.configure === 'function'
-    ? (TableBase as any).configure({
-        resizable: true,
-        HTMLAttributes: { class: 'tiptap-table' },
-      })
-    : TableBase
-
-  const TableRow = TableRowBase
-
-  const TableCell = typeof (TableCellBase as any)?.extend === 'function'
-    ? (TableCellBase as any).extend({
-        addAttributes() {
-          return {
-            ...(this as any).parent?.(),
-            backgroundColor: {
-              default: null,
-              parseHTML: (element: any) => element.getAttribute('data-bg') || element.style?.backgroundColor || null,
-              renderHTML: (attributes: any) => {
-                const { backgroundColor } = attributes
-                if (!backgroundColor) return {}
-                return {
-                  style: `background-color: ${backgroundColor};`,
-                  'data-bg': backgroundColor,
-                }
-              }
-            },
+  const TableCellExtended = TableCell.extend({
+    addAttributes() {
+      return {
+        // @ts-ignore parent provided by TipTap
+        ...this.parent?.(),
+        backgroundColor: {
+          default: null,
+          parseHTML: (element: any) => element.getAttribute('data-bg') || element.style?.backgroundColor || null,
+          renderHTML: (attributes: any) => {
+            const { backgroundColor } = attributes
+            if (!backgroundColor) return {}
+            return {
+              style: `background-color: ${backgroundColor};`,
+              'data-bg': backgroundColor,
+            }
           }
         },
-      })
-    : TableCellBase
-
-  const TableHeader = TableHeaderBase
+      }
+    },
+  })
 
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Table,
+      TableConfigured,
       TableRow,
       TableHeader,
-      TableCell,
+      TableCellExtended,
       Placeholder.configure({
         placeholder: placeholder || 'Start writing...',
       }),

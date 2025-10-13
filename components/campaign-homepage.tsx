@@ -1040,11 +1040,11 @@ export function CampaignHomepage({
                 <ScrollArea>
                   <div className="flex flex-row flex-wrap gap-2">
                     {sortedResources.map((resource) => (
-                      <Card key={resource.id} className="w-[calc(33.33%-16px)] bg-card hover:bg-card/70 transition-colors rounded-xl cursor-pointer" onClick={() => handleReadResource(resource)}>
+                      <Card key={resource.id} className="w-[calc(33.33%-6px)] bg-card hover:bg-card/70 transition-colors rounded-xl cursor-pointer" onClick={() => handleReadResource(resource)}>
                         <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex flex-col gap-2">
-                              <CardTitle className="text-lg font-regular">{resource.title}</CardTitle>
+                          <div className="flex items-start justify-between w-full h-full">
+                            <div className="flex flex-col gap-2 justify-between w-full h-full">
+                              <CardTitle className="text-lg font-regular flex-grow h-auto flex-1">{resource.title}</CardTitle>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                   <Icon icon="lucide:calendar" className="w-3 h-3" />

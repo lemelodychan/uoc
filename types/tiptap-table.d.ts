@@ -1,21 +1,17 @@
 declare module '@tiptap/extension-table' {
-  const Table: any
-  export default Table
+  export const Table: any
 }
 
 declare module '@tiptap/extension-table-row' {
-  const TableRow: any
-  export default TableRow
+  export const TableRow: any
 }
 
 declare module '@tiptap/extension-table-cell' {
-  const TableCell: any
-  export default TableCell
+  export const TableCell: any
 }
 
 declare module '@tiptap/extension-table-header' {
-  const TableHeader: any
-  export default TableHeader
+  export const TableHeader: any
 }
 
 declare module '@tiptap/core' {
