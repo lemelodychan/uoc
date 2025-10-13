@@ -669,7 +669,7 @@ export function CampaignHomepage({
       
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'notes' | 'resources')} className="w-full gap-4">
-        <TabsList className="grid w-full grid-cols-3 p-1 h-fit rounded-xl">
+        <TabsList className="grid w-full grid-cols-3 p-2 h-fit rounded-xl">
           <TabsTrigger value="overview" className="flex items-center gap-2 p-2 rounded-lg">
             <Icon icon="lucide:home" className="w-4 h-4" />
             Overview

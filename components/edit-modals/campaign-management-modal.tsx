@@ -114,9 +114,17 @@ export function CampaignManagementModal({
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col max-h-[80vh]">
             <div className="p-4 pb-0">
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="campaigns">Campaign Management</TabsTrigger>
-                <TabsTrigger value="classes">Class Management</TabsTrigger>
+              <TabsList className="grid grid-cols-2 w-full h-full p-2 rounded-xl">
+                <TabsTrigger value="campaigns" className="p-2 rounded-lg">Campaign Management</TabsTrigger>
+                <TabsTrigger value="classes" className="p-2 rounded-lg">
+                  Class Management 
+                  <Badge 
+                    variant="secondary" 
+                    className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1"
+                  >
+                    Beta
+                  </Badge>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -478,20 +486,22 @@ function ClassManagement() {
 
   return (
     <div className="flex flex-col gap-0 h-full min-h-0">
-      <div className="flex gap-2 items-center p-4 border-b">
-        <Input placeholder="Search classes..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <Button onClick={() => setEditingClass({
-          id: "",
-          name: "",
-          hit_die: 8,
-          primary_ability: "strength",
-          saving_throw_proficiencies: [],
-          spell_progression: {},
-          max_spell_slots: {},
-          class_features: {},
-        } as ClassData)}>
-          <Icon icon="lucide:plus" className="w-4 h-4" /> New Class
-        </Button>
+      <div className="flex flex-col w-full gap-2 p-4 pt-0 border-b">
+        <div className="flex flex-row gap-2">
+          <Input placeholder="Search classes..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Button onClick={() => setEditingClass({
+            id: "",
+            name: "",
+            hit_die: 8,
+            primary_ability: "strength",
+            saving_throw_proficiencies: [],
+            spell_progression: {},
+            max_spell_slots: {},
+            class_features: {},
+          } as ClassData)}>
+            <Icon icon="lucide:plus" className="w-4 h-4" /> New Class
+          </Button>
+        </div>
       </div>
 
       {classes.length === 0 ? (
