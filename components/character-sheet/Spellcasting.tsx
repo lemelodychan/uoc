@@ -286,7 +286,7 @@ export function Spellcasting({
                         const newValue = Math.max(0, Math.min(character.spellData.layOnHands!.totalHitPoints, parseInt(e.target.value) || 0))
                         onUpdateLayOnHands(newValue)
                       }}
-                      className="w-16 px-2 py-1 text-sm border rounded text-center"
+                      className="w-16 px-2 py-1 text-sm border rounded text-center bg-card"
                       title="Remaining Lay on Hands hit points"
                     />
                     <span className="text-sm text-muted-foreground">

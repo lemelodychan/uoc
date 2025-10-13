@@ -17,6 +17,7 @@ import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClass
 import { getBardicInspirationData, getSongOfRestData } from "./class-utils"
 import { isSuperadmin, canAccessPrivateSheet, canEditCharacter as canEditCharacterRole, canEditCharacterInCampaign } from "./user-roles"
 import type { UserProfile } from "./user-profiles"
+import { createClient as createBrowserClient } from "@supabase/supabase-js"
 
 const supabase = createClient()
 
@@ -72,7 +73,7 @@ export const createUserProfile = async (): Promise<{ success: boolean; error?: s
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return { error: authError?.message || "No authenticated user" }
+      return { success: false, error: authError?.message || "No authenticated user" }
     }
 
     const { error } = await supabase
@@ -85,13 +86,13 @@ export const createUserProfile = async (): Promise<{ success: boolean; error?: s
 
     if (error) {
       console.error("Error creating user profile:", error)
-      return { error: error.message }
+      return { success: false, error: error.message }
     }
 
     return { success: true }
   } catch (error) {
     console.error("Error in createUserProfile:", error)
-    return { error: "Failed to create user profile" }
+    return { success: false, error: "Failed to create user profile" }
   }
 }
 
@@ -99,7 +100,7 @@ export const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'disp
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return { error: authError?.message || "No authenticated user" }
+      return { success: false, error: authError?.message || "No authenticated user" }
     }
 
     const updateData: any = {
@@ -120,13 +121,56 @@ export const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'disp
 
     if (error) {
       console.error("Error updating user profile:", error)
-      return { error: error.message }
+      return { success: false, error: error.message }
+    }
+
+    // Also update the auth user's display_name in metadata when displayName changes
+    if (updates.displayName !== undefined) {
+      try {
+        // Use the same client; for server-side contexts use service role or session based update
+        const { error: authUpdateError } = await supabase.auth.updateUser({ data: { display_name: updates.displayName } as any })
+        if (authUpdateError) {
+          console.warn('Auth display name update failed:', authUpdateError.message)
+        }
+      } catch (e) {
+        console.warn('Auth display name update threw:', e)
+      }
     }
 
     return { success: true }
   } catch (error) {
     console.error("Error in updateUserProfile:", error)
-    return { error: "Failed to update user profile" }
+    return { success: false, error: "Failed to update user profile" }
+  }
+}
+
+export const syncCurrentUserProfileFromAuth = async (): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: authError?.message || "No authenticated user" }
+    }
+
+    const meta: any = user.user_metadata || {}
+    const displayName = meta.display_name || meta.full_name || meta.name || user.email?.split('@')[0] || 'User'
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .upsert({
+        user_id: user.id,
+        display_name: displayName,
+        permission_level: 'editor',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+
+    if (error) {
+      console.error('Error syncing user profile:', error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (e) {
+    console.error('Error in syncCurrentUserProfileFromAuth:', e)
+    return { success: false, error: 'Failed to sync user profile' }
   }
 }
 

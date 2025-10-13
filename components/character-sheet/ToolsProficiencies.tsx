@@ -113,6 +113,7 @@ export function ToolsProficiencies({
           </div>
           
           {/* Tools Proficiencies */}
+          {character.toolsProficiencies.length > 0 && (
           <div className="mt-4 pt-4 border-t">
             <div className="text-sm font-medium mb-2">Tools Proficiencies</div>
             <div className="flex flex-col gap-1.5">
@@ -161,10 +162,8 @@ export function ToolsProficiencies({
                 )
               })}
             </div>
-            {character.toolsProficiencies.length === 0 && (
-              <div className="text-sm text-muted-foreground text-center py-4">No tool proficiencies</div>
-            )}
           </div>
+          )}
         </div>
         
         {/* Magic Items */}
