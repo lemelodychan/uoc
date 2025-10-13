@@ -86,7 +86,7 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
   return (
     <div className={className}>
       {/* Toolbar */}
-      <div className="flex gap-1 p-2 border rounded-t-md bg-muted/50">
+      <div className="flex gap-1 p-2 border rounded-t-md bg-card">
         <Button
           type="button"
           variant="ghost"
@@ -183,7 +183,7 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
       </div>
 
       {/* Editor */}
-      <div className="border border-t-0 rounded-b-md bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+      <div className="border border-t-0 rounded-b-md bg-card focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
         <EditorContent editor={editor} />
       </div>
 
@@ -192,7 +192,8 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
         .ProseMirror {
           outline: none;
           min-height: 200px;
-          max-height: 400px;
+          height: 50vh;
+          max-height: 50vh;
           overflow-y: auto;
           padding: 12px;
           line-height: 1.6;

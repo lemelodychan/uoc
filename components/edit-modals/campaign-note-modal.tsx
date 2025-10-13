@@ -148,14 +148,11 @@ export function CampaignNoteModal({
           </div>
 
           <div className="flex-1 flex flex-col gap-2 min-h-0">
-            <div className="flex-1 min-h-0">
-              <WysiwygEditor
-                value={content}
-                onChange={setContent}
-                placeholder="Write your session notes here..."
-                className="h-full"
-              />
-            </div>
+            <WysiwygEditor
+              value={content}
+              onChange={setContent}
+              placeholder="Write your session notes here..."
+            />
           </div>
         </div>
 
