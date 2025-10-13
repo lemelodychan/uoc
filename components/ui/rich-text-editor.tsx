@@ -12,9 +12,10 @@ interface RichTextEditorProps {
   rows?: number
   className?: string
   maxHeight?: number | string
+  height?: number | string
 }
 
-export function RichTextEditor({ value, onChange, placeholder, rows = 6, className, maxHeight }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, placeholder, rows = 6, className, maxHeight, height }: RichTextEditorProps) {
   const [textareaRef, setTextareaRef] = useState<HTMLTextAreaElement | null>(null)
 
   const insertText = (before: string, after = "") => {
@@ -58,10 +59,17 @@ export function RichTextEditor({ value, onChange, placeholder, rows = 6, classNa
   const addLineBreak = () => insertText("\n")
 
   const minHeight = rows * 28 // approx line-height (tweakable)
-  const computedStyle: React.CSSProperties = {
-    minHeight,
-    ...(maxHeight ? { maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight, overflow: 'auto' } : {}),
-  }
+  const computedStyle: React.CSSProperties = height
+    ? {
+        height: typeof height === 'number' ? `${height}px` : height,
+        minHeight: typeof height === 'number' ? `${height}px` : height,
+        maxHeight: typeof height === 'number' ? `${height}px` : height,
+        overflow: 'auto',
+      }
+    : {
+        minHeight,
+        ...(maxHeight ? { maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight, overflow: 'auto' } : {}),
+      }
 
   return (
     <div className={className}>

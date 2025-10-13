@@ -14,6 +14,15 @@ export interface Campaign {
   characters: string[] // Array of character IDs
   isActive?: boolean // Whether this is the currently active campaign
   dungeonMasterId?: string // ID of the user who is the Dungeon Master
+  levelUpModeEnabled?: boolean // Whether DM has enabled level up for all characters
+  nextSessionDate?: string // ISO date string for next scheduled session
+  nextSessionTime?: string // Time string (HH:MM) for next scheduled session
+  nextSessionTimezone?: string // Timezone for next scheduled session
+  nextSessionNumber?: number // Session number for the next session
+  // Discord integration
+  discordWebhookUrl?: string
+  discordNotificationsEnabled?: boolean
+  discordReminderSent?: boolean
 }
 
 export interface CharacterData {
@@ -140,6 +149,8 @@ export interface CharacterData {
   partyStatus?: 'active' | 'away' | 'deceased'
   // Campaign association
   campaignId?: string
+  // Level up completion tracking
+  levelUpCompleted?: boolean
 }
 
 export type ProficiencyLevel = "none" | "proficient" | "expertise"

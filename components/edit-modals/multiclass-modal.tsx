@@ -62,6 +62,23 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
     }]
   })
 
+  // Sync classes state when character changes
+  useEffect(() => {
+    if (isOpen) {
+      if (character.classes && character.classes.length > 0) {
+        setClasses(character.classes)
+      } else {
+        // Convert legacy single class to multiclass format
+        setClasses([{
+          name: character.class,
+          subclass: character.subclass,
+          class_id: character.class_id,
+          level: character.level
+        }])
+      }
+    }
+  }, [isOpen, character.id, character.classes, character.class, character.subclass, character.class_id, character.level])
+
   const totalLevel = classes.reduce((sum, charClass) => sum + charClass.level, 0)
 
   const addClass = () => {

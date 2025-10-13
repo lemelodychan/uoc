@@ -66,7 +66,7 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers } from "@/lib/database"
+import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, getCampaignNotes, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote } from "@/lib/database"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
@@ -80,10 +80,11 @@ function CharacterSheetContent() {
   const [characters, setCharacters] = useState<CharacterData[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [users, setUsers] = useState<any[]>([])
+  const [notes, setNotes] = useState<CampaignNote[]>([])
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all")
   const [activeCharacterId, setActiveCharacterId] = useState<string>("")
   const [superadminOverride, setSuperadminOverride] = useState(false)
-  const [currentView, setCurrentView] = useState<'character' | 'campaign'>('character')
+  const [currentView, setCurrentView] = useState<'character' | 'campaign'>('campaign')
   
   // Get URL search parameters
   const searchParams = useSearchParams()
@@ -224,6 +225,27 @@ function CharacterSheetContent() {
   // Get current campaign data
   const currentCampaign = campaigns.find(c => c.id === selectedCampaignId)
   
+  // Load notes for current campaign
+  const loadNotesForCampaign = async (campaignId: string) => {
+    if (campaignId === "all" || campaignId === "no-campaign") {
+      setNotes([])
+      return
+    }
+
+    try {
+      const { notes: campaignNotes, error } = await getCampaignNotes(campaignId)
+      if (error) {
+        console.error("Failed to load campaign notes:", error)
+        setNotes([])
+      } else {
+        setNotes(campaignNotes || [])
+      }
+    } catch (error) {
+      console.error("Error loading campaign notes:", error)
+      setNotes([])
+    }
+  }
+
   // Set initial view based on active campaign
   useEffect(() => {
     if (campaigns.length > 0 && selectedCampaignId === "all") {
@@ -235,6 +257,13 @@ function CharacterSheetContent() {
       }
     }
   }, [campaigns, selectedCampaignId])
+
+  // Load notes when campaign changes
+  useEffect(() => {
+    if (selectedCampaignId) {
+      loadNotesForCampaign(selectedCampaignId)
+    }
+  }, [selectedCampaignId])
 
   useEffect(() => {
     try {
@@ -563,6 +592,95 @@ function CharacterSheetContent() {
     setLongRestModalOpen(true)
   }
 
+  // Campaign Notes Functions
+  const handleCreateNote = async (note: Omit<CampaignNote, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const { note: newNote, error } = await createCampaignNote(note)
+      if (error) {
+        console.error("Failed to create note:", error)
+        toast({
+          title: "Error",
+          description: "Failed to create note. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (newNote) {
+        setNotes(prev => [newNote, ...prev])
+        toast({
+          title: "Success",
+          description: "Note created successfully!",
+        })
+      }
+    } catch (error) {
+      console.error("Error creating note:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create note. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateNote = async (id: string, updates: Partial<Pick<CampaignNote, 'title' | 'content'>>) => {
+    try {
+      const { note: updatedNote, error } = await updateCampaignNote(id, updates)
+      if (error) {
+        console.error("Failed to update note:", error)
+        toast({
+          title: "Error",
+          description: "Failed to update note. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (updatedNote) {
+        setNotes(prev => prev.map(note => note.id === id ? updatedNote : note))
+        toast({
+          title: "Success",
+          description: "Note updated successfully!",
+        })
+      }
+    } catch (error) {
+      console.error("Error updating note:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update note. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteNote = async (id: string) => {
+    try {
+      const { success, error } = await deleteCampaignNote(id)
+      if (error || !success) {
+        console.error("Failed to delete note:", error)
+        toast({
+          title: "Error",
+          description: "Failed to delete note. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setNotes(prev => prev.filter(note => note.id !== id))
+      toast({
+        title: "Success",
+        description: "Note deleted successfully!",
+      })
+    } catch (error) {
+      console.error("Error deleting note:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete note. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Dice Roll Functions
   const handleOpenDiceRoll = () => {
     setDiceRollModalOpen(true)
@@ -659,6 +777,57 @@ function CharacterSheetContent() {
       toast({
         title: "Error",
         description: "An unexpected error occurred while updating the campaign.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleToggleLevelUpMode = async () => {
+    if (!currentCampaign) return
+    
+    const newLevelUpMode = !currentCampaign.levelUpModeEnabled
+    const updatedCampaign = { ...currentCampaign, levelUpModeEnabled: newLevelUpMode }
+    
+    try {
+      const { error } = await updateCampaignDB(updatedCampaign)
+      if (error) {
+        console.error("Failed to toggle level up mode:", error)
+        toast({
+          title: "Error",
+          description: "Failed to toggle level up mode.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // Update the campaigns list
+      setCampaigns(prev => prev.map(c => c.id === currentCampaign.id ? updatedCampaign : c))
+      
+      // If disabling level up mode, reset all character level up completion flags
+      if (!newLevelUpMode) {
+        const campaignCharacters = characters.filter(char => char.campaignId === currentCampaign.id)
+        const resetPromises = campaignCharacters.map(char => 
+          saveCharacter({ ...char, levelUpCompleted: false })
+        )
+        await Promise.all(resetPromises)
+        
+        // Update local state
+        setCharacters(prev => prev.map(char => 
+          char.campaignId === currentCampaign.id ? { ...char, levelUpCompleted: false } : char
+        ))
+      }
+      
+      toast({
+        title: newLevelUpMode ? "Level Up Enabled" : "Level Up Disabled",
+        description: newLevelUpMode 
+          ? "Characters can now level up." 
+          : "Level up has been disabled and completion flags reset.",
+      })
+    } catch (error) {
+      console.error("Error toggling level up mode:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
         variant: "destructive",
       })
     }
@@ -2473,6 +2642,20 @@ function CharacterSheetContent() {
         <main className={`flex-1 p-6 relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
           {currentView === 'character' ? (
             <>
+              {/* Breadcrumbs */}
+              <div className="mb-4 flex items-center gap-1 text-sm text-muted-foreground">
+                <button
+                  onClick={() => setCurrentView('campaign')}
+                  className="hover:text-primary transition-colors hover:cursor-pointer"
+                >
+                  {currentCampaign?.name || 'Campaign'}
+                </button>
+                <Icon icon="lucide:chevron-right" className="w-4 h-4" />
+                <span className="text-muted-foreground">
+                  Character: {activeCharacter.name}
+                </span>
+              </div>
+              
               <div className={!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}>
                 <CharacterHeader
                   character={activeCharacter}
@@ -2482,6 +2665,8 @@ function CharacterSheetContent() {
                   onOpenPortrait={() => setPortraitModalOpen(true)}
                   onLevelUp={() => setLevelUpModalOpen(true)}
                   canEdit={canEditActiveCharacter}
+                  levelUpEnabled={currentCampaign?.levelUpModeEnabled || false}
+                  campaign={currentCampaign}
                 />
               </div>
 
@@ -2651,6 +2836,7 @@ function CharacterSheetContent() {
               campaign={currentCampaign}
               characters={characters}
               users={users}
+              notes={notes}
               onSelectCharacter={(id) => {
                 setActiveCharacterId(id)
                 setCurrentView('character')
@@ -2660,6 +2846,12 @@ function CharacterSheetContent() {
               onCreateCharacter={createNewCharacter}
               currentUserId={currentUser?.id}
               onStartLongRest={handleStartLongRest}
+              onToggleLevelUpMode={handleToggleLevelUpMode}
+              levelUpModeEnabled={currentCampaign?.levelUpModeEnabled || false}
+              onUpdateCampaign={handleUpdateCampaign}
+              onCreateNote={handleCreateNote}
+              onUpdateNote={handleUpdateNote}
+              onDeleteNote={handleDeleteNote}
             />
           )}
 
@@ -3055,7 +3247,9 @@ function CharacterSheetContent() {
         isOpen={levelUpModalOpen}
         onClose={() => setLevelUpModalOpen(false)}
         character={activeCharacter}
-        onSave={updateCharacter}
+        onSave={(updates) => {
+          updateCharacter({ ...updates, levelUpCompleted: true })
+        }}
       />
       </div>
     </div>

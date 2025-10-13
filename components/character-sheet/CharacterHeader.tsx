@@ -14,6 +14,8 @@ interface CharacterHeaderProps {
   onOpenPortrait: () => void
   onLevelUp: () => void
   canEdit?: boolean
+  levelUpEnabled?: boolean
+  campaign?: any
 }
 
 const formatModifier = (mod: number): string => {
@@ -27,8 +29,12 @@ export function CharacterHeader({
   onOpenBiography, 
   onOpenPortrait,
   onLevelUp,
-  canEdit = true
+  canEdit = true,
+  levelUpEnabled = false,
+  campaign
 }: CharacterHeaderProps) {
+  const showLevelUpButton = canEdit && levelUpEnabled
+  const levelUpCompleted = character.levelUpCompleted || false
   return (
     <Card className="mb-6">
       <CardHeader className="pb-0">
@@ -71,10 +77,15 @@ export function CharacterHeader({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {canEdit && (
-              <Button variant="default" size="sm" onClick={onLevelUp}>
-                <Icon icon="lucide:trending-up" className="w-4 h-4" />
-                Level Up
+            {showLevelUpButton && (
+              <Button 
+                variant={levelUpCompleted ? "secondary" : "default"} 
+                size="sm" 
+                onClick={onLevelUp}
+                disabled={levelUpCompleted}
+              >
+                <Icon icon={levelUpCompleted ? "lucide:check" : "lucide:trending-up"} className="w-4 h-4" />
+                {levelUpCompleted ? "Level Up Complete" : "Level Up"}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={onOpenBiography}>

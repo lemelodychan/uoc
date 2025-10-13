@@ -189,11 +189,14 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
 
     setIsLoadingFeatures(true)
     try {
-      // Load features for the new level only
-      const { features } = await loadClassFeatures(selectedClass.class_id || '', newLevel, selectedClass.subclass)
+      // Calculate the new level for the selected class (current class level + 1)
+      const selectedClassNewLevel = selectedClass.level + 1
+      
+      // Load features for the selected class's new level only
+      const { features } = await loadClassFeatures(selectedClass.class_id || '', selectedClassNewLevel, selectedClass.subclass)
       if (features) {
-        // Filter to only show features that are exactly at the new level
-        const newLevelFeatures = features.filter(feature => feature.level === newLevel)
+        // Filter to only show features that are exactly at the selected class's new level
+        const newLevelFeatures = features.filter(feature => feature.level === selectedClassNewLevel)
         setNewFeatures(newLevelFeatures)
       }
       // Automatically proceed to features step after loading

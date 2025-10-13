@@ -94,19 +94,21 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
 
   // Sync local state with character prop when it changes
   useEffect(() => {
-    setFormData({
-      name: character.name,
-      class: character.class,
-      subclass: character.subclass || "",
-      level: character.level,
-      background: character.background,
-      race: character.race,
-      alignment: character.alignment,
-      partyStatus: character.partyStatus || 'active',
-      imageUrl: character.imageUrl || "",
-      visibility: character.visibility || 'public',
-    })
-  }, [character.name, character.class, character.subclass, character.level, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility])
+    if (isOpen) {
+      setFormData({
+        name: character.name,
+        class: character.class,
+        subclass: character.subclass || "",
+        level: character.level,
+        background: character.background,
+        race: character.race,
+        alignment: character.alignment,
+        partyStatus: character.partyStatus || 'active',
+        imageUrl: character.imageUrl || "",
+        visibility: character.visibility || 'public',
+      })
+    }
+  }, [isOpen, character.id, character.name, character.class, character.subclass, character.level, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility])
 
   const handleClassChange = (newClass: string) => {
     setFormData({

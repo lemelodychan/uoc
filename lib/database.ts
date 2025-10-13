@@ -1,5 +1,17 @@
 import { createClient } from "./supabase"
 import type { CharacterData, Campaign } from "./character-data"
+
+export interface CampaignNote {
+  id: string
+  campaign_id: string
+  author_id: string
+  title: string
+  content: string
+  session_date?: string
+  members_attending?: string[]
+  created_at: string
+  updated_at: string
+}
 import type { ClassData, SubclassData } from "./class-utils"
 import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, calculateProficiencyBonus, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData } from "./character-data"
 import { getBardicInspirationData, getSongOfRestData } from "./class-utils"
@@ -1654,7 +1666,15 @@ export const createCampaign = async (campaign: Campaign): Promise<{ success: boo
         updated_at: campaign.updated_at,
         characters: campaign.characters,
         is_active: campaign.isActive || false,
-        dungeon_master_id: campaign.dungeonMasterId || null
+        dungeon_master_id: campaign.dungeonMasterId || null,
+        level_up_mode_enabled: campaign.levelUpModeEnabled || false,
+        next_session_date: campaign.nextSessionDate || null,
+        next_session_time: campaign.nextSessionTime || null,
+        next_session_timezone: campaign.nextSessionTimezone || null,
+        next_session_number: campaign.nextSessionNumber || null,
+        discord_webhook_url: campaign.discordWebhookUrl || null,
+        discord_notifications_enabled: campaign.discordNotificationsEnabled || false,
+        discord_reminder_sent: campaign.discordReminderSent || false
       }])
 
     if (error) {
@@ -1689,7 +1709,15 @@ export const loadAllCampaigns = async (): Promise<{ campaigns?: Campaign[]; erro
       updated_at: row.updated_at,
       characters: row.characters || [],
       isActive: row.is_active || false,
-      dungeonMasterId: row.dungeon_master_id || undefined
+      dungeonMasterId: row.dungeon_master_id || undefined,
+      levelUpModeEnabled: row.level_up_mode_enabled || false,
+      nextSessionDate: row.next_session_date || undefined,
+      nextSessionTime: row.next_session_time || undefined,
+      nextSessionTimezone: row.next_session_timezone || undefined,
+      nextSessionNumber: row.next_session_number || undefined,
+      discordWebhookUrl: row.discord_webhook_url || undefined,
+      discordNotificationsEnabled: row.discord_notifications_enabled || false,
+      discordReminderSent: row.discord_reminder_sent || false
     }))
 
     return { campaigns }
@@ -1709,7 +1737,15 @@ export const updateCampaign = async (campaign: Campaign): Promise<{ success: boo
         updated_at: campaign.updated_at,
         characters: campaign.characters,
         is_active: campaign.isActive || false,
-        dungeon_master_id: campaign.dungeonMasterId || null
+        dungeon_master_id: campaign.dungeonMasterId || null,
+        level_up_mode_enabled: campaign.levelUpModeEnabled || false,
+        next_session_date: campaign.nextSessionDate || null,
+        next_session_time: campaign.nextSessionTime || null,
+        next_session_timezone: campaign.nextSessionTimezone || null,
+        next_session_number: campaign.nextSessionNumber || null,
+        discord_webhook_url: campaign.discordWebhookUrl || null,
+        discord_notifications_enabled: campaign.discordNotificationsEnabled || false,
+        discord_reminder_sent: campaign.discordReminderSent || false
       })
       .eq("id", campaign.id)
 
@@ -1821,5 +1857,90 @@ export const removeCharacterFromCampaign = async (characterId: string): Promise<
   } catch (error) {
     console.error("Error removing character from campaign:", error)
     return { success: false, error: "Failed to remove character from campaign" }
+  }
+}
+
+// Campaign Notes Functions
+export const getCampaignNotes = async (campaignId: string): Promise<{ notes?: CampaignNote[]; error?: string }> => {
+  try {
+    const { data: notes, error } = await supabase
+      .from("campaign_notes")
+      .select("*")
+      .eq("campaign_id", campaignId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching campaign notes:", error)
+      return { error: error.message }
+    }
+
+    return { notes: notes || [] }
+  } catch (error) {
+    console.error("Error in getCampaignNotes:", error)
+    return { error: "Failed to fetch campaign notes" }
+  }
+}
+
+export const createCampaignNote = async (note: Omit<CampaignNote, 'id' | 'created_at' | 'updated_at'>): Promise<{ note?: CampaignNote; error?: string }> => {
+  try {
+    console.log("Creating campaign note with data:", note)
+    const { data, error } = await supabase
+      .from("campaign_notes")
+      .insert([note])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error creating campaign note:", error)
+      return { error: error.message }
+    }
+
+    console.log("Successfully created campaign note:", data)
+    return { note: data }
+  } catch (error) {
+    console.error("Error in createCampaignNote:", error)
+    return { error: "Failed to create campaign note" }
+  }
+}
+
+export const updateCampaignNote = async (id: string, updates: Partial<Pick<CampaignNote, 'title' | 'content' | 'session_date' | 'members_attending'>>): Promise<{ note?: CampaignNote; error?: string }> => {
+  try {
+    console.log("Updating campaign note with data:", { id, updates })
+    const { data, error } = await supabase
+      .from("campaign_notes")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating campaign note:", error)
+      return { error: error.message }
+    }
+
+    console.log("Successfully updated campaign note:", data)
+    return { note: data }
+  } catch (error) {
+    console.error("Error in updateCampaignNote:", error)
+    return { error: "Failed to update campaign note" }
+  }
+}
+
+export const deleteCampaignNote = async (id: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from("campaign_notes")
+      .delete()
+      .eq("id", id)
+
+    if (error) {
+      console.error("Error deleting campaign note:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in deleteCampaignNote:", error)
+    return { success: false, error: "Failed to delete campaign note" }
   }
 }

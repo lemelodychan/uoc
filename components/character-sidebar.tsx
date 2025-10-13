@@ -347,16 +347,16 @@ export function CharacterSidebar({
                         <Tooltip key={character.id}>
                           <TooltipTrigger asChild>
                             <Card
-                              className={`cursor-pointer transition-colors mb-0 p-0 rounded-lg ${
+                              className={`cursor-pointer transition-colors mb-0 p-0 rounded-xl ${
                                 character.id === activeCharacterId && currentView === 'character'
                                   ? "bg-sidebar-accent border-sidebar-primary"
                                   : "hover:bg-sidebar-accent/25"
                               }`}
                               onClick={() => onSelectCharacter(character.id)}
                             >
-                              <CardContent className={`${isCollapsed ? "p-0" : "p-3"}`}>
+                              <CardContent className={`${isCollapsed ? "p-0" : "p-2"}`}>
                                 <div className={`flex ${isCollapsed ? "items-center justify-center" : "items-center gap-3"}`}>
-                                  <div className={`${isCollapsed ? "w-full h-12" : "w-12 h-12"} rounded-md bg-sidebar-primary/20 flex items-center justify-center overflow-hidden`}>
+                                  <div className={`${isCollapsed ? "w-full h-12" : "w-12 h-12"} rounded-lg bg-sidebar-primary/20 flex items-center justify-center overflow-hidden`}>
                                     {character.imageUrl ? (
                                       <img 
                                         src={character.imageUrl} alt={character.name} 
@@ -369,7 +369,7 @@ export function CharacterSidebar({
                                   {!isCollapsed && (
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-1">
-                                        <div className="font-bold font-display text-sidebar-foreground truncate">{character.name}</div>
+                                        <div className="font-bold text-sidebar-foreground truncate">{character.name}</div>
                                         {character.visibility === 'private' && (
                                           <Icon icon="lucide:lock" className="w-3 h-3 text-sidebar-foreground/50" />
                                         )}
