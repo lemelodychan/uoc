@@ -12,6 +12,24 @@ export interface CampaignNote {
   created_at: string
   updated_at: string
 }
+export interface CampaignResource {
+  id: string
+  campaign_id: string
+  author_id: string
+  title: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CampaignLink {
+  id: string
+  campaign_id: string
+  title: string
+  url: string
+  created_at: string
+  updated_at: string
+}
 import type { ClassData, SubclassData } from "./class-utils"
 import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, calculateProficiencyBonus, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData } from "./character-data"
 import { getBardicInspirationData, getSongOfRestData } from "./class-utils"
@@ -1986,5 +2004,146 @@ export const deleteCampaignNote = async (id: string): Promise<{ success: boolean
   } catch (error) {
     console.error("Error in deleteCampaignNote:", error)
     return { success: false, error: "Failed to delete campaign note" }
+  }
+}
+
+// Campaign Resources Functions
+export const getCampaignResources = async (campaignId: string): Promise<{ resources?: CampaignResource[]; error?: string }> => {
+  try {
+    const { data: resources, error } = await supabase
+      .from("campaign_resources")
+      .select("*")
+      .eq("campaign_id", campaignId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching campaign resources:\n", error)
+      return { error: error.message }
+    }
+
+    return { resources: resources || [] }
+  } catch (error) {
+    console.error("Error in getCampaignResources:", error)
+    return { error: "Failed to fetch campaign resources" }
+  }
+}
+
+export const createCampaignResource = async (resource: Omit<CampaignResource, 'id' | 'created_at' | 'updated_at'>): Promise<{ resource?: CampaignResource; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("campaign_resources")
+      .insert([resource])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error creating campaign resource:", error)
+      return { error: error.message }
+    }
+
+    return { resource: data }
+  } catch (error) {
+    console.error("Error in createCampaignResource:", error)
+    return { error: "Failed to create campaign resource" }
+  }
+}
+
+export const updateCampaignResource = async (id: string, updates: Partial<Pick<CampaignResource, 'title' | 'content'>>): Promise<{ resource?: CampaignResource; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("campaign_resources")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating campaign resource:", error)
+      return { error: error.message }
+    }
+
+    return { resource: data }
+  } catch (error) {
+    console.error("Error in updateCampaignResource:", error)
+    return { error: "Failed to update campaign resource" }
+  }
+}
+
+export const deleteCampaignResource = async (id: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from("campaign_resources")
+      .delete()
+      .eq("id", id)
+
+    if (error) {
+      console.error("Error deleting campaign resource:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in deleteCampaignResource:", error)
+    return { success: false, error: "Failed to delete campaign resource" }
+  }
+}
+
+// Campaign Links Functions
+export const getCampaignLinks = async (campaignId: string): Promise<{ links?: CampaignLink[]; error?: string }> => {
+  try {
+    const { data: links, error } = await supabase
+      .from("campaign_links")
+      .select("*")
+      .eq("campaign_id", campaignId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching campaign links:", error)
+      return { error: error.message }
+    }
+
+    return { links: links || [] }
+  } catch (error) {
+    console.error("Error in getCampaignLinks:", error)
+    return { error: "Failed to fetch campaign links" }
+  }
+}
+
+export const createCampaignLink = async (link: Omit<CampaignLink, 'id' | 'created_at' | 'updated_at'>): Promise<{ link?: CampaignLink; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("campaign_links")
+      .insert([link])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error creating campaign link:", error)
+      return { error: error.message }
+    }
+
+    return { link: data }
+  } catch (error) {
+    console.error("Error in createCampaignLink:", error)
+    return { error: "Failed to create campaign link" }
+  }
+}
+
+export const deleteCampaignLink = async (id: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { error } = await supabase
+      .from("campaign_links")
+      .delete()
+      .eq("id", id)
+
+    if (error) {
+      console.error("Error deleting campaign link:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in deleteCampaignLink:", error)
+    return { success: false, error: "Failed to delete campaign link" }
   }
 }

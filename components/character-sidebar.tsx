@@ -51,17 +51,16 @@ export function CharacterSidebar({
 
   // Helper function to format character level and class display
   const getCharacterLevelDisplay = (character: CharacterData): string => {
-    if (character.classes && character.classes.length > 0) {
-      // Multiclass character
+    // Treat as multiclass ONLY when there are 2+ classes.
+    // For single-class characters (including when classes has a single entry),
+    // always use the top-level level/class coming from the database.
+    if (character.classes && character.classes.length > 1) {
       const totalLevel = character.classes.reduce((total, cls) => total + cls.level, 0)
-      const classDisplay = character.classes
-        .map(cls => cls.name)
-        .join('/')
+      const classDisplay = character.classes.map(cls => cls.name).join('/')
       return `Level ${totalLevel} ${classDisplay}`
-    } else {
-      // Single class character
-      return `Level ${character.level} ${character.class}`
     }
+
+    return `Level ${character.level} ${character.class}`
   }
 
   // Filter characters based on selected campaign

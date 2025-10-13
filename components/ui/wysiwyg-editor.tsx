@@ -2,6 +2,10 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import * as TablePkg from '@tiptap/extension-table'
+import * as TableRowPkg from '@tiptap/extension-table-row'
+import * as TableCellPkg from '@tiptap/extension-table-cell'
+import * as TableHeaderPkg from '@tiptap/extension-table-header'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
@@ -15,16 +19,58 @@ interface WysiwygEditorProps {
 }
 
 export function WysiwygEditor({ value, onChange, placeholder, className }: WysiwygEditorProps) {
+  const TableBase = (TablePkg as any)?.default ?? (TablePkg as any).Table ?? (TablePkg as any)
+  const TableRowBase = (TableRowPkg as any)?.default ?? (TableRowPkg as any).TableRow ?? (TableRowPkg as any)
+  const TableCellBase = (TableCellPkg as any)?.default ?? (TableCellPkg as any).TableCell ?? (TableCellPkg as any)
+  const TableHeaderBase = (TableHeaderPkg as any)?.default ?? (TableHeaderPkg as any).TableHeader ?? (TableHeaderPkg as any)
+
+  const Table = typeof (TableBase as any)?.configure === 'function'
+    ? (TableBase as any).configure({
+        resizable: true,
+        HTMLAttributes: { class: 'tiptap-table' },
+      })
+    : TableBase
+
+  const TableRow = TableRowBase
+
+  const TableCell = typeof (TableCellBase as any)?.extend === 'function'
+    ? (TableCellBase as any).extend({
+        addAttributes() {
+          return {
+            ...(this as any).parent?.(),
+            backgroundColor: {
+              default: null,
+              parseHTML: (element: any) => element.getAttribute('data-bg') || element.style?.backgroundColor || null,
+              renderHTML: (attributes: any) => {
+                const { backgroundColor } = attributes
+                if (!backgroundColor) return {}
+                return {
+                  style: `background-color: ${backgroundColor};`,
+                  'data-bg': backgroundColor,
+                }
+              }
+            },
+          }
+        },
+      })
+    : TableCellBase
+
+  const TableHeader = TableHeaderBase
+
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Table,
+      TableRow,
+      TableHeader,
+      TableCell,
       Placeholder.configure({
         placeholder: placeholder || 'Start writing...',
       }),
     ],
     content: value,
     immediatelyRender: false,
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor }: { editor: any }) => {
       onChange(editor.getHTML())
     },
     editorProps: {
@@ -118,6 +164,81 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           <Icon icon="lucide:strikethrough" className="w-4 h-4" />
         </Button>
         <div className="w-px h-6 bg-border mx-1" />
+        {/* Table controls */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          className="h-8 w-8 p-0"
+          title="Insert Table"
+        >
+          <Icon icon="lucide:table" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().addColumnAfter().run()}
+          className="h-8 w-8 p-0"
+          title="Add Column"
+        >
+          <Icon icon="lucide:columns-3" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().addRowAfter().run()}
+          className="h-8 w-8 p-0"
+          title="Add Row"
+        >
+          <Icon icon="lucide:rows-3" className="w-4 h-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleHeaderRow().run()}
+          className={`h-8 w-8 p-0 ${editor.isActive('tableHeader') ? 'bg-accent' : ''}`}
+          title="Toggle Header Row"
+        >
+          <Icon icon="lucide:layout-panel-top" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleHeaderColumn().run()}
+          className="h-8 w-8 p-0"
+          title="Toggle Header Column"
+        >
+          <Icon icon="lucide:layout-panel-left" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const color = prompt('Enter a background color (e.g. #f1f5f9 or rgb(241,245,249))')
+            if (color) editor.chain().focus().setCellAttribute('backgroundColor', color).run()
+          }}
+          className="h-8 w-8 p-0"
+          title="Set Cell Background"
+        >
+          <Icon icon="lucide:paintbrush" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().setCellAttribute('backgroundColor', null).run()}
+          className="h-8 w-8 p-0"
+          title="Clear Cell Background"
+        >
+          <Icon icon="lucide:eraser" className="w-4 h-4" />
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -197,6 +318,88 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           overflow-y: auto;
           padding: 12px;
           line-height: 1.6;
+        }
+
+        .ProseMirror table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+          margin: 0.75rem 0;
+        }
+
+        .ProseMirror th,
+        .ProseMirror td {
+          border: 1px solid var(--border);
+          padding: 6px 8px;
+          vertical-align: top;
+          word-wrap: break-word;
+          font-size: 0.9em;
+        }
+
+        .ProseMirror th {
+          font-weight: 600;
+          background-color: rgba(148, 163, 184, 0.15);
+        }
+
+        .ProseMirror .tableWrapper {
+          margin: 0.75rem 0;
+          overflow-x: auto;
+        }
+
+        /* Column resize handle */
+        .ProseMirror .column-resize-handle {
+          position: absolute;
+          right: -2px;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background-color: rgba(148,163,184,0.6);
+          pointer-events: none;
+        }
+        .ProseMirror th,
+        .ProseMirror td {
+          position: relative;
+        }
+
+        .ProseMirror .selectedCell:after {
+          z-index: 2;
+          position: absolute;
+          content: "";
+          left: 0; right: 0; top: 0; bottom: 0;
+          background: rgba(200, 200, 255, 0.35);
+          pointer-events: none;
+        }
+
+        /* Prose output tables */
+        .prose table {
+          width: 100%;
+          table-layout: fixed;
+          margin: 0.75rem 0;
+          background-color: var(--card);
+          border-radius: 16px;
+          overflow: hidden;
+        }
+
+        .prose th,
+        .prose td {
+          border: 1px solid var(--border);
+          padding: 6px 8px;
+          vertical-align: top;
+          word-wrap: break-word;
+          font-size: 0.9em;
+        }
+
+        .prose th {
+          font-weight: 600;
+          background-color: rgba(148, 163, 184, 0.15);
+        }
+
+        .prose th p {
+          margin: 0;
+        }
+
+        .dark .prose th {
+          background-color: rgba(148, 163, 184, 0.12);
         }
 
         .ProseMirror p {

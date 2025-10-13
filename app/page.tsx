@@ -66,7 +66,7 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, getCampaignNotes, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote } from "@/lib/database"
+import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, getCampaignNotes, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
@@ -81,6 +81,8 @@ function CharacterSheetContent() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [notes, setNotes] = useState<CampaignNote[]>([])
+  const [resources, setResources] = useState<CampaignResource[]>([])
+  const [links, setLinks] = useState<CampaignLink[]>([])
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all")
   const [activeCharacterId, setActiveCharacterId] = useState<string>("")
   const [superadminOverride, setSuperadminOverride] = useState(false)
@@ -225,10 +227,12 @@ function CharacterSheetContent() {
   // Get current campaign data
   const currentCampaign = campaigns.find(c => c.id === selectedCampaignId)
   
-  // Load notes for current campaign
+  // Load campaign data (notes, resources, links)
   const loadNotesForCampaign = async (campaignId: string) => {
     if (campaignId === "all" || campaignId === "no-campaign") {
       setNotes([])
+      setResources([])
+      setLinks([])
       return
     }
 
@@ -240,9 +244,20 @@ function CharacterSheetContent() {
       } else {
         setNotes(campaignNotes || [])
       }
+
+      const [{ resources: res, error: resError } = {}, { links: lks, error: linkError } = {}] = await Promise.all([
+        getCampaignResources(campaignId),
+        getCampaignLinks(campaignId)
+      ])
+      if (resError) console.error("Failed to load campaign resources:", resError)
+      if (linkError) console.error("Failed to load campaign links:", linkError)
+      setResources(res || [])
+      setLinks(lks || [])
     } catch (error) {
       console.error("Error loading campaign notes:", error)
       setNotes([])
+      setResources([])
+      setLinks([])
     }
   }
 
@@ -678,6 +693,68 @@ function CharacterSheetContent() {
         description: "Failed to delete note. Please try again.",
         variant: "destructive",
       })
+    }
+  }
+
+  // Campaign Resources Functions
+  const handleCreateResource = async (resource: Omit<CampaignResource, 'id' | 'created_at' | 'updated_at'>) => {
+    const { resource: newResource, error } = await createCampaignResource(resource)
+    if (error || !newResource) {
+      console.error("Failed to create resource:", error)
+      toast({ title: "Error", description: "Failed to create resource.", variant: "destructive" })
+      throw new Error(error || 'createResourceFailed')
+    }
+    setResources(prev => [newResource, ...prev])
+    toast({ title: "Success", description: "Resource created." })
+    return newResource
+  }
+
+  const handleUpdateResource = async (id: string, updates: Partial<Pick<CampaignResource, 'title' | 'content'>>) => {
+    try {
+      const { resource: updated, error } = await updateCampaignResource(id, updates)
+      if (!error && updated) {
+        setResources(prev => prev.map(r => r.id === id ? updated : r))
+        toast({ title: "Success", description: "Resource updated." })
+      }
+    } catch (error) {
+      console.error("Error updating resource:", error)
+    }
+  }
+
+  const handleDeleteResource = async (id: string) => {
+    try {
+      const { success } = await deleteCampaignResource(id)
+      if (success) {
+        setResources(prev => prev.filter(r => r.id !== id))
+        toast({ title: "Success", description: "Resource deleted." })
+      }
+    } catch (error) {
+      console.error("Error deleting resource:", error)
+    }
+  }
+
+  // Campaign Links Functions
+  const handleCreateLink = async (link: Omit<CampaignLink, 'id' | 'created_at' | 'updated_at'>) => {
+    const { link: created, error } = await createCampaignLink(link)
+    if (error || !created) {
+      console.error("Failed to create link:", error)
+      toast({ title: "Error", description: "Failed to add link.", variant: "destructive" })
+      throw new Error(error || 'createLinkFailed')
+    }
+    setLinks(prev => [created, ...prev])
+    toast({ title: "Success", description: "Link added." })
+    return created
+  }
+
+  const handleDeleteLink = async (id: string) => {
+    try {
+      const { success } = await deleteCampaignLink(id)
+      if (success) {
+        setLinks(prev => prev.filter(l => l.id !== id))
+        toast({ title: "Success", description: "Link removed." })
+      }
+    } catch (error) {
+      console.error("Error deleting link:", error)
     }
   }
 
@@ -2837,6 +2914,8 @@ function CharacterSheetContent() {
               characters={characters}
               users={users}
               notes={notes}
+              resources={resources}
+              links={links}
               onSelectCharacter={(id) => {
                 setActiveCharacterId(id)
                 setCurrentView('character')
@@ -2852,6 +2931,11 @@ function CharacterSheetContent() {
               onCreateNote={handleCreateNote}
               onUpdateNote={handleUpdateNote}
               onDeleteNote={handleDeleteNote}
+              onCreateResource={handleCreateResource}
+              onUpdateResource={handleUpdateResource}
+              onDeleteResource={handleDeleteResource}
+              onCreateLink={handleCreateLink}
+              onDeleteLink={handleDeleteLink}
             />
           )}
 

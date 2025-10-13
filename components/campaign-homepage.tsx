@@ -13,15 +13,20 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Icon } from "@iconify/react"
 import type { CharacterData, Campaign } from "@/lib/character-data"
-import type { CampaignNote } from "@/lib/database"
+import type { CampaignNote, CampaignResource, CampaignLink } from "@/lib/database"
 import { CampaignNoteModal } from "./edit-modals/campaign-note-modal"
 import { CampaignNoteReadModal } from "./edit-modals/campaign-note-read-modal"
+import { CampaignResourceModal } from "./edit-modals/campaign-resource-modal"
+import { CampaignResourceReadModal } from "./edit-modals/campaign-resource-read-modal"
+import { CampaignLinkModal } from "./edit-modals/campaign-link-modal"
 
 interface CampaignHomepageProps {
   campaign: Campaign | undefined
   characters: CharacterData[]
   users: any[]
   notes: CampaignNote[]
+  resources?: CampaignResource[]
+  links?: CampaignLink[]
   onSelectCharacter: (id: string) => void
   onBackToCharacters: () => void
   onEditCampaign?: () => void
@@ -34,6 +39,11 @@ interface CampaignHomepageProps {
   onCreateNote?: (note: Omit<CampaignNote, 'id' | 'created_at' | 'updated_at'>) => void
   onUpdateNote?: (id: string, updates: Partial<Pick<CampaignNote, 'title' | 'content' | 'session_date' | 'members_attending'>>) => void
   onDeleteNote?: (id: string) => void
+  onCreateResource?: (resource: Omit<CampaignResource, 'id' | 'created_at' | 'updated_at'>) => void
+  onUpdateResource?: (id: string, updates: Partial<Pick<CampaignResource, 'title' | 'content'>>) => void
+  onDeleteResource?: (id: string) => void
+  onCreateLink?: (link: Omit<CampaignLink, 'id' | 'created_at' | 'updated_at'>) => void
+  onDeleteLink?: (id: string) => void
 }
 
 export function CampaignHomepage({ 
@@ -41,6 +51,8 @@ export function CampaignHomepage({
   characters, 
   users,
   notes,
+  resources = [],
+  links = [],
   onSelectCharacter, 
   onBackToCharacters,
   onEditCampaign,
@@ -52,19 +64,29 @@ export function CampaignHomepage({
   onUpdateCampaign,
   onCreateNote,
   onUpdateNote,
-  onDeleteNote
+  onDeleteNote,
+  onCreateResource,
+  onUpdateResource,
+  onDeleteResource,
+  onCreateLink,
+  onDeleteLink
 }: CampaignHomepageProps) {
   const [noteModalOpen, setNoteModalOpen] = useState(false)
   const [editingNote, setEditingNote] = useState<CampaignNote | null>(null)
   const [readModalOpen, setReadModalOpen] = useState(false)
   const [readingNote, setReadingNote] = useState<CampaignNote | null>(null)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'resources'>('overview')
   const [sessionDate, setSessionDate] = useState('')
   const [sessionTime, setSessionTime] = useState('15:00')
   const [sessionTimezone, setSessionTimezone] = useState('Europe/Amsterdam')
   const [sessionNumber, setSessionNumber] = useState('')
-  const [dmControlsExpanded, setDmControlsExpanded] = useState(true)
+  const [dmControlsExpanded, setDmControlsExpanded] = useState(false)
+  const [resourceModalOpen, setResourceModalOpen] = useState(false)
+  const [editingResource, setEditingResource] = useState<CampaignResource | null>(null)
+  const [resourceReadModalOpen, setResourceReadModalOpen] = useState(false)
+  const [readingResource, setReadingResource] = useState<CampaignResource | null>(null)
+  const [linkModalOpen, setLinkModalOpen] = useState(false)
   
   // Load existing session data when campaign changes
   useEffect(() => {
@@ -99,6 +121,10 @@ export function CampaignHomepage({
       }
     })
   }, [notes, sortOrder])
+
+  const sortedResources = useMemo(() => {
+    return [...resources].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [resources])
 
   // Filter characters for this campaign
   const campaignCharacters = characters.filter(char => 
@@ -158,6 +184,54 @@ export function CampaignHomepage({
     setEditingNote(note)
     setNoteModalOpen(true)
   }
+
+  // Helper functions for resources
+  const handleCreateResource = () => {
+    setEditingResource(null)
+    setResourceModalOpen(true)
+  }
+
+  const handleEditResource = (resource: CampaignResource) => {
+    setEditingResource(resource)
+    setResourceModalOpen(true)
+  }
+
+  const handleReadResource = (resource: CampaignResource) => {
+    setReadingResource(resource)
+    setResourceReadModalOpen(true)
+  }
+
+  const handleSaveResource = async (resource: Omit<CampaignResource, 'id' | 'created_at' | 'updated_at'>) => {
+    if (editingResource) {
+      await onUpdateResource?.(editingResource.id, { title: resource.title, content: resource.content })
+    } else {
+      await onCreateResource?.(resource)
+    }
+  }
+
+  const handleDeleteResource = async (resourceId: string) => {
+    if (confirm("Are you sure you want to delete this resource?")) {
+      await onDeleteResource?.(resourceId)
+    }
+  }
+
+  const handleEditResourceFromRead = () => {
+    if (readingResource) {
+      setEditingResource(readingResource)
+      setResourceReadModalOpen(false)
+      setResourceModalOpen(true)
+    }
+  }
+
+  const handleDeleteResourceFromRead = async () => {
+    if (readingResource) {
+      await handleDeleteResource(readingResource.id)
+      setResourceReadModalOpen(false)
+    }
+  }
+
+  // Helper functions for links
+  const handleOpenAddLink = () => setLinkModalOpen(true)
 
   const handleReadNote = (note: CampaignNote) => {
     setReadingNote(note)
@@ -427,7 +501,7 @@ export function CampaignHomepage({
                 className="p-1 h-6 w-6"
               >
                 <Icon 
-                  icon={dmControlsExpanded ? "lucide:chevron-up" : "lucide:chevron-down"} 
+                  icon={dmControlsExpanded ? "lucide:chevron-down" : "lucide:chevron-right"} 
                   className="w-4 h-4" 
                 />
               </Button>
@@ -594,8 +668,8 @@ export function CampaignHomepage({
       )}
       
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'notes')} className="w-full gap-4">
-        <TabsList className="grid w-full grid-cols-2 p-1 h-fit rounded-xl">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'notes' | 'resources')} className="w-full gap-4">
+        <TabsList className="grid w-full grid-cols-3 p-1 h-fit rounded-xl">
           <TabsTrigger value="overview" className="flex items-center gap-2 p-2 rounded-lg">
             <Icon icon="lucide:home" className="w-4 h-4" />
             Overview
@@ -603,6 +677,10 @@ export function CampaignHomepage({
           <TabsTrigger value="notes" className="flex items-center gap-2 p-2 rounded-lg">
             <Icon icon="lucide:sticky-note" className="w-4 h-4" />
             Session Notes
+          </TabsTrigger>
+          <TabsTrigger value="resources" className="flex items-center gap-2 p-2 rounded-lg">
+            <Icon icon="lucide:library" className="w-4 h-4" />
+            Resources
           </TabsTrigger>
         </TabsList>
 
@@ -798,6 +876,7 @@ export function CampaignHomepage({
           </Card>
         </TabsContent>
 
+        {/* Session Notes */}
         <TabsContent value="notes" className="space-y-6">
           <Card className="p-0 bg-transparent border-0 shadow-none gap-3">
             <CardHeader className="p-0">
@@ -893,6 +972,119 @@ export function CampaignHomepage({
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Resources */}
+        <TabsContent value="resources" className="space-y-6">
+          {/* Resources document management */}
+          <Card className="p-0 bg-transparent border-0 shadow-none gap-3">
+            <CardHeader className="p-0">
+              <div className="flex items-center justify-between h-[32px]">
+                <CardTitle>Resources</CardTitle>
+                {!!currentUserId && (
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={handleOpenAddLink} className="flex items-center gap-2" variant="outline">
+                      <Icon icon="lucide:plus" className="w-4 h-4" />
+                      Add Link
+                    </Button>
+                    <Button onClick={handleCreateResource} size="sm" className="flex items-center gap-2" variant="outline">
+                      <Icon icon="lucide:plus" className="w-4 h-4" />
+                      New Document
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 flex flex-col gap-4">
+              {links.length === 0 ? (
+                <>
+                </>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {links.map(link => (
+                    <a
+                      key={link.id}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-card text-primary text-sm rounded-full border-primary/30 border-1 hover:text-accent"
+                    >
+                      <Icon icon="lucide:link" className="w-3 h-3" />
+                      <span className="truncate max-w-[200px]">{link.title}</span>
+                      {isDungeonMaster && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 ml-1"
+                          onClick={(e) => { e.preventDefault(); onDeleteLink?.(link.id) }}
+                        >
+                          <Icon icon="lucide:x" className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+              {sortedResources.length === 0 ? (
+                <div className="text-center p-8 rounded-xl bg-card">
+                  <Icon icon="lucide:library" className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">No Documents Yet</h3>
+                  <p className="text-muted-foreground mb-4">Add documents for campaign lore, rules, and information.</p>
+                  {!!currentUserId && (
+                    <Button onClick={handleCreateResource}>
+                      <Icon icon="lucide:plus" className="w-4 h-4" />
+                      Create First Document
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <ScrollArea>
+                  <div className="flex flex-row flex-wrap gap-2">
+                    {sortedResources.map((resource) => (
+                      <Card key={resource.id} className="w-[calc(33.33%-16px)] bg-card hover:bg-card/70 transition-colors rounded-xl cursor-pointer" onClick={() => handleReadResource(resource)}>
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex flex-col gap-2">
+                              <CardTitle className="text-lg font-regular">{resource.title}</CardTitle>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Icon icon="lucide:calendar" className="w-3 h-3" />
+                                  {formatNoteDate(resource.created_at)}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Icon icon="lucide:feather" className="w-3 h-3" />
+                                  {getAuthorName(resource.author_id)}
+                                </div>
+                              </div>
+                            </div>
+                            {/* <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditResource(resource)}
+                                className="h-9 p-0"
+                              >
+                                <Icon icon="lucide:edit" className="w-4 h-4" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteResource(resource.id)}
+                                className="h-9 w-9 p-0 text-destructive hover:text-destructive"
+                              >
+                                <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                              </Button>
+                            </div> */}
+                          </div>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Campaign Note Modal */}
@@ -920,6 +1112,45 @@ export function CampaignHomepage({
         onDelete={handleDeleteFromRead}
         authorName={readingNote ? getAuthorName(readingNote.author_id) : ''}
         canEdit={readingNote ? readingNote.author_id === currentUserId : false}
+      />
+
+      {/* Campaign Resource Modal */}
+      <CampaignResourceModal
+        isOpen={resourceModalOpen}
+        onClose={() => {
+          setResourceModalOpen(false)
+          setEditingResource(null)
+        }}
+        onSave={handleSaveResource}
+        editingResource={editingResource}
+        campaignId={campaign?.id || ''}
+        currentUserId={currentUserId || ''}
+      />
+
+      {/* Campaign Resource Read Modal */}
+      <CampaignResourceReadModal
+        isOpen={resourceReadModalOpen}
+        onClose={() => {
+          setResourceReadModalOpen(false)
+          setReadingResource(null)
+        }}
+        resource={readingResource}
+        onEdit={handleEditResourceFromRead}
+        onDelete={handleDeleteResourceFromRead}
+        authorName={readingResource ? getAuthorName(readingResource.author_id) : ''}
+      />
+
+      {/* Campaign Link Modal */}
+      <CampaignLinkModal
+        isOpen={linkModalOpen}
+        onClose={() => setLinkModalOpen(false)}
+        onSave={async (link) => {
+          try {
+            await onCreateLink?.(link)
+            setLinkModalOpen(false)
+          } catch {}
+        }}
+        campaignId={campaign?.id || ''}
       />
     </div>
   )
