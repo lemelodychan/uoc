@@ -97,7 +97,6 @@ export function CampaignNoteReadModal({
           )}
         </div>
 
-        {canEdit && (
         <div className="flex justify-between p-4 border-t gap-2">
           <Button
             variant="outline"
@@ -117,8 +116,8 @@ export function CampaignNoteReadModal({
             <Icon icon="lucide:edit" className="w-4 h-4" />
             Edit
           </Button>
-      </div>
-        )}
+        </div>
+
       </DialogContent>
     </Dialog>
   )
