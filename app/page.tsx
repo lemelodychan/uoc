@@ -3224,14 +3224,16 @@ function CharacterSheetContent() {
 
       {/* Portrait Modal */}
       <Dialog open={portraitModalOpen} onOpenChange={setPortraitModalOpen}>
-        <DialogContent className="relative w-auto sm:max-w-none max-h-[90vh] p-2">
-          <DialogClose className="absolute right-2 top-2 z-50 bg-card border border-border rounded shadow px-2 py-1 text-sm">Close</DialogClose>
+        <DialogContent className="relative w-auto sm:max-w-none w-fit h-fit max-w-[50vw] max-h-[50vh] top-[-50vh] p-2">
+          <DialogClose className="absolute right-4 top-4 z-50 bg-card border border-border rounded shadow px-2 py-2 text-sm">
+            <Icon icon="lucide:x" className="w-4 h-4" />
+          </DialogClose>
           <div className="flex items-center justify-center">
             {activeCharacter.imageUrl && (
               <img
                 src={activeCharacter.imageUrl}
                 alt={activeCharacter.name}
-                className="max-h-[85vh] max-w-[90vw] object-contain rounded"
+                className="max-h-[48vh] max-w-[48vw] object-contain rounded"
               />
             )}
           </div>
