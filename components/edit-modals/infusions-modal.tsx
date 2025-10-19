@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Icon } from "@iconify/react"
 import type { CharacterData, Infusion } from "@/lib/character-data"
+import { getFeatureUsage, addFeatureOption, removeFeatureOption, updateFeatureUsage, addSingleFeature } from "@/lib/feature-usage-tracker"
 
 interface InfusionsModalProps {
   isOpen: boolean
@@ -17,17 +18,85 @@ interface InfusionsModalProps {
 }
 
 export function InfusionsModal({ isOpen, onClose, character, onSave }: InfusionsModalProps) {
-  const [infusions, setInfusions] = useState<Infusion[]>(character.infusions || [])
-  const [infusionNotes, setInfusionNotes] = useState(character.infusionNotes || "")
+  const [infusions, setInfusions] = useState<Infusion[]>([])
+  const [infusionNotes, setInfusionNotes] = useState("")
+
+  // Get unified feature usage data
+  const infusionsUsage = getFeatureUsage(character, 'artificer-infusions')
+  const selectedInfusions = infusionsUsage?.selectedOptions || []
+  const maxSelections = infusionsUsage?.maxSelections || 0
 
   // Sync local state with character prop when it changes
   useEffect(() => {
-    setInfusions(character.infusions || [])
-    setInfusionNotes(character.infusionNotes || "")
-  }, [character.infusions, character.infusionNotes])
+    // Always prioritize unified feature usage data if it exists
+    if (infusionsUsage && infusionsUsage.selectedOptions) {
+      const unifiedInfusions = infusionsUsage.selectedOptions.map((option: any) => {
+        if (typeof option === 'object') {
+          return {
+            id: option.id,
+            title: option.title,
+            description: option.description,
+            needsAttunement: option.needsAttunement,
+            ...option
+          }
+        } else {
+          // Fallback for string-based options
+          return {
+            id: option,
+            title: option,
+            description: '',
+            needsAttunement: false
+          }
+        }
+      })
+      setInfusions(unifiedInfusions)
+    } else {
+      // No unified data exists, start with empty array
+      setInfusions([])
+    }
+    
+    // Use unified notes only (legacy notes column has been dropped)
+    setInfusionNotes(infusionsUsage?.notes || "")
+  }, [infusionsUsage])
 
   const handleSave = () => {
-    onSave({ infusions, infusionNotes })
+    const updates: Partial<CharacterData> = {}
+    
+    // Ensure the infusions feature exists in unified system
+    let characterWithUsage = character
+    if (!infusionsUsage) {
+      const maxInfusions = Math.max(1, Math.floor((character.intelligence - 10) / 2))
+      const updatedUsage = addSingleFeature(character, 'artificer-infusions', {
+        featureName: 'Infuse Item',
+        featureType: 'options_list',
+        enabledAtLevel: 2,
+        maxSelections: maxInfusions
+      })
+      characterWithUsage = { ...character, classFeatureSkillsUsage: updatedUsage }
+    }
+    
+    // Update infusions using proper feature usage tracker
+    const updatedUsage = updateFeatureUsage(characterWithUsage, 'artificer-infusions', {
+      selectedOptions: infusions.map(infusion => ({
+        id: infusion.id || `infusion-${Date.now()}-${Math.random()}`,
+        title: infusion.title || 'Untitled Infusion',
+        description: infusion.description || '',
+        needsAttunement: infusion.needsAttunement || false,
+        ...infusion // Preserve any additional properties
+      })),
+      notes: infusionNotes, // Save notes to unified system
+      lastUpdated: new Date().toISOString()
+    })
+    
+    updates.classFeatureSkillsUsage = updatedUsage
+    
+    // Only update legacy data if no unified data exists (for backward compatibility)
+    if (!infusionsUsage || !infusionsUsage.selectedOptions) {
+      updates.infusions = infusions
+      updates.infusionNotes = infusionNotes
+    }
+    
+    onSave(updates)
     onClose()
   }
 

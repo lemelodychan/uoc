@@ -6,14 +6,89 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
+import { calculateTotalLevel, isSingleClass, getClassLevel, getClassSubclass } from "@/lib/character-data"
+import { getFeatureUsage } from "@/lib/feature-usage-tracker"
+import type { ClassFeatureSkill } from "@/lib/class-feature-types"
+import { loadClassFeatures } from "@/lib/database"
+import { createClient } from "@/lib/supabase"
+import { useState, useEffect } from "react"
+import { useClassFeatures } from "@/hooks/use-class-features"
+import { ClassFeaturesSkeleton, ClassFeatureItemSkeleton, ClassFeaturesEmptySkeleton } from "@/components/class-features-skeleton"
+
+interface FeatureSlotUsageProps {
+  feature: any
+  character: CharacterData
+  onUpdateUsage: (featureId: string, updates: any) => void
+}
+
+function FeatureSlotUsage({ feature, character, onUpdateUsage }: FeatureSlotUsageProps) {
+  const featureUsage = getFeatureUsage(character, feature.id)
+  const currentUses = featureUsage?.currentUses || 0
+  const maxUses = featureUsage?.maxUses || 0
+  
+  if (maxUses === 0) return null
+  
+  const handleUseSlot = () => {
+    if (currentUses < maxUses) {
+      onUpdateUsage(feature.id, { type: 'use_slot', amount: 1 })
+    }
+  }
+  
+  const handleRestoreSlot = () => {
+    if (currentUses > 0) {
+      onUpdateUsage(feature.id, { type: 'restore_slot', amount: 1 })
+    }
+  }
+  
+  return (
+    <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+      <span className="text-xs text-muted-foreground">Uses:</span>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 w-6 p-0"
+          onClick={handleRestoreSlot}
+          disabled={currentUses <= 0}
+        >
+          <Icon icon="lucide:minus" className="w-3 h-3" />
+        </Button>
+        <span className="text-sm font-mono min-w-[2rem] text-center">
+          {currentUses}/{maxUses}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 w-6 p-0"
+          onClick={handleUseSlot}
+          disabled={currentUses >= maxUses}
+        >
+          <Icon icon="lucide:plus" className="w-3 h-3" />
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 interface ClassFeaturesProps {
   character: CharacterData
   onRefreshFeatures: () => Promise<void>
   onOpenFeatureModal: (content: { title: string; description: string }) => void
+  onCleanupFeatures?: () => Promise<void>
+  onUpdateFeatureUsage?: (featureId: string, updates: any) => void
 }
 
-export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal }: ClassFeaturesProps) {
+
+export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal, onCleanupFeatures, onUpdateFeatureUsage }: ClassFeaturesProps) {
+  // Use the new class features hook with caching
+  const { 
+    features: allFeatures, 
+    loading: isLoadingFeatures, 
+    error: featuresError, 
+    fromCache, 
+    refresh: refreshFeatures 
+  } = useClassFeatures(character)
+
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader>
@@ -21,16 +96,42 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
           <CardTitle className="flex items-center gap-2">
             <Icon icon="lucide:star" className="w-5 h-5" />
             Class Features
+            {fromCache && (
+              <Icon icon="lucide:clock" className="w-3 h-3 text-muted-foreground" />
+            )}
           </CardTitle>
+          {onCleanupFeatures && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCleanupFeatures}
+              title="Remove features above current level"
+            >
+              <Icon icon="lucide:trash-2" className="w-4 h-4" />
+              Cleanup
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {character.classFeatures?.length > 0 ? (() => {
-            // Group features by class
-            const featuresByClass = new Map<string, Array<{name: string, description: string, source: string, level: number, className?: string}>>()
+          {isLoadingFeatures ? (
+            <ClassFeaturesSkeleton count={3} />
+          ) : featuresError ? (
+            <div className="text-center p-8 rounded-xl bg-card">
+              <Icon icon="lucide:alert-circle" className="w-12 h-12 mx-auto mb-4 text-destructive" />
+              <h3 className="text-lg font-semibold mb-2">Failed to Load Class Features</h3>
+              <p className="text-muted-foreground mb-4">{featuresError}</p>
+              <Button onClick={refreshFeatures} variant="outline">
+                <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          ) : allFeatures?.length > 0 ? (() => {
+            // Group features by class - NO FILTERING, NO SKIPPING, NO DEDUPLICATION
+            const featuresByClass = new Map<string, any[]>()
             
-            character.classFeatures.forEach(feature => {
+            allFeatures.forEach(feature => {
               // Use the className from the feature, or fallback to the character's primary class
               const className = feature.className || character.class
               
@@ -42,8 +143,10 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
             
             // Sort features within each class by level
             featuresByClass.forEach(features => {
-              features.sort((a, b) => a.level - b.level)
+              features.sort((a, b) => (a.level || a.enabledAtLevel || 1) - (b.level || b.enabledAtLevel || 1))
             })
+            
+            console.log('🔍 ClassFeatures Debug - Features by class:', featuresByClass)
             
             // Render grouped features
             return Array.from(featuresByClass.entries()).map(([className, features]) => (
@@ -62,14 +165,14 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
                 {features.map((feature, index) => (
                   <div key={`${className}-${index}`} className="p-3 border rounded-lg flex flex-col gap-2 bg-background">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="font-medium flex-1 min-w-0 truncate">{feature.name}</div>
+                      <div className="font-medium flex-1 min-w-0 truncate">{feature.name || feature.title}</div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">
-                          Level {feature.level}
+                          Level {feature.level || feature.enabledAtLevel || 'Unknown'}
                         </Badge>
-                        {feature.source?.toLowerCase() === "subclass" && (
+                        {(feature.source?.toLowerCase() === "subclass" || feature.enabledBySubclass || feature.feature_type === 'subclass') && (
                           <Badge variant="secondary" className="text-xs">
-                            {feature.source}
+                            {feature.source || 'Subclass'}
                           </Badge>
                         )}
                       </div>
@@ -77,14 +180,27 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
 
                     <div className="text-sm text-muted-foreground relative flex flex-col gap-2">
                       <div className="line-clamp-2 max-h-12 overflow-hidden">
-                        <RichTextDisplay content={feature.description} className="text-sm text-muted-foreground" />
+                        <RichTextDisplay content={feature.description || feature.subtitle || ''} className="text-sm text-muted-foreground" />
                       </div>
+                      
+                      {/* Feature Usage Tracking */}
+                      {((feature as any).feature_skill_type === 'slots' || (feature as any).featureType === 'slots') && onUpdateFeatureUsage && (
+                        <FeatureSlotUsage 
+                          feature={feature}
+                          character={character}
+                          onUpdateUsage={onUpdateFeatureUsage}
+                        />
+                      )}
+                      
                       <Button
                         variant="outline"
                         size="sm"
                         className="w-fit px-2 h-7 shadow-sm text-foreground"
                         onClick={() => {
-                          onOpenFeatureModal({ title: feature.name, description: feature.description })
+                          onOpenFeatureModal({ 
+                            title: feature.name || feature.title || 'Unknown Feature', 
+                            description: feature.description || feature.subtitle || '' 
+                          })
                         }}
                       >
                         Read more
@@ -95,9 +211,7 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
               </div>
             ))
           })() : (
-            <div className="text-sm text-muted-foreground text-center py-4">
-              No class features available
-            </div>
+            <ClassFeaturesEmptySkeleton />
           )}
         </div>
       </CardContent>

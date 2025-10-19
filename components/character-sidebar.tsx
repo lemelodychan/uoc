@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Icon } from "@iconify/react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { CharacterData, Campaign } from "@/lib/character-data"
+import { calculateTotalLevel } from "@/lib/character-data"
 import { canViewCharacter } from "@/lib/database"
 
 interface CharacterSidebarProps {
@@ -21,11 +22,11 @@ interface CharacterSidebarProps {
   onCreateCharacter: () => void
   onStartLongRest: () => void
   onOpenDiceRoll: () => void
-  onOpenCampaignManagement: () => void
+  onOpenManagement: () => void
   onOpenSpellLibrary: () => void
   currentUserId?: string
-  currentView?: 'character' | 'campaign'
-  onViewChange?: (view: 'character' | 'campaign') => void
+  currentView?: 'character' | 'campaign' | 'management'
+  onViewChange?: (view: 'character' | 'campaign' | 'management') => void
 }
 
 export function CharacterSidebar({
@@ -38,7 +39,7 @@ export function CharacterSidebar({
   onCreateCharacter,
   onStartLongRest,
   onOpenDiceRoll,
-  onOpenCampaignManagement,
+  onOpenManagement,
   onOpenSpellLibrary,
   currentUserId,
   currentView = 'character',
@@ -55,12 +56,12 @@ export function CharacterSidebar({
     // For single-class characters (including when classes has a single entry),
     // always use the top-level level/class coming from the database.
     if (character.classes && character.classes.length > 1) {
-      const totalLevel = character.classes.reduce((total, cls) => total + cls.level, 0)
+      const totalLevel = calculateTotalLevel(character.classes)
       const classDisplay = character.classes.map(cls => cls.name).join('/')
       return `Level ${totalLevel} ${classDisplay}`
     }
 
-    return `Level ${character.level} ${character.class}`
+    return `Level ${calculateTotalLevel(character.classes)} ${character.class}`
   }
 
   // Filter characters based on selected campaign
@@ -185,7 +186,7 @@ export function CharacterSidebar({
 
           {!isCollapsed && (
               <Button
-                onClick={onOpenCampaignManagement}
+                onClick={onOpenManagement}
                 variant="outline"
                 size="sm"
                 className="h-9"

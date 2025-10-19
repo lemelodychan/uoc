@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal, DialogOverlay } from "@/components/ui/dialog"
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -18,8 +19,45 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
 import type { UserProfile } from "@/lib/user-profiles"
-import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById } from "@/lib/database"
+import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass } from "@/lib/database"
 import { useToast } from "@/components/ui/use-toast"
+import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
+import { ClassDuplicationModal } from "./class-duplication-modal"
+import { ClassFeatureSkillModal } from "./class-feature-skill-modal"
+import { ProficiencyCheckboxes, SAVING_THROW_OPTIONS, SKILL_OPTIONS, EQUIPMENT_OPTIONS } from "@/components/ui/proficiency-checkboxes"
+import type { ClassFeatureSkill } from "@/lib/class-feature-types"
+
+// Helper function to normalize proficiency data from various formats
+function normalizeProficiencyArray(data: any): string[] {
+  if (!data) return []
+  
+  if (Array.isArray(data)) {
+    // If it's already an array, ensure all items are strings
+    return data.filter(item => typeof item === 'string')
+  }
+  if (typeof data === 'object') {
+    // If it's an object, extract the keys or values
+    if (Array.isArray(data.options)) {
+      return data.options.filter((item: any) => typeof item === 'string')
+    }
+    if (Array.isArray(data.proficiencies)) {
+      return data.proficiencies.filter((item: any) => typeof item === 'string')
+    }
+    // If it's a key-value object, return the keys where value is true
+    return Object.keys(data).filter(key => data[key] === true || data[key] === 'true')
+  }
+  if (typeof data === 'string') {
+    // If it's a string, try to parse it as JSON
+    try {
+      const parsed = JSON.parse(data)
+      return normalizeProficiencyArray(parsed)
+    } catch {
+      // If parsing fails, return as single-item array
+      return [data]
+    }
+  }
+  return []
+}
 
 type FeatureItem = { id: string; class_id: string; level: number; title: string; description: string; feature_type: string; subclass_id?: string | null }
 
@@ -103,8 +141,18 @@ export function CampaignManagementModal({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[960px] p-0 gap-0">
+      <Dialog open={isOpen} onOpenChange={onClose} modal={false}>
+        <DialogPortal>
+          <DialogOverlay />
+          <DialogPrimitive.Content
+            className="bg-white dark:bg-card data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-border p-6 shadow-lg duration-200 sm:max-w-[960px] p-0 gap-0"
+          >
+            <DialogPrimitive.Close
+              className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            >
+              <Icon icon="lucide:x" />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
           <DialogHeader className="p-4 pb-0">
             <DialogTitle>Management</DialogTitle>
             <DialogDescription>
@@ -113,20 +161,18 @@ export function CampaignManagementModal({
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col max-h-[80vh]">
-            <div className="p-4 pb-0">
-              <TabsList className="grid grid-cols-2 w-full h-full p-2 rounded-xl">
-                <TabsTrigger value="campaigns" className="p-2 rounded-lg">Campaign Management</TabsTrigger>
-                <TabsTrigger value="classes" className="p-2 rounded-lg">
-                  Class Management 
-                  <Badge 
-                    variant="secondary" 
-                    className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1"
-                  >
-                    Beta
-                  </Badge>
-                </TabsTrigger>
-              </TabsList>
-            </div>
+            <TabsList className="grid w-full grid-cols-2 p-2 h-fit rounded-xl">
+              <TabsTrigger value="campaigns" className="flex items-center gap-2 p-2 rounded-lg">Campaign Management</TabsTrigger>
+              <TabsTrigger value="classes" className="flex items-center gap-2 p-2 rounded-lg">
+                Class Management 
+                <Badge 
+                  variant="secondary" 
+                  className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1"
+                >
+                  Beta
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
 
             <TabsContent value="campaigns" className="flex-1 min-h-0 flex flex-col gap-0">
               <div className="flex gap-2 flex-shrink-0 border-b p-4">
@@ -235,7 +281,8 @@ export function CampaignManagementModal({
             </TabsContent>
           </Tabs>
 
-        </DialogContent>
+          </DialogPrimitive.Content>
+        </DialogPortal>
       </Dialog>
 
       {/* Campaign Creation Modal */}
@@ -293,11 +340,22 @@ function ClassManagement() {
   const [detailsClassId, setDetailsClassId] = useState<string | null>(null)
   const [detailsClassName, setDetailsClassName] = useState<string>("")
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false)
-  const [detailsTab, setDetailsTab] = useState<'subclasses' | 'features'>("subclasses")
+  const [detailsTab, setDetailsTab] = useState<'subclasses' | 'features' | 'feature-skills'>("subclasses")
+  
+  // New state for enhanced class management
+  const [duplicatingClass, setDuplicatingClass] = useState<ClassData | null>(null)
+  const [editingFeatureSkill, setEditingFeatureSkill] = useState<ClassFeatureSkill | null>(null)
+  const [featureSkillsByClass, setFeatureSkillsByClass] = useState<Record<string, ClassFeatureSkill[]>>({})
+  const [customClasses, setCustomClasses] = useState<ClassData[]>([])
+  const [showCustomOnly, setShowCustomOnly] = useState(false)
 
   const filteredClasses = useMemo(() => {
-    return classes.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
-  }, [classes, search])
+    let filtered = classes.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+    if (showCustomOnly) {
+      filtered = filtered.filter(c => c.is_custom)
+    }
+    return filtered
+  }, [classes, search, showCustomOnly])
 
   // Load from database on mount
   const reloadFromDb = async () => {
@@ -438,9 +496,32 @@ function ClassManagement() {
         const newClass: ClassData = {
           id: id!,
           name: cls.name!,
+          subclass: null,
+          description: null,
           hit_die: cls.hit_die ?? 8,
-          primary_ability: cls.primary_ability ?? "strength",
+          primary_ability: Array.isArray(cls.primary_ability) ? cls.primary_ability : [cls.primary_ability ?? "strength"],
           saving_throw_proficiencies: cls.saving_throw_proficiencies ?? [],
+          skill_proficiencies: null,
+          equipment_proficiencies: null,
+          starting_equipment: null,
+          spell_slots_1: null,
+          spell_slots_2: null,
+          spell_slots_3: null,
+          spell_slots_4: null,
+          spell_slots_5: null,
+          spell_slots_6: null,
+          spell_slots_7: null,
+          spell_slots_8: null,
+          spell_slots_9: null,
+          cantrips_known: null,
+          spells_known: null,
+          is_custom: false,
+          created_by: null,
+          duplicated_from: null,
+          source: 'SRD 5.1',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          // Legacy fields
           spell_progression: cls.spell_progression ?? {},
           max_spell_slots: cls.max_spell_slots ?? {},
           class_features: cls.class_features ?? {},
@@ -484,17 +565,112 @@ function ClassManagement() {
     setSubclasses(prev => prev.filter(s => s.id !== id))
   }
 
+  // New functions for enhanced class management
+  const handleDuplicateClass = async (sourceClass: ClassData, newName: string, options: {
+    copySubclasses?: boolean
+    copyFeatures?: boolean
+    copyFeatureSkills?: boolean
+  }) => {
+    try {
+      const { success, newClassId, error } = await duplicateClass(sourceClass.id, newName, options)
+      if (success && newClassId) {
+        toast({ title: "Class duplicated", description: `${newName} has been created successfully` })
+        await reloadFromDb() // Reload to show the new class
+        setDuplicatingClass(null)
+      } else {
+        toast({ title: "Error", description: error || "Failed to duplicate class", variant: "destructive" })
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to duplicate class", variant: "destructive" })
+    }
+  }
+
+  const handleAddFeatureSkill = (classId: string) => {
+    const newFeatureSkill: ClassFeatureSkill = {
+      id: crypto.randomUUID(),
+      version: 1,
+      title: '',
+      featureType: 'slots',
+      enabledAtLevel: 1,
+      config: {
+        usesFormula: '1',
+        replenishOn: 'long_rest',
+        displayStyle: 'circles'
+      }
+    }
+    setEditingFeatureSkill(newFeatureSkill)
+  }
+
+  const handleSaveFeatureSkill = async (featureSkill: ClassFeatureSkill) => {
+    try {
+      // This would integrate with the database function to save feature skills
+      // For now, we'll update the local state
+      setFeatureSkillsByClass(prev => ({
+        ...prev,
+        [featureSkill.id]: [...(prev[featureSkill.id] || []), featureSkill]
+      }))
+      setEditingFeatureSkill(null)
+      toast({ title: "Feature skill saved", description: `${featureSkill.title} has been added` })
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to save feature skill", variant: "destructive" })
+    }
+  }
+
+  const loadCustomClasses = async () => {
+    try {
+      const { classes: custom } = await getCustomClasses()
+      setCustomClasses(custom || [])
+    } catch (error) {
+      console.error("Failed to load custom classes:", error)
+    }
+  }
+
+  // Load custom classes on mount
+  useEffect(() => {
+    loadCustomClasses()
+  }, [])
+
   return (
     <div className="flex flex-col gap-0 h-full min-h-0">
       <div className="flex flex-col w-full gap-2 p-4 pt-0 border-b">
         <div className="flex flex-row gap-2">
           <Input placeholder="Search classes..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Button 
+            variant={showCustomOnly ? "default" : "outline"}
+            onClick={() => setShowCustomOnly(!showCustomOnly)}
+            className="whitespace-nowrap"
+          >
+            {showCustomOnly ? "Show All" : "Custom Only"}
+          </Button>
           <Button onClick={() => setEditingClass({
             id: "",
             name: "",
+            subclass: null,
+            description: null,
             hit_die: 8,
-            primary_ability: "strength",
+            primary_ability: ["strength"],
             saving_throw_proficiencies: [],
+            skill_proficiencies: null,
+            equipment_proficiencies: null,
+            starting_equipment: null,
+            spell_slots_1: null,
+            spell_slots_2: null,
+            spell_slots_3: null,
+            spell_slots_4: null,
+            spell_slots_5: null,
+            spell_slots_6: null,
+            spell_slots_7: null,
+            spell_slots_8: null,
+            spell_slots_9: null,
+            cantrips_known: null,
+            spells_known: null,
+            is_custom: true,
+            created_by: null,
+            duplicated_from: null,
+            source: 'Custom',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            // Legacy fields
             spell_progression: {},
             max_spell_slots: {},
             class_features: {},
@@ -515,7 +691,14 @@ function ClassManagement() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col gap-1">
-                    <CardTitle className="text-lg">{cls.name}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">{cls.name}</CardTitle>
+                      {cls.is_custom && (
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          Custom
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-xs font-medium">
                       Primary ability: <Badge variant="secondary">{cls.primary_ability}</Badge>
                     </div>
@@ -554,6 +737,15 @@ function ClassManagement() {
                     }}>
                       <Icon icon="lucide:edit" className="w-4 h-4" />
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-8 h-8" 
+                      onClick={() => setDuplicatingClass(cls)}
+                      title="Duplicate class"
+                    >
+                      <Icon icon="lucide:copy" className="w-4 h-4" />
+                    </Button>
                     <Button variant="outline" size="sm" className="w-8 h-8 text-[#ce6565] hover:bg-[#ce6565] hover:text-white" onClick={() => removeClass(cls.id)}>
                       <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
@@ -586,7 +778,7 @@ function ClassManagement() {
 
       {/* Class Editor */}
       <Dialog open={!!editingClass} onOpenChange={() => setEditingClass(null)}>
-        <DialogContent className="sm:max-w-[560px] h-[90vh] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogContent className="sm:max-w-[90vw] h-[90vh] max-h-[90vh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="sticky top-0 z-10 bg-background px-4 pt-4 pb-2 border-b shrink-0">
             <DialogTitle>{editingClass?.id ? "Edit Class" : "New Class"}</DialogTitle>
           </DialogHeader>
@@ -618,7 +810,24 @@ function ClassManagement() {
               </div>
               <div className="grid gap-1">
                 <Label htmlFor="primary-ability">Primary Ability</Label>
-                <Select value={String(Array.isArray((editingClass as any)?.primary_ability) ? (editingClass as any).primary_ability[0] : (editingClass as any)?.primary_ability ?? "Strength")} onValueChange={(val) => setEditingClass(prev => prev ? { ...prev, primary_ability: [val] as any } : prev)}>
+                <Select 
+                  value={(() => {
+                    const primaryAbility = Array.isArray((editingClass as any)?.primary_ability) 
+                      ? (editingClass as any).primary_ability[0] 
+                      : (editingClass as any)?.primary_ability ?? "strength"
+                    // Convert to capitalized format for display
+                    return primaryAbility ? primaryAbility.charAt(0).toUpperCase() + primaryAbility.slice(1).toLowerCase() : "Strength"
+                  })()} 
+                  onValueChange={(val) => {
+                    setEditingClass(prev => prev ? { ...prev, primary_ability: [val.toLowerCase()] as any } : prev)
+                    // Trigger autosave
+                    setTimeout(() => {
+                      if (editingClass) {
+                        upsertClass({ ...editingClass, primary_ability: [val.toLowerCase()] })
+                      }
+                    }, 500)
+                  }}
+                >
                   <SelectTrigger id="primary-ability">
                     <SelectValue placeholder="Select ability" />
                   </SelectTrigger>
@@ -634,41 +843,113 @@ function ClassManagement() {
               </div>
             </div>
             <div className="grid gap-1">
-              <Label>Saving Throw Proficiencies (JSON array)</Label>
-              <JsonCodeEditor value={editingClass?.saving_throw_proficiencies ?? []} onChange={(val) => setEditingClass(prev => prev ? { ...prev, saving_throw_proficiencies: val as any } as ClassData : prev)} />
+              <ProficiencyCheckboxes
+                value={normalizeProficiencyArray(editingClass?.saving_throw_proficiencies)}
+                onChange={(val) => {
+                  setEditingClass(prev => prev ? { ...prev, saving_throw_proficiencies: val as any } as ClassData : prev)
+                  // Trigger autosave
+                  setTimeout(() => {
+                    if (editingClass) {
+                      upsertClass({ ...editingClass, saving_throw_proficiencies: val })
+                    }
+                  }, 500)
+                }}
+                options={SAVING_THROW_OPTIONS}
+                title="Saving Throw Proficiencies"
+                description="Select which saving throws this class is proficient with"
+                maxSelections={2}
+              />
             </div>
             <div className="grid gap-1">
-              <Label>Skill Proficiencies (JSON)</Label>
-              <JsonCodeEditor value={(editingClass as any)?.skill_proficiencies ?? {}} onChange={(val) => setEditingClass(prev => prev ? { ...(prev as any), skill_proficiencies: val } as any : prev)} />
+              <ProficiencyCheckboxes
+                value={normalizeProficiencyArray((editingClass as any)?.skill_proficiencies)}
+                onChange={(val) => {
+                  setEditingClass(prev => prev ? { ...(prev as any), skill_proficiencies: val } as any : prev)
+                  // Trigger autosave
+                  setTimeout(() => {
+                    if (editingClass) {
+                      upsertClass({ ...editingClass, skill_proficiencies: val })
+                    }
+                  }, 500)
+                }}
+                options={SKILL_OPTIONS}
+                title="Skill Proficiencies"
+                description="Select which skills players can choose from when creating a character with this class"
+              />
             </div>
             <div className="grid gap-1">
-              <Label>Equipment Proficiencies (JSON)</Label>
-              <JsonCodeEditor value={(editingClass as any)?.equipment_proficiencies ?? {}} onChange={(val) => setEditingClass(prev => prev ? { ...(prev as any), equipment_proficiencies: val } as any : prev)} />
+              <ProficiencyCheckboxes
+                value={normalizeProficiencyArray((editingClass as any)?.equipment_proficiencies)}
+                onChange={(val) => {
+                  setEditingClass(prev => prev ? { ...(prev as any), equipment_proficiencies: val } as any : prev)
+                  // Trigger autosave
+                  setTimeout(() => {
+                    if (editingClass) {
+                      upsertClass({ ...editingClass, equipment_proficiencies: val })
+                    }
+                  }, 500)
+                }}
+                options={EQUIPMENT_OPTIONS}
+                title="Equipment Proficiencies"
+                description="Select which equipment this class is proficient with"
+              />
             </div>
             <div className="grid gap-1">
               <Label>Starting Equipment (JSON)</Label>
               <JsonCodeEditor value={(editingClass as any)?.starting_equipment ?? {}} onChange={(val) => setEditingClass(prev => prev ? { ...(prev as any), starting_equipment: val } as any : prev)} />
             </div>
             <div className="grid gap-1">
-              <Label>Spell Slots (JSON arrays per level)</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {[1,2,3,4,5,6,7,8,9].map((lvl) => (
-                  <div key={lvl} className="grid gap-1">
-                    <Label>Level {lvl}</Label>
-                    <JsonCodeEditor value={((editingClass as any)?.[`spell_slots_${lvl}`]) ?? []} onChange={(val) => setEditingClass(prev => prev ? { ...(prev as any), [`spell_slots_${lvl}`]: val } as any : prev)} />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <div className="grid gap-1">
-                <Label>Cantrips Known (array of numbers by level)</Label>
-                <JsonCodeEditor value={(editingClass as any)?.cantrips_known ?? []} onChange={(val) => setEditingClass(prev => prev ? { ...(prev as any), cantrips_known: val } as any : prev)} />
-              </div>
-              <div className="grid gap-1">
-                <Label>Spells Known (array of numbers by level)</Label>
-                <JsonCodeEditor value={(editingClass as any)?.spells_known ?? []} onChange={(val) => setEditingClass(prev => prev ? { ...(prev as any), spells_known: val } as any : prev)} />
-              </div>
+              <Label>Spell Progression</Label>
+              <SpellSlotsGrid
+                value={{
+                  cantripsKnown: (editingClass as any)?.cantrips_known ?? Array(20).fill(0),
+                  spellSlots: {
+                    spell_slots_1: (editingClass as any)?.spell_slots_1 ?? Array(20).fill(0),
+                    spell_slots_2: (editingClass as any)?.spell_slots_2 ?? Array(20).fill(0),
+                    spell_slots_3: (editingClass as any)?.spell_slots_3 ?? Array(20).fill(0),
+                    spell_slots_4: (editingClass as any)?.spell_slots_4 ?? Array(20).fill(0),
+                    spell_slots_5: (editingClass as any)?.spell_slots_5 ?? Array(20).fill(0),
+                    spell_slots_6: (editingClass as any)?.spell_slots_6 ?? Array(20).fill(0),
+                    spell_slots_7: (editingClass as any)?.spell_slots_7 ?? Array(20).fill(0),
+                    spell_slots_8: (editingClass as any)?.spell_slots_8 ?? Array(20).fill(0),
+                    spell_slots_9: (editingClass as any)?.spell_slots_9 ?? Array(20).fill(0)
+                  }
+                }}
+                onChange={(spellData) => {
+                  setEditingClass(prev => prev ? {
+                    ...(prev as any),
+                    cantrips_known: spellData.cantripsKnown,
+                    spell_slots_1: spellData.spellSlots.spell_slots_1,
+                    spell_slots_2: spellData.spellSlots.spell_slots_2,
+                    spell_slots_3: spellData.spellSlots.spell_slots_3,
+                    spell_slots_4: spellData.spellSlots.spell_slots_4,
+                    spell_slots_5: spellData.spellSlots.spell_slots_5,
+                    spell_slots_6: spellData.spellSlots.spell_slots_6,
+                    spell_slots_7: spellData.spellSlots.spell_slots_7,
+                    spell_slots_8: spellData.spellSlots.spell_slots_8,
+                    spell_slots_9: spellData.spellSlots.spell_slots_9
+                  } as any : prev)
+                  
+                  // Trigger autosave
+                  setTimeout(() => {
+                    if (editingClass) {
+                      upsertClass({
+                        ...editingClass,
+                        cantrips_known: spellData.cantripsKnown,
+                        spell_slots_1: spellData.spellSlots.spell_slots_1,
+                        spell_slots_2: spellData.spellSlots.spell_slots_2,
+                        spell_slots_3: spellData.spellSlots.spell_slots_3,
+                        spell_slots_4: spellData.spellSlots.spell_slots_4,
+                        spell_slots_5: spellData.spellSlots.spell_slots_5,
+                        spell_slots_6: spellData.spellSlots.spell_slots_6,
+                        spell_slots_7: spellData.spellSlots.spell_slots_7,
+                        spell_slots_8: spellData.spellSlots.spell_slots_8,
+                        spell_slots_9: spellData.spellSlots.spell_slots_9
+                      })
+                    }
+                  }, 1000) // Longer delay for spell slots since they change frequently
+                }}
+              />
             </div>
             </div>
           </div>
@@ -690,9 +971,10 @@ function ClassManagement() {
           <div className="flex-1 overflow-hidden gap-0">
             <Tabs value={detailsTab} onValueChange={(v:any)=>setDetailsTab(v)} className="h-full flex flex-col gap-0">
               <div className="p-4 border-b">
-                <TabsList className="w-full grid grid-cols-2">
+                <TabsList className="w-full grid grid-cols-3">
                   <TabsTrigger value="subclasses">Subclasses</TabsTrigger>
                   <TabsTrigger value="features">Class Features</TabsTrigger>
+                  <TabsTrigger value="feature-skills">Feature Skills</TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="subclasses" className="flex-1 overflow-y-auto p-4">
@@ -756,6 +1038,74 @@ function ClassManagement() {
                       </div>
                     )
                   })()}
+                </div>
+              </TabsContent>
+              <TabsContent value="feature-skills" className="flex-1 overflow-y-auto p-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Feature Skills</h3>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleAddFeatureSkill(detailsClassId!)}
+                    >
+                      <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
+                      Add Feature Skill
+                    </Button>
+                  </div>
+                  
+                  {detailsClassId && featureSkillsByClass[detailsClassId] ? (
+                    <div className="space-y-3">
+                      {featureSkillsByClass[detailsClassId].map((skill) => (
+                        <div key={skill.id} className="border rounded-lg p-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-medium">{skill.title}</h4>
+                              {skill.subtitle && (
+                                <p className="text-sm text-muted-foreground">{skill.subtitle}</p>
+                              )}
+                              <div className="flex gap-2 mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {skill.featureType.replace('_', ' ')}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  Level {skill.enabledAtLevel}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setEditingFeatureSkill(skill)}
+                              >
+                                <Icon icon="lucide:edit" className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-600 hover:bg-red-50"
+                                onClick={() => {
+                                  setFeatureSkillsByClass(prev => ({
+                                    ...prev,
+                                    [detailsClassId]: prev[detailsClassId].filter(s => s.id !== skill.id)
+                                  }))
+                                }}
+                              >
+                                <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Icon icon="lucide:zap" className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No feature skills defined for this class.</p>
+                      <p className="text-sm">Add feature skills to enable usage tracking for class abilities.</p>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>
@@ -879,6 +1229,29 @@ function ClassManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Class Duplication Modal */}
+      {duplicatingClass && (
+        <ClassDuplicationModal
+          sourceClass={duplicatingClass}
+          onClose={() => setDuplicatingClass(null)}
+          onSuccess={(newClass) => {
+            // The modal will handle the duplication internally
+            setDuplicatingClass(null)
+            reloadFromDb() // Reload to show the new class
+          }}
+        />
+      )}
+
+      {/* Feature Skill Editor Modal */}
+      {editingFeatureSkill && (
+        <ClassFeatureSkillModal
+          isOpen={!!editingFeatureSkill}
+          onClose={() => setEditingFeatureSkill(null)}
+          onSave={handleSaveFeatureSkill}
+          editingFeature={editingFeatureSkill}
+        />
+      )}
     </div>
   )
 }

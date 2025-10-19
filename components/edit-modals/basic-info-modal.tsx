@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
+import { calculateTotalLevel, isSingleClass, getPrimaryClass } from "@/lib/character-data"
 import { MulticlassModal } from "./multiclass-modal"
 import { getCurrentUser, getAllUsers } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
@@ -46,11 +47,12 @@ interface BasicInfoModalProps {
 }
 
 export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStatusChange }: BasicInfoModalProps) {
+  const primaryClass = getPrimaryClass(character.classes)
   const [formData, setFormData] = useState({
     name: character.name,
-    class: character.class,
-    subclass: character.subclass || "", // Added subclass to form data
-    level: character.level,
+    class: primaryClass?.name || character.class,
+    subclass: primaryClass?.subclass || character.subclass || "",
+    level: calculateTotalLevel(character.classes),
     background: character.background,
     race: character.race,
     alignment: character.alignment,
@@ -95,11 +97,12 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   // Sync local state with character prop when it changes
   useEffect(() => {
     if (isOpen) {
+      const primaryClass = getPrimaryClass(character.classes)
       setFormData({
         name: character.name,
-        class: character.class,
-        subclass: character.subclass || "",
-        level: character.level,
+        class: primaryClass?.name || character.class,
+        subclass: primaryClass?.subclass || character.subclass || "",
+        level: calculateTotalLevel(character.classes),
         background: character.background,
         race: character.race,
         alignment: character.alignment,
@@ -108,7 +111,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
         visibility: character.visibility || 'public',
       })
     }
-  }, [isOpen, character.id, character.name, character.class, character.subclass, character.level, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility])
+  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility])
 
   const handleClassChange = (newClass: string) => {
     setFormData({
@@ -119,8 +122,10 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   }
 
   const handleSave = () => {
+    // Don't include level in updates since it should be calculated from classes
+    const { level, ...formDataWithoutLevel } = formData
     onSave({
-      ...formData,
+      ...formDataWithoutLevel,
       visibility: formData.visibility
     })
     // Also update party status if it changed
@@ -200,15 +205,20 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
             <Label htmlFor="level" className="text-right">
               Level
             </Label>
-            <Input
-              id="level"
-              type="number"
-              min="1"
-              max="20"
-              value={formData.level}
-              onChange={(e) => setFormData({ ...formData, level: Number.parseInt(e.target.value) || 1 })}
-              className="w-full"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="level"
+                type="number"
+                min="1"
+                max="20"
+                value={formData.level}
+                readOnly
+                className="w-full bg-muted"
+              />
+              <span className="text-xs text-muted-foreground">
+                (calculated from classes)
+              </span>
+            </div>
           </div>
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="background" className="text-right">
@@ -348,11 +358,12 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
         onSave={(updates) => {
           // Update the form data with multiclass changes
           if (updates.classes) {
+            const primaryClass = getPrimaryClass(updates.classes)
             setFormData({
               ...formData,
-              class: updates.class || formData.class,
-              subclass: updates.subclass || formData.subclass,
-              level: updates.level || formData.level,
+              class: primaryClass?.name || formData.class,
+              subclass: primaryClass?.subclass || formData.subclass,
+              level: calculateTotalLevel(updates.classes),
             })
           }
           onSave(updates)

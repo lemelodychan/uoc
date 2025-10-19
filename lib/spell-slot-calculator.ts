@@ -42,13 +42,16 @@ export const calculateSpellSlotsFromClass = (classData: ClassSpellData | null, l
   ]
 
   spellLevels.forEach((slots, spellLevel) => {
-    const totalSlots = slots[levelIndex] || 0
-    if (totalSlots > 0) {
-      spellSlots.push({
-        level: spellLevel + 1, // Spell levels are 1-indexed
-        total: totalSlots,
-        used: 0, // Start with all slots available
-      })
+    // Ensure slots array exists and has the right length
+    if (slots && Array.isArray(slots) && slots.length >= level) {
+      const totalSlots = slots[levelIndex] || 0
+      if (totalSlots > 0) {
+        spellSlots.push({
+          level: spellLevel + 1, // Spell levels are 1-indexed
+          total: totalSlots,
+          used: 0, // Start with all slots available
+        })
+      }
     }
   })
 
@@ -61,7 +64,13 @@ export const getCantripsKnownFromClass = (classData: ClassSpellData | null, leve
   }
 
   const levelIndex = level - 1
-  return classData.cantrips_known[levelIndex] || 0
+  
+  // Ensure cantrips_known array exists and has the right length
+  if (classData.cantrips_known && Array.isArray(classData.cantrips_known) && classData.cantrips_known.length >= level) {
+    return classData.cantrips_known[levelIndex] || 0
+  }
+  
+  return 0
 }
 
 export const getSpellsKnownFromClass = (classData: ClassSpellData | null, level: number): number => {
@@ -70,7 +79,13 @@ export const getSpellsKnownFromClass = (classData: ClassSpellData | null, level:
   }
 
   const levelIndex = level - 1
-  return classData.spells_known[levelIndex] || 0
+  
+  // Ensure spells_known array exists and has the right length
+  if (classData.spells_known && Array.isArray(classData.spells_known) && classData.spells_known.length >= level) {
+    return classData.spells_known[levelIndex] || 0
+  }
+  
+  return 0
 }
 
 export const getBardicInspirationFromClass = (classData: ClassSpellData | null, level: number) => {

@@ -12,7 +12,12 @@ import { ThemeToggleSimple } from "@/components/theme-toggle-simple"
 import { LogoSVG } from "@/components/logo"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
-export function AppHeader() {
+interface AppHeaderProps {
+  currentView?: 'campaign' | 'management'
+  onViewChange?: (view: 'campaign' | 'management') => void
+}
+
+export function AppHeader({ currentView = 'campaign', onViewChange }: AppHeaderProps) {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [displayName, setDisplayName] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -173,13 +178,32 @@ export function AppHeader() {
   if (!user) return null
 
   return (
-    <header className="bg-card border-b border-border px-6 py-4">
+    <header className="bg-card border-b border-border px-6 py-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-6">
           <LogoSVG width={120} height={77} className="h-12 w-auto" />
-          <span className="text-sm text-muted-foreground">
-            Character Sheets & Campaign Management
-          </span>
+          
+          {/* Navigation Menu */}
+          <nav className="flex items-center gap-4">
+            <Button
+              variant={currentView === 'campaign' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => onViewChange?.('campaign')}
+              className="flex items-center gap-2"
+            >
+              <Icon icon="lucide:dice-6" className="w-4 h-4" />
+              Campaigns
+            </Button>
+            <Button
+              variant={currentView === 'management' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => onViewChange?.('management')}
+              className="flex items-center gap-2"
+            >
+              <Icon icon="lucide:settings" className="w-4 h-4" />
+              Settings
+            </Button>
+          </nav>
         </div>
         
         <div className="flex items-center gap-2">

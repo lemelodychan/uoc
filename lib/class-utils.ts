@@ -4,21 +4,47 @@ import { getSpellsKnown } from "./character-data"
 export interface ClassData {
   id: string
   name: string
+  subclass: string | null
+  description: string | null
   hit_die: number
-  primary_ability: string
+  primary_ability: string[]  // Array in database (e.g., ["Strength"], ["Intelligence", "Dexterity"])
   saving_throw_proficiencies: string[]
-  spell_progression: Record<string, any>
-  max_spell_slots: Record<string, Record<string, number>>
-  class_features: Record<string, any>
+  skill_proficiencies: any | null
+  equipment_proficiencies: any | null
+  starting_equipment: any | null
+  // Spell slots stored as arrays (one per character level 1-20)
+  spell_slots_1: number[] | null
+  spell_slots_2: number[] | null
+  spell_slots_3: number[] | null
+  spell_slots_4: number[] | null
+  spell_slots_5: number[] | null
+  spell_slots_6: number[] | null
+  spell_slots_7: number[] | null
+  spell_slots_8: number[] | null
+  spell_slots_9: number[] | null
+  cantrips_known: number[] | null
+  spells_known: number[] | null
+  // New metadata fields for custom class support
+  is_custom: boolean
+  created_by: string | null
+  duplicated_from: string | null
+  source: string
+  created_at: string
+  updated_at: string
+  // Legacy fields kept for backward compatibility
+  spell_progression?: Record<string, any>
+  max_spell_slots?: Record<string, Record<string, number>>
+  class_features?: Record<string, any>
   spellcasting_ability?: string
 }
 
 export interface SubclassData {
   id: string
-  class_id: string
   name: string
-  description: string
-  subclass_features: Record<string, any>
+  class_id: string
+  description: string | null
+  // Legacy field kept for backward compatibility
+  subclass_features?: Record<string, any>
 }
 
 // Calculate spell attack bonus based on class and ability scores
@@ -159,10 +185,21 @@ export function getCantripsKnown(level: number, classData?: ClassData, className
     return getWarlockCantripsKnown(level)
   }
 
-  if (!classData?.spell_progression) return 0
+  // Use the new cantrips_known array from class data
+  if (classData?.cantrips_known && Array.isArray(classData.cantrips_known)) {
+    const levelIndex = level - 1
+    if (levelIndex >= 0 && levelIndex < classData.cantrips_known.length) {
+      return classData.cantrips_known[levelIndex] || 0
+    }
+  }
 
-  const levelData = classData.spell_progression[level.toString()]
-  return levelData?.cantrips || 0
+  // Fallback to old spell_progression if new data not available
+  if (classData?.spell_progression) {
+    const levelData = classData.spell_progression[level.toString()]
+    return levelData?.cantrips || 0
+  }
+
+  return 0
 }
 
 // Calculate cantrips known for multiclassed characters

@@ -8,22 +8,29 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Icon } from "@iconify/react"
 import { type CharacterData, type EldritchCannon, createEldritchCannon } from "@/lib/character-data"
+import { getFeatureUsage, updateFeatureCustomState, addSingleFeature } from "@/lib/feature-usage-tracker"
 
 interface EldritchCannonModalProps {
   isOpen: boolean
   onClose: () => void
   character: CharacterData
-  onSave: (cannon: EldritchCannon | null) => void
+  onSave: (updates: Partial<CharacterData>) => void
 }
 
 export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: EldritchCannonModalProps) => {
-  const [cannon, setCannon] = useState<EldritchCannon | null>(character.eldritchCannon || null)
+  const [cannon, setCannon] = useState<EldritchCannon | null>(null)
   const [size, setSize] = useState<'Small' | 'Tiny'>('Small')
   const [type, setType] = useState<'Flamethrower' | 'Force Ballista' | 'Protector'>('Flamethrower')
 
+  // Get unified feature usage data
+  const eldritchCannonUsage = getFeatureUsage(character, 'eldritch-cannon')
+  const cannonData = eldritchCannonUsage?.customState || {}
+
   useEffect(() => {
-    setCannon(character.eldritchCannon || null)
-  }, [character.eldritchCannon])
+    // Use unified data only (legacy eldritchCannon column has been dropped)
+    const activeCannon = cannonData.cannons?.[0]
+    setCannon(activeCannon || null)
+  }, [eldritchCannonUsage])
 
   const handleCreateCannon = () => {
     const newCannon = createEldritchCannon(size, type, character)
@@ -35,7 +42,40 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
   }
 
   const handleSave = () => {
-    onSave(cannon)
+    console.log('🔧 Eldritch Cannon Save - Before:', {
+      existingUsage: character.classFeatureSkillsUsage,
+      eldritchCannonUsage,
+      cannonData
+    })
+    
+    // Ensure the feature is initialized first
+    let characterWithUsage = character
+    if (!eldritchCannonUsage) {
+      const updatedUsage = addSingleFeature(character, 'eldritch-cannon', {
+        featureName: 'Eldritch Cannon',
+        featureType: 'special_ux',
+        enabledAtLevel: 3
+      })
+      characterWithUsage = {
+        ...character,
+        classFeatureSkillsUsage: updatedUsage
+      }
+      console.log('🔧 Eldritch Cannon Save - After initialization:', {
+        updatedUsage,
+        characterWithUsage: characterWithUsage.classFeatureSkillsUsage
+      })
+    }
+    
+    // Save to unified system using proper feature usage tracker
+    const finalUsage = updateFeatureCustomState(characterWithUsage, 'eldritch-cannon', {
+      cannons: cannon ? [cannon] : [],
+      maxCannons: 1,
+      lastUpdated: new Date().toISOString()
+    })
+    
+    console.log('🔧 Eldritch Cannon Save - Final usage:', finalUsage)
+    
+    onSave({ classFeatureSkillsUsage: finalUsage })
     onClose()
   }
 

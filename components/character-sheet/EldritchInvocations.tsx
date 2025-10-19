@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { getWarlockInvocationsKnown } from "@/lib/character-data"
+import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
+import { getFeatureUsage } from "@/lib/feature-usage-tracker"
 
 interface EldritchInvocationsProps {
   character: CharacterData
@@ -13,10 +15,24 @@ interface EldritchInvocationsProps {
 }
 
 export function EldritchInvocations({ character, onEdit, onOpenFeatureModal }: EldritchInvocationsProps) {
-  const isWarlock = character.class.toLowerCase() === "warlock" || character.classes?.some(c => c.name.toLowerCase() === "warlock")
-  const warlockLevel = character.classes?.reduce((total, c) => c.name.toLowerCase() === "warlock" ? total + c.level : total, 0) || character.level
+  // Check if character has the eldritch invocations feature (level 2+ Warlock)
+  const hasEldritchInvocations = hasClassFeature(character, 'eldritch-invocations', 2)
+  const warlockLevel = getClassLevel(character, 'warlock')
   
-  if (!isWarlock || warlockLevel < 2) {
+  // Get unified feature usage data
+  const eldritchInvocationsUsage = getFeatureUsage(character, 'eldritch-invocations')
+  
+  // Determine which data to use
+  const useUnified = eldritchInvocationsUsage && eldritchInvocationsUsage.featureType === 'options_list'
+  const selectedInvocations = useUnified ? 
+    (eldritchInvocationsUsage.selectedOptions || []) : 
+    (character.spellData.eldritchInvocations || [])
+  const maxInvocations = useUnified ? 
+    (eldritchInvocationsUsage.maxSelections || getWarlockInvocationsKnown(warlockLevel)) : 
+    getWarlockInvocationsKnown(warlockLevel)
+  
+  // Show component if character is Warlock level 2+ (even if no invocations selected yet)
+  if (warlockLevel < 2) {
     return null
   }
 
@@ -45,37 +61,43 @@ export function EldritchInvocations({ character, onEdit, onOpenFeatureModal }: E
           <div className="text-center p-2 border rounded-lg flex flex-col gap-1 bg-background">
             <div className="text-sm text-muted-foreground">Invocations Known</div>
             <div className="text-xl font-bold font-mono">
-              {character.spellData.eldritchInvocations?.length || 0}/{getWarlockInvocationsKnown(warlockLevel)}
+              {selectedInvocations.length}/{maxInvocations}
             </div>
           </div>
         </div>
 
         {/* Invocations List */}
         <div className="space-y-3 flex flex-col gap-2">
-          {character.spellData.eldritchInvocations && character.spellData.eldritchInvocations.length > 0 ? (
-            character.spellData.eldritchInvocations.map((invocation, index) => (
-              <div key={index} className="p-2 mb-0 border rounded-lg flex items-center justify-between bg-background">
-                <h4 className="text-sm font-medium mb-0">{invocation.name}</h4>
-                {invocation.description && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="px-2 h-7 shadow-sm text-foreground"
-                    onClick={() => {
-                      onOpenFeatureModal({ 
-                        title: invocation.name, 
-                        description: invocation.description
-                      })
-                    }}
-                  >
-                    Read more
-                  </Button>
-                )}
-              </div>
-            ))
+          {selectedInvocations && selectedInvocations.length > 0 ? (
+            selectedInvocations.map((invocation, index) => {
+              // Handle both string and object formats
+              const invocationName = typeof invocation === 'string' ? invocation : (invocation.title || invocation.name)
+              const invocationDescription = typeof invocation === 'string' ? '' : (invocation.description || '')
+              
+              return (
+                <div key={index} className="p-2 mb-0 border rounded-lg flex items-center justify-between bg-background">
+                  <h4 className="text-sm font-medium mb-0">{invocationName}</h4>
+                  {invocationDescription && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="px-2 h-7 shadow-sm text-foreground"
+                      onClick={() => {
+                        onOpenFeatureModal({ 
+                          title: invocationName, 
+                          description: invocationDescription
+                        })
+                      }}
+                    >
+                      Read more
+                    </Button>
+                  )}
+                </div>
+              )
+            })
           ) : (
             <div className="text-center py-4 text-sm text-muted-foreground">
-              No invocations selected yet. You can choose {getWarlockInvocationsKnown(warlockLevel)} invocations at level {warlockLevel}.
+              No invocations selected yet. You can choose {maxInvocations} invocations at level {warlockLevel}.
             </div>
           )}
         </div>

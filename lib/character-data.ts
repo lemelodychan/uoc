@@ -96,11 +96,18 @@ export interface CharacterData {
   }>
   spellData: SpellData
   classFeatures: Array<{
-    name: string
-    description: string
-    source: string
+    id: string
+    class_id: string
     level: number
-    className?: string
+    title: string
+    description: string
+    feature_type: string
+    feature_skill_type?: string
+    subclass_id?: string
+    class_features_skills?: any
+    name: string
+    source: string
+    className: string
   }>
   toolsProficiencies: ToolProficiency[]
   equipment: string
@@ -123,16 +130,10 @@ export interface CharacterData {
   equipmentProficiencies?: EquipmentProficiencies
   // Per-feature custom rich-text notes appended to class feature modals (keyed by feature name)
   featureNotes?: Record<string, { content: string; imageUrl?: string }>
-  // Active Eldritch Cannon for Artificer Artillerist
-  eldritchCannon?: EldritchCannon
   feats: Array<{
     name: string
     description: string
   }>
-  infusions: Infusion[]
-  infusionNotes: string
-  // Temporary field to store bardic inspiration used count from database
-  bardicInspirationUsed?: number
   // Temporary field to store used spell slot counts from database
   spellSlotsUsed?: {
     1: number
@@ -151,6 +152,14 @@ export interface CharacterData {
   campaignId?: string
   // Level up completion tracking
   levelUpCompleted?: boolean
+  // New unified class features skills usage tracking
+  classFeatureSkillsUsage?: Record<string, {
+    currentUses?: number
+    currentPoints?: number
+    selectedOptions?: string[]
+    customState?: Record<string, any>
+    lastReset?: string
+  }>
 }
 
 export type ProficiencyLevel = "none" | "proficient" | "expertise"
@@ -303,19 +312,7 @@ export interface SpellData {
     currentUses: number
     replenishesOnLongRest: boolean
   }
-  // Warlock-specific features
-  eldritchInvocations?: EldritchInvocation[]
-  mysticArcanum?: MysticArcanum[]
-  genieWrath?: {
-    damageType: 'bludgeoning' | 'cold' | 'fire' | 'thunder'
-    usesPerTurn: number
-    currentUses: number
-  }
-  elementalGift?: {
-    flyingSpeed: number
-    usesPerLongRest: number
-    currentUses: number
-  }
+  // Legacy Warlock columns have been dropped - using unified system only
   sanctuaryVessel?: {
     vesselType: string
     hoursRemaining: number
@@ -1590,3 +1587,38 @@ export const getCharactersByStatus = (characters: CharacterData[], status: 'acti
 export const sampleCharacter: CharacterData | null = null
 
 export const sampleCharacters: CharacterData[] = []
+
+/**
+ * Calculate total character level from classes array
+ * This is the new source of truth for character level
+ */
+export function calculateTotalLevel(classes: CharacterClass[]): number {
+  if (!classes || classes.length === 0) return 0
+  return classes.reduce((total, charClass) => total + charClass.level, 0)
+}
+
+
+/**
+ * Check if character is single class
+ */
+export function isSingleClass(classes: CharacterClass[]): boolean {
+  return classes && classes.length === 1
+}
+
+/**
+ * Get class level for a specific class name
+ */
+export function getClassLevel(classes: CharacterClass[], className: string): number {
+  if (!classes) return 0
+  const charClass = classes.find(c => c.name.toLowerCase() === className.toLowerCase())
+  return charClass?.level || 0
+}
+
+/**
+ * Get subclass for a specific class name
+ */
+export function getClassSubclass(classes: CharacterClass[], className: string): string | undefined {
+  if (!classes) return undefined
+  const charClass = classes.find(c => c.name.toLowerCase() === className.toLowerCase())
+  return charClass?.subclass
+}

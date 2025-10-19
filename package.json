@@ -6,7 +6,12 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "migrate-features": "tsx scripts/migrate-feature-usage.ts",
+    "test-feature-usage": "tsx scripts/test-feature-usage.ts",
+    "test-infusion-migration": "tsx scripts/test-infusion-migration.ts",
+    "cleanup-legacy-infusions": "tsx scripts/cleanup-legacy-infusions.ts",
+    "setup-flash-of-genius": "tsx scripts/setup-flash-of-genius.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

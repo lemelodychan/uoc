@@ -13,7 +13,7 @@ import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { FeatEditModal } from "./feat-edit-modal"
 import type { CharacterData, CharacterClass } from "@/lib/character-data"
-import { calculateModifier, calculateProficiencyBonus, calculateSkillBonus, getHitDiceByClass } from "@/lib/character-data"
+import { calculateModifier, calculateProficiencyBonus, calculateSkillBonus, getHitDiceByClass, calculateTotalLevel, isSingleClass } from "@/lib/character-data"
 import { loadClassFeatures } from "@/lib/database"
 
 interface LevelUpModalProps {
@@ -45,7 +45,7 @@ interface ASIChoice {
 
 export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModalProps) {
   const [selectedClass, setSelectedClass] = useState<CharacterClass | null>(null)
-  const [newLevel, setNewLevel] = useState(character.level + 1)
+  const [newLevel, setNewLevel] = useState(calculateTotalLevel(character.classes) + 1)
   const [hpRoll, setHpRoll] = useState<number | null>(null)
   const [hpRollResult, setHpRollResult] = useState<{
     roll: number
@@ -62,24 +62,36 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   const [featEditModalOpen, setFeatEditModalOpen] = useState(false)
   const [editingFeatIndex, setEditingFeatIndex] = useState<number | null>(null)
 
-  // Reset state when modal opens
+  // Function to reset all state to initial values
+  // Always uses character's current active level + 1 as the starting point
+  const resetAllState = () => {
+    const totalLevel = calculateTotalLevel(character.classes)
+    console.log('Resetting level up modal state:', {
+      characterLevel: character.level,
+      totalLevelFromClasses: totalLevel,
+      characterClasses: character.classes?.map(c => ({ name: c.name, level: c.level })),
+      newLevel: totalLevel + 1
+    })
+    
+    setSelectedClass(null)
+    setNewLevel(totalLevel + 1) // Always start from character's total level + 1
+    setHpRoll(null)
+    setHpRollResult(null)
+    setNewFeatures([])
+    setAsiChoice(null)
+    setIsLoadingFeatures(false)
+    setStep('class_selection')
+    setEditableCharacter(character)
+    setCustomFeatName('')
+    setCustomFeatDescription('')
+    setFeatEditModalOpen(false)
+    setEditingFeatIndex(null)
+  }
+
+  // Reset state when modal opens or closes
   useEffect(() => {
-    if (isOpen) {
-      setSelectedClass(null)
-      setNewLevel(character.level + 1)
-      setHpRoll(null)
-      setHpRollResult(null)
-      setNewFeatures([])
-      setAsiChoice(null)
-      setIsLoadingFeatures(false)
-      setStep('class_selection')
-      setEditableCharacter(character)
-      setCustomFeatName('')
-      setCustomFeatDescription('')
-      setFeatEditModalOpen(false)
-      setEditingFeatIndex(null)
-    }
-  }, [isOpen, character.level, character])
+    resetAllState()
+  }, [isOpen, character.classes, character.id])
 
   // Auto-select class if only one class
   useEffect(() => {
@@ -189,14 +201,40 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
 
     setIsLoadingFeatures(true)
     try {
-      // Calculate the new level for the selected class (current class level + 1)
-      const selectedClassNewLevel = selectedClass.level + 1
+      // For single-class characters, the class level should match the character level
+      // For multiclass characters, we use the individual class level
+      const isSingleClassCharacter = isSingleClass(character.classes)
+      
+      let selectedClassNewLevel: number
+      if (isSingleClassCharacter) {
+        // Single class: class level should match character level
+        selectedClassNewLevel = selectedClass.level + 1
+      } else {
+        // Multiclass: use the individual class level
+        selectedClassNewLevel = selectedClass.level + 1
+      }
+      
+      console.log('Level up debug:', {
+        characterLevel: character.level,
+        totalLevelFromClasses: calculateTotalLevel(character.classes),
+        newLevel: newLevel,
+        selectedClassName: selectedClass.name,
+        selectedClassCurrentLevel: selectedClass.level,
+        selectedClassNewLevel: selectedClassNewLevel,
+        isSingleClass: isSingleClassCharacter,
+        totalClasses: character.classes?.length
+      })
       
       // Load features for the selected class's new level only
       const { features } = await loadClassFeatures(selectedClass.class_id || '', selectedClassNewLevel, selectedClass.subclass)
       if (features) {
         // Filter to only show features that are exactly at the selected class's new level
         const newLevelFeatures = features.filter(feature => feature.level === selectedClassNewLevel)
+        console.log('Features loaded:', {
+          totalFeatures: features.length,
+          newLevelFeatures: newLevelFeatures.length,
+          newLevelFeaturesList: newLevelFeatures.map(f => ({ name: f.name, level: f.level }))
+        })
         setNewFeatures(newLevelFeatures)
       }
       // Automatically proceed to features step after loading
@@ -332,9 +370,13 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     let updatedCharacter = { ...character }
 
     // Update character with new level
+    const isSingleClassCharacter = isSingleClass(character.classes)
     const updatedClasses = character.classes?.map(c => 
       c.name === selectedClass.name 
-        ? { ...c, level: c.level + 1 }
+        ? { 
+            ...c, 
+            level: c.level + 1 // Always increment the individual class level
+          }
         : c
     ) || []
 
@@ -361,7 +403,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     // Apply base level up changes
     updatedCharacter = {
       ...updatedCharacter,
-      level: newLevel,
+      level: calculateTotalLevel(updatedClasses), // Calculate total level from classes
       classes: updatedClasses,
       hitDiceByClass: updatedHitDiceByClass,
       maxHitPoints: newMaxHP,
@@ -396,7 +438,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     }
 
     onSave(updatedCharacter)
-    onClose()
+    handleClose()
   }
 
   const getAbilityOptions = () => [
@@ -614,14 +656,31 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     </div>
   )
 
+  const handleClose = () => {
+    resetAllState()
+    onClose()
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[1200px] max-h-[80vh] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:trending-up" className="w-5 h-5" />
             Level Up to {newLevel}
           </DialogTitle>
+          <div className="text-sm text-muted-foreground">
+            Current Level: {character.level} → New Level: {newLevel}
+            {selectedClass && (
+              <span className="ml-2">
+                | {selectedClass.name}: {
+                  character.classes && character.classes.length === 1 
+                    ? `${character.level} → ${newLevel}` 
+                    : `${selectedClass.level} → ${selectedClass.level + 1}`
+                }
+              </span>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden">
@@ -721,6 +780,15 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                 <p className="text-sm text-muted-foreground">
                   Here are the new features you gain at this level:
                 </p>
+                {selectedClass && (
+                  <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                    Loading features for {selectedClass.name} level {
+                      character.classes && character.classes.length === 1 
+                        ? newLevel 
+                        : selectedClass.level + 1
+                    }
+                  </p>
+                )}
               </div>
 
               {newFeatures.length > 0 ? (
@@ -1024,7 +1092,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             <div className="flex gap-2">
               {/* Show Cancel on first step or when HP is the first step, Previous on all other steps */}
               {(step === 'class_selection' || (step === 'hp_roll' && character.classes && character.classes.length === 1)) ? (
-                <Button variant="outline" onClick={onClose}>
+                <Button variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
               ) : (

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Icon } from "@iconify/react"
 import { CharacterData, EldritchInvocation, getWarlockInvocationsKnown } from "@/lib/character-data"
+import { getFeatureUsage, addSingleFeature, updateFeatureUsage } from "@/lib/feature-usage-tracker"
 
 interface EldritchInvocationsModalProps {
   isOpen: boolean
@@ -25,7 +26,30 @@ export function EldritchInvocationsModal({
   character,
   onSave,
 }: EldritchInvocationsModalProps) {
-  const [invocations, setInvocations] = useState<EldritchInvocation[]>(character.spellData.eldritchInvocations || [])
+  // Get unified feature usage data
+  const eldritchInvocationsUsage = getFeatureUsage(character, 'eldritch-invocations')
+  
+  // Determine which data to use (prioritize unified system)
+  const useUnified = eldritchInvocationsUsage && eldritchInvocationsUsage.featureType === 'options_list'
+  
+  // Convert unified system data to EldritchInvocation format
+  const convertToEldritchInvocations = (data: any[]): EldritchInvocation[] => {
+    return data.map(item => {
+      if (typeof item === 'string') {
+        return { name: item, description: '' }
+      } else if (item.title) {
+        return { name: item.title, description: item.description || '' }
+      } else {
+        return { name: item.name || '', description: item.description || '' }
+      }
+    })
+  }
+  
+  const initialInvocations = useUnified ? 
+    convertToEldritchInvocations(eldritchInvocationsUsage.selectedOptions || []) : 
+    (character.spellData.eldritchInvocations || [])
+  
+  const [invocations, setInvocations] = useState<EldritchInvocation[]>(initialInvocations)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [formData, setFormData] = useState({
@@ -35,18 +59,58 @@ export function EldritchInvocationsModal({
 
   useEffect(() => {
     if (isOpen) {
-      setInvocations(character.spellData.eldritchInvocations || [])
+      // Prioritize unified system data and convert to EldritchInvocation format
+      const currentInvocations = useUnified ? 
+        convertToEldritchInvocations(eldritchInvocationsUsage.selectedOptions || []) : 
+        (character.spellData.eldritchInvocations || [])
+      setInvocations(currentInvocations)
     }
-  }, [isOpen, character.spellData.eldritchInvocations])
+  }, [isOpen, eldritchInvocationsUsage, character.spellData.eldritchInvocations, useUnified])
 
-  const handleSave = () => {
-    onSave({
-      spellData: {
-        ...character.spellData,
-        eldritchInvocations: invocations,
-      },
-    })
-    onClose()
+  const handleSave = async () => {
+    try {
+      // Convert invocations to the format expected by the unified system
+      const selectedOptions = invocations.map(invocation => ({
+        id: invocation.name.toLowerCase().replace(/\s+/g, '-'),
+        title: invocation.name,
+        description: invocation.description
+      }))
+      
+      // Use unified system to save
+      if (useUnified) {
+        // Update existing feature
+        const updatedUsage = updateFeatureUsage(character, 'eldritch-invocations', {
+          selectedOptions: selectedOptions
+        })
+        onSave({
+          classFeatureSkillsUsage: updatedUsage
+        })
+      } else {
+        // Initialize feature in unified system
+        const maxInvocations = getWarlockInvocationsKnown(character.level)
+        const updatedUsage = addSingleFeature(character, 'eldritch-invocations', {
+          featureName: 'Eldritch Invocations',
+          featureType: 'options_list',
+          enabledAtLevel: 2,
+          maxSelections: maxInvocations,
+          selectedOptions: selectedOptions
+        })
+        onSave({
+          classFeatureSkillsUsage: updatedUsage
+        })
+      }
+      onClose()
+    } catch (error) {
+      console.error('Error saving eldritch invocations:', error)
+      // Fallback to legacy system if unified system fails
+      onSave({
+        spellData: {
+          ...character.spellData,
+          eldritchInvocations: invocations,
+        },
+      })
+      onClose()
+    }
   }
 
   const handleAddInvocation = () => {
@@ -101,7 +165,9 @@ export function EldritchInvocationsModal({
     setFormModalOpen(true)
   }
 
-  const maxInvocations = getWarlockInvocationsKnown(character.level)
+  const maxInvocations = useUnified ? 
+    (eldritchInvocationsUsage.maxSelections || getWarlockInvocationsKnown(character.level)) : 
+    getWarlockInvocationsKnown(character.level)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

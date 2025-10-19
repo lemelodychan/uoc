@@ -19,12 +19,13 @@ import { CampaignNoteReadModal } from "./edit-modals/campaign-note-read-modal"
 import { CampaignResourceModal } from "./edit-modals/campaign-resource-modal"
 import { CampaignResourceReadModal } from "./edit-modals/campaign-resource-read-modal"
 import { CampaignLinkModal } from "./edit-modals/campaign-link-modal"
+import { useCampaignNotes } from "@/hooks/use-campaign-notes"
+import { CampaignNotesSkeleton, CampaignNotesListSkeleton, CampaignNotesEmptySkeleton } from "./campaign-notes-skeleton"
 
 interface CampaignHomepageProps {
   campaign: Campaign | undefined
   characters: CharacterData[]
   users: any[]
-  notes: CampaignNote[]
   resources?: CampaignResource[]
   links?: CampaignLink[]
   onSelectCharacter: (id: string) => void
@@ -50,7 +51,6 @@ export function CampaignHomepage({
   campaign, 
   characters, 
   users,
-  notes,
   resources = [],
   links = [],
   onSelectCharacter, 
@@ -87,6 +87,17 @@ export function CampaignHomepage({
   const [resourceReadModalOpen, setResourceReadModalOpen] = useState(false)
   const [readingResource, setReadingResource] = useState<CampaignResource | null>(null)
   const [linkModalOpen, setLinkModalOpen] = useState(false)
+  
+  // Use campaign notes hook with caching
+  const { 
+    notes, 
+    loading: notesLoading, 
+    error: notesError, 
+    fromCache, 
+    isStale, 
+    refresh: refreshNotes,
+    invalidateCache: invalidateNotesCache 
+  } = useCampaignNotes(campaign?.id)
   
   // Load existing session data when campaign changes
   useEffect(() => {
@@ -264,6 +275,7 @@ export function CampaignHomepage({
     } else {
       await onCreateNote?.(note)
     }
+    // Cache will be updated automatically by the database functions
   }
 
   const handleDeleteNote = async (noteId: string) => {
@@ -761,7 +773,19 @@ export function CampaignHomepage({
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {sortedNotes.length > 0 ? (
+              {notesLoading ? (
+                <CampaignNotesSkeleton count={3} />
+              ) : notesError ? (
+                <div className="text-center p-8 rounded-xl bg-card">
+                  <Icon icon="lucide:alert-circle" className="w-12 h-12 mx-auto mb-4 text-destructive" />
+                  <h3 className="text-lg font-semibold mb-2">Failed to Load Notes</h3>
+                  <p className="text-muted-foreground mb-4">{notesError}</p>
+                  <Button onClick={refreshNotes} variant="outline">
+                    <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              ) : sortedNotes.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   {sortedNotes.slice(0, 3).map((note) => (
                     <Card 
@@ -771,7 +795,12 @@ export function CampaignHomepage({
                     >
                       <CardContent>
                         <div className="space-y-2">
-                          <h4 className="font-bold text-lg line-clamp-2">{note.title}</h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-lg line-clamp-2">{note.title}</h4>
+                            {fromCache && isStale && (
+                              <Icon icon="lucide:clock" className="w-3 h-3 text-muted-foreground" />
+                            )}
+                          </div>
                           <div className="flex items-center gap-x-4 gap-y-1 flex-row flex-wrap">
                             <div className="flex items-center gap-1 text-sm text-muted-foreground flex-nowrap">
                                 {note.session_date ? (
@@ -799,17 +828,7 @@ export function CampaignHomepage({
                   ))}
                 </div>
               ) : (
-                <div className="text-center p-8 rounded-xl bg-card">
-                  <Icon icon="lucide:sticky-note" className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">No Notes Yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Start documenting your campaign sessions with notes.
-                  </p>
-                  <Button onClick={handleCreateNote}>
-                    <Icon icon="lucide:plus" className="w-4 h-4" />
-                    Create First Note
-                  </Button>
-                </div>
+                <CampaignNotesEmptySkeleton />
               )}
             </CardContent>
           </Card>
@@ -903,7 +922,19 @@ export function CampaignHomepage({
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {notes.length === 0 ? (
+              {notesLoading ? (
+                <CampaignNotesListSkeleton count={5} />
+              ) : notesError ? (
+                <div className="text-center p-8 rounded-xl bg-card">
+                  <Icon icon="lucide:alert-circle" className="w-12 h-12 mx-auto mb-4 text-destructive" />
+                  <h3 className="text-lg font-semibold mb-2">Failed to Load Notes</h3>
+                  <p className="text-muted-foreground mb-4">{notesError}</p>
+                  <Button onClick={refreshNotes} variant="outline">
+                    <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              ) : notes.length === 0 ? (
                 <div className="text-center p-8 rounded-xl bg-card">
                   <Icon icon="lucide:sticky-note" className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-semibold mb-2">No Notes Yet</h3>
@@ -927,7 +958,12 @@ export function CampaignHomepage({
                         <CardHeader>
                           <div className="flex items-start justify-between">
                             <div className="flex flex-col gap-2">
-                              <CardTitle className="text-lg font-regular">{note.title}</CardTitle>
+                              <div className="flex items-center gap-2">
+                                <CardTitle className="text-lg font-regular">{note.title}</CardTitle>
+                                {fromCache && isStale && (
+                                  <Icon icon="lucide:clock" className="w-3 h-3 text-muted-foreground" />
+                                )}
+                              </div>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                   <Icon icon="lucide:calendar-days" className="w-3 h-3" />

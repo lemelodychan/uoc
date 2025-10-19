@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Icon } from "@iconify/react"
 import { CharacterSidebar } from "@/components/character-sidebar"
 import { CampaignManagementModal } from "@/components/edit-modals/campaign-management-modal"
+import { ManagementInterface } from "@/components/management-interface"
 import { CampaignCreationModal } from "@/components/edit-modals/campaign-creation-modal"
 import { BasicInfoModal } from "@/components/edit-modals/basic-info-modal"
 import { CharacterCreationModal } from "@/components/edit-modals/character-creation-modal"
-import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, createClassBasedSkills, calculatePassivePerception, calculatePassiveInsight, calculateSavingThrowBonus, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, getArtificerInfusionsKnown, getArtificerMaxInfusedItems, getTotalAdditionalSpells, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData, getWarlockInvocationsKnown, type EldritchCannon, type Campaign, createCampaign } from "@/lib/character-data"
+import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, createClassBasedSkills, calculatePassivePerception, calculatePassiveInsight, calculateSavingThrowBonus, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, getArtificerInfusionsKnown, getArtificerMaxInfusedItems, getTotalAdditionalSpells, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData, getWarlockInvocationsKnown, type Campaign, createCampaign } from "@/lib/character-data"
 import { AbilitiesModal } from "@/components/edit-modals/abilities-modal"
 import { CombatModal } from "@/components/edit-modals/combat-modal"
 import { WeaponsModal } from "@/components/edit-modals/weapons-modal"
@@ -49,6 +50,19 @@ import { EldritchCannonModal } from "@/components/edit-modals/eldritch-cannon-mo
 import { EldritchInvocationsModal } from "@/components/edit-modals/eldritch-invocations-modal"
 import { SpellLibraryModal } from "@/components/edit-modals/spell-library-modal"
 import { LevelUpModal } from "@/components/edit-modals/level-up-modal"
+import { FeatureUsageMigrationModal } from "@/components/feature-usage-migration-modal"
+import { 
+  useFeatureSlot, 
+  restoreFeatureSlot, 
+  addFeatureOption, 
+  removeFeatureOption,
+  updateFeatureCustomState,
+  updateFeatureNotes,
+  toggleFeatureAvailability,
+  getFeatureUsage,
+  initializeFeatureUsage,
+  updateFeatureUsage as updateFeatureUsageData
+} from "@/lib/feature-usage-tracker"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { useToast } from "@/hooks/use-toast"
@@ -66,7 +80,8 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, getCampaignNotes, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
+import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
+import { useClassFeaturesPreloader } from "@/hooks/use-class-features"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
@@ -80,13 +95,16 @@ function CharacterSheetContent() {
   const [characters, setCharacters] = useState<CharacterData[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [users, setUsers] = useState<any[]>([])
-  const [notes, setNotes] = useState<CampaignNote[]>([])
   const [resources, setResources] = useState<CampaignResource[]>([])
   const [links, setLinks] = useState<CampaignLink[]>([])
+  
+  // Class features preloader
+  const { preloadForCharacters } = useClassFeaturesPreloader()
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all")
   const [activeCharacterId, setActiveCharacterId] = useState<string>("")
   const [superadminOverride, setSuperadminOverride] = useState(false)
-  const [currentView, setCurrentView] = useState<'character' | 'campaign'>('campaign')
+  const [currentView, setCurrentView] = useState<'character' | 'campaign' | 'management'>('campaign')
+  const [appView, setAppView] = useState<'campaign' | 'management'>('campaign')
   
   // Get URL search parameters
   const searchParams = useSearchParams()
@@ -227,24 +245,15 @@ function CharacterSheetContent() {
   // Get current campaign data
   const currentCampaign = campaigns.find(c => c.id === selectedCampaignId)
   
-  // Load campaign data (notes, resources, links)
-  const loadNotesForCampaign = async (campaignId: string) => {
+  // Load campaign data (resources, links) - notes are now handled by the hook
+  const loadCampaignData = async (campaignId: string) => {
     if (campaignId === "all" || campaignId === "no-campaign") {
-      setNotes([])
       setResources([])
       setLinks([])
       return
     }
 
     try {
-      const { notes: campaignNotes, error } = await getCampaignNotes(campaignId)
-      if (error) {
-        console.error("Failed to load campaign notes:", error)
-        setNotes([])
-      } else {
-        setNotes(campaignNotes || [])
-      }
-
       const [{ resources: res, error: resError } = {}, { links: lks, error: linkError } = {}] = await Promise.all([
         getCampaignResources(campaignId),
         getCampaignLinks(campaignId)
@@ -254,8 +263,7 @@ function CharacterSheetContent() {
       setResources(res || [])
       setLinks(lks || [])
     } catch (error) {
-      console.error("Error loading campaign notes:", error)
-      setNotes([])
+      console.error("Error loading campaign data:", error)
       setResources([])
       setLinks([])
     }
@@ -273,10 +281,10 @@ function CharacterSheetContent() {
     }
   }, [campaigns, selectedCampaignId])
 
-  // Load notes when campaign changes
+  // Load campaign data when campaign changes
   useEffect(() => {
     if (selectedCampaignId) {
-      loadNotesForCampaign(selectedCampaignId)
+      loadCampaignData(selectedCampaignId)
     }
   }, [selectedCampaignId])
 
@@ -382,6 +390,7 @@ function CharacterSheetContent() {
 
     try {
       const { success, error, characterId } = await saveCharacter(currentCharacter)
+      
       if (success) {
         if (characterId && characterId !== currentCharacter.id) {
           setCharacters(prev => prev.map(char => char.id === activeCharacterId ? { ...char, id: characterId } : char))
@@ -428,10 +437,75 @@ function CharacterSheetContent() {
 
 
   const updateCharacter = (updates: Partial<CharacterData>, options?: { autosave?: boolean }) => {
-    setCharacters((prev) => prev.map((char) => (char.id === activeCharacterId ? { ...char, ...updates } : char)))
+    setCharacters((prev) => prev.map((char) => {
+      if (char.id === activeCharacterId) {
+        const updatedChar = { ...char, ...updates }
+        
+        // If level changed, update feature max uses that depend on proficiency bonus
+        if (updates.level && updates.level !== char.level) {
+          const { updateAllDynamicFeatures } = require('@/lib/feature-usage-tracker')
+          updatedChar.classFeatureSkillsUsage = updateAllDynamicFeatures(updatedChar)
+        }
+        
+        return updatedChar
+      }
+      return char
+    }))
+    
     if (options?.autosave !== false) {
       triggerAutoSave()
     }
+  }
+
+  // Helper function to update feature usage and save character
+  const updateFeatureUsage = async (featureId: string, updates: any) => {
+    const activeCharacter = characters.find(c => c.id === activeCharacterId)
+    if (!activeCharacter) return
+
+    let updatedUsage = activeCharacter.classFeatureSkillsUsage || {}
+    
+    // Apply the updates to the feature usage
+    if (updates.type === 'use_slot') {
+      console.log('🔧 Using slot for feature:', featureId)
+      updatedUsage = useFeatureSlot(activeCharacter, featureId, updates.amount || 1)
+    } else if (updates.type === 'restore_slot') {
+      console.log('🔧 Restoring slot for feature:', featureId)
+      updatedUsage = restoreFeatureSlot(activeCharacter, featureId, updates.amount || 1)
+    } else if (updates.type === 'add_option') {
+      updatedUsage = addFeatureOption(activeCharacter, featureId, updates.optionId)
+    } else if (updates.type === 'remove_option') {
+      updatedUsage = removeFeatureOption(activeCharacter, featureId, updates.optionId)
+    } else if (updates.type === 'update_custom_state') {
+      updatedUsage = updateFeatureCustomState(activeCharacter, featureId, updates.stateUpdates)
+    } else if (updates.type === 'update_notes') {
+      updatedUsage = updateFeatureNotes(activeCharacter, featureId, updates.notes)
+    } else if (updates.type === 'toggle_availability') {
+      updatedUsage = toggleFeatureAvailability(activeCharacter, featureId)
+    } else if (updates.type === 'update_max_uses') {
+      updatedUsage = updateFeatureUsageData(activeCharacter, featureId, {
+        maxUses: updates.maxUses,
+        currentUses: updates.currentUses
+      })
+    } else if (updates.type === 'direct_update') {
+      updatedUsage = {
+        ...updatedUsage,
+        [featureId]: {
+          ...updatedUsage[featureId],
+          ...updates.updates,
+          lastUpdated: new Date().toISOString()
+        }
+      }
+    }
+
+    // Always update the character with new usage data
+    updateCharacter({ classFeatureSkillsUsage: updatedUsage })
+  }
+
+  // Helper function to get feature usage data
+  const getFeatureUsageData = (featureId: string) => {
+    const activeCharacter = characters.find(c => c.id === activeCharacterId)
+    if (!activeCharacter) return null
+    return getFeatureUsage(activeCharacter, featureId)
   }
 
   const reloadCharacterFromDatabase = useCallback(async (characterId: string) => {
@@ -523,6 +597,11 @@ function CharacterSheetContent() {
           setCharacters(dbCharacters)
           setCampaigns(dbCampaigns || [])
           setUsers(dbUsers || [])
+          
+          // Preload class features for all characters in the background
+          preloadForCharacters(dbCharacters).catch(error => {
+            console.warn('Failed to preload class features:', error)
+          })
 
           // Set active campaign by default
           const activeCampaign = (dbCampaigns || []).find(c => c.isActive)
@@ -622,7 +701,6 @@ function CharacterSheetContent() {
       }
 
       if (newNote) {
-        setNotes(prev => [newNote, ...prev])
         toast({
           title: "Success",
           description: "Note created successfully!",
@@ -652,7 +730,6 @@ function CharacterSheetContent() {
       }
 
       if (updatedNote) {
-        setNotes(prev => prev.map(note => note.id === id ? updatedNote : note))
         toast({
           title: "Success",
           description: "Note updated successfully!",
@@ -670,7 +747,7 @@ function CharacterSheetContent() {
 
   const handleDeleteNote = async (id: string) => {
     try {
-      const { success, error } = await deleteCampaignNote(id)
+      const { success, error } = await deleteCampaignNote(id, selectedCampaignId)
       if (error || !success) {
         console.error("Failed to delete note:", error)
         toast({
@@ -681,7 +758,6 @@ function CharacterSheetContent() {
         return
       }
 
-      setNotes(prev => prev.filter(note => note.id !== id))
       toast({
         title: "Success",
         description: "Note deleted successfully!",
@@ -1327,22 +1403,7 @@ function CharacterSheetContent() {
             }
           }
 
-          // Elemental Gift (Warlock)
-          if (character.spellData.elementalGift) {
-            const elementalGift = character.spellData.elementalGift
-            const usesRestored = elementalGift.usesPerLongRest - elementalGift.currentUses
-            if (usesRestored > 0) {
-              classAbilityReplenishments.push({
-                abilityName: "Elemental Gift",
-                usesRestored,
-                maxUses: elementalGift.usesPerLongRest
-              })
-            }
-            updatedSpellData.elementalGift = {
-              ...elementalGift,
-              currentUses: elementalGift.usesPerLongRest
-            }
-          }
+          // Legacy Warlock columns have been dropped - using unified system only
 
           // Song of Rest (Bard) - reset to available
           if (character.spellData.songOfRest) {
@@ -1666,6 +1727,11 @@ function CharacterSheetContent() {
         setCampaigns(dbCampaigns || [])
         setUsers(dbUsers || [])
         
+        // Preload class features for all characters in the background
+        preloadForCharacters(dbCharacters).catch(error => {
+          console.warn('Failed to preload class features:', error)
+        })
+        
         // Set active campaign by default
         const activeCampaign = (dbCampaigns || []).find(c => c.isActive)
         if (activeCampaign) {
@@ -1917,19 +1983,10 @@ function CharacterSheetContent() {
             layOnHands: layOnHands || undefined,
             channelDivinitySlot: channelDivinitySlot || undefined,
             cleansingTouchSlot: cleansingTouchSlot || undefined,
-            // Clear class-specific features when class changes
-            ...(classChanged ? {
-              eldritchInvocations: undefined,
-              mysticArcanum: undefined,
-              genieWrath: undefined,
-              elementalGift: undefined,
-              sanctuaryVessel: undefined,
-              limitedWish: undefined,
-            } : {}),
+            // Legacy Warlock columns have been dropped - using unified system only
           },
           // Clear class-specific equipment when class changes
           ...(classChanged ? {
-            eldritchCannon: undefined,
             infusions: [],
             infusionNotes: "",
             hitDiceByClass: updates.classes && updates.classes.length > 1 ?
@@ -2224,27 +2281,7 @@ function CharacterSheetContent() {
         layOnHands: getLayOnHandsData(tempCharacter),
         channelDivinitySlot: getChannelDivinityData(tempCharacter),
         cleansingTouchSlot: getCleansingTouchData(tempCharacter),
-        // Add Warlock-specific features
-        ...(tempCharacter.class.toLowerCase() === "warlock" && tempCharacter.subclass?.toLowerCase() === "the genie" ? {
-          genieWrath: (() => {
-            const { createGenieWrath } = require('../lib/character-data')
-            return createGenieWrath('efreeti') // Default to Efreeti, can be changed later
-          })(),
-          elementalGift: (() => {
-            const { createElementalGift } = require('../lib/character-data')
-            return createElementalGift('efreeti', tempCharacter.level) // Default to Efreeti
-          })(),
-          sanctuaryVessel: tempCharacter.level >= 10 ? {
-            vesselType: 'Ring',
-            hoursRemaining: 0,
-            maxHours: 2 * calculateProficiencyBonus(tempCharacter.level)
-          } : undefined,
-          limitedWish: tempCharacter.level >= 14 ? {
-            usesPerLongRest: 1,
-            currentUses: 1,
-            longRestCooldown: 0
-          } : undefined,
-        } : {}),
+        // Legacy Warlock columns have been dropped - using unified system only
         // Add Raven Queen Warlock-specific features
         ...(tempCharacter.class.toLowerCase() === "warlock" && tempCharacter.subclass?.toLowerCase() === "the raven queen" ? {
           sentinelRaven: (() => {
@@ -2577,24 +2614,7 @@ function CharacterSheetContent() {
 
   // Warlock toggle functions
 
-  const toggleElementalGift = (index: number) => {
-    if (!activeCharacter || !activeCharacter.spellData.elementalGift) return
-
-    const elementalGift = activeCharacter.spellData.elementalGift
-    const isAvailable = index < (elementalGift.usesPerLongRest - elementalGift.currentUses)
-    const newCurrentUses = isAvailable ? elementalGift.currentUses + 1 : elementalGift.currentUses - 1
-
-    const updatedSpellData = {
-      ...activeCharacter.spellData,
-      elementalGift: {
-        ...elementalGift,
-        currentUses: Math.max(0, Math.min(elementalGift.usesPerLongRest, newCurrentUses)),
-      },
-    }
-
-    updateCharacter({ spellData: updatedSpellData })
-    triggerAutoSave()
-  }
+  // Legacy Warlock toggle functions have been removed - using unified system only
 
   const toggleSanctuaryVessel = (index: number) => {
     if (!activeCharacter || !activeCharacter.spellData.sanctuaryVessel) return
@@ -2653,8 +2673,9 @@ function CharacterSheetContent() {
     saveActiveCharacterToLocalStorage(characterId)
   }
 
-  const handleEldritchCannonSave = (cannon: EldritchCannon | null) => {
-    updateCharacter({ eldritchCannon: cannon || undefined })
+  const handleEldritchCannonSave = (updates: Partial<CharacterData>) => {
+    // Unified system only (legacy eldritchCannon column has been dropped)
+    updateCharacter(updates)
     triggerAutoSave()
   }
 
@@ -2687,37 +2708,61 @@ function CharacterSheetContent() {
 
   return (
     <div className="h-screen bg-background flex flex-col">
-      <AppHeader />
+      <AppHeader 
+        currentView={appView}
+        onViewChange={(view) => {
+          setAppView(view)
+          if (view === 'campaign') {
+            setCurrentView('campaign')
+          } else {
+            setCurrentView('management')
+          }
+        }}
+      />
       <div className="flex flex-1 overflow-hidden">
-        <CharacterSidebar
-          characters={characters}
-          campaigns={campaigns}
-          selectedCampaignId={selectedCampaignId}
-          onCampaignChange={(id) => {
-            setSelectedCampaignId(id)
-            if (id !== "all" && id !== "no-campaign") {
-              setCurrentView('campaign')
-            } else {
+        {appView === 'campaign' && (
+          <CharacterSidebar
+            characters={characters}
+            campaigns={campaigns}
+            selectedCampaignId={selectedCampaignId}
+            onCampaignChange={(id) => {
+              setSelectedCampaignId(id)
+              if (id !== "all" && id !== "no-campaign") {
+                setCurrentView('campaign')
+              } else {
+                setCurrentView('character')
+              }
+            }}
+            activeCharacterId={activeCharacterId}
+            onSelectCharacter={(id) => {
+              setActiveCharacterIdWithStorage(id)
               setCurrentView('character')
-            }
-          }}
-          activeCharacterId={activeCharacterId}
-          onSelectCharacter={(id) => {
-            setActiveCharacterIdWithStorage(id)
-            setCurrentView('character')
-          }}
-          onCreateCharacter={createNewCharacter}
-          onStartLongRest={handleStartLongRest}
-          onOpenDiceRoll={handleOpenDiceRoll}
-          onOpenCampaignManagement={handleOpenCampaignManagement}
-          onOpenSpellLibrary={handleOpenSpellLibrary}
-          currentUserId={currentUser?.id}
-          currentView={currentView}
-          onViewChange={setCurrentView}
-        />
+            }}
+            onCreateCharacter={createNewCharacter}
+            onStartLongRest={handleStartLongRest}
+            onOpenDiceRoll={handleOpenDiceRoll}
+            onOpenManagement={() => setCurrentView('management')}
+            onOpenSpellLibrary={handleOpenSpellLibrary}
+            currentUserId={currentUser?.id}
+            currentView={currentView}
+            onViewChange={setCurrentView}
+          />
+        )}
 
         <main className={`flex-1 p-6 relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
-          {currentView === 'character' ? (
+          {appView === 'management' ? (
+            <ManagementInterface
+              campaigns={campaigns}
+              characters={characters}
+              users={users}
+              onCreateCampaign={handleCreateCampaign}
+              onUpdateCampaign={handleUpdateCampaign}
+              onDeleteCampaign={handleDeleteCampaign}
+              onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
+              onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
+              onSetActiveCampaign={handleSetActiveCampaign}
+            />
+          ) : currentView === 'character' ? (
             <>
               {/* Breadcrumbs */}
               <div className="mb-4 flex items-center gap-1 text-sm text-muted-foreground">
@@ -2745,6 +2790,20 @@ function CharacterSheetContent() {
                   levelUpEnabled={currentCampaign?.levelUpModeEnabled || false}
                   campaign={currentCampaign}
                 />
+                
+                {/* Migration Button - only show if character needs migration */}
+                <div className="mb-4">
+                  <FeatureUsageMigrationModal
+                    characters={[activeCharacter]}
+                    onCharacterUpdate={updateCharacter}
+                    trigger={
+                      <Button variant="outline" size="sm">
+                        <Icon icon="lucide:database" className="w-4 h-4 mr-2" />
+                        Migrate Feature Usage
+                      </Button>
+                    }
+                  />
+                </div>
               </div>
 
               <div className={`grid grid-cols-1 xl:grid-cols-3 gap-6 ${!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}`}>
@@ -2825,6 +2884,7 @@ function CharacterSheetContent() {
             <EldritchCannonComponent
               character={activeCharacter}
               onEdit={() => setEldritchCannonModalOpen(true)}
+              onUpdateFeatureUsage={updateFeatureUsage}
             />
 
             <Spellcasting
@@ -2852,10 +2912,10 @@ function CharacterSheetContent() {
                 setCharacters(prev => prev.map(c => c.id === activeCharacter.id ? updatedCharacter : c))
                 triggerAutoSave()
               }}
-              onToggleElementalGift={toggleElementalGift}
               onToggleSanctuaryVessel={toggleSanctuaryVessel}
               onToggleLimitedWish={toggleLimitedWish}
               hasSpellcastingAbilities={hasSpellcastingAbilities}
+              onUpdateFeatureUsage={updateFeatureUsage}
             />
 
             <ToolsProficiencies
@@ -2885,6 +2945,7 @@ function CharacterSheetContent() {
               onRefreshFeatures={async () => {
                 // Refresh logic is handled in the component
               }}
+              onUpdateFeatureUsage={updateFeatureUsage}
             />
 
             <Infusions
@@ -2894,6 +2955,7 @@ function CharacterSheetContent() {
                 setFeatureModalContent(content)
                 setFeatureModalOpen(true)
               }}
+              onUpdateFeatureUsage={updateFeatureUsage}
             />
 
             <EldritchInvocations
@@ -2913,7 +2975,6 @@ function CharacterSheetContent() {
               campaign={currentCampaign}
               characters={characters}
               users={users}
-              notes={notes}
               resources={resources}
               links={links}
               onSelectCharacter={(id) => {

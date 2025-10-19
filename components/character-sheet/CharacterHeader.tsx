@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
+import { calculateTotalLevel } from "@/lib/character-data"
 
 interface CharacterHeaderProps {
   character: CharacterData
@@ -59,7 +60,7 @@ export function CharacterHeader({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">Level {character.level}</Badge>
+                <Badge variant="secondary">Level {calculateTotalLevel(character.classes)}</Badge>
                 <Badge variant="default">Proficiency {formatModifier(proficiencyBonus)}</Badge>
                 <Badge variant="outline">
                   {character.classes && character.classes.length > 1 ? (

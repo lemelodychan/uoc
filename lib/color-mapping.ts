@@ -146,6 +146,84 @@ export function getAbilityModifierColor(ability: string): string {
   return ABILITY_COLORS[ability as keyof typeof ABILITY_COLORS] || "bg-muted text-muted-foreground"
 }
 
+// Class-specific colors for unified class features
+export const CLASS_FEATURE_COLORS = {
+  // Bard - Pink
+  bard: {
+    available: "bg-[#c07a9b] border-[#c07a9b]",
+    used: "bg-card border-border"
+  },
+  // Artificer - Red
+  artificer: {
+    available: "bg-[#ce6565] border-[#ce6565]",
+    used: "bg-card border-border"
+  },
+  // Paladin - Purple
+  paladin: {
+    available: "bg-[#8b6ac0] border-[#8b6ac0]",
+    used: "bg-card border-border"
+  },
+  // Warlock - Green
+  warlock: {
+    available: "bg-[#6ab08b] border-[#6ab08b]",
+    used: "bg-card border-border"
+  },
+  // Wizard - Blue
+  wizard: {
+    available: "bg-[#6a8bc0] border-[#6a8bc0]",
+    used: "bg-card border-border"
+  },
+  // Sorcerer - Pink (same as Bard)
+  sorcerer: {
+    available: "bg-[#c07a9b] border-[#c07a9b]",
+    used: "bg-card border-border"
+  },
+  // Cleric - Blue (same as Wizard)
+  cleric: {
+    available: "bg-[#6a8bc0] border-[#6a8bc0]",
+    used: "bg-card border-border"
+  },
+  // Druid - Green (same as Warlock)
+  druid: {
+    available: "bg-[#6ab08b] border-[#6ab08b]",
+    used: "bg-card border-border"
+  },
+  // Fighter - Gold
+  fighter: {
+    available: "bg-[#b0986a] border-[#b0986a]",
+    used: "bg-card border-border"
+  },
+  // Ranger - Green (same as Druid)
+  ranger: {
+    available: "bg-[#6ab08b] border-[#6ab08b]",
+    used: "bg-card border-border"
+  },
+  // Rogue - Purple (same as Paladin)
+  rogue: {
+    available: "bg-[#8b6ac0] border-[#8b6ac0]",
+    used: "bg-card border-border"
+  },
+  // Barbarian - Red (same as Artificer)
+  barbarian: {
+    available: "bg-[#ce6565] border-[#ce6565]",
+    used: "bg-card border-border"
+  },
+  // Monk - Blue (same as Wizard)
+  monk: {
+    available: "bg-[#6a8bc0] border-[#6a8bc0]",
+    used: "bg-card border-border"
+  }
+} as const
+
+// Utility function to get class feature colors
+export function getClassFeatureColors(className: string): { available: string; used: string } {
+  const normalizedClass = className.toLowerCase()
+  return CLASS_FEATURE_COLORS[normalizedClass as keyof typeof CLASS_FEATURE_COLORS] || {
+    available: "bg-[#6a8bc0] border-[#6a8bc0]", // Default blue
+    used: "bg-card border-border"
+  }
+}
+
 // Common class combinations for consistent styling
 export const COMMON_CLASSES = {
   // Interactive elements
