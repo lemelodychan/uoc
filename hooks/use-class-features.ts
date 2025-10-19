@@ -111,7 +111,13 @@ export function useClassFeatures(character: CharacterData | undefined): UseClass
     } finally {
       setLoading(false)
     }
-  }, [character])
+  }, [
+    character?.id,
+    character?.class,
+    character?.subclass,
+    character?.level,
+    character?.classes
+  ])
 
   const refresh = useCallback(async () => {
     await loadFeatures(true)
