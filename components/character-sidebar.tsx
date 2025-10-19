@@ -183,17 +183,6 @@ export function CharacterSidebar({
               </SelectContent>
             </Select>
           )}
-
-          {!isCollapsed && (
-              <Button
-                onClick={onOpenManagement}
-                variant="outline"
-                size="sm"
-                className="h-9"
-              >
-                <Icon icon="lucide:settings" className="w-4 h-4" />
-              </Button>
-            )}
         </div>
 
         <div className="flex gap-2 mb-2">
