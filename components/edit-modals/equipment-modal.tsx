@@ -128,9 +128,9 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
         </DialogHeader>
         <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           {/* Tools Proficiencies Section */}
-          <div>
-            <Label className="text-sm font-medium mb-3 block">Tools Proficiencies</Label>
-            <div className="space-y-3">
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium block">Tools Proficiencies</Label>
+            <div className="flex flex-col gap-2">
               {toolsProficiencies.map((tool, index) => {
                 const isProficient = tool.proficiency === "proficient" || tool.proficiency === "expertise"
                 const hasExpertise = tool.proficiency === "expertise"
@@ -139,7 +139,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                   tool.manualModifier !== undefined ? tool.manualModifier : calculateToolBonusForTool(tool)
 
                 return (
-                  <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+                  <div key={index} className="flex items-center gap-3 p-3 border rounded-lg bg-card">
                     <div className="flex gap-3">
                       <div className="flex items-center gap-1">
                         <input
@@ -193,7 +193,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
                   </div>
                 )
               })}
-              <Button variant="outline" onClick={addTool} className="w-full bg-transparent">
+              <Button variant="outline" onClick={addTool} className="w-full bg-card">
                 <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Tool
               </Button>
@@ -201,17 +201,17 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
           </div>
 
           {/* Magic Items Section */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Magic Items</Label>
               <Button variant="outline" size="sm" onClick={addMagicItem}>
                 <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Magic Item
               </Button>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               {magicItems.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-card">
                   <div className="flex-1">
                     <div className="font-medium text-sm">{item.name || "Unnamed Magic Item"}</div>
                     {item.maxUses && item.maxUses > 0 && (
@@ -250,7 +250,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
           </div>
 
           {/* Equipment Text Section */}
-          <div>
+          <div className="flex flex-col gap-2">
             <Label htmlFor="equipment" className="text-sm font-medium">
               Equipment Notes
             </Label>

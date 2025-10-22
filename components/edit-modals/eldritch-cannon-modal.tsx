@@ -206,21 +206,21 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
 
                     <div className="space-y-2">
                       <Label>Armor Class</Label>
-                      <div className="p-2 bg-muted rounded text-center font-mono text-lg">
+                      <div className="p-2 bg-background border rounded text-center font-mono text-lg">
                         {cannon.armorClass}
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <Label>Attack Bonus</Label>
-                      <div className="p-2 bg-muted rounded text-center font-mono text-lg">
+                      <div className="p-2 bg-background border rounded text-center font-mono text-lg">
                         +{cannon.attackBonus}
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <Label>{cannon.type === 'Protector' ? 'Temp HP' : 'Damage'}</Label>
-                      <div className="p-2 bg-muted rounded text-center font-mono text-lg">
+                      <div className="p-2 bg-background border rounded text-center font-mono text-lg">
                         {cannon.damage}
                       </div>
                     </div>
@@ -229,7 +229,7 @@ export const EldritchCannonModal = ({ isOpen, onClose, character, onSave }: Eldr
                   {/* Special Property */}
                   <div className="space-y-2">
                     <Label>Special Property</Label>
-                    <div className="p-3 bg-muted rounded-lg text-sm">
+                    <div className="p-3 bg-background border rounded-lg text-sm">
                       {cannon.specialProperty}
                     </div>
                   </div>

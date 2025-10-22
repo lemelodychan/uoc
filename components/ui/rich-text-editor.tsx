@@ -72,15 +72,15 @@ export function RichTextEditor({ value, onChange, placeholder, rows = 6, classNa
       }
 
   return (
-    <div className={className}>
-      <div className="flex gap-2 mb-2">
-        <Button type="button" variant="outline" size="sm" onClick={addBold} className="h-8 px-2">
+    <div className={className + " flex flex-col gap-2"}>
+      <div className="flex gap-2 flex-row">
+        <Button type="button" variant="outline" size="sm" onClick={addBold} className="h-8 px-2 w-8">
           <Icon icon="lucide:bold" className="w-3 h-3" />
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={addBulletPoint} className="h-8 px-2">
+        <Button type="button" variant="outline" size="sm" onClick={addBulletPoint} className="h-8 px-2 w-8">
           <Icon icon="lucide:list" className="w-3 h-3" />
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={addLineBreak} className="h-8 px-2">
+        <Button type="button" variant="outline" size="sm" onClick={addLineBreak} className="h-8 px-2 w-8">
           <Icon icon="lucide:type" className="w-3 h-3" />
         </Button>
       </div>
@@ -93,7 +93,7 @@ export function RichTextEditor({ value, onChange, placeholder, rows = 6, classNa
         className="font-mono text-sm"
         style={computedStyle}
       />
-      <div className="text-xs text-muted-foreground mt-1">
+      <div className="text-xs text-muted-foreground">
         Use **bold** for emphasis, - for bullet points, and line breaks for formatting
       </div>
     </div>

@@ -111,8 +111,8 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Combat Stats</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
-          <div className="p-3 border rounded-lg space-y-3 grid grid-cols-2 gap-4 items-center">
+        <div className="grid gap-2 p-4 max-h-[50vh] overflow-y-auto">
+          <div className="p-3 border rounded-lg grid grid-cols-2 gap-4 items-center bg-card">
             <h3 className="text-sm font-medium mb-0 text-muted-foreground col-span-2">Basic Combat Stats</h3>
             <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
               <Label htmlFor="armorClass" className="text-right">
@@ -168,8 +168,8 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
             </div>
           </div>
           
-          <div className="p-3 border rounded-lg space-y-3 grid grid-cols-2 gap-4 items-center">
-            <h3 className="text-sm font-medium text-muted-foreground col-span-2 mb-0">Hit Points</h3>
+          <div className="p-3 border rounded-lg grid grid-cols-2 gap-4 items-center bg-card">
+            <h3 className="text-sm font-medium text-muted-foreground col-span-2">Hit Points</h3>
             <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
             <Label htmlFor="currentHitPoints" className="text-right">
               Current HP
@@ -212,9 +212,9 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
           </div>
 
           {/* Hit Dice Section */}
-          <div className="p-3 border rounded-lg space-y-3">
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-base font-medium">Hit Dice</Label>
+          <div className="p-3 border rounded-lg flex flex-col gap-2 bg-card">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium text-muted-foreground">Hit Dice</Label>
               <Button
                 type="button"
                 variant="outline"
@@ -357,8 +357,8 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
           </div>
 
           {/* Combat Notes Section */}
-          <div className="p-3 border rounded-lg space-y-3">
-            <Label htmlFor="combatNotes" className="text-base font-medium mb-3 block">
+          <div className="p-3 border rounded-lg flex flex-col gap-2 bg-card">
+            <Label htmlFor="combatNotes" className="text-sm font-medium block text-muted-foreground">
               Combat Notes
             </Label>
             <RichTextEditor

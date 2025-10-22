@@ -96,9 +96,6 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
           <CardTitle className="flex items-center gap-2">
             <Icon icon="lucide:star" className="w-5 h-5" />
             Class Features
-            {fromCache && (
-              <Icon icon="lucide:clock" className="w-3 h-3 text-muted-foreground" />
-            )}
           </CardTitle>
           {onCleanupFeatures && (
             <Button
@@ -150,7 +147,7 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
             
             // Render grouped features
             return Array.from(featuresByClass.entries()).map(([className, features]) => (
-              <div key={className} className="space-y-3">
+              <div key={className} className="flex flex-col gap-2">
                 {/* Class Header */}
                 {character.classes && character.classes.length > 1 && (
                   <div className="flex items-center gap-2 mt-2">

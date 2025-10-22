@@ -154,11 +154,39 @@ export interface CharacterData {
   levelUpCompleted?: boolean
   // New unified class features skills usage tracking
   classFeatureSkillsUsage?: Record<string, {
+    // Slots-based features (Bardic Inspiration, Flash of Genius, etc.)
     currentUses?: number
+    maxUses?: number
+    lastReset?: string // ISO timestamp
+    
+    // Points pool features (Lay on Hands, Ki Points, etc.)
     currentPoints?: number
-    selectedOptions?: string[]
+    maxPoints?: number
+    
+    // Options list features (Infusions, Eldritch Invocations, etc.)
+    selectedOptions?: string[] | Array<{
+      id: string
+      title: string
+      description: string
+      needsAttunement?: boolean
+      [key: string]: any
+    }>
+    maxSelections?: number
+    
+    // Special UX features (Eldritch Cannon, etc.)
     customState?: Record<string, any>
-    lastReset?: string
+    
+    // Notes for features (Infusion notes, etc.)
+    notes?: string
+    
+    // Availability toggle features (Song of Rest, Genie's Wrath, etc.)
+    isAvailable?: boolean
+    
+    // Metadata
+    featureName?: string
+    featureType?: 'slots' | 'points_pool' | 'options_list' | 'special_ux' | 'skill_modifier' | 'availability_toggle'
+    enabledAtLevel?: number
+    lastUpdated?: string // ISO timestamp
   }>
 }
 
@@ -251,6 +279,7 @@ export interface FeatSpellSlot {
 }
 
 export interface Infusion {
+  id?: string
   title: string
   description: string
   needsAttunement: boolean

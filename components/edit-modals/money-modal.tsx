@@ -58,9 +58,9 @@ export function MoneyModal({ isOpen, onClose, character, onSave }: MoneyModalPro
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 p-4 max-h-[50vh] overflow-y-auto">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2">
             {/* Gold */}
-            <div className="space-y-2 p-3 border rounded-lg">
+            <div className="space-y-2 p-3 border rounded-lg bg-card">
               <Label htmlFor="gold" className="text-sm font-medium flex items-center gap-2">
                 Gold Pieces
               </Label>
@@ -76,7 +76,7 @@ export function MoneyModal({ isOpen, onClose, character, onSave }: MoneyModalPro
             </div>
 
             {/* Silver */}
-            <div className="space-y-2 p-3 border rounded-lg">
+            <div className="space-y-2 p-3 border rounded-lg bg-card">
               <Label htmlFor="silver" className="text-sm font-medium flex items-center gap-2">
                 Silver Pieces
               </Label>
@@ -92,7 +92,7 @@ export function MoneyModal({ isOpen, onClose, character, onSave }: MoneyModalPro
             </div>
 
             {/* Copper */}
-            <div className="space-y-2 p-3 border rounded-lg">
+            <div className="space-y-2 p-3 border rounded-lg bg-card">
               <Label htmlFor="copper" className="text-sm font-medium flex items-center gap-2">
                 Copper Pieces
               </Label>

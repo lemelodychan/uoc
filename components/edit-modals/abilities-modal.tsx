@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { calculateModifier } from "@/lib/character-data"
 import type { CharacterData } from "@/lib/character-data"
+import { Badge } from "@/components/ui/badge"
 
 interface AbilitiesModalProps {
   isOpen: boolean
@@ -57,13 +58,13 @@ export function AbilitiesModal({ isOpen, onClose, character, onSave }: Abilities
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Ability Scores</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
+        <div className="flex flex-row flex-wrap gap-2 p-4 max-h-[50vh] overflow-y-auto">
           {abilities.map((ability) => {
             const score = formData[ability.key]
             const modifier = calculateModifier(score)
             return (
-              <div key={ability.key} className="grid grid-cols-5 items-center gap-4 p-3 border rounded-lg">
-                <Label htmlFor={ability.key} className="text-right col-span-2">
+              <div key={ability.key} className="flex flex-row w-[calc(50%-8px)] items-center gap-2 py-2 px-3 border rounded-lg bg-card">
+                <Label htmlFor={ability.key} className="w-[144px]">
                   {ability.label}
                 </Label>
                 <Input
@@ -73,12 +74,12 @@ export function AbilitiesModal({ isOpen, onClose, character, onSave }: Abilities
                   max="30"
                   value={score}
                   onChange={(e) => setFormData({ ...formData, [ability.key]: Number.parseInt(e.target.value) || 1 })}
-                  className="col-span-2"
+                  className="w-[80px] h-8"
                 />
-                <div className="text-sm text-muted-foreground">
-                  ({modifier >= 0 ? "+" : ""}
-                  {modifier})
-                </div>
+                <Badge variant="secondary">
+                  {modifier >= 0 ? "+" : ""}
+                  {modifier}
+                </Badge>
               </div>
             )
           })}

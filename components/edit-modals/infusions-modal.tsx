@@ -78,11 +78,11 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
     // Update infusions using proper feature usage tracker
     const updatedUsage = updateFeatureUsage(characterWithUsage, 'artificer-infusions', {
       selectedOptions: infusions.map(infusion => ({
+        ...infusion, // Preserve any additional properties first
         id: infusion.id || `infusion-${Date.now()}-${Math.random()}`,
         title: infusion.title || 'Untitled Infusion',
         description: infusion.description || '',
-        needsAttunement: infusion.needsAttunement || false,
-        ...infusion // Preserve any additional properties
+        needsAttunement: infusion.needsAttunement || false
       })),
       notes: infusionNotes, // Save notes to unified system
       lastUpdated: new Date().toISOString()
@@ -90,11 +90,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
     
     updates.classFeatureSkillsUsage = updatedUsage
     
-    // Only update legacy data if no unified data exists (for backward compatibility)
-    if (!infusionsUsage || !infusionsUsage.selectedOptions) {
-      updates.infusions = infusions
-      updates.infusionNotes = infusionNotes
-    }
+    // Legacy fields removed: unified system is the source of truth
     
     onSave(updates)
     onClose()
@@ -127,11 +123,19 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
         <div className="grid gap-6 p-4 max-h-[50vh] overflow-y-auto">
           <div>
             <h3 className="text-sm font-medium mb-3">Infusions List</h3>
-            <div className="space-y-4">
+            <div className="flex flex-col gap-2">
               {infusions.map((infusion, index) => (
-                <div key={index} className="p-4 border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
+                <div key={index} className="p-4 border rounded-lg bg-card relative flex flex-col gap-4">
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeInfusion(index)}
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8 absolute right-4 top-4"
+                    >
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                  </Button>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
                       <Label htmlFor={`infusion-title-${index}`} className="text-xs font-medium">
                         Infusion Title
                       </Label>
@@ -140,33 +144,23 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
                         value={infusion.title}
                         onChange={(e) => updateInfusion(index, "title", e.target.value)}
                         placeholder="e.g., Enhanced Weapon, Repeating Shot"
-                        className="mt-1"
+                        className="w-[240px]"
                       />
                     </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`infusion-attunement-${index}`}
-                          checked={infusion.needsAttunement}
-                          onChange={(e) => updateInfusion(index, "needsAttunement", e.target.checked)}
-                          className="w-4 h-4 rounded border-border"
-                        />
-                        <Label htmlFor={`infusion-attunement-${index}`} className="text-xs">
-                          Requires Attunement
-                        </Label>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeInfusion(index)}
-                        className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
-                      >
-                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`infusion-attunement-${index}`}
+                        checked={infusion.needsAttunement}
+                        onChange={(e) => updateInfusion(index, "needsAttunement", e.target.checked)}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <Label htmlFor={`infusion-attunement-${index}`} className="text-xs">
+                        Requires Attunement
+                      </Label>
                     </div>
                   </div>
-                  <div>
+                  <div className="flex flex-col gap-2">
                     <Label htmlFor={`infusion-description-${index}`} className="text-xs font-medium">
                       Description
                     </Label>
@@ -180,7 +174,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
                   </div>
                 </div>
               ))}
-              <Button variant="outline" onClick={addInfusion} className="w-full bg-transparent">
+              <Button variant="outline" onClick={addInfusion} className="w-full bg-card">
                 <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Infusion
               </Button>

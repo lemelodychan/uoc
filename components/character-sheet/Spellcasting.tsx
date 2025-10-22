@@ -649,8 +649,8 @@ export function Spellcasting({
 
       <CardContent className="space-y-4 flex flex-col gap-2">
         {/* Basic Spell Stats */}
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3 items-start">
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2 items-start">
             <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
               <div className="text-sm text-muted-foreground">Spell Attack</div>
               <div className="text-xl font-bold font-mono">

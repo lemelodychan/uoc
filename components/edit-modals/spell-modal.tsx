@@ -148,9 +148,9 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <div className="space-y-4">
+              <div className="flex flex-col gap-2">
                 {spellData.featSpellSlots.map((feat, featIndex) => (
-                  <div key={featIndex} className="p-4 border rounded-lg space-y-3 flex flex-col gap-2">
+                  <div key={featIndex} className="p-4 border rounded-lg space-y-3 flex flex-col gap-2 bg-card">
                     <div className="flex items-center gap-2">
                       <Input
                         placeholder="Spell name (e.g., Misty Step)"

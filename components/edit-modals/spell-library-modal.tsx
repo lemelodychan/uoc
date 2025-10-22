@@ -268,7 +268,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
 
         <div className="flex flex-col gap-0 max-h-[80vh]">
           {/* Search and Filters */}
-          <div className="flex flex-col gap-4 p-4 pt-0 border-b">
+          <div className="flex flex-col gap-4 p-4 pt-0 border-b bg-card">
             <div className="flex items-center gap-4 relative">
                 <Icon icon="lucide:search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input

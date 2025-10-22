@@ -1956,7 +1956,17 @@ function CharacterSheetContent() {
         const comprehensiveUpdates: Partial<CharacterData> = {
           ...updates,
           class_id: classData?.id,
-          classFeatures: classFeatures,
+          classFeatures: classFeatures.map(feature => ({
+            id: `feature-${Date.now()}-${Math.random()}`,
+            class_id: classData?.id || '',
+            level: feature.level,
+            title: feature.name,
+            description: feature.description,
+            feature_type: 'class_feature',
+            name: feature.name,
+            source: feature.source,
+            className: updates.class || currentCharacter.class
+          })),
           savingThrowProficiencies: (classChanged || multiclassChanged) ? 
             (updates.classes && updates.classes.length > 1 ? 
               (await import('@/lib/character-data')).getMulticlassSavingThrowProficiencies(updates.classes) :
@@ -2178,11 +2188,19 @@ function CharacterSheetContent() {
         featSpellSlots: [],
         spells: [],
       },
-      classFeatures: classFeatures,
+      classFeatures: classFeatures.map(feature => ({
+        id: `feature-${Date.now()}-${Math.random()}`,
+        class_id: characterData.classId,
+        level: feature.level,
+        title: feature.name,
+        description: feature.description,
+        feature_type: 'class_feature',
+        name: feature.name,
+        source: feature.source,
+        className: characterData.class
+      })),
       toolsProficiencies: [] as any,
       feats: [],
-      infusions: [],
-      infusionNotes: "",
       equipment: "",
       magicItems: [],
       languages: "",
@@ -2198,7 +2216,6 @@ function CharacterSheetContent() {
       flaws: "",
       backstory: "",
       notes: "",
-      bardicInspirationUsed: 0,
       // Initialize spell slots used to 0 for new characters
       spellSlotsUsed: {
         1: 0,
@@ -2757,9 +2774,9 @@ function CharacterSheetContent() {
               users={users}
               onCreateCampaign={handleCreateCampaign}
               onUpdateCampaign={handleUpdateCampaign}
-              onDeleteCampaign={handleDeleteCampaign}
+              onDeleteCampaign={(campaign) => handleDeleteCampaign(campaign.id)}
               onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
-              onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
+              onRemoveCharacterFromCampaign={(characterId) => handleRemoveCharacterFromCampaign(characterId, selectedCampaignId)}
               onSetActiveCampaign={handleSetActiveCampaign}
             />
           ) : currentView === 'character' ? (
@@ -2795,7 +2812,7 @@ function CharacterSheetContent() {
                 <div className="mb-4">
                   <FeatureUsageMigrationModal
                     characters={[activeCharacter]}
-                    onCharacterUpdate={updateCharacter}
+                    onCharacterUpdate={async (character) => updateCharacter(character)}
                     trigger={
                       <Button variant="outline" size="sm">
                         <Icon icon="lucide:database" className="w-4 h-4 mr-2" />
@@ -2900,20 +2917,6 @@ function CharacterSheetContent() {
               onOpenSpellList={() => setSpellListModalOpen(true)}
               onToggleSpellSlot={toggleSpellSlot}
               onToggleFeatSpellSlot={toggleFeatSpellSlot}
-              onToggleBardicInspiration={toggleBardicInspiration}
-              onToggleSongOfRest={() => {}}
-              onToggleFlashOfGenius={toggleFlashOfGenius}
-              onToggleDivineSense={toggleDivineSense}
-              onToggleChannelDivinity={toggleChannelDivinity}
-              onToggleCleansingTouch={toggleCleansingTouch}
-              onUpdateLayOnHands={(newValue) => {
-                // Update Lay on Hands used value
-                const updatedCharacter = { ...activeCharacter, layOnHandsUsed: newValue }
-                setCharacters(prev => prev.map(c => c.id === activeCharacter.id ? updatedCharacter : c))
-                triggerAutoSave()
-              }}
-              onToggleSanctuaryVessel={toggleSanctuaryVessel}
-              onToggleLimitedWish={toggleLimitedWish}
               hasSpellcastingAbilities={hasSpellcastingAbilities}
               onUpdateFeatureUsage={updateFeatureUsage}
             />
@@ -3128,8 +3131,8 @@ function CharacterSheetContent() {
           setFeatureNotesModalOpen(false)
         }
       }}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-4 border-b">
             <DialogTitle className="flex items-center gap-2">
               {featureModalContent?.title || "Feature"}
               {featureModalContent?.needsAttunement && (
@@ -3169,7 +3172,7 @@ function CharacterSheetContent() {
               </div>
             )}
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-3">
+          <div className="flex flex-col gap-4 overflow-y-auto p-4 max-h-[50vh]">
             {featureModalContent && (
               <>
                 {/* Render custom notes (image + text) ABOVE the base description — only for class features */}
@@ -3179,7 +3182,7 @@ function CharacterSheetContent() {
                   const hasImage = Boolean(note?.imageUrl)
                   const hasContent = Boolean(note?.content)
                   return (
-                    <div className="space-y-3 flex flex-col gap-1">
+                    <div className="flex flex-col gap-4">
                       {hasImage && (
                         <img
                           src={note!.imageUrl as string}
@@ -3188,23 +3191,22 @@ function CharacterSheetContent() {
                         />
                       )}
                       {hasContent ? (
-                        <div className="rounded-lg w-full border text-sm p-3 bg-muted/30 col-span-2 flex flex-col gap-3">
+                        <div className="rounded-lg w-full border text-sm p-3 bg-card col-span-2 flex flex-col gap-3">
                           <div className="text-md font-semibold text-black flex items-center gap-1"><Icon icon="lucide:notebook-pen" className="w-4 h-4" />Custom notes</div>
                           <RichTextDisplay content={note!.content as string} className="text-sm font-mono" />
                         </div>
                       ) : (
-                        <div className="rounded-lg w-full border text-sm font-mono text-muted-foreground p-3 bg-muted/30 col-span-2">
+                        <div className="rounded-lg w-full border text-sm font-mono text-muted-foreground p-3 bg-card col-span-2">
                           No custom notes yet. Click "Edit custom notes" to add your own text or an image.
                         </div>
                       )}
-                      <div className="pt-1 border-t col-span-2" />
                     </div>
                   )
                 })()}
 
                 {/* Base description from class data */}
-                <div className="space-y-3 flex flex-col gap-1">
-                  <div className="text-md font-medium mb-0">Description</div>
+                <div className="flex flex-col gap-2">
+                  <div className="text-md font-medium">Description</div>
                   <RichTextDisplay content={featureModalContent.description} className="text-sm text-muted-foreground" />
                 </div>
               </>
@@ -3213,7 +3215,7 @@ function CharacterSheetContent() {
 
           {/* Footer (fixed above scroll, only for class features) */}
           {featureModalContent && featureModalIsClassFeature && (
-            <div className="pt-3 mt-3 border-t flex items-center justify-end gap-2">
+            <div className="p-4 bg-card border-t flex items-center justify-end gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -3234,11 +3236,11 @@ function CharacterSheetContent() {
 
       {/* Custom Notes Editor Modal */}
       <Dialog open={featureNotesModalOpen} onOpenChange={setFeatureNotesModalOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Icon icon="lucide:notebook-pen" className="w-4 h-4" />Edit custom notes</DialogTitle>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle className="flex items-center gap-2">Edit custom notes</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
+          <div className="flex flex-col gap-4 p-4 overflow-y-auto p-4 max-h-[50vh]">
               <RichTextEditor
                 value={featureNotesDraft}
                 onChange={setFeatureNotesDraft}
@@ -3249,12 +3251,12 @@ function CharacterSheetContent() {
                   type="url"
                   value={featureImageDraft}
                   onChange={(e) => setFeatureImageDraft(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border rounded"
+                  className="w-full p-2 text-sm border rounded bg-card"
                   placeholder="https://example.com/image.png"
                 />
               </div>
           </div>
-          <div className="pt-3 mt-3 border-t flex items-center justify-end gap-2">
+          <div className="p-4 bg-card border-t flex items-center justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setFeatureNotesModalOpen(false)}>Cancel</Button>
             <Button
               size="sm"

@@ -67,9 +67,9 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
         </DialogHeader>
         <div className="flex flex-col gap-2 w-full items-start justify-start align-start p-4 max-h-[50vh] overflow-y-auto">
             <h3 className="text-sm font-medium">Weapons List</h3>
-            <div className="flex flex-col gap-3 w-full">
+            <div className="flex flex-col gap-2 w-full">
               {weapons.map((weapon, index) => (
-                <div key={index} className="gap-3 p-3 border rounded-lg flex flex-col gap-2">
+                <div key={index} className="gap-3 p-3 border rounded-lg flex flex-col gap-2 bg-card">
                   <div className="flex flex-row gap-2 w-full items-end">
                     <div className="col-span-3 flex flex-col gap-2">
                       <Label htmlFor={`weapon-name-${index}`} className="text-xs">
@@ -142,7 +142,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                   </div>
                 </div>
               ))}
-              <Button variant="outline" onClick={addWeapon} className="w-full bg-transparent">
+              <Button variant="outline" onClick={addWeapon} className="w-full bg-card">
                 <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
                 Add Weapon
               </Button>

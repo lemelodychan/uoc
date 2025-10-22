@@ -53,14 +53,9 @@ export function EldritchCannon({ character, onEdit, onUpdateFeatureUsage }: Eldr
       </CardHeader>
       <CardContent>
         {/* Max Cannons Display */}
-        <div className="mb-3 p-2 bg-muted rounded-lg text-center">
-          <div className="text-sm text-muted-foreground">Maximum Cannons</div>
-          <div className="text-lg font-bold">{maxCannons}</div>
-          {maxCannons > 1 && (
-            <div className="text-xs text-muted-foreground mt-1">
-              Fortified Position (Level 15) allows multiple cannons
-            </div>
-          )}
+        <div className="mb-2 p-2 bg-background rounded-lg text-center border">
+          <div className="text-sm text-muted-foreground">Active Cannons</div>
+          <div className="text-lg font-bold">{activeCannon ? 1 : 0}/{maxCannons}</div>
         </div>
         
         {activeCannon ? (

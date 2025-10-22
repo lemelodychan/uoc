@@ -681,7 +681,7 @@ export function CampaignHomepage({
       
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'notes' | 'resources')} className="w-full gap-4">
-        <TabsList className="grid w-full grid-cols-3 p-2 h-fit rounded-xl">
+        <TabsList className="grid w-full grid-cols-3 gap-2 p-2 h-fit rounded-xl">
           <TabsTrigger value="overview" className="flex items-center gap-2 p-2 rounded-lg">
             <Icon icon="lucide:home" className="w-4 h-4" />
             Overview
@@ -752,14 +752,14 @@ export function CampaignHomepage({
             </Card>
           )}
 
-          {/* Latest Sessions */}
-          <Card className="bg-transparent border-0 shadow-none p-0 gap-3">
-            <CardHeader className="p-0">
-              <div className="flex items-center justify-between h-[32px]">
-                <CardTitle className="flex items-center gap-2">
-                  Latest Sessions
-                </CardTitle>
-                {sortedNotes.length > 0 && (
+          {/* Latest Sessions - Only render if session notes exist */}
+          {!notesLoading && !notesError && sortedNotes.length > 0 && (
+            <Card className="bg-transparent border-0 shadow-none p-0 gap-3">
+              <CardHeader className="p-0">
+                <div className="flex items-center justify-between h-[32px]">
+                  <CardTitle className="flex items-center gap-2">
+                    Latest Sessions
+                  </CardTitle>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -769,23 +769,9 @@ export function CampaignHomepage({
                     See all
                     <Icon icon="lucide:arrow-right" className="w-4 h-4" />
                   </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {notesLoading ? (
-                <CampaignNotesSkeleton count={3} />
-              ) : notesError ? (
-                <div className="text-center p-8 rounded-xl bg-card">
-                  <Icon icon="lucide:alert-circle" className="w-12 h-12 mx-auto mb-4 text-destructive" />
-                  <h3 className="text-lg font-semibold mb-2">Failed to Load Notes</h3>
-                  <p className="text-muted-foreground mb-4">{notesError}</p>
-                  <Button onClick={refreshNotes} variant="outline">
-                    <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
-                    Retry
-                  </Button>
                 </div>
-              ) : sortedNotes.length > 0 ? (
+              </CardHeader>
+              <CardContent className="p-0">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   {sortedNotes.slice(0, 3).map((note) => (
                     <Card 
@@ -827,11 +813,9 @@ export function CampaignHomepage({
                     </Card>
                   ))}
                 </div>
-              ) : (
-                <CampaignNotesEmptySkeleton />
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Characters */}
           <Card className="bg-transparent border-0 shadow-none p-0 gap-3">

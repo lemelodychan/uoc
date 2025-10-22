@@ -58,9 +58,9 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
     const isEditing = editingSection === field
     
     return (
-      <div className="space-y-3">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h4 className="font-medium text-lg">{title}</h4>
+          <h4 className="font-medium text-md">{title}</h4>
           {!isEditing && (
             <Button variant="outline" size="sm" onClick={() => startEditing(field)}>
               <Icon icon="lucide:edit" className="w-4 h-4 mr-2" />
@@ -70,7 +70,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
         </div>
         
         {isEditing ? (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-4">
             <RichTextEditor
               value={formData[field]}
               onChange={(value) => updateField(field, value)}
@@ -87,7 +87,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
             </div>
           </div>
         ) : (
-          <div className="p-3 border rounded-lg bg-muted/20">
+          <div className="p-3 border rounded-lg bg-card">
             {content ? (
               <RichTextDisplay content={content} />
             ) : (
@@ -101,7 +101,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[70vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:user" className="w-5 h-5" />
@@ -109,16 +109,11 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 p-4 max-h-[50vh] overflow-y-auto">
+        <div className="space-y-6 p-4 max-h-[70vh] overflow-y-auto">
           {renderSection("Personality Traits", "personalityTraits", formData.personalityTraits)}
           {renderSection("Backstory", "backstory", formData.backstory)}
           {renderSection("Notes", "notes", formData.notes)}
         </div>
-        <DialogFooter className="p-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -39,7 +39,6 @@ export function LanguagesModal({ isOpen, onClose, character, onSave }: Languages
             onChange={setLanguages}
             placeholder="List languages you know (e.g., **Common**, **Elvish**, **Draconic**)..."
             rows={6}
-            className="mt-2"
           />
         </div>
         <DialogFooter className="p-4 border-t">

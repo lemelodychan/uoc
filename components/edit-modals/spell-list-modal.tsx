@@ -438,7 +438,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
 
         <div className="flex flex-col gap-0 min-h-[70vh] max-h-[70vh] overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 gap-0 min-h-0">
-            <div className="flex items-center justify-between gap-4 p-4 pt-0 border-b">
+            <div className="flex items-center justify-between gap-4 p-4 pt-0 border-b bg-card">
               <TabsList>
                 {tabs.map((t) => (
                   <TabsTrigger key={t.id} value={t.id}>
