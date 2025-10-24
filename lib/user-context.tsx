@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { UserProfile } from './user-profiles'
-import { getCurrentUser, getCurrentUserProfile, createUserProfile } from './database'
+import { getCurrentUser, getCurrentUserProfile, createUserProfile, syncCurrentUserProfileFromAuth } from './database'
 import { isSuperadmin as isSuperadminLegacy } from './user-roles'
 import { isSuperadmin } from './user-profiles'
 
@@ -54,6 +54,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           setUserProfile(profile || null)
+          
+          // Ensure superadmin users have the correct permission level
+          if (isSuperadminLegacy(currentUser.id) && profile?.permissionLevel !== 'superadmin') {
+            console.log("🔄 Syncing superadmin permission level...")
+            try {
+              await syncCurrentUserProfileFromAuth()
+              // Refresh the profile after sync
+              const { profile: updatedProfile } = await getCurrentUserProfile()
+              setUserProfile(updatedProfile || null)
+            } catch (syncError) {
+              console.error("Error syncing superadmin permission:", syncError)
+            }
+          }
         }
       } catch (err) {
         console.error("Error loading user data:", err)
@@ -64,6 +77,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     loadUserData()
+
+    // Listen for auth state changes (e.g., after login)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Page became visible, refresh user data in case auth state changed
+        loadUserData()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   // Determine if user is superadmin (combine both new and legacy checks)

@@ -160,10 +160,10 @@ export function CharacterSidebar({
         </div>
       </div> */}
 
-      <div className={`flex flex-col gap-2 flex-1 min-h-0 w-full ${isCollapsed ? "p-2" : "p-4"}`}>
+      <div className={`flex flex-col gap-0 flex-1 min-h-0 w-full ${isCollapsed ? "p-2" : "p-0"}`}>
 
         {/* Campaign Selector */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 p-4 pb-2">
           {!isCollapsed && (campaigns || []).length > 0 && (
               <Select value={selectedCampaignId} onValueChange={onCampaignChange}>
               <SelectTrigger className="w-full text-md font-medium pl-8 relative">
@@ -185,7 +185,7 @@ export function CharacterSidebar({
           )}
         </div>
 
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2 px-4">
           <Button
             onClick={onCreateCharacter}
             className={`flex-1 bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground ${
@@ -198,10 +198,12 @@ export function CharacterSidebar({
         </div>
 
         {/* Campaign Homepage Link */}
+        <div className="px-4 w-full pt-2">
         {!isCollapsed && selectedCampaignId && selectedCampaignId !== "all" && selectedCampaignId !== "no-campaign" && (
+          <div className="border-b pb-2 pt-1">
           <Button
             variant="outline"
-            className={`w-full rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 border-0 hover:text-primary ${
+            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
               currentView === 'campaign' ? 'text-primary' : ''
             }`}
             onClick={() => {
@@ -213,14 +215,16 @@ export function CharacterSidebar({
             <Icon icon="lucide:home" className="w-4 h-4" />
             Campaign Home
           </Button>
+          </div>
         )}
+        </div>
 
-        <ScrollArea className="flex-1 min-h-0 border-t pt-1">
-          <div className="space-y-4 flex flex-col gap-2">
+        <ScrollArea className="flex-1 min-h-0 flex flex-col gap-2 px-4">
+          <div className="flex flex-col gap-2">
             {/* Campaign Filter Summary */}
 			{selectedCampaignId === 'all' ? (
 				// Single unified status grouping for All Campaigns
-				<div className="space-y-2 flex flex-col gap-2">
+				<div className="flex flex-col gap-2">
 					{statusOrder.map((status) => {
 						const charactersInStatus = (globalStatusGroups as unknown as Record<string, CharacterData[]>)[status] || []
 						if (charactersInStatus.length === 0) return null
@@ -310,7 +314,7 @@ export function CharacterSidebar({
               if (!hasCharacters) return null
 
               return (
-                <div key={campaignId} className="space-y-2 flex flex-col gap-2">
+                <div key={campaignId} className="flex flex-col gap-0 pt-2">
 						{/* Campaign name header removed as requested */}
                   
                   {statusOrder.map((status) => {
@@ -320,9 +324,9 @@ export function CharacterSidebar({
                     const config = statusConfig[status]
 
                     return (
-                      <div key={`${campaignId}-${status}`} className="flex flex-col gap-3 mt-2">
+                      <div key={`${campaignId}-${status}`} className="flex flex-col gap-3 mt-0 mb-4">
                         {!isCollapsed && (
-										      <div className="flex items-center gap-2 ml-1 text-sm">
+										      <div className="flex items-center gap-2 ml-1 mt-2 text-sm">
                             <Icon icon={config.icon} className="w-4 h-4" />
                             <span className="text-sm font-medium">{config.label}</span>
                             <Badge variant="secondary" className="text-[10px] bg-card border-border text-sidebar-foreground">
@@ -331,7 +335,7 @@ export function CharacterSidebar({
                           </div>
                         )}
                         <TooltipProvider>
-                          <div className="space-y-1 flex flex-col gap-2">
+                          <div className="flex flex-col gap-2">
                       {charactersInStatus.map((character: CharacterData) => (
                         <Tooltip key={character.id}>
                           <TooltipTrigger asChild>
@@ -405,7 +409,7 @@ export function CharacterSidebar({
       </div>
 
       {/* Footer with Action Buttons */}
-      <div className="p-4 border-t border-sidebar-border space-y-2">
+      <div className="p-4 border-t border-sidebar-border flex flex-col gap-2">
         <Button
           onClick={onOpenSpellLibrary}
           variant="outline"

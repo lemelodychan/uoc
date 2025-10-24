@@ -342,6 +342,14 @@ function CharacterSheetContent() {
     currentCampaign?.dungeonMasterId,
     selectedCampaignId
   ) : false
+
+  // Recalculate permissions when user context changes
+  useEffect(() => {
+    if (activeCharacter && currentUser) {
+      console.log("🔄 User context updated, recalculating permissions for character:", activeCharacter.name)
+      console.log("👤 Current user:", currentUser.id, "isSuperadmin:", isUserSuperadmin)
+    }
+  }, [currentUser, isUserSuperadmin, activeCharacter])
   
   // Reset superadmin override when switching to a different character
   const [previousCharacterId, setPreviousCharacterId] = useState<string>("")
@@ -566,8 +574,11 @@ function CharacterSheetContent() {
   }
 
   useEffect(() => {
-    loadFromDatabaseFirst()
-  }, [])
+    // Only load characters after user context is loaded
+    if (!userLoading) {
+      loadFromDatabaseFirst()
+    }
+  }, [userLoading])
 
   // Spell slots are now calculated during initial character load, no need for async updates
 
@@ -2697,31 +2708,20 @@ function CharacterSheetContent() {
   }
 
 
-  if (isInitialLoading || !activeCharacter) {
+  if (isInitialLoading || userLoading || !activeCharacter) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Icon icon="lucide:refresh-cw" className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-lg font-medium">Loading character data...</p>
           <p className="text-sm text-muted-foreground">
-            {isInitialLoading ? "Connecting to database..." : "No characters available"}
+            {userLoading ? "Loading user permissions..." : isInitialLoading ? "Connecting to database..." : "No characters available"}
           </p>
         </div>
       </div>
     )
   }
 
-  // Show loading state while user data is being loaded
-  if (userLoading) {
-    return (
-      <div className="h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <div className="text-sm text-muted-foreground">Loading user data...</div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="h-screen bg-background flex flex-col">
