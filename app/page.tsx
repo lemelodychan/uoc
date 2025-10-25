@@ -2258,6 +2258,8 @@ function CharacterSheetContent() {
       alignment: characterData.alignment,
       userId: user?.id,
       visibility: 'public',
+      // Automatically assign to current campaign if viewing a campaign
+      campaignId: currentView === 'campaign' && currentCampaign ? currentCampaign.id : undefined,
       strength: 10,
       dexterity: 10,
       constitution: 10,
@@ -2440,7 +2442,9 @@ function CharacterSheetContent() {
         }
         toast({
           title: "Success",
-          description: `${characterData.name} created successfully!`,
+          description: currentView === 'campaign' && currentCampaign 
+            ? `${characterData.name} created and added to ${currentCampaign.name}!`
+            : `${characterData.name} created successfully!`,
         })
       } else {
         toast({
