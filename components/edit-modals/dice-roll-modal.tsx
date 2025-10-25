@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
-import { calculateModifier, calculateProficiencyBonus, calculateSavingThrowBonus, calculateSpellAttackBonus } from "@/lib/character-data"
+import { calculateModifier, calculateProficiencyBonus, calculateSavingThrowBonus, calculateSpellAttackBonus, calculateSkillBonus } from "@/lib/character-data"
 
 interface DiceRollModalProps {
   isOpen: boolean
@@ -130,17 +130,8 @@ const calculateAutoModifier = (character: CharacterData, rollType: RollType, sav
       })
       
       if (skill) {
-        const abilityModifier = calculateModifier(character[skill.ability])
-        const proficiencyBonus = calculateProficiencyBonus(character.level)
-        
-        let skillModifier = abilityModifier
-        if (skill.proficiency === "proficient") {
-          skillModifier += proficiencyBonus
-        } else if (skill.proficiency === "expertise") {
-          skillModifier += proficiencyBonus * 2
-        }
-        
-        return skillModifier
+        // Use centralized skill bonus calculation (includes Jack of All Trades for Bards)
+        return calculateSkillBonus(character, skill)
       }
       
       // Fallback to ability modifier if skill not found

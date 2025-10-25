@@ -396,12 +396,20 @@ export const calculateSkillBonus = (character: CharacterData, skill: Skill): num
   const abilityModifier = calculateModifier(abilityScore)
   const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level)
 
+  // Check if character is a Bard (single class or multiclass)
+  const isBard = character.class.toLowerCase() === "bard" || 
+    character.classes?.some(c => c.name.toLowerCase() === "bard")
+
   switch (skill.proficiency) {
     case "proficient":
       return abilityModifier + proficiencyBonus
     case "expertise":
       return abilityModifier + proficiencyBonus * 2
     default:
+      // Jack of All Trades: Bards add half proficiency bonus (rounded down) to skills they're not proficient in
+      if (isBard) {
+        return abilityModifier + Math.floor(proficiencyBonus / 2)
+      }
       return abilityModifier
   }
 }
@@ -519,11 +527,18 @@ export const calculatePassivePerception = (character: CharacterData, proficiency
   const perceptionSkill = character.skills.find(skill => skill.name === "Perception")
   const wisdomModifier = calculateModifier(character.wisdom)
   
+  // Check if character is a Bard (single class or multiclass)
+  const isBard = character.class.toLowerCase() === "bard" || 
+    character.classes?.some(c => c.name.toLowerCase() === "bard")
+  
   let skillBonus = wisdomModifier
   if (perceptionSkill?.proficiency === "proficient") {
     skillBonus += proficiencyBonus
   } else if (perceptionSkill?.proficiency === "expertise") {
     skillBonus += proficiencyBonus * 2
+  } else if (isBard) {
+    // Jack of All Trades: Bards add half proficiency bonus (rounded down) to skills they're not proficient in
+    skillBonus += Math.floor(proficiencyBonus / 2)
   }
   
   return 10 + skillBonus
@@ -533,11 +548,18 @@ export const calculatePassiveInsight = (character: CharacterData, proficiencyBon
   const insightSkill = character.skills.find(skill => skill.name === "Insight")
   const wisdomModifier = calculateModifier(character.wisdom)
   
+  // Check if character is a Bard (single class or multiclass)
+  const isBard = character.class.toLowerCase() === "bard" || 
+    character.classes?.some(c => c.name.toLowerCase() === "bard")
+  
   let skillBonus = wisdomModifier
   if (insightSkill?.proficiency === "proficient") {
     skillBonus += proficiencyBonus
   } else if (insightSkill?.proficiency === "expertise") {
     skillBonus += proficiencyBonus * 2
+  } else if (isBard) {
+    // Jack of All Trades: Bards add half proficiency bonus (rounded down) to skills they're not proficient in
+    skillBonus += Math.floor(proficiencyBonus / 2)
   }
   
   return 10 + skillBonus

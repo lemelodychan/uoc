@@ -61,7 +61,9 @@ import {
   toggleFeatureAvailability,
   getFeatureUsage,
   initializeFeatureUsage,
-  updateFeatureUsage as updateFeatureUsageData
+  updateFeatureUsage as updateFeatureUsageData,
+  resetAllFeatureUsage,
+  type FeatureUsageData
 } from "@/lib/feature-usage-tracker"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
@@ -80,7 +82,7 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
+import { saveCharacter, loadCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
 import { useClassFeaturesPreloader } from "@/hooks/use-class-features"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
@@ -1174,8 +1176,36 @@ function CharacterSheetContent() {
         };
       }[] = []
 
+      // CRITICAL: Fetch fresh character data from database before applying long rest effects
+      // This ensures we're working with the most up-to-date data and don't overwrite
+      // any changes that were made since the modal was opened (by this user or others)
+      console.log('[Long Rest] Fetching fresh character data for', selectedCharacterIds.length, 'characters...')
+      const freshCharacterPromises = selectedCharacterIds.map(id => loadCharacter(id))
+      const freshCharacterResults = await Promise.all(freshCharacterPromises)
+      
+      // Create a map of fresh character data
+      const freshCharactersMap = new Map<string, CharacterData>()
+      freshCharacterResults.forEach((result: { character?: CharacterData; error?: string }) => {
+        if (result.character) {
+          freshCharactersMap.set(result.character.id, result.character)
+        } else if (result.error) {
+          console.error('[Long Rest] Failed to load character:', result.error)
+        }
+      })
+      
+      // Merge fresh data with existing characters state
+      // Use fresh data for selected characters, keep existing data for others
+      const charactersToProcess = characters.map(character => {
+        if (freshCharactersMap.has(character.id)) {
+          return freshCharactersMap.get(character.id)!
+        }
+        return character
+      })
+
+      console.log('[Long Rest] Processing long rest for', freshCharactersMap.size, 'freshly loaded characters')
+
       // Update all selected characters to restore their hit points and replenish magic items
-      const updatedCharacters = characters.map(character => {
+      const updatedCharacters = charactersToProcess.map(character => {
         if (selectedCharacterIds.includes(character.id)) {
           const hpRestored = character.maxHitPoints - character.currentHitPoints
           const exhaustionReduced = Math.min(1, character.exhaustion || 0) // Reduce by 1, but not below 0
@@ -1450,6 +1480,59 @@ function CharacterSheetContent() {
 
           updatedSpellData.featSpellSlots = updatedFeatSpellSlots
 
+          // Replenish all unified class feature skills usage (new system)
+          // This handles all features tracked in classFeatureSkillsUsage: slots, points pools, availability toggles
+          const updatedClassFeatureSkillsUsage = resetAllFeatureUsage(character, 'long_rest')
+          
+          // Track class feature replenishments from unified system for results display
+          if (updatedClassFeatureSkillsUsage) {
+            Object.entries(updatedClassFeatureSkillsUsage).forEach(([featureId, featureData]: [string, FeatureUsageData[string]]) => {
+              // Track slots-based features
+              if (featureData.featureType === 'slots' && featureData.maxUses) {
+                const currentUsage = character.classFeatureSkillsUsage?.[featureId]
+                const previousUses = currentUsage?.currentUses ?? featureData.maxUses
+                const usesRestored = featureData.maxUses - previousUses
+                
+                if (usesRestored > 0) {
+                  classAbilityReplenishments.push({
+                    abilityName: featureData.featureName || featureId,
+                    usesRestored,
+                    maxUses: featureData.maxUses
+                  })
+                }
+              }
+              
+              // Track points pool features
+              if (featureData.featureType === 'points_pool' && featureData.maxPoints) {
+                const currentUsage = character.classFeatureSkillsUsage?.[featureId]
+                const previousPoints = currentUsage?.currentPoints ?? featureData.maxPoints
+                const pointsRestored = featureData.maxPoints - previousPoints
+                
+                if (pointsRestored > 0) {
+                  classAbilityReplenishments.push({
+                    abilityName: featureData.featureName || featureId,
+                    usesRestored: pointsRestored,
+                    maxUses: featureData.maxPoints
+                  })
+                }
+              }
+              
+              // Track availability toggle features
+              if (featureData.featureType === 'availability_toggle') {
+                const currentUsage = character.classFeatureSkillsUsage?.[featureId]
+                const wasAvailable = currentUsage?.isAvailable ?? true
+                
+                if (!wasAvailable && featureData.isAvailable) {
+                  classAbilityReplenishments.push({
+                    abilityName: featureData.featureName || featureId,
+                    usesRestored: 1,
+                    maxUses: 1
+                  })
+                }
+              }
+            })
+          }
+
           // Replenish hit dice (restore up to half of total hit dice, minimum 1)
           let updatedHitDice = character.hitDice
           if (character.hitDice) {
@@ -1491,6 +1574,7 @@ function CharacterSheetContent() {
             features: updatedFeatures,
             spellData: updatedSpellData,
             hitDice: updatedHitDice,
+            classFeatureSkillsUsage: updatedClassFeatureSkillsUsage,
             exhaustion: Math.max(0, (character.exhaustion || 0) - 1), // Reduce exhaustion by 1 (minimum 0)
           }
         }
@@ -1536,7 +1620,7 @@ function CharacterSheetContent() {
       console.error("Error applying long rest effects:", error)
       throw error
     }
-  }, [characters, toast])
+  }, [characters, toast]) // Note: characters is used only for merging with fresh DB data, not for the actual rest effects
 
   const handleIncomingLongRestEvent = useCallback(async (event: LongRestEvent) => {
     

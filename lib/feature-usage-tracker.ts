@@ -215,11 +215,12 @@ export function initializeFeatureUsage(
   featureId: string,
   featureConfig: {
     featureName: string
-    featureType: 'slots' | 'points_pool' | 'options_list' | 'special_ux' | 'skill_modifier'
+    featureType: 'slots' | 'points_pool' | 'options_list' | 'special_ux' | 'skill_modifier' | 'availability_toggle'
     enabledAtLevel: number
     maxUses?: number
     maxPoints?: number
     maxSelections?: number
+    isAvailable?: boolean
   }
 ): FeatureUsageData {
   const currentUsage = getFeatureUsageData(character)
@@ -245,6 +246,9 @@ export function initializeFeatureUsage(
     case 'points_pool':
       newUsage.currentPoints = featureConfig.maxPoints || 0
       newUsage.maxPoints = featureConfig.maxPoints || 0
+      break
+    case 'availability_toggle':
+      newUsage.isAvailable = featureConfig.isAvailable ?? true
       break
     case 'options_list':
       newUsage.selectedOptions = []
@@ -272,11 +276,12 @@ export function addSingleFeature(
   featureId: string,
   featureConfig: {
     featureName: string
-    featureType: 'slots' | 'points_pool' | 'options_list' | 'special_ux' | 'skill_modifier'
+    featureType: 'slots' | 'points_pool' | 'options_list' | 'special_ux' | 'skill_modifier' | 'availability_toggle'
     enabledAtLevel: number
     maxUses?: number
     maxPoints?: number
     maxSelections?: number
+    isAvailable?: boolean
   }
 ): FeatureUsageData {
   const currentUsage = getFeatureUsageData(character)
@@ -302,6 +307,9 @@ export function addSingleFeature(
     case 'points_pool':
       newUsage.currentPoints = featureConfig.maxPoints || 0
       newUsage.maxPoints = featureConfig.maxPoints || 0
+      break
+    case 'availability_toggle':
+      newUsage.isAvailable = featureConfig.isAvailable ?? true
       break
     case 'options_list':
       newUsage.selectedOptions = []
@@ -351,6 +359,12 @@ export function resetFeatureUsage(
       // Reset to max points on long rest
       if (resetType === 'long_rest' || resetType === 'dawn') {
         updates.currentPoints = usage.maxPoints || 0
+      }
+      break
+    case 'availability_toggle':
+      // Reset availability to true on long rest
+      if (resetType === 'long_rest' || resetType === 'dawn') {
+        updates.isAvailable = true
       }
       break
     case 'options_list':
