@@ -77,6 +77,8 @@ export function ManagementInterface({
             show_martial_arts: dbClass.show_martial_arts,
             show_ki_points: dbClass.show_ki_points,
             show_unarmored_movement: dbClass.show_unarmored_movement,
+            show_rage: dbClass.show_rage,
+            show_rage_damage: dbClass.show_rage_damage,
             is_custom: dbClass.is_custom
           })
           
@@ -112,12 +114,17 @@ export function ManagementInterface({
           showMartialArts: dbClass.show_martial_arts ?? false,
           showKiPoints: dbClass.show_ki_points ?? false,
           showUnarmoredMovement: dbClass.show_unarmored_movement ?? false,
+          showRage: dbClass.show_rage ?? false,
+          showRageDamage: dbClass.show_rage_damage ?? false,
           // Sorcerer-specific fields
           sorcery_points: Array.isArray(dbClass.sorcery_points) ? dbClass.sorcery_points : null,
           // Monk-specific fields
           martial_arts_dice: Array.isArray(dbClass.martial_arts_dice) ? dbClass.martial_arts_dice : null,
           ki_points: Array.isArray(dbClass.ki_points) ? dbClass.ki_points : null,
           unarmored_movement: Array.isArray(dbClass.unarmored_movement) ? dbClass.unarmored_movement : null,
+          // Barbarian-specific fields
+          rage_uses: Array.isArray(dbClass.rage_uses) ? dbClass.rage_uses : null,
+          rage_damage: Array.isArray(dbClass.rage_damage) ? dbClass.rage_damage : null,
           // Custom class support fields
           is_custom: dbClass.is_custom ?? false,
           created_by: dbClass.created_by ?? null,
@@ -303,12 +310,17 @@ export function ManagementInterface({
                     showMartialArts: result.klass.show_martial_arts ?? false,
                     showKiPoints: result.klass.show_ki_points ?? false,
                     showUnarmoredMovement: result.klass.show_unarmored_movement ?? false,
+                    showRage: result.klass.show_rage ?? false,
+                    showRageDamage: result.klass.show_rage_damage ?? false,
                     // Sorcerer-specific fields
                     sorcery_points: Array.isArray(result.klass.sorcery_points) ? result.klass.sorcery_points : null,
                     // Monk-specific fields
                     martial_arts_dice: Array.isArray(result.klass.martial_arts_dice) ? result.klass.martial_arts_dice : null,
                     ki_points: Array.isArray(result.klass.ki_points) ? result.klass.ki_points : null,
                     unarmored_movement: Array.isArray(result.klass.unarmored_movement) ? result.klass.unarmored_movement : null,
+                    // Barbarian-specific fields
+                    rage_uses: Array.isArray(result.klass.rage_uses) ? result.klass.rage_uses : null,
+                    rage_damage: Array.isArray(result.klass.rage_damage) ? result.klass.rage_damage : null,
                     // Custom class support fields
                     is_custom: result.klass.is_custom ?? false,
                     created_by: result.klass.created_by ?? null,
@@ -328,6 +340,8 @@ export function ManagementInterface({
                     showMartialArts: transformedClass.showMartialArts,
                     showKiPoints: transformedClass.showKiPoints,
                     showUnarmoredMovement: transformedClass.showUnarmoredMovement,
+                    showRage: transformedClass.showRage,
+                    showRageDamage: transformedClass.showRageDamage,
                     is_custom: transformedClass.is_custom
                   })
                   

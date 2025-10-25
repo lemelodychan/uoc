@@ -30,11 +30,15 @@ export interface ClassData {
   showMartialArts?: boolean
   showKiPoints?: boolean
   showUnarmoredMovement?: boolean
+  showRage?: boolean
+  showRageDamage?: boolean
   // Special progression data
   sorcery_points?: number[] | null
   martial_arts_dice?: number[] | null
   ki_points?: number[] | null
   unarmored_movement?: number[] | null
+  rage_uses?: number[] | null
+  rage_damage?: number[] | null
   // New metadata fields for custom class support
   is_custom: boolean
   created_by: string | null

@@ -221,37 +221,27 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
           <DialogTitle>Multiclassing Configuration</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4 p-4 max-h-[50vh] overflow-y-auto">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Total Character Level: <Badge variant="secondary">{totalLevel}</Badge>
-            </div>
-            <Button onClick={addClass} size="sm" variant="outline">
-              <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
-              Add Class
-            </Button>
-          </div>
-
+        <div className="flex flex-col gap-4 p-4 max-h-[50vh] overflow-y-auto">
           {classes.map((charClass, index) => (
-            <Card key={index}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Class {index + 1}</CardTitle>
+            <Card key={index} className="gap-2 p-3">
+              <CardHeader className="p-0">
+                <div className="flex items-start justify-between">
+                  <CardTitle className="text-md">Class {index + 1}</CardTitle>
                   {classes.length > 1 && (
                     <Button
                       onClick={() => removeClass(index)}
                       size="sm"
                       variant="outline"
-                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"
                     >
                       <Icon icon="lucide:trash-2" className="w-4 h-4" />
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="flex flex-col gap-3 p-0">
                 <div className="flex flex-row gap-4 align-start items-start justify-start w-full">
-                  <div className="flex flex-col gap-2 w-full">
+                  <div className="flex flex-col gap-2 w-[124px] max-w-[124px] min-w-[124px]">
                     <Label htmlFor={`class-${index}`} className="h-4">Class</Label>
                     <Select
                       value={charClass.name}
@@ -339,7 +329,7 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Hit Die:</span>
-                  <Badge variant="outline">
+                  <Badge variant="secondary">
                     {charClass.name ? getHitDieType(charClass.name) : "d8"}
                   </Badge>
                 </div>
@@ -347,9 +337,10 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
             </Card>
           ))}
         </div>
-        <DialogFooter className="p-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
+        <DialogFooter className="p-4 border-t flex flex-row !justify-between items-center">
+          <Button onClick={addClass} variant="outline">
+            <Icon icon="lucide:plus" className="w-4 h-4" />
+            Add Class
           </Button>
           <Button onClick={handleSave}>
             Save Multiclass Configuration

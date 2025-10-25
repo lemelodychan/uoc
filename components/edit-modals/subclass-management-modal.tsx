@@ -8,10 +8,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Icon } from "@iconify/react"
 import { useToast } from "@/hooks/use-toast"
 import type { ClassData } from "@/lib/class-utils"
 import { upsertClass, deleteClass } from "@/lib/database"
+import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
 
 interface SubclassManagementModalProps {
   isOpen: boolean
@@ -68,6 +70,21 @@ export function SubclassManagementModal({
       spell_slots_9: baseClass.spell_slots_9,
       cantrips_known: baseClass.cantrips_known,
       spells_known: baseClass.spells_known,
+      // Spellcasting toggles - start with base class values
+      showSpellsKnown: baseClass.showSpellsKnown || false,
+      showSorceryPoints: baseClass.showSorceryPoints || false,
+      showMartialArts: baseClass.showMartialArts || false,
+      showKiPoints: baseClass.showKiPoints || false,
+      showUnarmoredMovement: baseClass.showUnarmoredMovement || false,
+      showRage: baseClass.showRage || false,
+      showRageDamage: baseClass.showRageDamage || false,
+      // Progression data - start with base class values
+      sorcery_points: baseClass.sorcery_points,
+      martial_arts_dice: baseClass.martial_arts_dice,
+      ki_points: baseClass.ki_points,
+      unarmored_movement: baseClass.unarmored_movement,
+      rage_uses: baseClass.rage_uses,
+      rage_damage: baseClass.rage_damage,
       is_custom: baseClass.is_custom,
       created_by: baseClass.created_by,
       duplicated_from: baseClass.duplicated_from,
@@ -238,7 +255,7 @@ export function SubclassManagementModal({
 
       {/* Subclass Edit Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-2xl p-0 gap-0">
+        <DialogContent className="!w-[60vw] !max-w-[90vw] h-[90vh] !max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
           <DialogHeader className="border-b p-4">
             <DialogTitle>
               {isCreating ? 'Create New Subclass' : `Edit ${editingSubclass?.subclass}`}
@@ -252,7 +269,7 @@ export function SubclassManagementModal({
           </DialogHeader>
 
           {editingSubclass && (
-            <div className="p-4 bg-background overflow-y-auto flex flex-col gap-4">
+            <div className="p-4 bg-background overflow-y-auto flex flex-col gap-4 !w-[60vw] !max-w-90vw]">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="subclass-name">Subclass Name</Label>
                 <Input
@@ -295,6 +312,67 @@ export function SubclassManagementModal({
                   </div>
                 </div>
               </div>
+
+              {/* Spellcasting Options */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="subclass-spellcasting"
+                    checked={editingSubclass.showSpellsKnown || false}
+                    onCheckedChange={(checked) => setEditingSubclass(prev => 
+                      prev ? { ...prev, showSpellsKnown: !!checked } : null
+                    )}
+                  />
+                  <Label htmlFor="subclass-spellcasting" className="text-sm font-medium">
+                    Enable Spellcasting for this Subclass
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, this subclass will have its own spellcasting progression that overrides the base class.
+                </p>
+              </div>
+
+              {/* Spell Matrix - only show if spellcasting is enabled */}
+              {editingSubclass.showSpellsKnown && (
+                <div className="flex flex-col gap-2">
+                  <SpellSlotsGrid
+                    value={{
+                      cantripsKnown: editingSubclass.cantrips_known || [],
+                      spellsKnown: editingSubclass.spells_known || [],
+                      spellSlots: {
+                        spell_slots_1: editingSubclass.spell_slots_1 || [],
+                        spell_slots_2: editingSubclass.spell_slots_2 || [],
+                        spell_slots_3: editingSubclass.spell_slots_3 || [],
+                        spell_slots_4: editingSubclass.spell_slots_4 || [],
+                        spell_slots_5: editingSubclass.spell_slots_5 || [],
+                        spell_slots_6: editingSubclass.spell_slots_6 || [],
+                        spell_slots_7: editingSubclass.spell_slots_7 || [],
+                        spell_slots_8: editingSubclass.spell_slots_8 || [],
+                        spell_slots_9: editingSubclass.spell_slots_9 || [],
+                      },
+                      sorceryPoints: editingSubclass.sorcery_points || [],
+                      martialArtsDice: editingSubclass.martial_arts_dice || [],
+                      kiPoints: editingSubclass.ki_points || [],
+                      unarmoredMovement: editingSubclass.unarmored_movement || [],
+                      rageUses: editingSubclass.rage_uses || [],
+                      rageDamage: editingSubclass.rage_damage || [],
+                    }}
+                    onChange={(data) => {
+                      setEditingSubclass(prev => prev ? {
+                        ...prev,
+                        spells_known: data.spellsKnown || null,
+                        sorcery_points: data.sorceryPoints || null,
+                        martial_arts_dice: data.martialArtsDice || null,
+                        ki_points: data.kiPoints || null,
+                        unarmored_movement: data.unarmoredMovement || null,
+                        rage_uses: data.rageUses || null,
+                        rage_damage: data.rageDamage || null,
+                      } : null)
+                    }}
+                    readonly={false}
+                  />
+                </div>
+              )}
             </div>
           )}
 

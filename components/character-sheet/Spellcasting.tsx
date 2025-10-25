@@ -44,6 +44,14 @@ const isMonk = (character: CharacterData): boolean => {
   return character.class.toLowerCase() === 'monk'
 }
 
+// Helper function to check if character is a barbarian
+const isBarbarian = (character: CharacterData): boolean => {
+  if (character.classes && character.classes.length > 0) {
+    return character.classes.some(cls => cls.name.toLowerCase() === 'barbarian')
+  }
+  return character.class.toLowerCase() === 'barbarian'
+}
+
 
 export function Spellcasting({ 
   character, 
@@ -64,6 +72,7 @@ export function Spellcasting({
   const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
   const [monkClassData, setMonkClassData] = useState<any>(null)
+  const [barbarianClassData, setBarbarianClassData] = useState<any>(null)
 
   // Load class feature skills
   useEffect(() => {
@@ -88,7 +97,10 @@ export function Spellcasting({
     if (isMonk(character)) {
       const loadMonkData = async () => {
         try {
-          const { classData } = await loadClassData('Monk')
+          // Get the monk class from character.classes to find subclass
+          const monkClass = character.classes?.find(cls => cls.name.toLowerCase() === 'monk')
+          const subclass = monkClass?.subclass
+          const { classData } = await loadClassData('Monk', subclass)
           setMonkClassData(classData)
         } catch (error) {
           console.error('Error loading monk class data:', error)
@@ -98,8 +110,26 @@ export function Spellcasting({
     }
   }, [character.id, character.classes])
 
-  // Show component for monks (even without spellcasting) or characters with spellcasting abilities
-  if (!isMonk(character) && !hasSpellcastingAbilities(character)) {
+  // Load barbarian class data if character is a barbarian
+  useEffect(() => {
+    if (isBarbarian(character)) {
+      const loadBarbarianData = async () => {
+        try {
+          // Get the barbarian class from character.classes to find subclass
+          const barbarianClass = character.classes?.find(cls => cls.name.toLowerCase() === 'barbarian')
+          const subclass = barbarianClass?.subclass
+          const { classData } = await loadClassData('Barbarian', subclass)
+          setBarbarianClassData(classData)
+        } catch (error) {
+          console.error('Error loading barbarian class data:', error)
+        }
+      }
+      loadBarbarianData()
+    }
+  }, [character.id, character.classes])
+
+  // Show component for monks/barbarians (even without spellcasting) or characters with spellcasting abilities
+  if (!isMonk(character) && !isBarbarian(character) && !hasSpellcastingAbilities(character)) {
     return null
   }
 
@@ -163,6 +193,40 @@ export function Spellcasting({
     }
     
     return monkClassData.unarmored_movement[Math.min(getMonkLevel() - 1, 19)] || 0
+  }
+
+  // Helper functions for barbarian abilities
+  const getBarbarianLevel = (): number => {
+    if (character.classes && character.classes.length > 0) {
+      const barbarianClass = character.classes.find(cls => cls.name.toLowerCase() === 'barbarian')
+      return barbarianClass ? barbarianClass.level : 0
+    }
+    return character.class.toLowerCase() === 'barbarian' ? character.level : 0
+  }
+
+  const getRageUses = (): string => {
+    const level = getBarbarianLevel()
+    
+    // Check if we have database data first
+    if (barbarianClassData?.rage_uses && Array.isArray(barbarianClassData.rage_uses)) {
+      const rageUses = barbarianClassData.rage_uses[Math.min(level - 1, 19)] || 0
+      return rageUses === 0 ? "Unlimited" : rageUses.toString()
+    }
+    
+    // Fallback progression if no database data
+    if (level >= 20) return "Unlimited"
+    if (level >= 17) return "6"
+    if (level >= 12) return "5"
+    if (level >= 6) return "4"
+    if (level >= 3) return "3"
+    return "2"
+  }
+
+  const getRageDamage = (): number => {
+    const level = getBarbarianLevel()
+    if (level >= 16) return 4
+    if (level >= 9) return 3
+    return 2
   }
 
   // Note: Features are now loaded automatically from database via loadClassFeatureSkills
@@ -716,8 +780,14 @@ export function Spellcasting({
       <CardHeader className="pb-0">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Icon icon={isMonk(character) && !hasSpellcastingAbilities(character) ? "lucide:zap" : "lucide:sparkles"} className="w-5 h-5" />
-            {isMonk(character) && !hasSpellcastingAbilities(character) ? "Monk Abilities" : "Spellcasting"}
+            <Icon icon={
+              (isMonk(character) && !hasSpellcastingAbilities(character)) ? "lucide:zap" :
+              (isBarbarian(character) && !hasSpellcastingAbilities(character)) ? "lucide:sword" :
+              "lucide:sparkles"
+            } className="w-5 h-5" />
+            {(isMonk(character) && !hasSpellcastingAbilities(character)) ? "Monk Abilities" :
+             (isBarbarian(character) && !hasSpellcastingAbilities(character)) ? "Barbarian Abilities" :
+             "Spellcasting"}
           </CardTitle>
           <Button variant="outline" size="sm" onClick={onEdit}>
             <Icon icon="lucide:edit" className="w-4 h-4" />
@@ -741,6 +811,25 @@ export function Spellcasting({
                 <div className="text-sm text-muted-foreground">Unarmored Mvmt</div>
                 <div className="text-xl font-bold font-mono">
                   +{getUnarmoredMovement()} ft.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isBarbarian(character) && (
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2 items-start">
+              <div className="text-center border py-2 px-1 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
+                <div className="text-sm text-muted-foreground">Rage</div>
+                <div className="text-xl font-bold font-mono">
+                  {getRageUses()}
+                </div>
+              </div>
+              <div className="text-center border py-2 px-1 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
+                <div className="text-sm text-muted-foreground">Rage Damage</div>
+                <div className="text-xl font-bold font-mono">
+                  +{getRageDamage()}
                 </div>
               </div>
             </div>

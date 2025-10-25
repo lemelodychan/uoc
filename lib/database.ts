@@ -1716,34 +1716,24 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
 
 export const loadClassData = async (className: string, subclass?: string): Promise<{ classData?: any; error?: string }> => {
   try {
-    let query = supabase
+    // Load all classes for this class name (base class + all subclasses)
+    const { data: allClasses, error: allClassesError } = await supabase
       .from("classes")
       .select("*")
       .eq("name", className)
-    
-    if (subclass) {
-      query = query.eq("subclass", subclass)
-    } else {
-      // When no subclass is specified, get the base class (subclass IS NULL)
-      query = query.is("subclass", null)
+      .order("subclass", { ascending: true })
+
+    if (allClassesError) {
+      console.error("Error loading class data:", allClassesError)
+      return { error: allClassesError.message }
     }
 
-    const { data, error } = await query
-
-    if (error) {
-      console.error("Error loading class data:", error)
-      return { error: error.message }
-    }
-
-    if (!data || data.length === 0) {
+    if (!allClasses || allClasses.length === 0) {
       return { error: "Class not found" }
     }
 
-    if (data.length > 1) {
-      console.warn("Multiple class entries found for:", className, subclass, "Using the first one")
-    }
-
-    const classData = data[0] // Use the first entry if multiple found
+    // Use the new priority system to get the correct class data
+    const classData = getClassDataWithSubclassPriority(allClasses, className, subclass)
 
     return { classData }
   } catch (error) {
@@ -1805,12 +1795,17 @@ export const loadClassesWithDetails = async (): Promise<{
     show_martial_arts?: boolean | null
     show_ki_points?: boolean | null
     show_unarmored_movement?: boolean | null
+    show_rage?: boolean | null
+    show_rage_damage?: boolean | null
     // Sorcerer-specific fields
     sorcery_points?: number | null
     // Monk-specific fields
     martial_arts_dice?: number | null
     ki_points?: number | null
     unarmored_movement?: number | null
+    // Barbarian-specific fields
+    rage_uses?: number | null
+    rage_damage?: number | null
     // Custom class support fields
     is_custom?: boolean | null
     created_by?: string | null
@@ -1843,6 +1838,8 @@ export const loadClassesWithDetails = async (): Promise<{
       show_martial_arts: cls.show_martial_arts,
       show_ki_points: cls.show_ki_points,
       show_unarmored_movement: cls.show_unarmored_movement,
+      show_rage: cls.show_rage,
+      show_rage_damage: cls.show_rage_damage,
       is_custom: cls.is_custom
     })))
 
@@ -1851,6 +1848,52 @@ export const loadClassesWithDetails = async (): Promise<{
     console.error("Error loading classes with details:", error)
     return { error: "Failed to load classes" }
   }
+}
+
+// Helper function to get class data with subclass spellcasting priority
+export const getClassDataWithSubclassPriority = (classes: any[], className: string, subclassName?: string) => {
+  // Find the base class
+  const baseClass = classes.find(cls => cls.name === className && !cls.subclass)
+  
+  if (!baseClass) {
+    return null
+  }
+  
+  // If no subclass specified, return base class
+  if (!subclassName) {
+    return baseClass
+  }
+  
+  // Find the subclass
+  const subclass = classes.find(cls => cls.name === className && cls.subclass === subclassName)
+  
+  if (!subclass) {
+    return baseClass
+  }
+  
+  // Merge base class with subclass, prioritizing subclass spellcasting data
+  const mergedClass = {
+    ...baseClass,
+    ...subclass,
+    // Override with subclass data if subclass has spellcasting enabled
+    show_spells_known: subclass.show_spells_known ? subclass.show_spells_known : baseClass.show_spells_known,
+    show_sorcery_points: subclass.show_spells_known ? subclass.show_sorcery_points : baseClass.show_sorcery_points,
+    show_martial_arts: subclass.show_spells_known ? subclass.show_martial_arts : baseClass.show_martial_arts,
+    show_ki_points: subclass.show_spells_known ? subclass.show_ki_points : baseClass.show_ki_points,
+    show_unarmored_movement: subclass.show_spells_known ? subclass.show_unarmored_movement : baseClass.show_unarmored_movement,
+    show_rage: subclass.show_spells_known ? subclass.show_rage : baseClass.show_rage,
+    show_rage_damage: subclass.show_spells_known ? subclass.show_rage_damage : baseClass.show_rage_damage,
+    // Override progression data if subclass has spellcasting enabled
+    spells_known: subclass.show_spells_known ? subclass.spells_known : baseClass.spells_known,
+    sorcery_points: subclass.show_spells_known ? subclass.sorcery_points : baseClass.sorcery_points,
+    martial_arts_dice: subclass.show_spells_known ? subclass.martial_arts_dice : baseClass.martial_arts_dice,
+    ki_points: subclass.show_spells_known ? subclass.ki_points : baseClass.ki_points,
+    unarmored_movement: subclass.show_spells_known ? subclass.unarmored_movement : baseClass.unarmored_movement,
+    rage_uses: subclass.show_spells_known ? subclass.rage_uses : baseClass.rage_uses,
+    rage_damage: subclass.show_spells_known ? subclass.rage_damage : baseClass.rage_damage,
+  }
+  
+  return mergedClass
 }
 
 export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> => {
@@ -1917,12 +1960,17 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
       show_martial_arts: (cls as any).showMartialArts || false,
       show_ki_points: (cls as any).showKiPoints || false,
       show_unarmored_movement: (cls as any).showUnarmoredMovement || false,
+      show_rage: (cls as any).showRage || false,
+      show_rage_damage: (cls as any).showRageDamage || false,
       // Sorcerer-specific fields
       sorcery_points: toNumberArray((cls as any).sorcery_points),
       // Monk-specific fields
       martial_arts_dice: toNumberArray((cls as any).martial_arts_dice),
       ki_points: toNumberArray((cls as any).ki_points),
       unarmored_movement: toNumberArray((cls as any).unarmored_movement),
+      // Barbarian-specific fields
+      rage_uses: toNumberArray((cls as any).rage_uses),
+      rage_damage: toNumberArray((cls as any).rage_damage),
     }
 
     // Always include is_custom field, defaulting to true for new classes
@@ -1935,6 +1983,8 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
       show_martial_arts: payload.show_martial_arts,
       show_ki_points: payload.show_ki_points,
       show_unarmored_movement: payload.show_unarmored_movement,
+      show_rage: payload.show_rage,
+      show_rage_damage: payload.show_rage_damage,
       is_custom: payload.is_custom
     })
     console.log('UpsertClass full payload:', JSON.stringify(payload, null, 2))

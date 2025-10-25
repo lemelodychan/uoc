@@ -205,7 +205,7 @@ export const CLASS_FEATURE_COLORS = {
   },
   // Barbarian - Red (same as Artificer)
   barbarian: {
-    available: "bg-[#ce6565] border-[#ce6565]",
+    available: "bg-[#8b4513] border-[#8b4513]",
     used: "bg-card border-border"
   },
   // Monk - Orange/Amber

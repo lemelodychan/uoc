@@ -27,6 +27,8 @@ interface SpellSlotsGridProps {
     martialArtsDice?: number[]  // 20 levels (stored as die size: 4, 6, 8, 10, 12)
     kiPoints?: number[]  // 20 levels
     unarmoredMovement?: number[]  // 20 levels (feet)
+    rageUses?: number[]  // 20 levels
+    rageDamage?: number[]  // 20 levels
   }
   onChange: (value: { 
     cantripsKnown: number[], 
@@ -46,6 +48,8 @@ interface SpellSlotsGridProps {
     martialArtsDice?: number[]
     kiPoints?: number[]
     unarmoredMovement?: number[]
+    rageUses?: number[]
+    rageDamage?: number[]
   }) => void
   readonly?: boolean
   title?: string
@@ -55,6 +59,8 @@ interface SpellSlotsGridProps {
   showMartialArts?: boolean
   showKiPoints?: boolean
   showUnarmoredMovement?: boolean
+  showRage?: boolean
+  showRageDamage?: boolean
 }
 
 export function SpellSlotsGrid({ 
@@ -66,7 +72,9 @@ export function SpellSlotsGrid({
   showSorceryPoints = false,
   showMartialArts = false,
   showKiPoints = false,
-  showUnarmoredMovement = false
+  showUnarmoredMovement = false,
+  showRage = false,
+  showRageDamage = false
 }: SpellSlotsGridProps) {
   const [cantripsKnown, setCantripsKnown] = useState<number[]>(value?.cantripsKnown || createEmptyArray())
   const [spellsKnown, setSpellsKnown] = useState<number[]>(value?.spellsKnown || createEmptyArray())
@@ -87,6 +95,8 @@ export function SpellSlotsGrid({
   const [martialArtsDice, setMartialArtsDice] = useState<number[]>(value?.martialArtsDice || createEmptyArray())
   const [kiPoints, setKiPoints] = useState<number[]>(value?.kiPoints || createEmptyArray())
   const [unarmoredMovement, setUnarmoredMovement] = useState<number[]>(value?.unarmoredMovement || createEmptyArray())
+  const [rageUses, setRageUses] = useState<number[]>(value?.rageUses || createEmptyArray())
+  const [rageDamage, setRageDamage] = useState<number[]>(value?.rageDamage || createEmptyArray())
   const [errors, setErrors] = useState<string[]>([])
   const [draggedRow, setDraggedRow] = useState<number | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -248,7 +258,49 @@ export function SpellSlotsGrid({
       sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
       martialArtsDice: showMartialArts ? martialArtsDice : undefined,
       kiPoints: showKiPoints ? kiPoints : undefined,
-      unarmoredMovement: showUnarmoredMovement ? newUnarmoredMovement : undefined
+      unarmoredMovement: showUnarmoredMovement ? newUnarmoredMovement : undefined,
+      rageUses: showRage ? rageUses : undefined,
+      rageDamage: showRageDamage ? rageDamage : undefined
+    })
+  }
+
+  function handleRageUsesChange(charLevel: number, newValue: number) {
+    if (readonly) return
+    
+    const newRageUses = [...rageUses]
+    newRageUses[charLevel] = Math.max(0, newValue)
+    setRageUses(newRageUses)
+    
+    onChange({ 
+      cantripsKnown, 
+      spellsKnown: showSpellsKnown ? spellsKnown : undefined,
+      spellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined,
+      rageUses: showRage ? newRageUses : undefined,
+      rageDamage: showRageDamage ? rageDamage : undefined
+    })
+  }
+
+  function handleRageDamageChange(charLevel: number, newValue: number) {
+    if (readonly) return
+    
+    const newRageDamage = [...rageDamage]
+    newRageDamage[charLevel] = Math.max(0, newValue)
+    setRageDamage(newRageDamage)
+    
+    onChange({ 
+      cantripsKnown, 
+      spellsKnown: showSpellsKnown ? spellsKnown : undefined,
+      spellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined,
+      rageUses: showRage ? rageUses : undefined,
+      rageDamage: showRageDamage ? newRageDamage : undefined
     })
   }
 
@@ -348,7 +400,7 @@ export function SpellSlotsGrid({
   function handleKeyDown(event: React.KeyboardEvent, charLevel: number, columnIndex: number) {
     if (readonly) return
     
-    const totalColumns = showSpellsKnown ? 11 : 10 // Level, Cantrips, [Spells Known], 1st-9th
+    const totalColumns = 2 + (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0) + (showMartialArts ? 1 : 0) + (showKiPoints ? 1 : 0) + (showUnarmoredMovement ? 1 : 0) + (showRage ? 1 : 0) + (showRageDamage ? 1 : 0) + 9 // Level, Cantrips, special columns, 1st-9th
     const totalRows = 20
     
     let newRow = charLevel
@@ -498,6 +550,8 @@ export function SpellSlotsGrid({
             {showMartialArts && <th className="p-2 text-left font-medium">Martial Arts</th>}
             {showKiPoints && <th className="p-2 text-left font-medium">Ki Points</th>}
             {showUnarmoredMovement && <th className="p-2 text-left font-medium">Unarmored Movement</th>}
+            {showRage && <th className="p-2 text-left font-medium">Rage</th>}
+            {showRageDamage && <th className="p-2 text-left font-medium">Rage Damage</th>}
             <th className="p-2 text-left font-medium">1st</th>
             <th className="p-2 text-left font-medium">2nd</th>
             <th className="p-2 text-left font-medium">3rd</th>
@@ -632,10 +686,50 @@ export function SpellSlotsGrid({
                   </td>
                 )}
                 
+                {/* Rage */}
+                {showRage && (
+                  <td className="p-1">
+                    {readonly ? (
+                      <div className="w-15 text-center py-2 px-1 text-sm font-mono">
+                        {(rageUses[charLevel] || 0) === 0 ? "Unlimited" : (rageUses[charLevel] || 0)}
+                      </div>
+                    ) : (
+                      <Input
+                        id={`input-${charLevel}-rage`}
+                        type="number"
+                        min="0"
+                        value={rageUses[charLevel] || 0}
+                        onChange={(e) => handleRageUsesChange(charLevel, parseInt(e.target.value) || 0)}
+                        onKeyDown={(e) => handleKeyDown(e, charLevel, 2 + (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0) + (showMartialArts ? 1 : 0) + (showKiPoints ? 1 : 0) + (showUnarmoredMovement ? 1 : 0))}
+                        className="w-15 text-center"
+                        disabled={readonly}
+                        title="Number of rage uses per long rest (0 = Unlimited)"
+                      />
+                    )}
+                  </td>
+                )}
+                
+                {/* Rage Damage */}
+                {showRageDamage && (
+                  <td className="p-1">
+                    <Input
+                      id={`input-${charLevel}-rage-damage`}
+                      type="number"
+                      min="0"
+                      value={rageDamage[charLevel] || 0}
+                      onChange={(e) => handleRageDamageChange(charLevel, parseInt(e.target.value) || 0)}
+                      onKeyDown={(e) => handleKeyDown(e, charLevel, 2 + (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0) + (showMartialArts ? 1 : 0) + (showKiPoints ? 1 : 0) + (showUnarmoredMovement ? 1 : 0) + (showRage ? 1 : 0))}
+                      className="w-15 text-center"
+                      disabled={readonly}
+                      title="Bonus damage from rage"
+                    />
+                  </td>
+                )}
+                
                 {/* Spell Slots */}
                 {Array.from({ length: 9 }, (_, spellLevel) => {
                   const spellSlotKey = `spell_slots_${spellLevel + 1}` as keyof typeof spellSlots
-                  const specialColumnsCount = (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0) + (showMartialArts ? 1 : 0) + (showKiPoints ? 1 : 0) + (showUnarmoredMovement ? 1 : 0)
+                  const specialColumnsCount = (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0) + (showMartialArts ? 1 : 0) + (showKiPoints ? 1 : 0) + (showUnarmoredMovement ? 1 : 0) + (showRage ? 1 : 0) + (showRageDamage ? 1 : 0)
                   const columnIndex = spellLevel + 2 + specialColumnsCount
                   return (
                     <td key={spellLevel} className="p-1">

@@ -11,7 +11,14 @@
     "test-feature-usage": "tsx scripts/test-feature-usage.ts",
     "test-infusion-migration": "tsx scripts/test-infusion-migration.ts",
     "cleanup-legacy-infusions": "tsx scripts/cleanup-legacy-infusions.ts",
-    "setup-flash-of-genius": "tsx scripts/setup-flash-of-genius.ts"
+    "setup-flash-of-genius": "tsx scripts/setup-flash-of-genius.ts",
+    "add-barbarian-columns": "tsx scripts/add-barbarian-columns.ts",
+    "test-barbarian-toggles": "tsx scripts/test-barbarian-toggles.ts",
+    "test-toggle-persistence": "tsx scripts/test-toggle-persistence.ts",
+    "test-frontend-persistence": "tsx scripts/test-frontend-persistence.ts",
+    "update-barbarian-progression": "tsx scripts/update-barbarian-progression.ts",
+    "test-unlimited-rage": "tsx scripts/test-unlimited-rage.ts",
+    "test-subclass-spellcasting-priority": "tsx scripts/test-subclass-spellcasting-priority.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

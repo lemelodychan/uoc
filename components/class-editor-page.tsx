@@ -43,6 +43,8 @@ export function ClassEditorPage({
       showMartialArts: classData.showMartialArts,
       showKiPoints: classData.showKiPoints,
       showUnarmoredMovement: classData.showUnarmoredMovement,
+      showRage: classData.showRage,
+      showRageDamage: classData.showRageDamage,
       is_custom: classData.is_custom
     })
     setEditingClass(classData)
@@ -56,9 +58,11 @@ export function ClassEditorPage({
       showMartialArts: editingClass.showMartialArts,
       showKiPoints: editingClass.showKiPoints,
       showUnarmoredMovement: editingClass.showUnarmoredMovement,
+      showRage: editingClass.showRage,
+      showRageDamage: editingClass.showRageDamage,
       is_custom: editingClass.is_custom
     })
-  }, [editingClass.showSpellsKnown, editingClass.showSorceryPoints, editingClass.showMartialArts, editingClass.showKiPoints, editingClass.showUnarmoredMovement, editingClass.is_custom])
+  }, [editingClass.showSpellsKnown, editingClass.showSorceryPoints, editingClass.showMartialArts, editingClass.showKiPoints, editingClass.showUnarmoredMovement, editingClass.showRage, editingClass.showRageDamage, editingClass.is_custom])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -89,6 +93,8 @@ export function ClassEditorPage({
         showMartialArts: classDataToSave.showMartialArts,
         showKiPoints: classDataToSave.showKiPoints,
         showUnarmoredMovement: classDataToSave.showUnarmoredMovement,
+        showRage: classDataToSave.showRage,
+        showRageDamage: classDataToSave.showRageDamage,
         is_custom: classDataToSave.is_custom
       })
       
@@ -335,6 +341,32 @@ export function ClassEditorPage({
                     Unarmored Movement
                   </Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="show-rage"
+                    checked={editingClass.showRage || false}
+                    onCheckedChange={(checked) => {
+                      console.log('Rage toggle changed:', checked)
+                      setEditingClass(prev => ({ ...prev, showRage: !!checked }))
+                    }}
+                  />
+                  <Label htmlFor="show-rage" className="text-sm font-normal">
+                    Rage
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="show-rage-damage"
+                    checked={editingClass.showRageDamage || false}
+                    onCheckedChange={(checked) => {
+                      console.log('Rage Damage toggle changed:', checked)
+                      setEditingClass(prev => ({ ...prev, showRageDamage: !!checked }))
+                    }}
+                  />
+                  <Label htmlFor="show-rage-damage" className="text-sm font-normal">
+                    Rage Damage
+                  </Label>
+                </div>
               </div>
             </div>
             <div className="flex flex-col gap-2">
@@ -414,13 +446,18 @@ export function ClassEditorPage({
               // Monk-specific fields
               martialArtsDice: editingClass.martial_arts_dice || Array(20).fill(4),
               kiPoints: editingClass.ki_points || Array(20).fill(0),
-              unarmoredMovement: editingClass.unarmored_movement || Array(20).fill(0)
+              unarmoredMovement: editingClass.unarmored_movement || Array(20).fill(0),
+              // Barbarian-specific fields
+              rageUses: editingClass.rage_uses || Array(20).fill(0),
+              rageDamage: editingClass.rage_damage || Array(20).fill(0)
             }}
             showSpellsKnown={editingClass.showSpellsKnown || false}
             showSorceryPoints={editingClass.showSorceryPoints || false}
             showMartialArts={editingClass.showMartialArts || false}
             showKiPoints={editingClass.showKiPoints || false}
             showUnarmoredMovement={editingClass.showUnarmoredMovement || false}
+            showRage={editingClass.showRage || false}
+            showRageDamage={editingClass.showRageDamage || false}
             onChange={(spellData) => {
               setEditingClass(prev => ({
                 ...prev,
@@ -440,7 +477,10 @@ export function ClassEditorPage({
                 // Monk-specific fields
                 martial_arts_dice: spellData.martialArtsDice || null,
                 ki_points: spellData.kiPoints || null,
-                unarmored_movement: spellData.unarmoredMovement || null
+                unarmored_movement: spellData.unarmoredMovement || null,
+                // Barbarian-specific fields
+                rage_uses: spellData.rageUses || null,
+                rage_damage: spellData.rageDamage || null
               }))
             }}
           />
