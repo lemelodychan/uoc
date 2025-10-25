@@ -79,10 +79,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     loadUserData()
 
     // Listen for auth state changes (e.g., after login)
+    // Only refresh user data if the tab has been hidden for a significant time
+    let lastHiddenTime = 0
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Page became visible, refresh user data in case auth state changed
-        loadUserData()
+        const now = Date.now()
+        const timeHidden = now - lastHiddenTime
+        
+        // Only refresh if tab was hidden for more than 1 hour (3600000ms)
+        // This prevents unnecessary reloads during long thinking processes
+        if (timeHidden > 3600000) {
+          console.log('Tab was hidden for', Math.round(timeHidden / 1000), 'seconds, refreshing user data')
+          loadUserData()
+        }
+      } else if (document.visibilityState === 'hidden') {
+        lastHiddenTime = Date.now()
       }
     }
 

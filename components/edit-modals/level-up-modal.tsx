@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -14,7 +14,8 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { FeatEditModal } from "./feat-edit-modal"
 import type { CharacterData, CharacterClass } from "@/lib/character-data"
 import { calculateModifier, calculateProficiencyBonus, calculateSkillBonus, getHitDiceByClass, calculateTotalLevel, isSingleClass } from "@/lib/character-data"
-import { loadClassFeatures } from "@/lib/database"
+import { loadClassFeatures, loadClassesWithDetails } from "@/lib/database"
+import type { ClassData } from "@/lib/class-utils"
 
 interface LevelUpModalProps {
   isOpen: boolean
@@ -43,6 +44,11 @@ interface ASIChoice {
   } | null
 }
 
+interface NewClassSelection {
+  classData: ClassData
+  selectedSkills: string[]
+}
+
 export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModalProps) {
   const [selectedClass, setSelectedClass] = useState<CharacterClass | null>(null)
   const [newLevel, setNewLevel] = useState(calculateTotalLevel(character.classes) + 1)
@@ -55,12 +61,15 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   const [newFeatures, setNewFeatures] = useState<NewFeatures[]>([])
   const [asiChoice, setAsiChoice] = useState<ASIChoice | null>(null)
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
-  const [step, setStep] = useState<'class_selection' | 'hp_roll' | 'features' | 'asi_choice' | 'summary'>('class_selection')
+  const [step, setStep] = useState<'class_selection' | 'new_class_selection' | 'skill_selection' | 'hp_roll' | 'features' | 'asi_choice' | 'summary'>('class_selection')
   const [editableCharacter, setEditableCharacter] = useState<CharacterData>(character)
   const [customFeatName, setCustomFeatName] = useState('')
   const [customFeatDescription, setCustomFeatDescription] = useState('')
   const [featEditModalOpen, setFeatEditModalOpen] = useState(false)
   const [editingFeatIndex, setEditingFeatIndex] = useState<number | null>(null)
+  const [availableClasses, setAvailableClasses] = useState<ClassData[]>([])
+  const [newClassSelection, setNewClassSelection] = useState<NewClassSelection | null>(null)
+  const [isLoadingClasses, setIsLoadingClasses] = useState(false)
 
   // Function to reset all state to initial values
   // Always uses character's current active level + 1 as the starting point
@@ -86,20 +95,19 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     setCustomFeatDescription('')
     setFeatEditModalOpen(false)
     setEditingFeatIndex(null)
+    setAvailableClasses([])
+    setNewClassSelection(null)
+    setIsLoadingClasses(false)
   }
 
   // Reset state when modal opens or closes
   useEffect(() => {
-    resetAllState()
-  }, [isOpen, character.classes, character.id])
-
-  // Auto-select class if only one class
-  useEffect(() => {
-    if (isOpen && character.classes && character.classes.length === 1) {
-      setSelectedClass(character.classes[0])
-      setStep('hp_roll')
+    if (isOpen) {
+      resetAllState()
     }
-  }, [isOpen, character.classes])
+  }, [isOpen, character.id]) // Removed character.classes to prevent unnecessary resets
+
+  // No auto-selection - always show class selection step
 
   // Update editable character when ASI choices are made (for real-time preview)
   useEffect(() => {
@@ -164,26 +172,147 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     }
   }
 
+  const loadAvailableClasses = async () => {
+    setIsLoadingClasses(true)
+    try {
+      const { classes, error } = await loadClassesWithDetails()
+      if (error) {
+        console.error('Error loading classes:', error)
+        return
+      }
+      
+      // Filter out classes the character already has and only show base classes (no subclasses)
+      const existingClassNames = character.classes?.map(c => c.name.toLowerCase()) || []
+      const baseClasses = classes?.filter(cls => 
+        !cls.subclass && // Only base classes
+        !existingClassNames.includes(cls.name.toLowerCase()) // Not already taken
+      ).map(cls => ({
+        id: cls.id,
+        name: cls.name,
+        subclass: cls.subclass,
+        description: cls.description || null,
+        hit_die: cls.hit_die || 8,
+        primary_ability: cls.primary_ability ? [cls.primary_ability] : [],
+        saving_throw_proficiencies: cls.saving_throw_proficiencies || [],
+        skill_proficiencies: cls.skill_proficiencies || null,
+        equipment_proficiencies: cls.equipment_proficiencies || null,
+        starting_equipment: cls.starting_equipment || null,
+        spell_slots_1: cls.spell_slots_1 || null,
+        spell_slots_2: cls.spell_slots_2 || null,
+        spell_slots_3: cls.spell_slots_3 || null,
+        spell_slots_4: cls.spell_slots_4 || null,
+        spell_slots_5: cls.spell_slots_5 || null,
+        spell_slots_6: cls.spell_slots_6 || null,
+        spell_slots_7: cls.spell_slots_7 || null,
+        spell_slots_8: cls.spell_slots_8 || null,
+        spell_slots_9: cls.spell_slots_9 || null,
+        cantrips_known: Array.isArray(cls.cantrips_known) ? cls.cantrips_known : (cls.cantrips_known ? [cls.cantrips_known] : null),
+        spells_known: Array.isArray(cls.spells_known) ? cls.spells_known : (cls.spells_known ? [cls.spells_known] : null),
+        is_custom: false,
+        created_by: null,
+        duplicated_from: null,
+        source: 'PHB',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })) || []
+      
+      setAvailableClasses(baseClasses)
+      setStep('new_class_selection')
+    } catch (error) {
+      console.error('Error loading classes:', error)
+    } finally {
+      setIsLoadingClasses(false)
+    }
+  }
+
+  const handleNewClassSelection = (classData: ClassData) => {
+    setNewClassSelection({
+      classData,
+      selectedSkills: []
+    })
+    setStep('skill_selection')
+  }
+
+  const handleSkillSelection = (selectedSkills: string[]) => {
+    if (newClassSelection) {
+      setNewClassSelection({
+        ...newClassSelection,
+        selectedSkills
+      })
+      
+      // Update the editable character's skills to show in sidebar preview
+      const updatedSkills = character.skills.map(skill => {
+        const isSelected = selectedSkills.includes(skill.name)
+        
+        // If this skill is in the new class's skill list and is selected
+        if (newClassSelection.classData.skill_proficiencies?.includes(skill.name) && isSelected) {
+          // Apply new class proficiency
+          if (skill.proficiency === 'proficient') {
+            return { ...skill, proficiency: 'expertise' as const }
+          } else {
+            return { ...skill, proficiency: 'proficient' as const }
+          }
+        }
+        
+        return skill
+      })
+      
+      // Add any new skills that weren't already in the character's skill list
+      const newSkills = selectedSkills
+        .filter(skillName => !character.skills.find(s => s.name === skillName))
+        .map(skillName => ({
+          name: skillName,
+          ability: getSkillAbility(skillName),
+          proficiency: 'proficient' as const
+        }))
+      
+      // Update the editable character with the new skills
+      setEditableCharacter(prev => ({
+        ...prev,
+        skills: [...updatedSkills, ...newSkills]
+      }))
+      
+      // Create a temporary CharacterClass for the new class
+      const newCharacterClass: CharacterClass = {
+        name: newClassSelection.classData.name,
+        level: 1,
+        class_id: newClassSelection.classData.id,
+        subclass: undefined
+      }
+      setSelectedClass(newCharacterClass)
+      setStep('hp_roll')
+    }
+  }
+
   const rollHitDie = () => {
     if (!selectedClass) return
 
-    const hitDieTypes: Record<string, number> = {
-      'barbarian': 12,
-      'fighter': 10,
-      'paladin': 10,
-      'ranger': 10,
-      'artificer': 8,
-      'bard': 8,
-      'cleric': 8,
-      'druid': 8,
-      'monk': 8,
-      'rogue': 8,
-      'warlock': 8,
-      'wizard': 6,
-      'sorcerer': 6
+    let dieSize: number
+
+    // Check if this is a new class (multiclassing)
+    if (newClassSelection) {
+      // Use the new class's hit die from the class data
+      dieSize = newClassSelection.classData.hit_die || 8
+    } else {
+      // Use the existing class's hit die
+      const hitDieTypes: Record<string, number> = {
+        'barbarian': 12,
+        'fighter': 10,
+        'paladin': 10,
+        'ranger': 10,
+        'artificer': 8,
+        'bard': 8,
+        'cleric': 8,
+        'druid': 8,
+        'monk': 8,
+        'rogue': 8,
+        'warlock': 8,
+        'wizard': 6,
+        'sorcerer': 6
+      }
+      dieSize = hitDieTypes[selectedClass.name.toLowerCase()] || 8
     }
 
-    const dieSize = hitDieTypes[selectedClass.name.toLowerCase()] || 8
     const roll = Math.floor(Math.random() * dieSize) + 1
     const constitutionModifier = calculateModifier(editableCharacter.constitution)
     const total = Math.max(1, roll + constitutionModifier) // Minimum 1 HP gain
@@ -369,23 +498,86 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     // Start with the original character (not the editable preview)
     let updatedCharacter = { ...character }
 
-    // Update character with new level
-    const isSingleClassCharacter = isSingleClass(character.classes)
-    const updatedClasses = character.classes?.map(c => 
-      c.name === selectedClass.name 
-        ? { 
-            ...c, 
-            level: c.level + 1 // Always increment the individual class level
-          }
-        : c
-    ) || []
+    let updatedClasses: CharacterClass[]
+    let updatedHitDiceByClass = character.hitDiceByClass || []
 
-    // Update hit dice
-    const updatedHitDiceByClass = character.hitDiceByClass?.map(hd =>
-      hd.className === selectedClass.name
-        ? { ...hd, total: hd.total + 1 }
-        : hd
-    ) || []
+    // Check if this is a new class (multiclassing)
+    const isNewClass = newClassSelection !== null
+    
+    if (isNewClass && newClassSelection) {
+      // Adding a new class at level 1
+      const newCharacterClass: CharacterClass = {
+        name: newClassSelection.classData.name,
+        level: 1,
+        class_id: newClassSelection.classData.id,
+        subclass: undefined
+      }
+      
+      updatedClasses = [...(character.classes || []), newCharacterClass]
+      
+      // Add hit dice for the new class
+      const hitDieSize = newClassSelection.classData.hit_die || 8
+      updatedHitDiceByClass = [
+        ...updatedHitDiceByClass,
+        {
+          className: newClassSelection.classData.name,
+          dieType: `d${hitDieSize}`,
+          total: 1,
+          used: 0
+        }
+      ]
+      
+      // Add new skills from the selected class
+      const newSkills = newClassSelection.selectedSkills.map(skillName => {
+        const existingSkill = character.skills.find(s => s.name === skillName)
+        if (existingSkill) {
+          // If already proficient, upgrade to expertise if possible
+          return {
+            ...existingSkill,
+            proficiency: (existingSkill.proficiency === 'proficient' ? 'expertise' : 'proficient') as 'proficient' | 'expertise' | 'none'
+          }
+        } else {
+          // Add new skill proficiency
+          return {
+            name: skillName,
+            ability: getSkillAbility(skillName),
+            proficiency: 'proficient' as const
+          }
+        }
+      })
+      
+      // Update skills
+      const updatedSkills = character.skills.map(skill => {
+        const newSkill = newSkills.find(ns => ns.name === skill.name)
+        return newSkill || skill
+      })
+      
+      // Add any new skills that weren't already in the character's skill list
+      newSkills.forEach(newSkill => {
+        if (!updatedSkills.find(s => s.name === newSkill.name)) {
+          updatedSkills.push(newSkill)
+        }
+      })
+      
+      updatedCharacter.skills = updatedSkills
+    } else {
+      // Leveling up existing class
+      updatedClasses = character.classes?.map(c => 
+        c.name === selectedClass.name 
+          ? { 
+              ...c, 
+              level: c.level + 1 // Always increment the individual class level
+            }
+          : c
+      ) || []
+
+      // Update hit dice
+      updatedHitDiceByClass = character.hitDiceByClass?.map(hd =>
+        hd.className === selectedClass.name
+          ? { ...hd, total: hd.total + 1 }
+          : hd
+      ) || []
+    }
 
     // Update max HP
     const newMaxHP = character.maxHitPoints + hpRollResult.total
@@ -395,7 +587,17 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     const updatedClassFeatures = [
       ...character.classFeatures,
       ...newFeatures.map(f => ({
-        ...f,
+        id: f.name.toLowerCase().replace(/\s+/g, '_'),
+        class_id: selectedClass.class_id || '',
+        level: f.level,
+        title: f.name,
+        description: f.description,
+        feature_type: 'class_feature',
+        feature_skill_type: undefined,
+        subclass_id: undefined,
+        class_features_skills: undefined,
+        name: f.name,
+        source: f.source,
         className: selectedClass.name
       }))
     ]
@@ -465,11 +667,49 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     }
   ]
 
-  const updateEditableCharacter = (updates: Partial<CharacterData>) => {
+  const updateEditableCharacter = useCallback((updates: Partial<CharacterData>) => {
     setEditableCharacter(prev => ({ ...prev, ...updates }))
+  }, [])
+
+  // Function to reset choices when going back to class selection
+  const resetChoices = () => {
+    setSelectedClass(null)
+    setHpRoll(null)
+    setHpRollResult(null)
+    setNewFeatures([])
+    setAsiChoice(null)
+    setIsLoadingFeatures(false)
+    setAvailableClasses([])
+    setNewClassSelection(null)
+    setIsLoadingClasses(false)
+    setEditableCharacter(character) // Reset to original character
   }
 
-  const CharacterSidebar = () => (
+  const getSkillAbility = useCallback((skillName: string): 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma' => {
+    const skillAbilityMap: Record<string, 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma'> = {
+      'acrobatics': 'dexterity',
+      'animal_handling': 'wisdom',
+      'arcana': 'intelligence',
+      'athletics': 'strength',
+      'deception': 'charisma',
+      'history': 'intelligence',
+      'insight': 'wisdom',
+      'intimidation': 'charisma',
+      'investigation': 'intelligence',
+      'medicine': 'wisdom',
+      'nature': 'intelligence',
+      'perception': 'wisdom',
+      'performance': 'charisma',
+      'persuasion': 'charisma',
+      'religion': 'intelligence',
+      'sleight_of_hand': 'dexterity',
+      'stealth': 'dexterity',
+      'survival': 'wisdom'
+    }
+    return skillAbilityMap[skillName] || 'intelligence'
+  }, [])
+
+  const CharacterSidebar = useMemo(() => (
     <div className="w-80 border-l bg-muted/20 p-4 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
       
       {/* Ability Scores */}
@@ -654,7 +894,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
           </CardContent>
         </Card>
     </div>
-  )
+  ), [editableCharacter, character, updateEditableCharacter, hpRollResult])
 
   const handleClose = () => {
     resetAllState()
@@ -674,9 +914,11 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             {selectedClass && (
               <span className="ml-2">
                 | {selectedClass.name}: {
-                  character.classes && character.classes.length === 1 
-                    ? `${character.level} → ${newLevel}` 
-                    : `${selectedClass.level} → ${selectedClass.level + 1}`
+                  newClassSelection 
+                    ? `New Class at Level 1` 
+                    : character.classes && character.classes.length === 1 
+                      ? `${character.level} → ${newLevel}` 
+                      : `${selectedClass.level} → ${selectedClass.level + 1}`
                 }
               </span>
             )}
@@ -689,31 +931,124 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
           {step === 'class_selection' && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <h3 className="text-lg font-semibold">Choose a class to level up</h3>
+                <h3 className="text-lg font-semibold">Choose Your Advancement</h3>
                 <p className="text-sm text-muted-foreground">
-                  Select which class you want to advance to level {newLevel}
+                  {character.classes && character.classes.length === 1 
+                    ? "Level up your current class or add a new class (multiclassing)"
+                    : "Level up one of your existing classes or add a new class (multiclassing)"
+                  }
                 </p>
               </div>
               
-              <div className="flex flex-col gap-2">
-                {character.classes?.map((charClass) => (
-                  <Card key={charClass.name} className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex flex-col gap-3">
+                {/* Existing Classes */}
+                {character.classes && character.classes.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <h4 className="text-md font-medium text-muted-foreground">Existing Classes</h4>
+                    {character.classes.map((charClass) => (
+                      <Card key={charClass.name} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                        <CardContent className="px-4 py-0">
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-row items-center gap-4">
+                              <h4 className="font-medium flex items-center gap-2">
+                                <span className="capitalize">{charClass.name}</span>
+                                <Badge variant="outline">Level {charClass.level}</Badge>
+                              </h4>
+                              {charClass.subclass && (
+                                <p className="text-sm text-muted-foreground">{charClass.subclass}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleClassSelection(charClass.name)}
+                              >
+                                Level Up
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Multiclass Option */}
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-md font-medium text-muted-foreground">Multiclassing</h4>
+                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors border-dashed">
                     <CardContent className="px-4 py-0">
                       <div className="flex items-center justify-between">
                         <div className="flex flex-row items-center gap-4">
                           <h4 className="font-medium flex items-center gap-2">
-                            <span className="capitalize">{charClass.name}</span>
-                            <Badge variant="outline">Level {charClass.level}</Badge>
+                            <Icon icon="lucide:plus" className="w-4 h-4" />
+                            <span>Add New Class</span>
+                            <Badge variant="secondary">Level 1</Badge>
                           </h4>
-                          {charClass.subclass && (
-                            <p className="text-sm text-muted-foreground">{charClass.subclass}</p>
+                          <p className="text-sm text-muted-foreground">Start a new class at level 1</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={loadAvailableClasses}
+                            disabled={isLoadingClasses}
+                          >
+                            {isLoadingClasses ? (
+                              <>
+                                <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin mr-1" />
+                                Loading...
+                              </>
+                            ) : (
+                              'Add Class'
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: New Class Selection */}
+          {step === 'new_class_selection' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-lg font-semibold">Choose a New Class</h3>
+                <p className="text-sm text-muted-foreground">
+                  Select which class you want to add to your character
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                {availableClasses.map((classData) => (
+                  <Card key={classData.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardContent className="px-4 py-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-1">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <span className="capitalize">{classData.name}</span>
+                            <Badge variant="outline">d{classData.hit_die}</Badge>
+                          </h4>
+                          {classData.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {classData.description}
+                            </p>
+                          )}
+                          {classData.skill_proficiencies && Array.isArray(classData.skill_proficiencies) && (
+                            <p className="text-xs text-muted-foreground">
+                              Choose 2 from: {classData.skill_proficiencies.join(', ')}
+                            </p>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleClassSelection(charClass.name)}
+                            onClick={() => handleNewClassSelection(classData)}
                           >
                             Select
                           </Button>
@@ -726,7 +1061,126 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             </div>
           )}
 
-          {/* Step 2: HP Roll */}
+          {/* Step 3: Skill Selection */}
+          {step === 'skill_selection' && newClassSelection && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-lg font-semibold">Choose Skill Proficiencies</h3>
+                <p className="text-sm text-muted-foreground">
+                  Select 2 skills to be proficient in from your new {newClassSelection.classData.name} class
+                </p>
+              </div>
+              
+              <Card>
+                <CardContent className="px-4 py-0">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
+                      <h4 className="font-medium">{newClassSelection.classData.name} Skills</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Choose 2 skills from the following options:
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      {newClassSelection.classData.skill_proficiencies?.map((skillName: string) => {
+                        const isSelected = newClassSelection.selectedSkills.includes(skillName)
+                        const canSelect = newClassSelection.selectedSkills.length < 2 || isSelected
+                        
+                        return (
+                          <div
+                            key={skillName}
+                            className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                              isSelected 
+                                ? 'bg-primary text-primary-foreground border-primary' 
+                                : canSelect 
+                                  ? 'hover:bg-muted/50 border-border' 
+                                  : 'opacity-50 cursor-not-allowed border-border'
+                            }`}
+                            onClick={() => {
+                              if (!canSelect) return
+                              
+                              let newSelectedSkills: string[]
+                              if (isSelected) {
+                                newSelectedSkills = newClassSelection.selectedSkills.filter(s => s !== skillName)
+                              } else {
+                                newSelectedSkills = [...newClassSelection.selectedSkills, skillName]
+                              }
+                              
+                              setNewClassSelection({
+                                ...newClassSelection,
+                                selectedSkills: newSelectedSkills
+                              })
+                              
+                              // Update the editable character's skills in real-time for sidebar preview
+                              const updatedSkills = character.skills.map(skill => {
+                                const isSelected = newSelectedSkills.includes(skill.name)
+                                const wasSelected = newClassSelection.selectedSkills.includes(skill.name)
+                                
+                                // If this skill is in the new class's skill list
+                                if (newClassSelection.classData.skill_proficiencies?.includes(skill.name)) {
+                                  if (isSelected) {
+                                    // Apply new class proficiency
+                                    const originalSkill = character.skills.find(s => s.name === skill.name)
+                                    if (originalSkill?.proficiency === 'proficient') {
+                                      return { ...skill, proficiency: 'expertise' as const }
+                                    } else {
+                                      return { ...skill, proficiency: 'proficient' as const }
+                                    }
+                                  } else if (wasSelected) {
+                                    // Revert to original proficiency
+                                    const originalSkill = character.skills.find(s => s.name === skill.name)
+                                    return { ...skill, proficiency: originalSkill?.proficiency || 'none' }
+                                  }
+                                }
+                                
+                                return skill
+                              })
+                              
+                              // Add any new skills that weren't already in the character's skill list
+                              const newSkills = newSelectedSkills
+                                .filter(skillName => !character.skills.find(s => s.name === skillName))
+                                .map(skillName => ({
+                                  name: skillName,
+                                  ability: getSkillAbility(skillName),
+                                  proficiency: 'proficient' as const
+                                }))
+                              
+                              // Update the editable character with the new skills
+                              setEditableCharacter(prev => ({
+                                ...prev,
+                                skills: [...updatedSkills, ...newSkills]
+                              }))
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                                isSelected 
+                                  ? 'bg-primary-foreground border-primary-foreground' 
+                                  : 'border-current'
+                              }`}>
+                                {isSelected && (
+                                  <Icon icon="lucide:check" className="w-3 h-3 text-primary" />
+                                )}
+                              </div>
+                              <span className="font-medium capitalize">
+                                {skillName.replace(/_/g, ' ')}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    
+                    <div className="text-sm text-muted-foreground">
+                      Selected: {newClassSelection.selectedSkills.length}/2
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Step 4: HP Roll */}
           {step === 'hp_roll' && selectedClass && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
@@ -742,8 +1196,16 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                     <div className="flex flex-col gap-0">
                       <h4 className="font-medium">{selectedClass.name} Hit Die</h4>
                       <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Badge variant="outline">d{newClassSelection ? newClassSelection.classData.hit_die : (() => {
+                          const hitDieTypes: Record<string, number> = {
+                            'barbarian': 12, 'fighter': 10, 'paladin': 10, 'ranger': 10,
+                            'artificer': 8, 'bard': 8, 'cleric': 8, 'druid': 8, 'monk': 8,
+                            'rogue': 8, 'warlock': 8, 'wizard': 6, 'sorcerer': 6
+                          }
+                          return hitDieTypes[selectedClass.name.toLowerCase()] || 8
+                        })()}</Badge>
                         <Badge variant="outline">{formatModifier(calculateModifier(editableCharacter.constitution))}</Badge>
-                        Consitutition                      
+                        Constitution                      
                       </p>
                     </div>
                     <Button
@@ -772,7 +1234,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             </div>
           )}
 
-          {/* Step 3: New Features */}
+          {/* Step 5: New Features */}
           {step === 'features' && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
@@ -821,7 +1283,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             </div>
           )}
 
-          {/* Step 4: ASI Choice */}
+          {/* Step 6: ASI Choice */}
           {step === 'asi_choice' && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
@@ -1004,7 +1466,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             </div>
           )}
 
-          {/* Step 5: Summary */}
+          {/* Step 7: Summary */}
           {step === 'summary' && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
@@ -1019,8 +1481,18 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                   <div className="flex flex-row gap-4 items-center justify-start pb-4 border-b mb-4">
                     <h5 className="text-base font-display font-bold w-[240px]">Class Advancement</h5>
                     <p className="flex items-center gap-2">
-                      <span className="text-sm">{selectedClass?.name} to</span>
-                      <Badge variant="outline">Level {newLevel}</Badge>
+                      {newClassSelection ? (
+                        <>
+                          <span className="text-sm">Adding new class:</span>
+                          <Badge variant="default">{selectedClass?.name}</Badge>
+                          <span className="text-sm">at Level 1</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm">{selectedClass?.name} to</span>
+                          <Badge variant="outline">Level {newLevel}</Badge>
+                        </>
+                      )}
                     </p>
                   </div>
 
@@ -1035,6 +1507,22 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                       </p>
                     </div>
                   </div>
+
+                  {newClassSelection && (
+                    <div className="flex flex-row gap-4 items-center justify-start pt-4 border-t mt-4">
+                      <h5 className="text-base font-display font-bold w-[240px]">New Skills</h5>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">Gaining proficiency in:</span>
+                        <div className="flex gap-1">
+                          {newClassSelection.selectedSkills.map((skill, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {skill.replace(/_/g, ' ')}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                    {newFeatures.length > 0 && (
                      <div className="flex flex-row gap-4 items-center justify-start pt-4 border-t mt-4">
@@ -1084,14 +1572,14 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
           </div>
           
           {/* Character Sidebar */}
-          <CharacterSidebar />
+          {CharacterSidebar}
         </div>
 
         <DialogFooter className="p-4 border-t">
           <div className="flex justify-between w-full">
             <div className="flex gap-2">
-              {/* Show Cancel on first step or when HP is the first step, Previous on all other steps */}
-              {(step === 'class_selection' || (step === 'hp_roll' && character.classes && character.classes.length === 1)) ? (
+              {/* Show Cancel on first step, Previous on all other steps */}
+              {step === 'class_selection' ? (
                 <Button variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
@@ -1099,10 +1587,25 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                 <Button 
                   variant="outline" 
                   onClick={() => {
-                    if (step === 'hp_roll') setStep('class_selection')
-                    else if (step === 'features') setStep('hp_roll')
-                    else if (step === 'asi_choice') setStep('features')
-                    else if (step === 'summary') setStep('asi_choice')
+                    if (step === 'new_class_selection') {
+                      setStep('class_selection')
+                      resetChoices()
+                    } else if (step === 'skill_selection') {
+                      setStep('new_class_selection')
+                    } else if (step === 'hp_roll') {
+                      if (newClassSelection) {
+                        setStep('skill_selection')
+                      } else {
+                        setStep('class_selection')
+                        resetChoices()
+                      }
+                    } else if (step === 'features') {
+                      setStep('hp_roll')
+                    } else if (step === 'asi_choice') {
+                      setStep('features')
+                    } else if (step === 'summary') {
+                      setStep('asi_choice')
+                    }
                   }}
                 >
                   <Icon icon="lucide:arrow-left" className="w-4 h-4" />
@@ -1113,6 +1616,16 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             
             <div className="flex gap-2">
               {/* Step-specific continue buttons - always visible */}
+              {step === 'skill_selection' && (
+                <Button
+                  onClick={() => handleSkillSelection(newClassSelection?.selectedSkills || [])}
+                  disabled={!newClassSelection || newClassSelection.selectedSkills.length !== 2}
+                >
+                  Continue to HP Roll
+                  <Icon icon="lucide:arrow-right" className="w-4 h-4" />
+                </Button>
+              )}
+              
               {step === 'hp_roll' && (
                 <Button 
                   onClick={loadNewFeatures} 

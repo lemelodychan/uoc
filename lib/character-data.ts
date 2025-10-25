@@ -244,6 +244,7 @@ export interface SpellSlot {
   level: number
   total: number
   used: number
+  isWarlockSlot?: boolean // Optional flag to distinguish Warlock Pact Magic slots
 }
 
 export interface BardicInspiration {
@@ -700,7 +701,11 @@ export const calculatePaladinSpellsKnown = (character: CharacterData): number =>
 
 // Calculate Paladin Divine Sense uses (1 + Charisma modifier)
 export const getDivineSenseData = (character: CharacterData): { usesPerRest: number; currentUses: number; replenishesOnLongRest: boolean } | undefined => {
-  if (character.class.toLowerCase() !== "paladin") {
+  // Check if character has Paladin class (for multiclassing support)
+  const hasPaladinClass = character.class.toLowerCase() === "paladin" || 
+    character.classes?.some(c => c.name.toLowerCase() === "paladin")
+  
+  if (!hasPaladinClass) {
     return undefined
   }
   
@@ -716,11 +721,18 @@ export const getDivineSenseData = (character: CharacterData): { usesPerRest: num
 
 // Calculate Paladin Lay on Hands (paladin level × 5 hit points)
 export const getLayOnHandsData = (character: CharacterData): { totalHitPoints: number; currentHitPoints: number; replenishesOnLongRest: boolean } | undefined => {
-  if (character.class.toLowerCase() !== "paladin") {
+  // Check if character has Paladin class (for multiclassing support)
+  const hasPaladinClass = character.class.toLowerCase() === "paladin" || 
+    character.classes?.some(c => c.name.toLowerCase() === "paladin")
+  
+  if (!hasPaladinClass) {
     return undefined
   }
   
-  const totalHitPoints = character.level * 5
+  // For multiclassed characters, use Paladin class level specifically
+  const paladinClass = character.classes?.find(c => c.name.toLowerCase() === "paladin")
+  const paladinLevel = paladinClass?.level || character.level
+  const totalHitPoints = paladinLevel * 5
   
   return {
     totalHitPoints,
@@ -731,14 +743,22 @@ export const getLayOnHandsData = (character: CharacterData): { totalHitPoints: n
 
 // Calculate Paladin Channel Divinity uses (1 use, 2 at 6th level, 3 at 18th level)
 export const getChannelDivinityData = (character: CharacterData): { usesPerRest: number; currentUses: number; replenishesOnLongRest: boolean } | undefined => {
-  if (character.class.toLowerCase() !== "paladin") {
+  // Check if character has Paladin class (for multiclassing support)
+  const hasPaladinClass = character.class.toLowerCase() === "paladin" || 
+    character.classes?.some(c => c.name.toLowerCase() === "paladin")
+  
+  if (!hasPaladinClass) {
     return undefined
   }
   
+  // For multiclassed characters, use Paladin class level specifically
+  const paladinClass = character.classes?.find(c => c.name.toLowerCase() === "paladin")
+  const paladinLevel = paladinClass?.level || character.level
+  
   let usesPerRest = 1
-  if (character.level >= 18) {
+  if (paladinLevel >= 18) {
     usesPerRest = 3
-  } else if (character.level >= 6) {
+  } else if (paladinLevel >= 6) {
     usesPerRest = 2
   }
   
@@ -751,7 +771,19 @@ export const getChannelDivinityData = (character: CharacterData): { usesPerRest:
 
 // Calculate Paladin Cleansing Touch uses (Charisma modifier, minimum 1, available at 14th level)
 export const getCleansingTouchData = (character: CharacterData): { usesPerRest: number; currentUses: number; replenishesOnLongRest: boolean } | undefined => {
-  if (character.class.toLowerCase() !== "paladin" || character.level < 14) {
+  // Check if character has Paladin class (for multiclassing support)
+  const hasPaladinClass = character.class.toLowerCase() === "paladin" || 
+    character.classes?.some(c => c.name.toLowerCase() === "paladin")
+  
+  if (!hasPaladinClass) {
+    return undefined
+  }
+  
+  // For multiclassed characters, use Paladin class level specifically
+  const paladinClass = character.classes?.find(c => c.name.toLowerCase() === "paladin")
+  const paladinLevel = paladinClass?.level || character.level
+  
+  if (paladinLevel < 14) {
     return undefined
   }
   
@@ -1099,20 +1131,28 @@ export interface MysticArcanum {
 
 // Warlock utility functions
 export const getWarlockSpellSlots = (level: number): SpellSlot[] => {
-  // Warlock Pact Magic: fewer slots but they recover on short rest and can be used for any spell level
+  // Warlock Pact Magic: fewer slots but they recover on short rest and are always the highest level available
   // Based on official D&D 5e Warlock table
   const slots: SpellSlot[] = []
   
-  // Determine the number of spell slots based on level
+  // Determine the number of spell slots and their level based on Warlock level
   let numberOfSlots = 1
+  let spellLevel = 1
   
-  if (level >= 1) { numberOfSlots = 1 }
-  if (level >= 2) { numberOfSlots = 2 }
-  if (level >= 11) { numberOfSlots = 3 }
-  if (level >= 17) { numberOfSlots = 4 }
+  if (level >= 1) { numberOfSlots = 1; spellLevel = 1 }
+  if (level >= 2) { numberOfSlots = 2; spellLevel = 1 }
+  if (level >= 3) { numberOfSlots = 2; spellLevel = 2 }
+  if (level >= 5) { numberOfSlots = 2; spellLevel = 3 }
+  if (level >= 7) { numberOfSlots = 2; spellLevel = 4 }
+  if (level >= 9) { numberOfSlots = 2; spellLevel = 5 }
+  if (level >= 11) { numberOfSlots = 3; spellLevel = 5 }
+  if (level >= 13) { numberOfSlots = 3; spellLevel = 6 }
+  if (level >= 15) { numberOfSlots = 3; spellLevel = 7 }
+  if (level >= 17) { numberOfSlots = 4; spellLevel = 7 }
+  if (level >= 19) { numberOfSlots = 4; spellLevel = 8 }
   
-  // Create a single slot entry with level 0 to indicate "any level" for Warlocks
-  slots.push({ level: 0, total: numberOfSlots, used: 0 })
+  // Create a single slot entry with the actual spell level for Warlocks
+  slots.push({ level: spellLevel, total: numberOfSlots, used: 0 })
   
   return slots
 }
@@ -1390,8 +1430,23 @@ export const getMulticlassSpellSlots = (classes: CharacterClass[]): SpellSlot[] 
   // Calculate spell slots for non-Warlock spellcasters using multiclassing table
   if (nonWarlockSpellcasters.length > 0) {
     const totalSpellcasterLevel = nonWarlockSpellcasters.reduce((total, charClass) => {
-      // Each class contributes its full level to spellcaster level
-      return total + charClass.level
+      // Apply D&D 5e multiclassing rules for spellcaster level calculation
+      const className = charClass.name.toLowerCase()
+      
+      // Full casters: Wizard, Sorcerer, Bard, Cleric, Druid
+      if (['wizard', 'sorcerer', 'bard', 'cleric', 'druid'].includes(className)) {
+        return total + charClass.level
+      }
+      // Half casters: Paladin, Ranger, Artificer
+      else if (['paladin', 'ranger', 'artificer'].includes(className)) {
+        return total + Math.floor(charClass.level / 2)
+      }
+      // Third casters: Eldritch Knight Fighter, Arcane Trickster Rogue
+      // Note: These would need to be identified by subclass, not just class
+      // For now, we'll assume they're not present in the current system
+      else {
+        return total + charClass.level // Fallback to full level
+      }
     }, 0)
     
     // Use the standard multiclassing spell slot table
@@ -1403,7 +1458,9 @@ export const getMulticlassSpellSlots = (classes: CharacterClass[]): SpellSlot[] 
   if (warlockClasses.length > 0) {
     const totalWarlockLevel = warlockClasses.reduce((total, charClass) => total + charClass.level, 0)
     const warlockSlots = getWarlockSpellSlots(totalWarlockLevel)
-    spellSlots = [...spellSlots, ...warlockSlots]
+    // Mark Warlock slots with a special property to distinguish them in the UI
+    const markedWarlockSlots = warlockSlots.map(slot => ({ ...slot, isWarlockSlot: true }))
+    spellSlots = [...spellSlots, ...markedWarlockSlots]
   }
   
   return spellSlots

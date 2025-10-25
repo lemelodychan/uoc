@@ -467,7 +467,11 @@ export function Spellcasting({
   const renderSlotsFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string, className?: string) => {
     if (!skill.id) return null
     
-    const maxUses = getFeatureMaxUses(character, skill.id) || usage?.maxUses || 0
+    // Calculate max uses using class-specific level for multiclassed characters
+    const slotConfig = skill.config as any
+    const maxUses = slotConfig?.usesFormula 
+      ? calculateUsesFromFormula(slotConfig.usesFormula, character, skill.className)
+      : getFeatureMaxUses(character, skill.id) || usage?.maxUses || 0
     const currentUses = usage?.currentUses || maxUses
 
     if (maxUses === 0) return null
@@ -521,7 +525,11 @@ export function Spellcasting({
   const renderPointsPoolFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string) => {
     if (!skill.id) return null
     
-    const maxPoints = usage?.maxPoints || 0
+    // Calculate max points using class-specific level for multiclassed characters
+    const pointsConfig = skill.config as any
+    const maxPoints = pointsConfig?.totalFormula 
+      ? calculateUsesFromFormula(pointsConfig.totalFormula, character, skill.className)
+      : usage?.maxPoints || 0
     const currentPoints = usage?.currentPoints || maxPoints
 
     if (maxPoints === 0) return null
@@ -694,7 +702,11 @@ export function Spellcasting({
             <div className="grid grid-cols-1 gap-2">
               {character.spellData.spellSlots.map((slot) => (
                 <div key={slot.level} className="p-2 border rounded flex items-center justify-between bg-background">
-                  <div className="text-sm font-medium mb-1">Level {slot.level}</div>
+                  <div className="text-sm font-medium mb-1">
+                    {(slot as any).isWarlockSlot 
+                      ? `Warlock Level ${slot.level}` 
+                      : `Level ${slot.level}`}
+                  </div>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: slot.total }, (_, i) => {
                       const isAvailable = i < (slot.total - slot.used)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { fromZonedTime, toZonedTime, format, formatInTimeZone } from 'date-fns-tz'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +21,8 @@ import { CampaignResourceReadModal } from "./edit-modals/campaign-resource-read-
 import { CampaignLinkModal } from "./edit-modals/campaign-link-modal"
 import { useCampaignNotes } from "@/hooks/use-campaign-notes"
 import { CampaignNotesSkeleton, CampaignNotesListSkeleton, CampaignNotesEmptySkeleton } from "./campaign-notes-skeleton"
+import { useUser } from "@/lib/user-context"
+import { useToast } from "@/hooks/use-toast"
 
 interface CampaignHomepageProps {
   campaign: Campaign | undefined
@@ -87,6 +89,12 @@ export function CampaignHomepage({
   const [resourceReadModalOpen, setResourceReadModalOpen] = useState(false)
   const [readingResource, setReadingResource] = useState<CampaignResource | null>(null)
   const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const [showSessionMenu, setShowSessionMenu] = useState(false)
+  const sessionMenuRef = useRef<HTMLDivElement>(null)
+  
+  // User context and toast
+  const { isSuperadmin } = useUser()
+  const { toast } = useToast()
   
   // Use campaign notes hook with caching
   const { 
@@ -117,6 +125,23 @@ export function CampaignHomepage({
       setSessionNumber(campaign.nextSessionNumber.toString())
     }
   }, [campaign?.id, campaign?.nextSessionDate, campaign?.nextSessionTime, campaign?.nextSessionTimezone, campaign?.nextSessionNumber])
+
+  // Close session menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sessionMenuRef.current && !sessionMenuRef.current.contains(event.target as Node)) {
+        setShowSessionMenu(false)
+      }
+    }
+
+    if (showSessionMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSessionMenu])
   
   // Sort notes by session date (fallback to created_at) with configurable order
   const sortedNotes = useMemo(() => {
@@ -184,6 +209,10 @@ export function CampaignHomepage({
 
   // Check if current user is the dungeon master
   const isDungeonMaster = campaign?.dungeonMasterId === currentUserId
+  
+  // Check if user can manage session (superadmin or dungeon master)
+  const canManageSession = isSuperadmin || isDungeonMaster
+  
 
   // Helper functions for notes
   const handleCreateNote = () => {
@@ -314,7 +343,11 @@ export function CampaignHomepage({
         nextSessionDate: fallbackDate.toISOString(),
         nextSessionTime: sessionTime,
         nextSessionTimezone: sessionTimezone,
-        nextSessionNumber: parseInt(sessionNumber)
+        nextSessionNumber: parseInt(sessionNumber),
+        // Enable Discord notifications if webhook URL exists
+        discordNotificationsEnabled: !!campaign.discordWebhookUrl,
+        // Reset reminder sent flag for new session
+        discordReminderSent: false
       }
       
       await onUpdateCampaign?.(updatedCampaign)
@@ -325,34 +358,212 @@ export function CampaignHomepage({
       return
     }
     
-    console.log('Scheduling debug:')
-    console.log('Selected date:', sessionDate)
-    console.log('Selected time:', sessionTime)
-    console.log('Selected timezone:', sessionTimezone)
-    console.log('Local date:', localDate.toString())
-    console.log('Selected date:', selectedDate.toString())
-    console.log('UTC date valid:', !isNaN(utcDate.getTime()))
-    if (!isNaN(utcDate.getTime())) {
-      console.log('UTC date:', utcDate.toISOString())
-      console.log('UTC in selected timezone:', format(utcDate, 'yyyy-MM-dd HH:mm:ss', { timeZone: sessionTimezone }))
-      console.log('UTC in Amsterdam:', format(utcDate, 'yyyy-MM-dd HH:mm:ss', { timeZone: 'Europe/Amsterdam' }))
-      console.log('UTC in Quebec:', format(utcDate, 'yyyy-MM-dd HH:mm:ss', { timeZone: 'America/Montreal' }))
-      console.log('UTC in Tokyo:', format(utcDate, 'yyyy-MM-dd HH:mm:ss', { timeZone: 'Asia/Tokyo' }))
-    }
     
     const updatedCampaign = {
       ...campaign,
       nextSessionDate: !isNaN(utcDate.getTime()) ? utcDate.toISOString() : new Date().toISOString(),
       nextSessionTime: sessionTime,
       nextSessionTimezone: sessionTimezone,
-      nextSessionNumber: parseInt(sessionNumber)
+      nextSessionNumber: parseInt(sessionNumber),
+      // Enable Discord notifications if webhook URL exists
+      discordNotificationsEnabled: !!campaign.discordWebhookUrl,
+      // Reset reminder sent flag for new session
+      discordReminderSent: false
     }
     
-    await onUpdateCampaign?.(updatedCampaign)
+    try {
+      await onUpdateCampaign?.(updatedCampaign)
+      toast({
+        title: "Session scheduled!",
+        description: `Session #${sessionNumber} scheduled for ${sessionDate} at ${sessionTime} ${sessionTimezone}`,
+      })
+    } catch (error) {
+      console.error('❌ Failed to update campaign:', error)
+      toast({
+        title: "Failed to schedule session",
+        description: "An error occurred while updating the campaign.",
+        variant: "destructive"
+      })
+      return
+    }
+    
     setSessionDate('')
     setSessionTime('15:00')
     setSessionTimezone('Europe/Amsterdam')
     setSessionNumber('')
+  }
+
+  // Handle manual Discord notification
+  const handleSendDiscordNotification = async () => {
+    if (!campaign?.id) return
+    
+    console.log('🎯 Sending Discord notification for campaign:', campaign.id)
+    
+    try {
+      const response = await fetch('/api/cron/discord-reminders/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId: campaign.id })
+      })
+      
+      console.log('📡 Response status:', response.status)
+      console.log('📡 Response ok:', response.ok)
+      
+      const result = await response.json()
+      
+      // Log the debug information
+      if (result.debugLogs) {
+        console.log('🔍 Debug logs from server:')
+        result.debugLogs.forEach((log: string) => console.log(log))
+      }
+      
+      if (response.ok) {
+        if (result.sent > 0) {
+          toast({
+            title: "Discord notification sent",
+            description: "The reminder has been sent to Discord successfully.",
+          })
+        } else {
+          toast({
+            title: "No notification sent",
+            description: "The campaign didn't meet the conditions for sending a reminder. Check console for details.",
+            variant: "destructive"
+          })
+        }
+      } else {
+        toast({
+          title: "Failed to send notification",
+          description: result.error || "An error occurred while sending the notification.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('❌ Error sending Discord notification:', error)
+      console.error('❌ Error details:', error)
+      toast({
+        title: "Error",
+        description: `Failed to send Discord notification: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleTestAllTimezones = async () => {
+    try {
+      const response = await fetch('/api/test-all-timezones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok) {
+        console.log('🌍 All timezone test results:', result)
+        console.log('\n📊 Summary:')
+        result.timezoneTests.forEach((test: any) => {
+          console.log(`\n${test.sourceTimezone.label} (${test.sourceTimezone.name}):`)
+          console.log(`  Source: ${test.sourceDateTime}`)
+          console.log(`  UTC: ${test.utcDateTime}`)
+          console.log(`  Europe: ${test.conversions.Europe}`)
+          console.log(`  Quebec: ${test.conversions.Quebec}`)
+          console.log(`  Tokyo: ${test.conversions.Tokyo}`)
+        })
+        
+        toast({
+          title: "All timezone test completed",
+          description: "Check console for results",
+        })
+      } else {
+        console.error('❌ Failed to test timezones:', result)
+        toast({
+          title: "Failed to test timezones",
+          description: result.error || "Unknown error",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('❌ Error testing timezones:', error)
+      toast({
+        title: "Error",
+        description: "Failed to test timezones",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Handle delete scheduled session
+  const handleDeleteScheduledSession = async () => {
+    if (!campaign || !confirm("Are you sure you want to delete the scheduled session?")) return
+    
+    const updatedCampaign = {
+      ...campaign,
+      nextSessionDate: undefined,
+      nextSessionTime: undefined,
+      nextSessionTimezone: undefined,
+      nextSessionNumber: undefined,
+      discordNotificationsEnabled: false,
+      discordReminderSent: false,
+      updated_at: new Date().toISOString()
+    }
+    
+    await onUpdateCampaign?.(updatedCampaign)
+    
+    toast({
+      title: "Session deleted",
+      description: "The scheduled session has been deleted.",
+    })
+  }
+
+  // Handle enable Discord notifications
+  const handleEnableDiscordNotifications = async () => {
+    if (!campaign) return
+    
+    const updatedCampaign = {
+      ...campaign,
+      discordNotificationsEnabled: true,
+      discordReminderSent: false, // Reset reminder flag
+      updated_at: new Date().toISOString()
+    }
+    
+    await onUpdateCampaign?.(updatedCampaign)
+    
+    toast({
+      title: "Discord notifications enabled",
+      description: "Discord notifications have been enabled for this campaign.",
+    })
+  }
+
+  // Handle test Discord reminders
+  const handleTestDiscordReminders = async () => {
+    try {
+      const response = await fetch('/api/cron/discord-reminders/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok) {
+        toast({
+          title: "Discord reminder test completed",
+          description: `Processed ${result.processed} campaigns, sent ${result.sent} notifications. Check console for details.`,
+        })
+      } else {
+        toast({
+          title: "Test failed",
+          description: result.error || "An error occurred during the test.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error testing Discord reminders:', error)
+      toast({
+        title: "Error",
+        description: "Failed to test Discord reminders. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   const getAuthorName = (authorId: string) => {
@@ -696,17 +907,88 @@ export function CampaignHomepage({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="p-0 flex flex-col gap-8">
+        <TabsContent value="overview" className="p-0 flex flex-col gap-8 overflow-visible">
           {/* Next Scheduled Session */}
           {campaign?.nextSessionDate && campaign?.nextSessionNumber && (
-            <Card className="bg-card from-primary/10 to-primary/5 border-primary/20">
+            <Card className="bg-card from-primary/10 to-primary/5 border-primary/20 relative overflow-visible">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Icon icon="lucide:calendar-clock" className="w-5 h-5 text-primary" />
-                  Next Scheduled Session
-                </CardTitle>
+                <div className="flex items-center justify-between relative">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Icon icon="lucide:calendar-clock" className="w-5 h-5 text-primary" />
+                    Next Scheduled Session
+                  </CardTitle>
+                  {canManageSession && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0"
+                      onClick={() => setShowSessionMenu(!showSessionMenu)}
+                    >
+                      <Icon icon="lucide:more-horizontal" className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
+                {/* Custom dropdown menu positioned within the card */}
+                {showSessionMenu && (
+                  <div ref={sessionMenuRef} className="absolute top-12 right-4 z-50 bg-popover border rounded-md shadow-md p-1 min-w-[200px]">
+                    {/* Temporary test button */}
+                    <button
+                      onClick={() => {
+                        handleTestAllTimezones()
+                        setShowSessionMenu(false)
+                      }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-muted/50 hover:text-accent"
+                    >
+                      <Icon icon="lucide:globe" className="h-4 w-4" />
+                      Test all timezones
+                    </button>
+                    <div className="bg-border -mx-1 my-1 h-px" />
+                    
+                    {campaign.discordWebhookUrl && campaign.discordNotificationsEnabled && (
+                      <>
+                        <button
+                          onClick={() => {
+                            handleSendDiscordNotification()
+                            setShowSessionMenu(false)
+                          }}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-muted/50 hover:text-accent"
+                        >
+                          <Icon icon="lucide:message-circle" className="h-4 w-4" />
+                          Send Discord notification
+                        </button>
+                        <div className="bg-border -mx-1 my-1 h-px" />
+                      </>
+                    )}
+                    {campaign.discordWebhookUrl && !campaign.discordNotificationsEnabled && (
+                      <>
+                        <button
+                          onClick={() => {
+                            handleEnableDiscordNotifications()
+                            setShowSessionMenu(false)
+                          }}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-muted/50 hover:text-accent"
+                        >
+                          <Icon icon="lucide:bell" className="h-4 w-4" />
+                          Enable Discord notifications
+                        </button>
+                        <div className="bg-border -mx-1 my-1 h-px" />
+                      </>
+                    )}
+                    <button
+                      onClick={() => {
+                        handleDeleteScheduledSession()
+                        setShowSessionMenu(false)
+                      }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-muted/50 text-destructive hover:text-destructive"
+                    >
+                      <Icon icon="lucide:trash-2" className="h-4 w-4" />
+                      Delete scheduled session
+                    </button>
+                  </div>
+                )}
+                
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Badge variant="default" className="text-sm">

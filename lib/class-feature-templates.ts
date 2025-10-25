@@ -258,17 +258,26 @@ function createDieProgression(...args: Array<string | number>): string[] {
 /**
  * Calculate the number of uses from a formula string
  */
-export function calculateUsesFromFormula(formula: string, character: CharacterData): number {
-  const context = createFormulaContext(character)
+export function calculateUsesFromFormula(formula: string, character: CharacterData, className?: string): number {
+  const context = createFormulaContext(character, className)
   return evaluateFormula(formula, context)
 }
 
 /**
  * Create a formula evaluation context from character data
  */
-function createFormulaContext(character: CharacterData): FormulaContext {
+function createFormulaContext(character: CharacterData, className?: string): FormulaContext {
+  // For multiclassed characters, use the specific class level if provided
+  let effectiveLevel = character.level
+  if (className && character.classes && character.classes.length > 1) {
+    const classData = character.classes.find(c => c.name.toLowerCase() === className.toLowerCase())
+    if (classData) {
+      effectiveLevel = classData.level
+    }
+  }
+  
   return {
-    level: character.level,
+    level: effectiveLevel,
     strength: character.strength,
     dexterity: character.dexterity,
     constitution: character.constitution,

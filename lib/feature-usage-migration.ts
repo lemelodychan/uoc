@@ -238,7 +238,10 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
     const layOnHandsId = 'lay-on-hands'
     // Only migrate if not already in unified system
     if (!migratedUsage[layOnHandsId]) {
-      const maxPoints = character.level * 5 // 5 points per level
+      // For multiclassed characters, use Paladin class level specifically
+      const paladinClass = character.classes?.find(c => c.name.toLowerCase() === 'paladin')
+      const paladinLevel = paladinClass?.level || character.level
+      const maxPoints = paladinLevel * 5 // 5 points per Paladin level
       const currentPoints = maxPoints - (character.spellData?.layOnHands?.used || 0)
       
       migratedUsage[layOnHandsId] = {

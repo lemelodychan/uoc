@@ -96,12 +96,14 @@ export function CampaignCreationModal({
               dungeonMasterId: dungeonMasterId || undefined,
               // Discord integration
               discordWebhookUrl: discordWebhookUrl.trim() || undefined,
+              discordNotificationsEnabled: !!discordWebhookUrl.trim(), // Enable notifications if webhook URL is provided
               // Preserve session scheduling and level up fields
               levelUpModeEnabled: editingCampaign?.levelUpModeEnabled || false,
               nextSessionDate: editingCampaign?.nextSessionDate,
               nextSessionTime: editingCampaign?.nextSessionTime,
               nextSessionTimezone: editingCampaign?.nextSessionTimezone,
-              nextSessionNumber: editingCampaign?.nextSessionNumber
+              nextSessionNumber: editingCampaign?.nextSessionNumber,
+              discordReminderSent: editingCampaign?.discordReminderSent || false
             }
 
     onSave(campaign)

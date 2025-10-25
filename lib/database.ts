@@ -1,4 +1,5 @@
-import { createClient } from "./supabase"
+import { createClient as createBrowserClient } from "./supabase"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import type { CharacterData, Campaign } from "./character-data"
 
 export interface CampaignNote {
@@ -35,9 +36,7 @@ import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClass
 import { getBardicInspirationData, getSongOfRestData } from "./class-utils"
 import { isSuperadmin, canAccessPrivateSheet, canEditCharacter as canEditCharacterRole, canEditCharacterInCampaign } from "./user-roles"
 import type { UserProfile } from "./user-profiles"
-import { createClient as createBrowserClient } from "@supabase/supabase-js"
-
-const supabase = createClient()
+const supabase = createBrowserClient()
 
 export const getCurrentUser = async (): Promise<{ user?: any; error?: string }> => {
   try {
@@ -501,14 +500,16 @@ export const saveCharacter = async (
 
     // Always save spell slot usage to ensure consistency
     // This prevents data loss and ensures all characters have their spell slot usage tracked
-    if (character.class.toLowerCase() === "warlock") {
-      // For Warlocks, save the unified Pact Magic usage to spell_slots_1_used
-      // and set all other levels to 0
-      const warlockSlot = character.spellData?.spellSlots?.find((x) => x.level === 0)
+    if (character.class.toLowerCase() === "warlock" || character.classes?.some(c => c.name.toLowerCase() === "warlock")) {
+      // For Warlocks (including multiclassed), find the Warlock slot and save its usage
+      const warlockSlot = character.spellData?.spellSlots?.find((x) => (x as any).isWarlockSlot)
       if (warlockSlot) {
+        // Save Warlock slot usage to the appropriate level column
+        const warlockLevel = warlockSlot.level
         const warlockUsed = warlockSlot.used
-        saveData.spell_slots_1_used = warlockUsed
-        // Set all other levels to 0 for Warlocks
+        
+        // Initialize all levels to 0
+        saveData.spell_slots_1_used = 0
         saveData.spell_slots_2_used = 0
         saveData.spell_slots_3_used = 0
         saveData.spell_slots_4_used = 0
@@ -517,6 +518,18 @@ export const saveCharacter = async (
         saveData.spell_slots_7_used = 0
         saveData.spell_slots_8_used = 0
         saveData.spell_slots_9_used = 0
+        
+        // Set the Warlock slot usage to the correct level
+        if (warlockLevel >= 1 && warlockLevel <= 9) {
+          saveData[`spell_slots_${warlockLevel}_used`] = warlockUsed
+        }
+        
+        // Also save any non-Warlock spell slots (for multiclassed characters)
+        character.spellData?.spellSlots?.forEach(slot => {
+          if (!(slot as any).isWarlockSlot && slot.level >= 1 && slot.level <= 9) {
+            saveData[`spell_slots_${slot.level}_used`] = slot.used
+          }
+        })
       } else {
         // If no warlock slot found, set all to 0
         saveData.spell_slots_1_used = 0
@@ -794,12 +807,18 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
     
     // Restore usage if we have spell slots and usage data
     if (calculatedSpellSlots.length > 0 && tempCharacter.spellSlotsUsed) {
-      if (data.class_name.toLowerCase() === "warlock") {
-        // For Warlocks, use the first available spell slot usage column as the unified Pact Magic usage
-        // Since all individual columns should be 0 for Warlocks, we'll use spell_slots_1_used as the unified counter
-        const warlockUsed = data.spell_slots_1_used || 0
+      if (data.class_name.toLowerCase() === "warlock" || (data.classes && data.classes.some((c: any) => c.name.toLowerCase() === "warlock"))) {
+        // For Warlocks (including multiclassed), restore usage based on the actual spell level
         calculatedSpellSlots = calculatedSpellSlots.map((slot) => {
-          return { ...slot, used: warlockUsed }
+          if ((slot as any).isWarlockSlot) {
+            // For Warlock slots, get the usage from the appropriate level column
+            const usedCount = tempCharacter.spellSlotsUsed?.[slot.level as keyof typeof tempCharacter.spellSlotsUsed] || 0
+            return { ...slot, used: usedCount }
+          } else {
+            // For non-Warlock slots (multiclassed characters), use normal restoration
+            const usedCount = tempCharacter.spellSlotsUsed?.[slot.level as keyof typeof tempCharacter.spellSlotsUsed] || 0
+            return { ...slot, used: usedCount }
+          }
         })
       } else {
         // For other classes, use the normal level-based restoration
@@ -1187,12 +1206,18 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
         
         // Restore usage if we have spell slots and usage data
         if (calculatedSpellSlots.length > 0 && tempCharacter.spellSlotsUsed) {
-          if (row.class_name.toLowerCase() === "warlock") {
-            // For Warlocks, use the first available spell slot usage column as the unified Pact Magic usage
-            // Since all individual columns should be 0 for Warlocks, we'll use spell_slots_1_used as the unified counter
-            const warlockUsed = row.spell_slots_1_used || 0
+          if (row.class_name.toLowerCase() === "warlock" || (row.classes && row.classes.some((c: any) => c.name.toLowerCase() === "warlock"))) {
+            // For Warlocks (including multiclassed), restore usage based on the actual spell level
             calculatedSpellSlots = calculatedSpellSlots.map((slot) => {
-              return { ...slot, used: warlockUsed }
+              if ((slot as any).isWarlockSlot) {
+                // For Warlock slots, get the usage from the appropriate level column
+                const usedCount = tempCharacter.spellSlotsUsed?.[slot.level as keyof typeof tempCharacter.spellSlotsUsed] || 0
+                return { ...slot, used: usedCount }
+              } else {
+                // For non-Warlock slots (multiclassed characters), use normal restoration
+                const usedCount = tempCharacter.spellSlotsUsed?.[slot.level as keyof typeof tempCharacter.spellSlotsUsed] || 0
+                return { ...slot, used: usedCount }
+              }
             })
           } else {
             // For other classes, use the normal level-based restoration
@@ -1314,7 +1339,10 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
         // Initialize Lay on Hands (Paladin level 1+) - only if it doesn't exist
         if (character.level >= 1 && !updatedUsage['lay-on-hands']) {
           // Calculate max points from class feature or fallback to hardcoded
-          let maxPoints = character.level * 5 // Default Lay on Hands formula
+          // For multiclassed characters, use Paladin class level specifically
+          const paladinClass = character.classes?.find(c => c.name.toLowerCase() === 'paladin')
+          const paladinLevel = paladinClass?.level || character.level
+          let maxPoints = paladinLevel * 5 // Default Lay on Hands formula
           
           // Try to get from class features if available
           if (character.classFeatures) {
@@ -1332,7 +1360,7 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
               const config = layOnHandsFeature.class_features_skills.config
               if (config?.totalFormula) {
                 const { calculateUsesFromFormula } = await import('./class-feature-templates')
-                maxPoints = calculateUsesFromFormula(config.totalFormula, character)
+                maxPoints = calculateUsesFromFormula(config.totalFormula, character, 'paladin')
               }
             }
           }
@@ -2295,9 +2323,18 @@ export const createCampaign = async (campaign: Campaign): Promise<{ success: boo
   }
 }
 
-export const loadAllCampaigns = async (): Promise<{ campaigns?: Campaign[]; error?: string }> => {
+export const loadAllCampaigns = async (useServiceRole = false): Promise<{ campaigns?: Campaign[]; error?: string }> => {
   try {
-    const { data, error } = await supabase
+    // Use service role client if requested (for API routes that need to bypass RLS)
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+    const client = useServiceRole && serviceRoleKey 
+      ? createSupabaseClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          serviceRoleKey
+        )
+      : supabase
+
+    const { data, error } = await client
       .from("campaigns")
       .select("*")
       .order("created_at", { ascending: false })

@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { campaigns, error } = await loadAllCampaigns()
+  const { campaigns, error } = await loadAllCampaigns(true) // Use service role to bypass RLS
   if (error) return NextResponse.json({ error }, { status: 500 })
 
   const nowUtc = new Date()
@@ -21,14 +21,46 @@ export async function GET(req: Request) {
   await Promise.all((campaigns || []).map(async (c) => {
     if (!c.discordWebhookUrl || !c.discordNotificationsEnabled || !c.nextSessionDate || !c.nextSessionNumber) return
 
-    const sessionUtc = new Date(c.nextSessionDate)
+    // Parse session date and time correctly
+    let sessionUtc: Date
+    if (c.nextSessionDate && c.nextSessionTime && c.nextSessionTimezone) {
+      // Combine date and time in the specified timezone
+      const dateTimeString = `${c.nextSessionDate}T${c.nextSessionTime}`
+      const localDate = new Date(dateTimeString)
+      
+      // Convert from the session timezone to UTC
+      const { fromZonedTime } = await import('date-fns-tz')
+      sessionUtc = fromZonedTime(localDate, c.nextSessionTimezone)
+    } else {
+      // Fallback to old method
+      sessionUtc = new Date(c.nextSessionDate)
+    }
+    
     if (isNaN(sessionUtc.getTime())) return
 
     const diff = sessionUtc.getTime() - nowUtc.getTime()
+    const hoursUntilSession = diff / (1000 * 60 * 60)
 
-    // Send only if within [24h window +/- 10m] and not already sent
+    // Debug logging
+    console.log(`Campaign: ${c.name}`)
+    console.log(`Session UTC: ${sessionUtc.toISOString()}`)
+    console.log(`Now UTC: ${nowUtc.toISOString()}`)
+    console.log(`Hours until session: ${hoursUntilSession.toFixed(2)}`)
+    console.log(`Reminder sent: ${c.discordReminderSent}`)
+    console.log(`Notifications enabled: ${c.discordNotificationsEnabled}`)
+
+    // Send if:
+    // 1. Within [24h window +/- 10m] and not already sent, OR
+    // 2. Session is less than 24 hours away and reminder not sent (for immediate notifications)
     const window = 10 * 60 * 1000
-    if (!c.discordReminderSent && Math.abs(diff - twentyFourHMs) <= window) {
+    const shouldSendReminder = !c.discordReminderSent && (
+      Math.abs(diff - twentyFourHMs) <= window || // Within 24h ± 10m window
+      (diff < twentyFourHMs && diff > 0) // Less than 24h away but not yet passed
+    )
+    
+    console.log(`Should send reminder: ${shouldSendReminder}`)
+    
+    if (shouldSendReminder) {
       const eu = formatInTimeZone(sessionUtc, 'Europe/Amsterdam', 'MMMM d, yyyy HH:mm')
       const qc = formatInTimeZone(sessionUtc, 'America/Montreal', 'MMMM d, yyyy HH:mm')
       const jp = formatInTimeZone(sessionUtc, 'Asia/Tokyo', 'MMMM d, yyyy HH:mm')

@@ -92,7 +92,7 @@ function SlotsRenderer({
   onOpenFeatureModal 
 }: FeatureSkillRendererProps) {
   const config = skill.config as any
-  const maxUses = calculateUsesFromFormula(config.usesFormula, character)
+  const maxUses = calculateUsesFromFormula(config.usesFormula, character, skill.className)
   const currentUses = usage.currentUses ?? maxUses
 
   const handleToggleUse = (index: number) => {
@@ -171,7 +171,7 @@ function PointsPoolRenderer({
   onOpenFeatureModal 
 }: FeatureSkillRendererProps) {
   const config = skill.config as any
-  const maxPoints = calculateUsesFromFormula(config.totalFormula, character)
+  const maxPoints = calculateUsesFromFormula(config.totalFormula, character, skill.className)
   const currentPoints = usage.currentPoints ?? maxPoints
 
   const handleIncrement = () => {
@@ -250,7 +250,7 @@ function OptionsListRenderer({
   onOpenFeatureModal 
 }: FeatureSkillRendererProps) {
   const config = skill.config as any
-  const maxSelections = calculateUsesFromFormula(config.maxSelectionsFormula, character)
+  const maxSelections = calculateUsesFromFormula(config.maxSelectionsFormula, character, skill.className)
   const selectedOptions = usage.selectedOptions || []
 
   return (
