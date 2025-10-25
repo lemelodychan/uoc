@@ -514,11 +514,11 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   const completeLevelUp = () => {
     if (!selectedClass || !hpRollResult) return
 
-    // Start with the original character (not the editable preview)
-    let updatedCharacter = { ...character }
+    // Start with the editable character to preserve all changes made during level-up
+    let updatedCharacter = { ...editableCharacter }
 
     let updatedClasses: CharacterClass[]
-    let updatedHitDiceByClass = character.hitDiceByClass || []
+    let updatedHitDiceByClass = editableCharacter.hitDiceByClass || []
 
     // Check if this is a new class (multiclassing)
     const isNewClass = newClassSelection !== null
@@ -532,7 +532,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
         subclass: undefined
       }
       
-      updatedClasses = [...(character.classes || []), newCharacterClass]
+      updatedClasses = [...(editableCharacter.classes || []), newCharacterClass]
       
       // Add hit dice for the new class
       const hitDieSize = newClassSelection.classData.hit_die || 8
@@ -546,42 +546,11 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
         }
       ]
       
-      // Add new skills from the selected class
-      const newSkills = newClassSelection.selectedSkills.map(skillName => {
-        const existingSkill = character.skills.find(s => s.name === skillName)
-        if (existingSkill) {
-          // If already proficient, upgrade to expertise if possible
-          return {
-            ...existingSkill,
-            proficiency: (existingSkill.proficiency === 'proficient' ? 'expertise' : 'proficient') as 'proficient' | 'expertise' | 'none'
-          }
-        } else {
-          // Add new skill proficiency
-          return {
-            name: skillName,
-            ability: getSkillAbility(skillName),
-            proficiency: 'proficient' as const
-          }
-        }
-      })
-      
-      // Update skills
-      const updatedSkills = character.skills.map(skill => {
-        const newSkill = newSkills.find(ns => ns.name === skill.name)
-        return newSkill || skill
-      })
-      
-      // Add any new skills that weren't already in the character's skill list
-      newSkills.forEach(newSkill => {
-        if (!updatedSkills.find(s => s.name === newSkill.name)) {
-          updatedSkills.push(newSkill)
-        }
-      })
-      
-      updatedCharacter.skills = updatedSkills
+      // The skills are already updated in editableCharacter from the sidebar preview
+      // No need to duplicate the skill logic here since it's already handled
     } else {
       // Leveling up existing class
-      updatedClasses = character.classes?.map(c => 
+      updatedClasses = editableCharacter.classes?.map(c => 
         c.name === selectedClass.name 
           ? { 
               ...c, 
@@ -589,9 +558,9 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             }
           : c
       ) || []
-
+      
       // Update hit dice
-      updatedHitDiceByClass = character.hitDiceByClass?.map(hd =>
+      updatedHitDiceByClass = editableCharacter.hitDiceByClass?.map(hd =>
         hd.className === selectedClass.name
           ? { ...hd, total: hd.total + 1 }
           : hd
@@ -599,12 +568,12 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     }
 
     // Update max HP
-    const newMaxHP = character.maxHitPoints + hpRollResult.total
-    const newCurrentHP = character.currentHitPoints + hpRollResult.total
+    const newMaxHP = editableCharacter.maxHitPoints + hpRollResult.total
+    const newCurrentHP = editableCharacter.currentHitPoints + hpRollResult.total
 
     // Add new features
     const updatedClassFeatures = [
-      ...character.classFeatures,
+      ...editableCharacter.classFeatures,
       ...newFeatures.map(f => ({
         id: f.name.toLowerCase().replace(/\s+/g, '_'),
         class_id: selectedClass.class_id || '',
@@ -640,21 +609,21 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
         const firstAbility = first.toLowerCase() as keyof CharacterData
         updatedCharacter = {
           ...updatedCharacter,
-          [firstAbility]: (character[firstAbility] as number) + (second ? 1 : 2)
+          [firstAbility]: (editableCharacter[firstAbility] as number) + (second ? 1 : 2)
         }
       }
       if (second) {
         const secondAbility = second.toLowerCase() as keyof CharacterData
         updatedCharacter = {
           ...updatedCharacter,
-          [secondAbility]: (character[secondAbility] as number) + 1
+          [secondAbility]: (editableCharacter[secondAbility] as number) + 1
         }
       }
     } else if (asiChoice?.type === 'feat' && asiChoice.feat) {
       // Add feat
       updatedCharacter = {
         ...updatedCharacter,
-        feats: [...character.feats, asiChoice.feat]
+        feats: [...editableCharacter.feats, asiChoice.feat]
       }
     }
 
