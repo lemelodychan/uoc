@@ -12,7 +12,7 @@ import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
 import { getFeatureUsage, getFeatureCustomDescription, getFeatureMaxUses } from "@/lib/feature-usage-tracker"
 import { calculateUsesFromFormula } from "@/lib/class-feature-templates"
 import type { ClassFeatureSkill } from "@/lib/class-feature-types"
-import { loadClassFeatureSkills } from "@/lib/database"
+import { loadClassFeatureSkills, loadClassData } from "@/lib/database"
 import { useState, useEffect } from "react"
 
 interface SpellcastingProps {
@@ -36,6 +36,15 @@ const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
+// Helper function to check if character is a monk
+const isMonk = (character: CharacterData): boolean => {
+  if (character.classes && character.classes.length > 0) {
+    return character.classes.some(cls => cls.name.toLowerCase() === 'monk')
+  }
+  return character.class.toLowerCase() === 'monk'
+}
+
+
 export function Spellcasting({ 
   character, 
   strengthMod,
@@ -54,6 +63,7 @@ export function Spellcasting({
 }: SpellcastingProps) {
   const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
+  const [monkClassData, setMonkClassData] = useState<any>(null)
 
   // Load class feature skills
   useEffect(() => {
@@ -73,7 +83,23 @@ export function Spellcasting({
     loadFeatures()
   }, [character.id, character.level, character.classes])
 
-  if (!hasSpellcastingAbilities(character)) {
+  // Load monk class data if character is a monk
+  useEffect(() => {
+    if (isMonk(character)) {
+      const loadMonkData = async () => {
+        try {
+          const { classData } = await loadClassData('Monk')
+          setMonkClassData(classData)
+        } catch (error) {
+          console.error('Error loading monk class data:', error)
+        }
+      }
+      loadMonkData()
+    }
+  }, [character.id, character.classes])
+
+  // Show component for monks (even without spellcasting) or characters with spellcasting abilities
+  if (!isMonk(character) && !hasSpellcastingAbilities(character)) {
     return null
   }
 
@@ -93,6 +119,51 @@ export function Spellcasting({
   }
 
   const spellcastingModifier = getSpellcastingModifier()
+
+  // Helper functions for monk abilities
+  const getMonkLevel = (): number => {
+    if (character.classes && character.classes.length > 0) {
+      const monkClass = character.classes.find(cls => cls.name.toLowerCase() === 'monk')
+      return monkClass ? monkClass.level : 0
+    }
+    return character.class.toLowerCase() === 'monk' ? character.level : 0
+  }
+
+  const getDieNotation = (dieSize: number): string => {
+    return `d${dieSize}`
+  }
+
+  const getMartialArtsDie = (): string => {
+    if (!monkClassData?.martial_arts_dice || !Array.isArray(monkClassData.martial_arts_dice)) {
+      // Fallback progression if no database data
+      const fallbackProgression = [4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 10, 10]
+      const dieSize = fallbackProgression[Math.min(getMonkLevel() - 1, 19)] || 4
+      return getDieNotation(dieSize)
+    }
+    
+    const dieSize = monkClassData.martial_arts_dice[Math.min(getMonkLevel() - 1, 19)] || 4
+    return getDieNotation(dieSize)
+  }
+
+  const getKiPoints = (): number => {
+    if (!monkClassData?.ki_points || !Array.isArray(monkClassData.ki_points)) {
+      // Fallback progression if no database data
+      const fallbackProgression = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+      return fallbackProgression[Math.min(getMonkLevel() - 1, 19)] || 0
+    }
+    
+    return monkClassData.ki_points[Math.min(getMonkLevel() - 1, 19)] || 0
+  }
+
+  const getUnarmoredMovement = (): number => {
+    if (!monkClassData?.unarmored_movement || !Array.isArray(monkClassData.unarmored_movement)) {
+      // Fallback progression if no database data
+      const fallbackProgression = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      return fallbackProgression[Math.min(getMonkLevel() - 1, 19)] || 0
+    }
+    
+    return monkClassData.unarmored_movement[Math.min(getMonkLevel() - 1, 19)] || 0
+  }
 
   // Note: Features are now loaded automatically from database via loadClassFeatureSkills
   // No need for hardcoded getBaseClassFeatures function
@@ -435,7 +506,7 @@ export function Spellcasting({
     return Array.from(featuresByClass.entries())
       .filter(([className, features]) => features.length > 0) // Only show classes that have features
       .map(([className, features]) => (
-      <div key={className} className="flex flex-col gap-2 mb-3">
+      <div key={className} className="flex flex-col gap-2">
         <div className="text-sm font-medium">{className} Skills</div>
         {features.map((skill) => renderFeatureSkill(skill, className))}
       </div>
@@ -645,8 +716,8 @@ export function Spellcasting({
       <CardHeader className="pb-0">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Icon icon="lucide:sparkles" className="w-5 h-5" />
-            Spells & Magic
+            <Icon icon={isMonk(character) && !hasSpellcastingAbilities(character) ? "lucide:zap" : "lucide:sparkles"} className="w-5 h-5" />
+            {isMonk(character) && !hasSpellcastingAbilities(character) ? "Monk Abilities" : "Spellcasting"}
           </CardTitle>
           <Button variant="outline" size="sm" onClick={onEdit}>
             <Icon icon="lucide:edit" className="w-4 h-4" />
@@ -655,9 +726,30 @@ export function Spellcasting({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4 flex flex-col gap-2">
+      <CardContent className="flex flex-col gap-4">
+        {/* Monk Abilities Section */}
+        {isMonk(character) && (
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2 items-start">
+              <div className="text-center border py-2 px-1 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
+                <div className="text-sm text-muted-foreground">Martial Arts</div>
+                <div className="text-xl font-bold font-mono">
+                  {getMartialArtsDie()}
+                </div>
+              </div>
+              <div className="text-center border py-2 px-1 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
+                <div className="text-sm text-muted-foreground">Unarmored Mvmt</div>
+                <div className="text-xl font-bold font-mono">
+                  +{getUnarmoredMovement()} ft.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Basic Spell Stats */}
-        <div className="flex flex-col gap-2">
+        {hasSpellcastingAbilities(character) && (
+          <div className="flex flex-col gap-2">
           <div className="grid grid-cols-2 gap-2 items-start">
             <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
               <div className="text-sm text-muted-foreground">Spell Attack</div>
@@ -689,15 +781,16 @@ export function Spellcasting({
             <Icon icon="lucide:book-open" className="w-4 h-4" />
             Spell List
           </Button>
-        </div>
+          </div>
+        )}
 
         {/* Unified Class Features */}
         {renderUnifiedClassFeatures()}
 
 
         {/* Spell Slots */}
-        {character.spellData.spellSlots && character.spellData.spellSlots.length > 0 && (
-          <div className="flex flex-col gap-2 mb-3">
+        {hasSpellcastingAbilities(character) && character.spellData.spellSlots && character.spellData.spellSlots.length > 0 && (
+          <div className="flex flex-col gap-2">
             <div className="text-sm font-medium">Spell Slots</div>
             <div className="grid grid-cols-1 gap-2">
               {character.spellData.spellSlots.map((slot) => (
@@ -735,7 +828,7 @@ export function Spellcasting({
 
         {/* Feat Spell Slots */}
         {character.spellData.featSpellSlots && character.spellData.featSpellSlots.length > 0 && (
-          <div className="flex flex-col gap-2 mb-3">
+          <div className="flex flex-col gap-2">
             <div className="text-sm font-medium">Feat Spell Slots</div>
             <div className="flex flex-col gap-2">
               {character.spellData.featSpellSlots.map((featSlot, featIndex) => (

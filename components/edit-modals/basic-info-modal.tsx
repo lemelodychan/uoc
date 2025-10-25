@@ -10,33 +10,8 @@ import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel, isSingleClass, getPrimaryClass } from "@/lib/character-data"
 import { MulticlassModal } from "./multiclass-modal"
-import { getCurrentUser, getAllUsers } from "@/lib/database"
+import { getCurrentUser, getAllUsers, loadAllClasses } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
-
-const DND_CLASSES = {
-  Artificer: ["Artillerist"],
-  Bard: [
-    "College of Lore",
-  ],
-  Paladin: [
-    "Oath of Redemption",
-  ],
-  Rogue: [
-    "Thief",
-    "Assassin",
-    "Arcane Trickster",
-    "Inquisitive",
-    "Mastermind",
-    "Scout",
-    "Swashbuckler",
-    "Phantom",
-    "Soulknife",
-  ],
-  Warlock: [
-    "The Genie",
-    "The Raven Queen",
-  ],
-} as const
 
 interface BasicInfoModalProps {
   isOpen: boolean
@@ -64,6 +39,8 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [users, setUsers] = useState<UserProfile[]>([])
+  const [availableClasses, setAvailableClasses] = useState<Array<{id: string, name: string, subclass: string | null}>>([])
+  const [loadingClasses, setLoadingClasses] = useState(false)
 
   // Get current user and check ownership
   useEffect(() => {
@@ -88,10 +65,41 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     }
   }, [isOpen])
 
+  // Load available classes from database when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingClasses(true)
+      loadAllClasses().then(({ classes, error }) => {
+        if (error) {
+          console.error("Failed to load classes:", error)
+        } else {
+          setAvailableClasses(classes || [])
+        }
+        setLoadingClasses(false)
+      })
+    }
+  }, [isOpen])
+
   const getOwnerDisplayName = (): string => {
     if (!character.userId) return 'No Owner'
     const owner = users.find(user => user.userId === character.userId)
     return owner ? owner.displayName || `User ${owner.userId.slice(0, 8)}...` : 'Unknown User'
+  }
+
+  // Helper function to get unique base class names from database
+  const getAvailableBaseClasses = (): string[] => {
+    const baseClasses = availableClasses
+      .filter(cls => cls.subclass === null)
+      .map(cls => cls.name)
+    return [...new Set(baseClasses)].sort()
+  }
+
+  // Helper function to get subclasses for a given base class
+  const getAvailableSubclasses = (baseClassName: string): string[] => {
+    return availableClasses
+      .filter(cls => cls.name === baseClassName && cls.subclass !== null)
+      .map(cls => cls.subclass!)
+      .sort()
   }
 
   // Sync local state with character prop when it changes
@@ -124,10 +132,21 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   const handleSave = () => {
     // Don't include level in updates since it should be calculated from classes
     const { level, ...formDataWithoutLevel } = formData
-    onSave({
-      ...formDataWithoutLevel,
-      visibility: formData.visibility
-    })
+    
+    // If this is a single class character and the class changed, update the classes array
+    let updates = { ...formDataWithoutLevel, visibility: formData.visibility }
+    
+    if (isSingleClass(character.classes) && (formData.class !== character.class || formData.subclass !== character.subclass)) {
+      // Update the classes array for single class characters
+      (updates as any).classes = [{
+        name: formData.class,
+        subclass: formData.subclass || undefined,
+        class_id: undefined, // Will be loaded by the updateBasicInfo function
+        level: character.level
+      }]
+    }
+    
+    onSave(updates)
     // Also update party status if it changed
     if (onPartyStatusChange && formData.partyStatus !== character.partyStatus) {
       onPartyStatusChange(formData.partyStatus)
@@ -135,7 +154,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     onClose()
   }
 
-  const availableSubclasses = formData.class ? DND_CLASSES[formData.class as keyof typeof DND_CLASSES] || [] : []
+  const availableSubclasses = formData.class ? getAvailableSubclasses(formData.class) : []
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -201,6 +220,59 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               </Button>
             </div>
           </div>
+          
+          {/* Single class editing - only show if not multiclassed */}
+          {(!character.classes || character.classes.length <= 1) && (
+            <>
+              <div className="grid grid-cols-[112px_auto] items-center gap-3">
+                <Label htmlFor="baseClass" className="text-right">
+                  Base Class
+                </Label>
+                <Select
+                  value={formData.class}
+                  onValueChange={handleClassChange}
+                  disabled={loadingClasses}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={loadingClasses ? "Loading classes..." : "Select a class"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableBaseClasses().map((className) => (
+                      <SelectItem key={className} value={className}>
+                        {className}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {formData.class && availableSubclasses.length > 0 && (
+                <div className="grid grid-cols-[112px_auto] items-center gap-3">
+                  <Label htmlFor="subclass" className="text-right">
+                    Subclass
+                  </Label>
+                  <Select
+                    value={formData.subclass}
+                    onValueChange={(value) => setFormData({ ...formData, subclass: value })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a subclass (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">
+                        <span className="text-muted-foreground">No subclass</span>
+                      </SelectItem>
+                      {availableSubclasses.map((subclassName) => (
+                        <SelectItem key={subclassName} value={subclassName}>
+                          {subclassName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
+          )}
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="level" className="text-right">
               Level

@@ -24,6 +24,17 @@ export interface ClassData {
   spell_slots_9: number[] | null
   cantrips_known: number[] | null
   spells_known: number[] | null
+  // Column toggles for spell progression matrix
+  showSpellsKnown?: boolean
+  showSorceryPoints?: boolean
+  showMartialArts?: boolean
+  showKiPoints?: boolean
+  showUnarmoredMovement?: boolean
+  // Special progression data
+  sorcery_points?: number[] | null
+  martial_arts_dice?: number[] | null
+  ki_points?: number[] | null
+  unarmored_movement?: number[] | null
   // New metadata fields for custom class support
   is_custom: boolean
   created_by: string | null

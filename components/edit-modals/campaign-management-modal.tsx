@@ -410,7 +410,7 @@ function ClassManagement() {
           spells_known: source.spells_known ?? 0,
           spell_progression: source.spell_progression ?? {},
           max_spell_slots: source.max_spell_slots ?? {},
-          class_features: source.class_features ?? {},
+          // class_features column has been dropped - using separate class_features table
         }
         base.push(baseCommon as ClassData)
         featureLoadPairs.push([baseId, name])

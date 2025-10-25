@@ -185,7 +185,7 @@ export function CharacterSidebar({
           )}
         </div>
 
-        <div className="flex gap-2 px-4">
+{/*         <div className="flex gap-2 px-4">
           <Button
             onClick={onCreateCharacter}
             className={`flex-1 bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground ${
@@ -195,7 +195,7 @@ export function CharacterSidebar({
             <Icon icon="lucide:user-round-plus" className={`${isCollapsed ? "w-6 h-6" : "w-4 h-4"}`} />
             {!isCollapsed && <span>New Character</span>}
           </Button>
-        </div>
+        </div> */}
 
         {/* Campaign Homepage Link */}
         <div className="px-4 w-full pt-2">

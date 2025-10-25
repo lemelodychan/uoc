@@ -11,32 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import { useToast } from "@/hooks/use-toast"
 import type { CharacterData, CharacterClass } from "@/lib/character-data"
-
-const DND_CLASSES = {
-  Artificer: ["Artillerist"],
-  Bard: [
-    "College of Lore",
-    "College of Swords",
-  ],
-  Paladin: [
-    "Oath of Redemption",
-  ],
-  Rogue: [
-    "Thief",
-    "Assassin",
-    "Arcane Trickster",
-    "Inquisitive",
-    "Mastermind",
-    "Scout",
-    "Swashbuckler",
-    "Phantom",
-    "Soulknife",
-  ],
-  Warlock: [
-    "The Genie",
-    "The Raven Queen",
-  ],
-} as const
+import { loadAllClasses } from "@/lib/database"
 
 interface MulticlassModalProps {
   isOpen: boolean
@@ -61,6 +36,10 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
       level: character.level
     }]
   })
+  
+  // Database classes state
+  const [availableClasses, setAvailableClasses] = useState<Array<{id: string, name: string, subclass: string | null}>>([])
+  const [loadingClasses, setLoadingClasses] = useState(false)
 
   // Sync classes state when character changes
   useEffect(() => {
@@ -78,6 +57,42 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
       }
     }
   }, [isOpen, character.id, character.classes, character.class, character.subclass, character.class_id, character.level])
+
+  // Load available classes from database when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingClasses(true)
+      loadAllClasses().then(({ classes, error }) => {
+        if (error) {
+          console.error("Failed to load classes:", error)
+          toast({
+            title: "Error",
+            description: "Failed to load available classes",
+            variant: "destructive"
+          })
+        } else {
+          setAvailableClasses(classes || [])
+        }
+        setLoadingClasses(false)
+      })
+    }
+  }, [isOpen, toast])
+
+  // Helper function to get unique base class names from database
+  const getAvailableBaseClasses = (): string[] => {
+    const baseClasses = availableClasses
+      .filter(cls => cls.subclass === null)
+      .map(cls => cls.name)
+    return [...new Set(baseClasses)].sort()
+  }
+
+  // Helper function to get subclasses for a given base class
+  const getAvailableSubclasses = (baseClassName: string): string[] => {
+    return availableClasses
+      .filter(cls => cls.name === baseClassName && cls.subclass !== null)
+      .map(cls => cls.subclass!)
+      .sort()
+  }
 
   const totalLevel = classes.reduce((sum, charClass) => sum + charClass.level, 0)
 
@@ -184,6 +199,7 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
       classes: validClasses,
       level: totalLevel,
       hitDiceByClass: hitDiceByClass,
+      classFeatureSkillsUsage: {}, // Clear old class feature usage data
       // Update legacy fields for backward compatibility
       class: validClasses[0].name,
       subclass: validClasses[0].subclass,
@@ -195,7 +211,7 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
   }
 
   const availableSubclasses = (className: string) => {
-    return DND_CLASSES[className as keyof typeof DND_CLASSES] || []
+    return getAvailableSubclasses(className)
   }
 
   return (
@@ -247,7 +263,7 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
                         <SelectValue placeholder="Select class" />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.keys(DND_CLASSES).map((className) => (
+                        {getAvailableBaseClasses().map((className) => (
                           <SelectItem key={className} value={className}>
                             {className}
                           </SelectItem>

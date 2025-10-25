@@ -69,7 +69,18 @@ export function ManagementInterface({
       const result = await loadClassesWithDetails()
       if (result.classes) {
         // Transform the database result to match ClassData interface
-        const transformedClasses: ClassData[] = result.classes.map(dbClass => ({
+        const transformedClasses: ClassData[] = result.classes.map(dbClass => {
+          // Debug: Log the transformation for toggles
+          console.log(`Transforming class ${dbClass.name}:`, {
+            show_spells_known: dbClass.show_spells_known,
+            show_sorcery_points: dbClass.show_sorcery_points,
+            show_martial_arts: dbClass.show_martial_arts,
+            show_ki_points: dbClass.show_ki_points,
+            show_unarmored_movement: dbClass.show_unarmored_movement,
+            is_custom: dbClass.is_custom
+          })
+          
+          return {
           id: dbClass.id,
           name: dbClass.name,
           subclass: dbClass.subclass,
@@ -95,17 +106,31 @@ export function ManagementInterface({
           spell_slots_9: dbClass.spell_slots_9,
           cantrips_known: Array.isArray(dbClass.cantrips_known) ? dbClass.cantrips_known : null,
           spells_known: Array.isArray(dbClass.spells_known) ? dbClass.spells_known : null,
-          is_custom: false, // Default value, will be updated when we have proper data
-          created_by: null,
-          duplicated_from: null,
-          source: 'custom',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          // Column toggles for spell progression matrix
+          showSpellsKnown: dbClass.show_spells_known ?? false,
+          showSorceryPoints: dbClass.show_sorcery_points ?? false,
+          showMartialArts: dbClass.show_martial_arts ?? false,
+          showKiPoints: dbClass.show_ki_points ?? false,
+          showUnarmoredMovement: dbClass.show_unarmored_movement ?? false,
+          // Sorcerer-specific fields
+          sorcery_points: Array.isArray(dbClass.sorcery_points) ? dbClass.sorcery_points : null,
+          // Monk-specific fields
+          martial_arts_dice: Array.isArray(dbClass.martial_arts_dice) ? dbClass.martial_arts_dice : null,
+          ki_points: Array.isArray(dbClass.ki_points) ? dbClass.ki_points : null,
+          unarmored_movement: Array.isArray(dbClass.unarmored_movement) ? dbClass.unarmored_movement : null,
+          // Custom class support fields
+          is_custom: dbClass.is_custom ?? false,
+          created_by: dbClass.created_by ?? null,
+          duplicated_from: dbClass.duplicated_from ?? null,
+          source: dbClass.source ?? 'custom',
+          created_at: dbClass.created_at ?? new Date().toISOString(),
+          updated_at: dbClass.updated_at ?? new Date().toISOString(),
           // Legacy fields
           spell_progression: dbClass.spell_progression,
           max_spell_slots: dbClass.max_spell_slots,
-          class_features: dbClass.class_features
-        }))
+          // class_features column has been dropped - using separate class_features table
+        }
+        })
         setClasses(transformedClasses)
       }
     } catch (error) {
@@ -245,7 +270,68 @@ export function ManagementInterface({
                 // Fetch fresh data from database
                 const result = await loadClassById(classData.id)
                 if (result.klass) {
-                  setEditingClass(result.klass)
+                  // Transform the raw database data to ClassData format
+                  const transformedClass: ClassData = {
+                    id: result.klass.id,
+                    name: result.klass.name,
+                    subclass: result.klass.subclass,
+                    description: result.klass.description || null,
+                    hit_die: result.klass.hit_die || 8,
+                    primary_ability: Array.isArray(result.klass.primary_ability) 
+                      ? result.klass.primary_ability 
+                      : result.klass.primary_ability 
+                        ? [result.klass.primary_ability] 
+                        : [],
+                    saving_throw_proficiencies: result.klass.saving_throw_proficiencies || [],
+                    skill_proficiencies: result.klass.skill_proficiencies,
+                    equipment_proficiencies: result.klass.equipment_proficiencies,
+                    starting_equipment: result.klass.starting_equipment,
+                    spell_slots_1: result.klass.spell_slots_1,
+                    spell_slots_2: result.klass.spell_slots_2,
+                    spell_slots_3: result.klass.spell_slots_3,
+                    spell_slots_4: result.klass.spell_slots_4,
+                    spell_slots_5: result.klass.spell_slots_5,
+                    spell_slots_6: result.klass.spell_slots_6,
+                    spell_slots_7: result.klass.spell_slots_7,
+                    spell_slots_8: result.klass.spell_slots_8,
+                    spell_slots_9: result.klass.spell_slots_9,
+                    cantrips_known: Array.isArray(result.klass.cantrips_known) ? result.klass.cantrips_known : null,
+                    spells_known: Array.isArray(result.klass.spells_known) ? result.klass.spells_known : null,
+                    // Column toggles for spell progression matrix
+                    showSpellsKnown: result.klass.show_spells_known ?? false,
+                    showSorceryPoints: result.klass.show_sorcery_points ?? false,
+                    showMartialArts: result.klass.show_martial_arts ?? false,
+                    showKiPoints: result.klass.show_ki_points ?? false,
+                    showUnarmoredMovement: result.klass.show_unarmored_movement ?? false,
+                    // Sorcerer-specific fields
+                    sorcery_points: Array.isArray(result.klass.sorcery_points) ? result.klass.sorcery_points : null,
+                    // Monk-specific fields
+                    martial_arts_dice: Array.isArray(result.klass.martial_arts_dice) ? result.klass.martial_arts_dice : null,
+                    ki_points: Array.isArray(result.klass.ki_points) ? result.klass.ki_points : null,
+                    unarmored_movement: Array.isArray(result.klass.unarmored_movement) ? result.klass.unarmored_movement : null,
+                    // Custom class support fields
+                    is_custom: result.klass.is_custom ?? false,
+                    created_by: result.klass.created_by ?? null,
+                    duplicated_from: result.klass.duplicated_from ?? null,
+                    source: result.klass.source ?? 'custom',
+                    created_at: result.klass.created_at ?? new Date().toISOString(),
+                    updated_at: result.klass.updated_at ?? new Date().toISOString(),
+                    // Legacy fields
+                    spell_progression: result.klass.spell_progression,
+                    max_spell_slots: result.klass.max_spell_slots,
+                  }
+                  
+                  console.log('Transformed class for editing:', {
+                    name: transformedClass.name,
+                    showSpellsKnown: transformedClass.showSpellsKnown,
+                    showSorceryPoints: transformedClass.showSorceryPoints,
+                    showMartialArts: transformedClass.showMartialArts,
+                    showKiPoints: transformedClass.showKiPoints,
+                    showUnarmoredMovement: transformedClass.showUnarmoredMovement,
+                    is_custom: transformedClass.is_custom
+                  })
+                  
+                  setEditingClass(transformedClass)
                   setClassEditorView('editor')
                 } else {
                   toast({
@@ -257,7 +343,7 @@ export function ManagementInterface({
               }}
               onCreateClass={() => {
                 setEditingClass({
-                  id: '',
+                  id: '', // Will be generated by database
                   name: '',
                   subclass: null,
                   description: null,
@@ -278,7 +364,7 @@ export function ManagementInterface({
                   spell_slots_9: null,
                   cantrips_known: null,
                   spells_known: null,
-                  is_custom: false,
+                  is_custom: true, // Mark as custom class
                   created_by: null,
                   duplicated_from: null,
                   source: 'custom',

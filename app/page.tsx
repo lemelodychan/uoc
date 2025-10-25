@@ -242,6 +242,14 @@ function CharacterSheetContent() {
     }
   }
 
+  // Helper function to check if character is a monk
+  const isMonk = (character: CharacterData): boolean => {
+    if (character.classes && character.classes.length > 0) {
+      return character.classes.some(cls => cls.name.toLowerCase() === 'monk')
+    }
+    return character.class.toLowerCase() === 'monk'
+  }
+
   // Get current campaign data
   const currentCampaign = campaigns.find(c => c.id === selectedCampaignId)
   
@@ -2007,9 +2015,10 @@ function CharacterSheetContent() {
             // Legacy Warlock columns have been dropped - using unified system only
           },
           // Clear class-specific equipment when class changes
-          ...(classChanged ? {
+          ...(classChanged || multiclassChanged ? {
             infusions: [],
             infusionNotes: "",
+            classFeatureSkillsUsage: {}, // Clear old class feature usage data
             hitDiceByClass: updates.classes && updates.classes.length > 1 ?
               (await import('@/lib/character-data')).getHitDiceByClass(updates.classes) :
               undefined,

@@ -6,12 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Icon } from '@iconify/react'
-import { useToast } from '@/hooks/use-toast'
 
 interface SpellSlotsGridProps {
   value: {
     cantripsKnown: number[]  // 20 levels
-    spellsKnown?: number[]  // 20 levels (optional for classes like Bard)
+    spellsKnown?: number[]  // 20 levels (optional)
     spellSlots: {
       spell_slots_1: number[]  // 20 levels
       spell_slots_2: number[]  // 20 levels
@@ -23,6 +22,11 @@ interface SpellSlotsGridProps {
       spell_slots_8: number[]  // 20 levels
       spell_slots_9: number[]  // 20 levels
     }
+    // Special progression fields
+    sorceryPoints?: number[]  // 20 levels
+    martialArtsDice?: number[]  // 20 levels (stored as die size: 4, 6, 8, 10, 12)
+    kiPoints?: number[]  // 20 levels
+    unarmoredMovement?: number[]  // 20 levels (feet)
   }
   onChange: (value: { 
     cantripsKnown: number[], 
@@ -38,13 +42,32 @@ interface SpellSlotsGridProps {
       spell_slots_8: number[]
       spell_slots_9: number[]
     }
+    sorceryPoints?: number[]
+    martialArtsDice?: number[]
+    kiPoints?: number[]
+    unarmoredMovement?: number[]
   }) => void
   readonly?: boolean
   title?: string
-  showSpellsKnown?: boolean  // Whether to show the spells known column
+  // Individual column toggles
+  showSpellsKnown?: boolean
+  showSorceryPoints?: boolean
+  showMartialArts?: boolean
+  showKiPoints?: boolean
+  showUnarmoredMovement?: boolean
 }
 
-export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spell Progression", showSpellsKnown = false }: SpellSlotsGridProps) {
+export function SpellSlotsGrid({ 
+  value, 
+  onChange, 
+  readonly = false, 
+  title = "Spell Progression", 
+  showSpellsKnown = false,
+  showSorceryPoints = false,
+  showMartialArts = false,
+  showKiPoints = false,
+  showUnarmoredMovement = false
+}: SpellSlotsGridProps) {
   const [cantripsKnown, setCantripsKnown] = useState<number[]>(value?.cantripsKnown || createEmptyArray())
   const [spellsKnown, setSpellsKnown] = useState<number[]>(value?.spellsKnown || createEmptyArray())
   const [spellSlots, setSpellSlots] = useState({
@@ -58,56 +81,20 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
     spell_slots_8: value?.spellSlots?.spell_slots_8 || createEmptyArray(),
     spell_slots_9: value?.spellSlots?.spell_slots_9 || createEmptyArray(),
   })
+  // Sorcerer-specific state
+  const [sorceryPoints, setSorceryPoints] = useState<number[]>(value?.sorceryPoints || createEmptyArray())
+  // Monk-specific state
+  const [martialArtsDice, setMartialArtsDice] = useState<number[]>(value?.martialArtsDice || createEmptyArray())
+  const [kiPoints, setKiPoints] = useState<number[]>(value?.kiPoints || createEmptyArray())
+  const [unarmoredMovement, setUnarmoredMovement] = useState<number[]>(value?.unarmoredMovement || createEmptyArray())
   const [errors, setErrors] = useState<string[]>([])
   const [draggedRow, setDraggedRow] = useState<number | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  const { toast } = useToast()
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
 
   function createEmptyArray(): number[] {
     return Array(20).fill(0)
   }
 
-  function handleSaveWithFeedback(newValue: { 
-    cantripsKnown: number[], 
-    spellsKnown?: number[],
-    spellSlots: {
-      spell_slots_1: number[]
-      spell_slots_2: number[]
-      spell_slots_3: number[]
-      spell_slots_4: number[]
-      spell_slots_5: number[]
-      spell_slots_6: number[]
-      spell_slots_7: number[]
-      spell_slots_8: number[]
-      spell_slots_9: number[]
-    }
-  }) {
-    // Clear any existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-
-    setIsSaving(true)
-    
-    // Debounced save operation
-    saveTimeoutRef.current = setTimeout(() => {
-      // Simulate save operation (replace with actual save logic)
-      setTimeout(() => {
-        onChange(newValue)
-        setIsSaving(false)
-        setLastSaved(new Date())
-        
-        toast({
-          title: "Spell progression saved",
-          description: "Your changes have been saved successfully.",
-          duration: 2000,
-        })
-      }, 500) // Simulate network delay
-    }, 1000) // Debounce delay
-  }
 
   // Update state when value prop changes
   useEffect(() => {
@@ -128,14 +115,6 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
     }
   }, [value])
 
-  // Cleanup save timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-    }
-  }, [])
 
   function handleCantripsChange(charLevel: number, newValue: number) {
     if (readonly) return
@@ -144,11 +123,15 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
     newCantrips[charLevel] = Math.max(0, newValue)
     setCantripsKnown(newCantrips)
     
-    // Debounced save with feedback
-    handleSaveWithFeedback({ 
+    // Update parent component immediately without debouncing
+    onChange({ 
       cantripsKnown: newCantrips, 
       spellsKnown: showSpellsKnown ? spellsKnown : undefined,
-      spellSlots 
+      spellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined
     })
   }
 
@@ -159,11 +142,15 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
     newSpellsKnown[charLevel] = Math.max(0, newValue)
     setSpellsKnown(newSpellsKnown)
     
-    // Debounced save with feedback
-    handleSaveWithFeedback({ 
+    // Update parent component immediately without debouncing
+    onChange({ 
       cantripsKnown, 
-      spellsKnown: newSpellsKnown,
-      spellSlots 
+      spellsKnown: showSpellsKnown ? newSpellsKnown : undefined,
+      spellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined
     })
   }
 
@@ -179,11 +166,89 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
     newSpellSlots[spellSlotKey][charLevel] = Math.max(0, Math.min(4, newValue))
     setSpellSlots(newSpellSlots)
     
-    // Debounced save with feedback
-    handleSaveWithFeedback({ 
+    // Update parent component immediately without debouncing
+    onChange({ 
       cantripsKnown, 
       spellsKnown: showSpellsKnown ? spellsKnown : undefined,
-      spellSlots: newSpellSlots 
+      spellSlots: newSpellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined
+    })
+  }
+
+  // Sorcerer-specific handlers
+  function handleSorceryPointsChange(charLevel: number, newValue: number) {
+    if (readonly) return
+    
+    const newSorceryPoints = [...sorceryPoints]
+    newSorceryPoints[charLevel] = Math.max(0, newValue)
+    setSorceryPoints(newSorceryPoints)
+    
+    onChange({ 
+      cantripsKnown, 
+      spellsKnown: showSpellsKnown ? spellsKnown : undefined,
+      spellSlots,
+      sorceryPoints: showSorceryPoints ? newSorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined
+    })
+  }
+
+  // Monk-specific handlers
+  function handleMartialArtsDiceChange(charLevel: number, newValue: number) {
+    if (readonly) return
+    
+    const newMartialArtsDice = [...martialArtsDice]
+    newMartialArtsDice[charLevel] = Math.max(4, Math.min(12, newValue)) // d4 to d12
+    setMartialArtsDice(newMartialArtsDice)
+    
+    onChange({ 
+      cantripsKnown, 
+      spellsKnown: showSpellsKnown ? spellsKnown : undefined,
+      spellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? newMartialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined
+    })
+  }
+
+  function handleKiPointsChange(charLevel: number, newValue: number) {
+    if (readonly) return
+    
+    const newKiPoints = [...kiPoints]
+    newKiPoints[charLevel] = Math.max(0, newValue)
+    setKiPoints(newKiPoints)
+    
+    onChange({ 
+      cantripsKnown, 
+      spellsKnown: showSpellsKnown ? spellsKnown : undefined,
+      spellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? newKiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined
+    })
+  }
+
+  function handleUnarmoredMovementChange(charLevel: number, newValue: number) {
+    if (readonly) return
+    
+    const newUnarmoredMovement = [...unarmoredMovement]
+    newUnarmoredMovement[charLevel] = Math.max(0, newValue)
+    setUnarmoredMovement(newUnarmoredMovement)
+    
+    onChange({ 
+      cantripsKnown, 
+      spellsKnown: showSpellsKnown ? spellsKnown : undefined,
+      spellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? newUnarmoredMovement : undefined
     })
   }
 
@@ -228,7 +293,11 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
       onChange({ 
         cantripsKnown: preset.cantripsKnown, 
         spellsKnown: showSpellsKnown ? spellsKnown : undefined,
-        spellSlots: columnBasedSpellSlots 
+        spellSlots: columnBasedSpellSlots,
+        sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+        martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+        kiPoints: showKiPoints ? kiPoints : undefined,
+        unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined
       })
     }
   }
@@ -265,10 +334,14 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
     setCantripsKnown(newCantrips)
     setSpellsKnown(newSpellsKnown)
     setSpellSlots(newSpellSlots)
-    handleSaveWithFeedback({ 
+    onChange({ 
       cantripsKnown: newCantrips, 
       spellsKnown: showSpellsKnown ? newSpellsKnown : undefined,
-      spellSlots: newSpellSlots 
+      spellSlots: newSpellSlots,
+      sorceryPoints: showSorceryPoints ? sorceryPoints : undefined,
+      martialArtsDice: showMartialArts ? martialArtsDice : undefined,
+      kiPoints: showKiPoints ? kiPoints : undefined,
+      unarmoredMovement: showUnarmoredMovement ? unarmoredMovement : undefined
     })
   }
 
@@ -394,20 +467,6 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center">
-        {isSaving && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin" />
-            <span>Saving...</span>
-          </div>
-        )}
-        {lastSaved && !isSaving && (
-          <div className="flex items-center gap-2 text-sm text-green-600">
-            <Icon icon="lucide:check-circle" className="h-4 w-4" />
-            <span>Saved {lastSaved.toLocaleTimeString()}</span>
-          </div>
-        )}
-      </div>
 
       {errors.length > 0 && (
         <Alert variant="destructive">
@@ -431,17 +490,24 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
             <tr>
               {!readonly && <th className="p-2 text-left font-medium w-8"></th>}
               <th className="p-2 text-left font-medium">Level</th>
-              <th className="p-2 text-left font-medium">Cantrips</th>
-              {showSpellsKnown && <th className="p-2 text-left font-medium">Spells Known</th>}
-              <th className="p-2 text-left font-medium">1st</th>
-              <th className="p-2 text-left font-medium">2nd</th>
-              <th className="p-2 text-left font-medium">3rd</th>
-              <th className="p-2 text-left font-medium">4th</th>
-              <th className="p-2 text-left font-medium">5th</th>
-              <th className="p-2 text-left font-medium">6th</th>
-              <th className="p-2 text-left font-medium">7th</th>
-              <th className="p-2 text-left font-medium">8th</th>
-              <th className="p-2 text-left font-medium">9th</th>
+              
+            {/* Dynamic columns based on toggles */}
+            <th className="p-2 text-left font-medium">Cantrips</th>
+            {showSpellsKnown && <th className="p-2 text-left font-medium">Spells Known</th>}
+            {showSorceryPoints && <th className="p-2 text-left font-medium">Sorcery Points</th>}
+            {showMartialArts && <th className="p-2 text-left font-medium">Martial Arts</th>}
+            {showKiPoints && <th className="p-2 text-left font-medium">Ki Points</th>}
+            {showUnarmoredMovement && <th className="p-2 text-left font-medium">Unarmored Movement</th>}
+            <th className="p-2 text-left font-medium">1st</th>
+            <th className="p-2 text-left font-medium">2nd</th>
+            <th className="p-2 text-left font-medium">3rd</th>
+            <th className="p-2 text-left font-medium">4th</th>
+            <th className="p-2 text-left font-medium">5th</th>
+            <th className="p-2 text-left font-medium">6th</th>
+            <th className="p-2 text-left font-medium">7th</th>
+            <th className="p-2 text-left font-medium">8th</th>
+            <th className="p-2 text-left font-medium">9th</th>
+              
               {!readonly && <th className="p-2 text-left font-medium"></th>}
             </tr>
           </thead>
@@ -468,10 +534,11 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
                 )}
                 <td className="p-2 font-medium">{charLevel + 1}</td>
                 
+                {/* Dynamic columns based on toggles */}
                 {/* Cantrips Known */}
                 <td className="p-1">
                   <Input
-                    id={`input-${charLevel}-1`}
+                    id={`input-${charLevel}-cantrips`}
                     type="number"
                     min="0"
                     value={cantripsKnown[charLevel]}
@@ -498,9 +565,78 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
                   </td>
                 )}
                 
+                {/* Sorcery Points */}
+                {showSorceryPoints && (
+                  <td className="p-1">
+                    <Input
+                      id={`input-${charLevel}-sorcery`}
+                      type="number"
+                      min="0"
+                      value={sorceryPoints[charLevel] || 0}
+                      onChange={(e) => handleSorceryPointsChange(charLevel, parseInt(e.target.value) || 0)}
+                      onKeyDown={(e) => handleKeyDown(e, charLevel, 2 + (showSpellsKnown ? 1 : 0))}
+                      className="w-15 text-center"
+                      disabled={readonly}
+                    />
+                  </td>
+                )}
+                
+                {/* Martial Arts Dice */}
+                {showMartialArts && (
+                  <td className="p-1">
+                    <Input
+                      id={`input-${charLevel}-martial`}
+                      type="number"
+                      min="4"
+                      max="12"
+                      value={martialArtsDice[charLevel] || 4}
+                      onChange={(e) => handleMartialArtsDiceChange(charLevel, parseInt(e.target.value) || 4)}
+                      onKeyDown={(e) => handleKeyDown(e, charLevel, 2 + (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0))}
+                      className="w-15 text-center"
+                      disabled={readonly}
+                      title="Martial Arts Die Size (d4-d12)"
+                    />
+                  </td>
+                )}
+                
+                {/* Ki Points */}
+                {showKiPoints && (
+                  <td className="p-1">
+                    <Input
+                      id={`input-${charLevel}-ki`}
+                      type="number"
+                      min="0"
+                      value={kiPoints[charLevel] || 0}
+                      onChange={(e) => handleKiPointsChange(charLevel, parseInt(e.target.value) || 0)}
+                      onKeyDown={(e) => handleKeyDown(e, charLevel, 2 + (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0) + (showMartialArts ? 1 : 0))}
+                      className="w-15 text-center"
+                      disabled={readonly}
+                    />
+                  </td>
+                )}
+                
+                {/* Unarmored Movement */}
+                {showUnarmoredMovement && (
+                  <td className="p-1">
+                    <Input
+                      id={`input-${charLevel}-movement`}
+                      type="number"
+                      min="0"
+                      value={unarmoredMovement[charLevel] || 0}
+                      onChange={(e) => handleUnarmoredMovementChange(charLevel, parseInt(e.target.value) || 0)}
+                      onKeyDown={(e) => handleKeyDown(e, charLevel, 2 + (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0) + (showMartialArts ? 1 : 0) + (showKiPoints ? 1 : 0))}
+                      className="w-15 text-center"
+                      disabled={readonly}
+                      title="Additional movement speed in feet"
+                    />
+                  </td>
+                )}
+                
                 {/* Spell Slots */}
                 {Array.from({ length: 9 }, (_, spellLevel) => {
                   const spellSlotKey = `spell_slots_${spellLevel + 1}` as keyof typeof spellSlots
+                  const specialColumnsCount = (showSpellsKnown ? 1 : 0) + (showSorceryPoints ? 1 : 0) + (showMartialArts ? 1 : 0) + (showKiPoints ? 1 : 0) + (showUnarmoredMovement ? 1 : 0)
+                  const columnIndex = spellLevel + 2 + specialColumnsCount
                   return (
                     <td key={spellLevel} className="p-1">
                       <Input
@@ -510,7 +646,7 @@ export function SpellSlotsGrid({ value, onChange, readonly = false, title = "Spe
                         max="4"
                         value={spellSlots[spellSlotKey][charLevel] || 0}
                         onChange={(e) => handleSpellSlotChange(charLevel, spellLevel, parseInt(e.target.value) || 0)}
-                        onKeyDown={(e) => handleKeyDown(e, charLevel, spellLevel + (showSpellsKnown ? 3 : 2))}
+                        onKeyDown={(e) => handleKeyDown(e, charLevel, columnIndex)}
                         className="w-15 text-center"
                         disabled={readonly}
                       />

@@ -208,15 +208,21 @@ export const CLASS_FEATURE_COLORS = {
     available: "bg-[#ce6565] border-[#ce6565]",
     used: "bg-card border-border"
   },
-  // Monk - Blue (same as Wizard)
+  // Monk - Orange/Amber
   monk: {
-    available: "bg-[#6a8bc0] border-[#6a8bc0]",
+    available: "bg-[#d4a574] border-[#d4a574]",
     used: "bg-card border-border"
   }
 } as const
 
 // Utility function to get class feature colors
-export function getClassFeatureColors(className: string): { available: string; used: string } {
+export function getClassFeatureColors(className: string | undefined | null): { available: string; used: string } {
+  if (!className) {
+    return {
+      available: "bg-[#6a8bc0] border-[#6a8bc0]", // Default blue
+      used: "bg-card border-border"
+    }
+  }
   const normalizedClass = className.toLowerCase()
   return CLASS_FEATURE_COLORS[normalizedClass as keyof typeof CLASS_FEATURE_COLORS] || {
     available: "bg-[#6a8bc0] border-[#6a8bc0]", // Default blue

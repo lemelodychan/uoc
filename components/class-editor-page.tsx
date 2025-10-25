@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Icon } from "@iconify/react"
 import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
 import { ProficiencyCheckboxes, SAVING_THROW_OPTIONS, SKILL_OPTIONS, EQUIPMENT_OPTIONS } from "@/components/ui/proficiency-checkboxes"
@@ -35,17 +36,61 @@ export function ClassEditorPage({
 
   // Update local state when classData prop changes
   useEffect(() => {
+    console.log('Class editor loaded with classData:', {
+      name: classData.name,
+      showSpellsKnown: classData.showSpellsKnown,
+      showSorceryPoints: classData.showSorceryPoints,
+      showMartialArts: classData.showMartialArts,
+      showKiPoints: classData.showKiPoints,
+      showUnarmoredMovement: classData.showUnarmoredMovement,
+      is_custom: classData.is_custom
+    })
     setEditingClass(classData)
   }, [classData])
+  
+  // Debug: Log current toggle state whenever editingClass changes
+  useEffect(() => {
+    console.log('Current editingClass toggle state:', {
+      showSpellsKnown: editingClass.showSpellsKnown,
+      showSorceryPoints: editingClass.showSorceryPoints,
+      showMartialArts: editingClass.showMartialArts,
+      showKiPoints: editingClass.showKiPoints,
+      showUnarmoredMovement: editingClass.showUnarmoredMovement,
+      is_custom: editingClass.is_custom
+    })
+  }, [editingClass.showSpellsKnown, editingClass.showSorceryPoints, editingClass.showMartialArts, editingClass.showKiPoints, editingClass.showUnarmoredMovement, editingClass.is_custom])
 
   const handleSave = async () => {
     setIsSaving(true)
     try {
+      // Validate required fields
+      if (!editingClass.name || editingClass.name.trim() === '') {
+        toast({
+          title: "Validation Error",
+          description: "Class name is required",
+          variant: "destructive"
+        })
+        return
+      }
+
       // Prepare the data for saving
       const classDataToSave = {
         ...editingClass,
+        name: editingClass.name.trim(),
+        // For new classes (empty ID), don't include the ID so database can generate one
+        ...(editingClass.id && editingClass.id.trim() !== '' ? { id: editingClass.id } : {}),
         updated_at: new Date().toISOString()
       }
+      
+      // Debug: Log the toggle values being saved
+      console.log('Saving class with toggles:', {
+        showSpellsKnown: classDataToSave.showSpellsKnown,
+        showSorceryPoints: classDataToSave.showSorceryPoints,
+        showMartialArts: classDataToSave.showMartialArts,
+        showKiPoints: classDataToSave.showKiPoints,
+        showUnarmoredMovement: classDataToSave.showUnarmoredMovement,
+        is_custom: classDataToSave.is_custom
+      })
       
       await onSave(classDataToSave)
       toast({
@@ -65,8 +110,10 @@ export function ClassEditorPage({
   }
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete "${editingClass.name}"? This action cannot be undone.`)) {
-      onDelete(editingClass.id)
+    if (editingClass.id && editingClass.id.trim() !== '') {
+      if (confirm(`Are you sure you want to delete "${editingClass.name}"? This action cannot be undone.`)) {
+        onDelete(editingClass.id)
+      }
     }
   }
 
@@ -110,11 +157,19 @@ export function ClassEditorPage({
           </p>
         </div>
         <div className="flex gap-2">
-          {editingClass.id && (
+          <Button variant="outline" onClick={onCancel}>
+            <Icon icon="lucide:x" className="w-4 h-4" />
+            Cancel
+          </Button>
+          {editingClass.id && editingClass.id.trim() !== '' && (
             <>
               <Button variant="outline" onClick={onDuplicate}>
                 <Icon icon="lucide:copy" className="w-4 h-4" />
                 Duplicate
+              </Button>
+              <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:bg-red-50 hover:text-red-700">
+                <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                Delete
               </Button>
             </>
           )}
@@ -190,6 +245,115 @@ export function ClassEditorPage({
               rows={4}
             />
           </div>
+          <div className="flex flex-row gap-4">
+            <div className="flex flex-col gap-2 flex-1">
+              <Label htmlFor="source">Source</Label>
+              <Select
+                value={editingClass.source || 'custom'}
+                onValueChange={(value) => setEditingClass(prev => ({ ...prev, source: value }))}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom</SelectItem>
+                  <SelectItem value="SRD 5.1">SRD 5.1</SelectItem>
+                  <SelectItem value="PHB">Player's Handbook</SelectItem>
+                  <SelectItem value="XGE">Xanathar's Guide to Everything</SelectItem>
+                  <SelectItem value="TCE">Tasha's Cauldron of Everything</SelectItem>
+                  <SelectItem value="FToD">Fizban's Treasury of Dragons</SelectItem>
+                  <SelectItem value="MPMM">Mordenkainen Presents: Monsters of the Multiverse</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="spell-progression">Spell Progression Columns</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="show-spells-known"
+                    checked={editingClass.showSpellsKnown || false}
+                    onCheckedChange={(checked) => {
+                      console.log('Spells Known toggle changed:', checked)
+                      setEditingClass(prev => ({ ...prev, showSpellsKnown: !!checked }))
+                    }}
+                  />
+                  <Label htmlFor="show-spells-known" className="text-sm font-normal">
+                    Spells Known
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="show-sorcery-points"
+                    checked={editingClass.showSorceryPoints || false}
+                    onCheckedChange={(checked) => {
+                      console.log('Sorcery Points toggle changed:', checked)
+                      setEditingClass(prev => ({ ...prev, showSorceryPoints: !!checked }))
+                    }}
+                  />
+                  <Label htmlFor="show-sorcery-points" className="text-sm font-normal">
+                    Sorcery Points
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="show-martial-arts"
+                    checked={editingClass.showMartialArts || false}
+                    onCheckedChange={(checked) => {
+                      console.log('Martial Arts toggle changed:', checked)
+                      setEditingClass(prev => ({ ...prev, showMartialArts: !!checked }))
+                    }}
+                  />
+                  <Label htmlFor="show-martial-arts" className="text-sm font-normal">
+                    Martial Arts
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="show-ki-points"
+                    checked={editingClass.showKiPoints || false}
+                    onCheckedChange={(checked) => {
+                      console.log('Ki Points toggle changed:', checked)
+                      setEditingClass(prev => ({ ...prev, showKiPoints: !!checked }))
+                    }}
+                  />
+                  <Label htmlFor="show-ki-points" className="text-sm font-normal">
+                    Ki Points
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="show-unarmored-movement"
+                    checked={editingClass.showUnarmoredMovement || false}
+                    onCheckedChange={(checked) => {
+                      console.log('Unarmored Movement toggle changed:', checked)
+                      setEditingClass(prev => ({ ...prev, showUnarmoredMovement: !!checked }))
+                    }}
+                  />
+                  <Label htmlFor="show-unarmored-movement" className="text-sm font-normal">
+                    Unarmored Movement
+                  </Label>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="is-custom">Custom Class</Label>
+              <div className="flex items-center space-x-2 mt-2">
+                <Checkbox
+                  id="is-custom"
+                  checked={editingClass.is_custom || false}
+                  onCheckedChange={(checked) => {
+                    console.log('Custom Class toggle changed:', checked)
+                    setEditingClass(prev => ({ ...prev, is_custom: !!checked }))
+                  }}
+                />
+                <Label htmlFor="is-custom" className="text-sm font-normal">
+                  This is a custom class
+                </Label>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -244,9 +408,19 @@ export function ClassEditorPage({
                 spell_slots_7: editingClass.spell_slots_7 || Array(20).fill(0),
                 spell_slots_8: editingClass.spell_slots_8 || Array(20).fill(0),
                 spell_slots_9: editingClass.spell_slots_9 || Array(20).fill(0)
-              }
+              },
+              // Sorcerer-specific fields
+              sorceryPoints: editingClass.sorcery_points || Array(20).fill(0),
+              // Monk-specific fields
+              martialArtsDice: editingClass.martial_arts_dice || Array(20).fill(4),
+              kiPoints: editingClass.ki_points || Array(20).fill(0),
+              unarmoredMovement: editingClass.unarmored_movement || Array(20).fill(0)
             }}
-            showSpellsKnown={editingClass.name?.toLowerCase() === 'bard'}
+            showSpellsKnown={editingClass.showSpellsKnown || false}
+            showSorceryPoints={editingClass.showSorceryPoints || false}
+            showMartialArts={editingClass.showMartialArts || false}
+            showKiPoints={editingClass.showKiPoints || false}
+            showUnarmoredMovement={editingClass.showUnarmoredMovement || false}
             onChange={(spellData) => {
               setEditingClass(prev => ({
                 ...prev,
@@ -260,7 +434,13 @@ export function ClassEditorPage({
                 spell_slots_6: spellData.spellSlots.spell_slots_6,
                 spell_slots_7: spellData.spellSlots.spell_slots_7,
                 spell_slots_8: spellData.spellSlots.spell_slots_8,
-                spell_slots_9: spellData.spellSlots.spell_slots_9
+                spell_slots_9: spellData.spellSlots.spell_slots_9,
+                // Sorcerer-specific fields
+                sorcery_points: spellData.sorceryPoints || null,
+                // Monk-specific fields
+                martial_arts_dice: spellData.martialArtsDice || null,
+                ki_points: spellData.kiPoints || null,
+                unarmored_movement: spellData.unarmoredMovement || null
               }))
             }}
           />

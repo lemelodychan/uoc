@@ -1799,7 +1799,26 @@ export const loadClassesWithDetails = async (): Promise<{
     spells_known?: number | null
     spell_progression: any | null
     max_spell_slots: any | null
-    class_features: any | null
+    // Column toggles for spell progression matrix
+    show_spells_known?: boolean | null
+    show_sorcery_points?: boolean | null
+    show_martial_arts?: boolean | null
+    show_ki_points?: boolean | null
+    show_unarmored_movement?: boolean | null
+    // Sorcerer-specific fields
+    sorcery_points?: number | null
+    // Monk-specific fields
+    martial_arts_dice?: number | null
+    ki_points?: number | null
+    unarmored_movement?: number | null
+    // Custom class support fields
+    is_custom?: boolean | null
+    created_by?: string | null
+    duplicated_from?: string | null
+    source?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+    // class_features column has been dropped - using separate class_features table
   }>
   error?: string
 }> => {
@@ -1814,6 +1833,18 @@ export const loadClassesWithDetails = async (): Promise<{
       console.error("Error loading classes with details:", error)
       return { error: error.message }
     }
+
+    // Debug: Log the loaded data to see what toggles are being loaded
+    console.log('Loaded classes data:', data?.map(cls => ({
+      id: cls.id,
+      name: cls.name,
+      show_spells_known: cls.show_spells_known,
+      show_sorcery_points: cls.show_sorcery_points,
+      show_martial_arts: cls.show_martial_arts,
+      show_ki_points: cls.show_ki_points,
+      show_unarmored_movement: cls.show_unarmored_movement,
+      is_custom: cls.is_custom
+    })))
 
     return { classes: data || [] }
   } catch (error) {
@@ -1856,6 +1887,7 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
       return arr.map((s) => s.length ? s[0].toUpperCase() + s.slice(1).toLowerCase() : s)
     }
     const id = cls.id && cls.id.length > 0 ? cls.id : globalThis.crypto.randomUUID()
+    // Start with minimal payload and only include fields that are likely to exist in the database
     const payload: any = {
       id,
       name: cls.name,
@@ -1879,13 +1911,54 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
       spell_slots_9: toNumberArray((cls as any).spell_slots_9),
       cantrips_known: toNumberArray((cls as any).cantrips_known),
       spells_known: toNumberArray((cls as any).spells_known),
-      // Removed legacy columns not present in DB schema: spell_progression, max_spell_slots
-      class_features: cls.class_features ?? null,
+      // Column toggles for spell progression matrix
+      show_spells_known: (cls as any).showSpellsKnown || false,
+      show_sorcery_points: (cls as any).showSorceryPoints || false,
+      show_martial_arts: (cls as any).showMartialArts || false,
+      show_ki_points: (cls as any).showKiPoints || false,
+      show_unarmored_movement: (cls as any).showUnarmoredMovement || false,
+      // Sorcerer-specific fields
+      sorcery_points: toNumberArray((cls as any).sorcery_points),
+      // Monk-specific fields
+      martial_arts_dice: toNumberArray((cls as any).martial_arts_dice),
+      ki_points: toNumberArray((cls as any).ki_points),
+      unarmored_movement: toNumberArray((cls as any).unarmored_movement),
     }
 
+    // Always include is_custom field, defaulting to true for new classes
+    payload.is_custom = (cls as any).is_custom ?? true
+    
+    // Debug: Log the payload to see what's being saved
+    console.log('UpsertClass payload toggles:', {
+      show_spells_known: payload.show_spells_known,
+      show_sorcery_points: payload.show_sorcery_points,
+      show_martial_arts: payload.show_martial_arts,
+      show_ki_points: payload.show_ki_points,
+      show_unarmored_movement: payload.show_unarmored_movement,
+      is_custom: payload.is_custom
+    })
+    console.log('UpsertClass full payload:', JSON.stringify(payload, null, 2))
+    if ((cls as any).created_by !== undefined) {
+      payload.created_by = (cls as any).created_by
+    }
+    if ((cls as any).duplicated_from !== undefined) {
+      payload.duplicated_from = (cls as any).duplicated_from
+    }
+    // Always include source field, defaulting to 'custom' if not specified
+    payload.source = (cls as any).source ?? 'custom'
+    if ((cls as any).created_at !== undefined) {
+      payload.created_at = (cls as any).created_at
+    }
+    if ((cls as any).updated_at !== undefined) {
+      payload.updated_at = (cls as any).updated_at
+    }
+
+    console.log("📤 Payload being sent to database:", payload)
+    
     const { error } = await supabase.from("classes").upsert(payload)
     if (error) {
-      console.error("Error upserting class:", error)
+      console.error("❌ Error upserting class:", error)
+      console.error("📤 Payload that failed:", payload)
       return { success: false, error: error.message }
     }
 
