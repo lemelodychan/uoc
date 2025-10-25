@@ -50,6 +50,24 @@ interface NewClassSelection {
 }
 
 export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModalProps) {
+  // Function to format skill names from database format to display format
+  const formatSkillName = (skillName: string): string => {
+    return skillName
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+
+  // Function to get ability abbreviation
+  const getAbilityAbbreviation = (ability: string): string => {
+    return ability.slice(0, 3).toUpperCase()
+  }
+
+  // Function to convert formatted skill name back to database format
+  const skillNameToDatabaseFormat = (skillName: string): string => {
+    return skillName.toLowerCase().replace(/\s+/g, '_')
+  }
+
   const [selectedClass, setSelectedClass] = useState<CharacterClass | null>(null)
   const [newLevel, setNewLevel] = useState(calculateTotalLevel(character.classes) + 1)
   const [hpRoll, setHpRoll] = useState<number | null>(null)
@@ -242,10 +260,11 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
       
       // Update the editable character's skills to show in sidebar preview
       const updatedSkills = character.skills.map(skill => {
-        const isSelected = selectedSkills.includes(skill.name)
+        const skillInDbFormat = skillNameToDatabaseFormat(skill.name)
+        const isSelected = selectedSkills.includes(skillInDbFormat)
         
         // If this skill is in the new class's skill list and is selected
-        if (newClassSelection.classData.skill_proficiencies?.includes(skill.name) && isSelected) {
+        if (newClassSelection.classData.skill_proficiencies?.includes(skillInDbFormat) && isSelected) {
           // Apply new class proficiency
           if (skill.proficiency === 'proficient') {
             return { ...skill, proficiency: 'expertise' as const }
@@ -964,6 +983,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                                 size="sm"
                                 onClick={() => handleClassSelection(charClass.name)}
                               >
+                                <Icon icon="lucide:trending-up" className="w-4 h-4" />
                                 Level Up
                               </Button>
                             </div>
@@ -977,14 +997,13 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                 {/* Multiclass Option */}
                 <div className="flex flex-col gap-2">
                   <h4 className="text-md font-medium text-muted-foreground">Multiclassing</h4>
-                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors border-dashed">
+                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors border">
                     <CardContent className="px-4 py-0">
                       <div className="flex items-center justify-between">
                         <div className="flex flex-row items-center gap-4">
                           <h4 className="font-medium flex items-center gap-2">
-                            <Icon icon="lucide:plus" className="w-4 h-4" />
                             <span>Add New Class</span>
-                            <Badge variant="secondary">Level 1</Badge>
+                            <Badge variant="outline">Level 1</Badge>
                           </h4>
                           <p className="text-sm text-muted-foreground">Start a new class at level 1</p>
                         </div>
@@ -1001,7 +1020,10 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                                 Loading...
                               </>
                             ) : (
-                              'Add Class'
+                              <>
+                                <Icon icon="lucide:plus" className="w-4 h-4" />
+                                Add Class
+                              </>
                             )}
                           </Button>
                         </div>
@@ -1023,12 +1045,12 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                 </p>
               </div>
               
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-4">
                 {availableClasses.map((classData) => (
                   <Card key={classData.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
                     <CardContent className="px-4 py-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-col gap-1">
+                      <div className="flex items-start gap-4">
+                        <div className="flex flex-col gap-2">
                           <h4 className="font-medium flex items-center gap-2">
                             <span className="capitalize">{classData.name}</span>
                             <Badge variant="outline">d{classData.hit_die}</Badge>
@@ -1040,7 +1062,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                           )}
                           {classData.skill_proficiencies && Array.isArray(classData.skill_proficiencies) && (
                             <p className="text-xs text-muted-foreground">
-                              Choose 2 from: {classData.skill_proficiencies.join(', ')}
+                              Choose 2 from: {classData.skill_proficiencies.map(skill => formatSkillName(skill)).join(', ')}
                             </p>
                           )}
                         </div>
@@ -1081,7 +1103,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                       </p>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       {newClassSelection.classData.skill_proficiencies?.map((skillName: string) => {
                         const isSelected = newClassSelection.selectedSkills.includes(skillName)
                         const canSelect = newClassSelection.selectedSkills.length < 2 || isSelected
@@ -1089,82 +1111,73 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                         return (
                           <div
                             key={skillName}
-                            className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                              isSelected 
-                                ? 'bg-primary text-primary-foreground border-primary' 
-                                : canSelect 
-                                  ? 'hover:bg-muted/50 border-border' 
-                                  : 'opacity-50 cursor-not-allowed border-border'
+                            className={`flex items-center gap-2 rounded ${
+                              !canSelect ? 'opacity-50' : ''
                             }`}
-                            onClick={() => {
-                              if (!canSelect) return
-                              
-                              let newSelectedSkills: string[]
-                              if (isSelected) {
-                                newSelectedSkills = newClassSelection.selectedSkills.filter(s => s !== skillName)
-                              } else {
-                                newSelectedSkills = [...newClassSelection.selectedSkills, skillName]
-                              }
-                              
-                              setNewClassSelection({
-                                ...newClassSelection,
-                                selectedSkills: newSelectedSkills
-                              })
-                              
-                              // Update the editable character's skills in real-time for sidebar preview
-                              const updatedSkills = character.skills.map(skill => {
-                                const isSelected = newSelectedSkills.includes(skill.name)
-                                const wasSelected = newClassSelection.selectedSkills.includes(skill.name)
-                                
-                                // If this skill is in the new class's skill list
-                                if (newClassSelection.classData.skill_proficiencies?.includes(skill.name)) {
-                                  if (isSelected) {
-                                    // Apply new class proficiency
-                                    const originalSkill = character.skills.find(s => s.name === skill.name)
-                                    if (originalSkill?.proficiency === 'proficient') {
-                                      return { ...skill, proficiency: 'expertise' as const }
-                                    } else {
-                                      return { ...skill, proficiency: 'proficient' as const }
-                                    }
-                                  } else if (wasSelected) {
-                                    // Revert to original proficiency
-                                    const originalSkill = character.skills.find(s => s.name === skill.name)
-                                    return { ...skill, proficiency: originalSkill?.proficiency || 'none' }
-                                  }
-                                }
-                                
-                                return skill
-                              })
-                              
-                              // Add any new skills that weren't already in the character's skill list
-                              const newSkills = newSelectedSkills
-                                .filter(skillName => !character.skills.find(s => s.name === skillName))
-                                .map(skillName => ({
-                                  name: skillName,
-                                  ability: getSkillAbility(skillName),
-                                  proficiency: 'proficient' as const
-                                }))
-                              
-                              // Update the editable character with the new skills
-                              setEditableCharacter(prev => ({
-                                ...prev,
-                                skills: [...updatedSkills, ...newSkills]
-                              }))
-                            }}
                           >
                             <div className="flex items-center gap-2">
-                              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                                isSelected 
-                                  ? 'bg-primary-foreground border-primary-foreground' 
-                                  : 'border-current'
-                              }`}>
-                                {isSelected && (
-                                  <Icon icon="lucide:check" className="w-3 h-3 text-primary" />
-                                )}
-                              </div>
-                              <span className="font-medium capitalize">
-                                {skillName.replace(/_/g, ' ')}
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  if (!canSelect) return
+                                  
+                                  let newSelectedSkills: string[]
+                                  if (isSelected) {
+                                    newSelectedSkills = newClassSelection.selectedSkills.filter(s => s !== skillName)
+                                  } else {
+                                    newSelectedSkills = [...newClassSelection.selectedSkills, skillName]
+                                  }
+                                  
+                                  setNewClassSelection({
+                                    ...newClassSelection,
+                                    selectedSkills: newSelectedSkills
+                                  })
+                                  
+                                  // Update the editable character's skills in real-time for sidebar preview
+                                  const updatedSkills = character.skills.map(skill => {
+                                    const skillInDbFormat = skillNameToDatabaseFormat(skill.name)
+                                    const isSelected = newSelectedSkills.includes(skillInDbFormat)
+                                    const wasSelected = newClassSelection.selectedSkills.includes(skillInDbFormat)
+                                    
+                                    // If this skill is in the new class's skill list
+                                    if (newClassSelection.classData.skill_proficiencies?.includes(skillInDbFormat)) {
+                                      if (isSelected) {
+                                        // Apply new class proficiency
+                                        const originalSkill = character.skills.find(s => s.name === skill.name)
+                                        return { ...skill, proficiency: originalSkill?.proficiency === 'proficient' ? 'expertise' as const : 'proficient' as const }
+                                      } else if (wasSelected) {
+                                        // Revert to original proficiency
+                                        const originalSkill = character.skills.find(s => s.name === skill.name)
+                                        return { ...skill, proficiency: originalSkill?.proficiency || 'none' }
+                                      }
+                                    }
+                                    
+                                    return skill
+                                  })
+                                  
+                                  // Add any new skills that weren't already in the character's skill list
+                                  const newSkills = newSelectedSkills
+                                    .filter(skillName => !character.skills.find(s => skillNameToDatabaseFormat(s.name) === skillName))
+                                    .map(skillName => ({
+                                      name: formatSkillName(skillName),
+                                      ability: getSkillAbility(skillName),
+                                      proficiency: 'proficient' as const
+                                    }))
+                                  
+                                  // Update the editable character with the new skills
+                                  setEditableCharacter(prev => ({
+                                    ...prev,
+                                    skills: [...updatedSkills, ...newSkills]
+                                  }))
+                                }}
+                                disabled={!canSelect}
+                                className="w-4 h-4"
+                              />
+                              <span className="text-sm font-medium">
+                                {formatSkillName(skillName)}
                               </span>
+                              <span className="text-sm text-muted-foreground">({getAbilityAbbreviation(getSkillAbility(skillName))})</span>
                             </div>
                           </div>
                         )
@@ -1516,7 +1529,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                         <div className="flex gap-1">
                           {newClassSelection.selectedSkills.map((skill, index) => (
                             <Badge key={index} variant="secondary" className="text-xs">
-                              {skill.replace(/_/g, ' ')}
+                              {formatSkillName(skill)} ({getAbilityAbbreviation(getSkillAbility(skill))})
                             </Badge>
                           ))}
                         </div>
