@@ -90,7 +90,7 @@ export function CampaignCreationModal({
     if (!name.trim()) return
 
             const campaign: Campaign = {
-              id: editingCampaign?.id || `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              id: editingCampaign?.id || `campaign_${crypto.randomUUID()}`,
               name: name.trim(),
               description: description.trim() || undefined,
               created_at: editingCampaign?.created_at || new Date().toISOString(),

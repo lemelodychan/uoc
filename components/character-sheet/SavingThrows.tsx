@@ -35,11 +35,7 @@ export function SavingThrows({
       <CardContent>
         <div className="flex flex-col gap-1">
           {(() => {
-            console.log('[DEBUG] UI: Rendering saving throws:', character.savingThrowProficiencies)
-            console.log('[DEBUG] UI: Saving throws length:', character.savingThrowProficiencies?.length)
-            console.log('[DEBUG] UI: Active character classes:', character.classes)
             if (!character.savingThrowProficiencies || character.savingThrowProficiencies.length === 0) {
-              console.log('[DEBUG] UI: No saving throws found, returning empty div')
               return <div>No saving throws loaded</div>
             }
             return character.savingThrowProficiencies.map((savingThrow) => {

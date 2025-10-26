@@ -71,7 +71,7 @@ export function ClassFeatureSkillModal({
     // Generate ID if not provided
     const featureData: ClassFeatureSkill = {
       ...formData,
-      id: formData.id || `feature-${Date.now()}`,
+      id: formData.id || `feature-${crypto.randomUUID()}`,
       version: formData.version || 1,
       title: formData.title || '',
       featureType: formData.featureType || 'slots',

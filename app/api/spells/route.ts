@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         higher_levels: spell.higherLevel || null
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (spellError) {
       console.error('Error creating spell:', spellError)

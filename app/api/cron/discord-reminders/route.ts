@@ -42,12 +42,6 @@ export async function GET(req: Request) {
     const hoursUntilSession = diff / (1000 * 60 * 60)
 
     // Debug logging
-    console.log(`Campaign: ${c.name}`)
-    console.log(`Session UTC: ${sessionUtc.toISOString()}`)
-    console.log(`Now UTC: ${nowUtc.toISOString()}`)
-    console.log(`Hours until session: ${hoursUntilSession.toFixed(2)}`)
-    console.log(`Reminder sent: ${c.discordReminderSent}`)
-    console.log(`Notifications enabled: ${c.discordNotificationsEnabled}`)
 
     // Send if:
     // 1. Within [24h window +/- 10m] and not already sent, OR

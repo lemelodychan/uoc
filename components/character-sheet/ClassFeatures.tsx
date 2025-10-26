@@ -146,7 +146,6 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
               features.sort((a, b) => (a.level || a.enabledAtLevel || 1) - (b.level || b.enabledAtLevel || 1))
             })
             
-            console.log('🔍 ClassFeatures Debug - Features by class (hidden features filtered):', featuresByClass)
             
             // Render grouped features
             return Array.from(featuresByClass.entries()).map(([className, features]) => (

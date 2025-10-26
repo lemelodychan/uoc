@@ -29,7 +29,7 @@ export async function PUT(
       })
       .eq('id', spellId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (spellError) {
       console.error('Error updating spell:', spellError)

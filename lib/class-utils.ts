@@ -218,6 +218,36 @@ export function getCantripsKnown(level: number, classData?: ClassData, className
   return 0
 }
 
+// Get cantrips known using class spell slots matrix (preferred method)
+export async function getCantripsKnownFromClasses(level: number, classData?: ClassData, className?: string, character?: any): Promise<number> {
+  // Handle multiclassing
+  if (character?.classes && character.classes.length > 0) {
+    return getMulticlassCantripsKnownFromClasses(character)
+  }
+
+  // For Warlocks, use the Warlock-specific calculation
+  if (className?.toLowerCase() === "warlock") {
+    const { getWarlockCantripsKnown } = require('./character-data')
+    return getWarlockCantripsKnown(level)
+  }
+
+  // Use the new cantrips_known array from class data
+  if (classData?.cantrips_known && Array.isArray(classData.cantrips_known)) {
+    const levelIndex = level - 1
+    if (levelIndex >= 0 && levelIndex < classData.cantrips_known.length) {
+      return classData.cantrips_known[levelIndex] || 0
+    }
+  }
+
+  // Fallback to old spell_progression if new data not available
+  if (classData?.spell_progression) {
+    const levelData = classData.spell_progression[level.toString()]
+    return levelData?.cantrips || 0
+  }
+
+  return 0
+}
+
 // Calculate cantrips known for multiclassed characters
 export function getMulticlassCantripsKnown(character: any): number {
   const { getSpellcastingClasses, getWarlockCantripsKnown } = require('./character-data')
@@ -236,6 +266,12 @@ export function getMulticlassCantripsKnown(character: any): number {
   }
   
   return totalCantripsKnown
+}
+
+// Calculate cantrips known for multiclassed characters using class spell slots matrix
+export const getMulticlassCantripsKnownFromClasses = async (character: any): Promise<number> => {
+  const { getMulticlassCantripsKnownFromClasses } = await import('./spell-slot-calculator')
+  return getMulticlassCantripsKnownFromClasses(character)
 }
 
 // Get spells known based on class and level

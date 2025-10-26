@@ -36,33 +36,9 @@ export function ClassEditorPage({
 
   // Update local state when classData prop changes
   useEffect(() => {
-    console.log('Class editor loaded with classData:', {
-      name: classData.name,
-      showSpellsKnown: classData.showSpellsKnown,
-      showSorceryPoints: classData.showSorceryPoints,
-      showMartialArts: classData.showMartialArts,
-      showKiPoints: classData.showKiPoints,
-      showUnarmoredMovement: classData.showUnarmoredMovement,
-      showRage: classData.showRage,
-      showRageDamage: classData.showRageDamage,
-      is_custom: classData.is_custom
-    })
     setEditingClass(classData)
   }, [classData])
   
-  // Debug: Log current toggle state whenever editingClass changes
-  useEffect(() => {
-    console.log('Current editingClass toggle state:', {
-      showSpellsKnown: editingClass.showSpellsKnown,
-      showSorceryPoints: editingClass.showSorceryPoints,
-      showMartialArts: editingClass.showMartialArts,
-      showKiPoints: editingClass.showKiPoints,
-      showUnarmoredMovement: editingClass.showUnarmoredMovement,
-      showRage: editingClass.showRage,
-      showRageDamage: editingClass.showRageDamage,
-      is_custom: editingClass.is_custom
-    })
-  }, [editingClass.showSpellsKnown, editingClass.showSorceryPoints, editingClass.showMartialArts, editingClass.showKiPoints, editingClass.showUnarmoredMovement, editingClass.showRage, editingClass.showRageDamage, editingClass.is_custom])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -86,17 +62,6 @@ export function ClassEditorPage({
         updated_at: new Date().toISOString()
       }
       
-      // Debug: Log the toggle values being saved
-      console.log('Saving class with toggles:', {
-        showSpellsKnown: classDataToSave.showSpellsKnown,
-        showSorceryPoints: classDataToSave.showSorceryPoints,
-        showMartialArts: classDataToSave.showMartialArts,
-        showKiPoints: classDataToSave.showKiPoints,
-        showUnarmoredMovement: classDataToSave.showUnarmoredMovement,
-        showRage: classDataToSave.showRage,
-        showRageDamage: classDataToSave.showRageDamage,
-        is_custom: classDataToSave.is_custom
-      })
       
       await onSave(classDataToSave)
       toast({
@@ -299,7 +264,6 @@ export function ClassEditorPage({
                   id="is-custom"
                   checked={editingClass.is_custom || false}
                   onCheckedChange={(checked) => {
-                    console.log('Custom Class toggle changed:', checked)
                     setEditingClass(prev => ({ ...prev, is_custom: !!checked }))
                   }}
                 />
@@ -357,7 +321,6 @@ export function ClassEditorPage({
                   id="show-spells-known"
                   checked={editingClass.showSpellsKnown || false}
                   onCheckedChange={(checked) => {
-                    console.log('Spells Known toggle changed:', checked)
                     setEditingClass(prev => ({ ...prev, showSpellsKnown: !!checked }))
                   }}
                 />
@@ -370,7 +333,6 @@ export function ClassEditorPage({
                   id="show-sorcery-points"
                   checked={editingClass.showSorceryPoints || false}
                   onCheckedChange={(checked) => {
-                    console.log('Sorcery Points toggle changed:', checked)
                     setEditingClass(prev => ({ ...prev, showSorceryPoints: !!checked }))
                   }}
                 />
@@ -383,7 +345,6 @@ export function ClassEditorPage({
                   id="show-martial-arts"
                   checked={editingClass.showMartialArts || false}
                   onCheckedChange={(checked) => {
-                    console.log('Martial Arts toggle changed:', checked)
                     setEditingClass(prev => ({ ...prev, showMartialArts: !!checked }))
                   }}
                 />
@@ -396,7 +357,6 @@ export function ClassEditorPage({
                   id="show-ki-points"
                   checked={editingClass.showKiPoints || false}
                   onCheckedChange={(checked) => {
-                    console.log('Ki Points toggle changed:', checked)
                     setEditingClass(prev => ({ ...prev, showKiPoints: !!checked }))
                   }}
                 />
@@ -409,7 +369,6 @@ export function ClassEditorPage({
                   id="show-unarmored-movement"
                   checked={editingClass.showUnarmoredMovement || false}
                   onCheckedChange={(checked) => {
-                    console.log('Unarmored Movement toggle changed:', checked)
                     setEditingClass(prev => ({ ...prev, showUnarmoredMovement: !!checked }))
                   }}
                 />
@@ -422,7 +381,6 @@ export function ClassEditorPage({
                   id="show-rage"
                   checked={editingClass.showRage || false}
                   onCheckedChange={(checked) => {
-                    console.log('Rage toggle changed:', checked)
                     setEditingClass(prev => ({ ...prev, showRage: !!checked }))
                   }}
                 />
@@ -435,7 +393,6 @@ export function ClassEditorPage({
                   id="show-rage-damage"
                   checked={editingClass.showRageDamage || false}
                   onCheckedChange={(checked) => {
-                    console.log('Rage Damage toggle changed:', checked)
                     setEditingClass(prev => ({ ...prev, showRageDamage: !!checked }))
                   }}
                 />

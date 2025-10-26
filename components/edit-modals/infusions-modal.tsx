@@ -79,7 +79,7 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
     const updatedUsage = updateFeatureUsage(characterWithUsage, 'artificer-infusions', {
       selectedOptions: infusions.map(infusion => ({
         ...infusion, // Preserve any additional properties first
-        id: infusion.id || `infusion-${Date.now()}-${Math.random()}`,
+        id: infusion.id || `infusion-${crypto.randomUUID()}`,
         title: infusion.title || 'Untitled Infusion',
         description: infusion.description || '',
         needsAttunement: infusion.needsAttunement || false
@@ -97,7 +97,13 @@ export function InfusionsModal({ isOpen, onClose, character, onSave }: Infusions
   }
 
   const addInfusion = () => {
-    setInfusions([...infusions, { title: "", description: "", needsAttunement: false }])
+    const newInfusion = { 
+      id: `infusion-${crypto.randomUUID()}`,
+      title: "", 
+      description: "", 
+      needsAttunement: false 
+    }
+    setInfusions([...infusions, newInfusion])
   }
 
   const removeInfusion = (index: number) => {

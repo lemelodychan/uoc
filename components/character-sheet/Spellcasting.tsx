@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
-import { getTotalAdditionalSpells } from "@/lib/character-data"
 import { getCombatColor, getClassFeatureColors } from "@/lib/color-mapping"
 import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
 import { getFeatureUsage, getFeatureCustomDescription, getFeatureMaxUses } from "@/lib/feature-usage-tracker"
@@ -73,6 +72,11 @@ export function Spellcasting({
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
   const [monkClassData, setMonkClassData] = useState<any>(null)
   const [barbarianClassData, setBarbarianClassData] = useState<any>(null)
+  // Calculate cantrips and spells known from classes table data
+  const [cantripsKnown, setCantripsKnown] = useState<{ total: number; breakdown: string }>({ total: 0, breakdown: "0" })
+  const [spellsKnown, setSpellsKnown] = useState<{ total: number; breakdown: string }>({ total: 0, breakdown: "0" })
+  const [shouldShowSpellsKnown, setShouldShowSpellsKnown] = useState<boolean>(true)
+  const [isLoadingCounts, setIsLoadingCounts] = useState(false)
 
   // Load class feature skills
   useEffect(() => {
@@ -82,7 +86,6 @@ export function Spellcasting({
         const { featureSkills } = await loadClassFeatureSkills(character)
         setClassFeatureSkills(featureSkills || [])
       } catch (error) {
-        console.error('Error loading class feature skills:', error)
         setClassFeatureSkills([])
       } finally {
         setIsLoadingFeatures(false)
@@ -103,7 +106,7 @@ export function Spellcasting({
           const { classData } = await loadClassData('Monk', subclass)
           setMonkClassData(classData)
         } catch (error) {
-          console.error('Error loading monk class data:', error)
+          // Silent error handling
         }
       }
       loadMonkData()
@@ -121,12 +124,92 @@ export function Spellcasting({
           const { classData } = await loadClassData('Barbarian', subclass)
           setBarbarianClassData(classData)
         } catch (error) {
-          console.error('Error loading barbarian class data:', error)
+          // Silent error handling
         }
       }
       loadBarbarianData()
     }
   }, [character.id, character.classes])
+
+  // Calculate cantrips and spells known from classes table
+  useEffect(() => {
+    const calculateCounts = async () => {
+      if (!hasSpellcastingAbilities(character)) {
+        return
+      }
+
+      setIsLoadingCounts(true)
+      try {
+        if (character.classes && character.classes.length > 0) {
+          // Multiclassed character - sum up from all classes and build breakdown
+          let totalCantrips = 0
+          let totalSpells = 0
+          let anyClassShowsSpells = false
+          const cantripBreakdowns: string[] = []
+          const spellBreakdowns: string[] = []
+
+          for (const charClass of character.classes) {
+            const { fetchClassData, getCantripsKnownFromClass, getSpellsKnownFromClass } = await import('@/lib/spell-slot-calculator')
+            const classData = await fetchClassData(charClass.name, undefined)
+            
+            if (classData) {
+              const classCantrips = getCantripsKnownFromClass(classData, charClass.level)
+              totalCantrips += classCantrips
+              // Only add to breakdown if the class contributes cantrips
+              if (classCantrips > 0) {
+                cantripBreakdowns.push(classCantrips.toString())
+              }
+              
+              if (classData.show_spells_known) {
+                const classSpells = getSpellsKnownFromClass(classData, charClass.level)
+                totalSpells += classSpells
+                // Only add to breakdown if the class contributes spells
+                if (classSpells > 0) {
+                  spellBreakdowns.push(classSpells.toString())
+                }
+                anyClassShowsSpells = true
+              }
+            }
+          }
+
+          const cantripBreakdown = cantripBreakdowns.length > 1 ? cantripBreakdowns.join(" + ") : cantripBreakdowns[0] || "0"
+          const spellBreakdown = spellBreakdowns.length > 1 ? spellBreakdowns.join(" + ") : spellBreakdowns[0] || "0"
+
+          setCantripsKnown({ total: totalCantrips, breakdown: cantripBreakdown })
+          setSpellsKnown({ total: totalSpells, breakdown: spellBreakdown })
+          setShouldShowSpellsKnown(anyClassShowsSpells)
+        } else {
+          // Single class character
+          const { fetchClassData, getCantripsKnownFromClass, getSpellsKnownFromClass } = await import('@/lib/spell-slot-calculator')
+          const classData = await fetchClassData(character.class, undefined)
+          
+          if (classData) {
+            const cantrips = getCantripsKnownFromClass(classData, character.level)
+            setCantripsKnown({ total: cantrips, breakdown: cantrips.toString() })
+            
+            if (classData.show_spells_known) {
+              const spells = getSpellsKnownFromClass(classData, character.level)
+              setSpellsKnown({ total: spells, breakdown: spells.toString() })
+              setShouldShowSpellsKnown(true)
+            } else {
+              setSpellsKnown({ total: 0, breakdown: "0" })
+              setShouldShowSpellsKnown(false)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error calculating spell counts:', error)
+        // Fallback to character data
+        setCantripsKnown({ total: character.spellData.cantripsKnown, breakdown: character.spellData.cantripsKnown.toString() })
+        setSpellsKnown({ total: character.spellData.spellsKnown, breakdown: character.spellData.spellsKnown.toString() })
+        setShouldShowSpellsKnown(true)
+      } finally {
+        setIsLoadingCounts(false)
+      }
+    }
+
+    calculateCounts()
+  }, [character.id, character.level, character.class, character.classes])
 
   // Show component for monks/barbarians (even without spellcasting) or characters with spellcasting abilities
   if (!isMonk(character) && !isBarbarian(character) && !hasSpellcastingAbilities(character)) {
@@ -403,7 +486,6 @@ export function Spellcasting({
         }
       
       default:
-        console.log('🔍 Debug - Unknown feature ID:', featureId)
         return null
     }
   }
@@ -426,7 +508,6 @@ export function Spellcasting({
     // Some features in the database may have incorrect feature types or missing className
     allFeatures.forEach(feature => {
       if (feature.id === 'song-of-rest' && feature.featureType === 'special_ux') {
-        console.log('🔍 Debug - Correcting Song of Rest feature type from database:', feature.featureType, 'to availability_toggle')
         feature.featureType = 'availability_toggle'
         feature.config = {
           defaultAvailable: true,
@@ -452,23 +533,15 @@ export function Spellcasting({
           // Default to the first class if no match found
           feature.className = character.classes?.[0]?.name || character.class
         }
-        console.log('🔍 Debug - Added className to feature from database:', feature.id, '->', feature.className)
       }
     })
-    
-    console.log('🔍 Debug - Initial classFeatureSkills:', classFeatureSkills?.length || 0)
-    console.log('🔍 Debug - Character classFeatureSkillsUsage:', character.classFeatureSkillsUsage)
-    console.log('🔍 Debug - Character classes:', character.classes?.map(c => ({ name: c.name, level: c.level, subclass: c.subclass })))
-    console.log('🔍 Debug - Has bardic-inspiration in usage?', character.classFeatureSkillsUsage?.['bardic-inspiration'])
     
     // Add features from character's existing usage data that aren't already loaded
     // These features exist in usage data but not in the database class features
     if (character.classFeatureSkillsUsage) {
       Object.entries(character.classFeatureSkillsUsage).forEach(([featureId, usageData]: [string, any]) => {
-        console.log('🔍 Debug - Processing usage data:', featureId, usageData)
         // Skip if already loaded from database
         if (allFeatures.some(f => f.id === featureId)) {
-          console.log('🔍 Debug - Skipping', featureId, 'already loaded from database')
           return
         }
         
@@ -477,7 +550,6 @@ export function Spellcasting({
         const featureSkill = createFeatureSkillFromId(featureId, usageData)
         
         if (featureSkill) {
-          console.log('🔍 Debug - Adding feature from usage data:', featureSkill)
           allFeatures.push(featureSkill)
         }
       })
@@ -490,10 +562,7 @@ export function Spellcasting({
     // Group features by class
     const featuresByClass = new Map<string, ClassFeatureSkill[]>()
     
-    console.log('🔍 Debug - Total features before filtering:', allFeatures.length)
     allFeatures.forEach(skill => {
-      console.log('🔍 Debug - Processing feature:', skill.id, skill.title, skill.featureType)
-      
       // Skip features that have their own special UX components
       const specialUXFeatures = [
         'infusions', // Has its own Infusions component
@@ -516,9 +585,7 @@ export function Spellcasting({
                              skill.title?.toLowerCase().includes(special)
                            )
       
-      console.log('🔍 Debug - Should exclude', skill.id, ':', shouldExclude)
       if (shouldExclude) {
-        console.log('🔍 Debug - Excluding feature:', skill.id)
         return
       }
 
@@ -534,36 +601,14 @@ export function Spellcasting({
           skill.id?.toLowerCase().includes(c.name.toLowerCase())
         )?.name || character.class
       }
-      
-      console.log('🔍 Debug - Feature grouping:', {
-        featureId: skill.id,
-        featureTitle: skill.title,
-        featureClassName: skill.className,
-        assignedClassName: className,
-        characterClasses: character.classes?.map(c => c.name)
-      })
 
       if (!featuresByClass.has(className)) {
         featuresByClass.set(className, [])
       }
       featuresByClass.get(className)!.push(skill)
     })
-
-    console.log('🔍 Debug - Final featuresByClass:', featuresByClass.size, 'classes')
-    console.log('🔍 Debug - Features by class:', Array.from(featuresByClass.entries()))
-    
-    // Debug each feature's className assignment
-    allFeatures.forEach(feature => {
-      console.log('🔍 Debug - Feature className assignment:', {
-        id: feature.id,
-        title: feature.title,
-        className: feature.className,
-        characterClasses: character.classes?.map(c => c.name)
-      })
-    })
     
     if (allFeatures.length === 0 || featuresByClass.size === 0) {
-      console.log('🔍 Debug - No features to render')
       return null
     }
 
@@ -572,7 +617,11 @@ export function Spellcasting({
       .map(([className, features]) => (
       <div key={className} className="flex flex-col gap-2">
         <div className="text-sm font-medium">{className} Skills</div>
-        {features.map((skill) => renderFeatureSkill(skill, className))}
+        {features.map((skill, index) => (
+          <div key={skill.id || `${className}-${index}`}>
+            {renderFeatureSkill(skill, className)}
+          </div>
+        ))}
       </div>
     ))
   }
@@ -838,39 +887,55 @@ export function Spellcasting({
 
         {/* Basic Spell Stats */}
         {hasSpellcastingAbilities(character) && (
-          <div className="flex flex-col gap-2">
-          <div className="grid grid-cols-2 gap-2 items-start">
-            <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
-              <div className="text-sm text-muted-foreground">Spell Attack</div>
-              <div className="text-xl font-bold font-mono">
-                {formatModifier(character.spellData.spellAttackBonus)}
+          <>
+            <div className="flex flex-col gap-2">
+              {/* Spell Attack and Spell Save DC always on same row */}
+              <div className="grid grid-cols-2 gap-2 items-start">
+                <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
+                  <div className="text-sm text-muted-foreground">Spell Attack</div>
+                  <div className="text-xl font-bold font-mono">
+                    {formatModifier(character.spellData.spellAttackBonus)}
+                  </div>
+                </div>
+                <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
+                  <div className="text-sm text-muted-foreground">Spell Save DC</div>
+                  <div className="text-xl font-bold font-mono">{character.spellData.spellSaveDC}</div>
+                </div>
               </div>
+              
+              {/* Cantrips and Spells row - only show if character has cantrips or spells known */}
+              {(cantripsKnown.total > 0 || spellsKnown.total > 0) && (
+                <div className={`grid gap-2 items-start ${shouldShowSpellsKnown ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
+                    <div className="text-sm text-muted-foreground">Cantrips</div>
+                    <div className="text-xl font-bold font-mono">
+                      {isLoadingCounts ? (
+                        <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                      ) : (
+                        cantripsKnown.breakdown
+                      )}
+                    </div>
+                  </div>
+                  {shouldShowSpellsKnown && (
+                    <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
+                      <div className="text-sm text-muted-foreground">Spells</div>
+                      <div className="text-xl font-bold font-mono">
+                        {isLoadingCounts ? (
+                          <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                        ) : (
+                          spellsKnown.breakdown
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
-              <div className="text-sm text-muted-foreground">Spell Save DC</div>
-              <div className="text-xl font-bold font-mono">{character.spellData.spellSaveDC}</div>
-            </div>
-            <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
-              <div className="text-sm text-muted-foreground">Cantrips</div>
-              <div className="text-xl font-bold font-mono">{character.spellData.cantripsKnown}</div>
-            </div>
-            <div className="text-center border p-2 rounded-lg col-span-1 mb-0 flex flex-col items-center gap-1 bg-background">
-              <div className="text-sm text-muted-foreground">Spells</div>
-              <div className="flex items-center justify-center gap-2">
-                <div className="text-xl font-bold font-mono">{character.spellData.spellsKnown}</div>
-                {getTotalAdditionalSpells(character) > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{getTotalAdditionalSpells(character)}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          <Button className="w-full" variant="outline" size="sm" onClick={onOpenSpellList}>
-            <Icon icon="lucide:book-open" className="w-4 h-4" />
-            Spell List
-          </Button>
-          </div>
+            <Button className="w-full" variant="outline" size="sm" onClick={onOpenSpellList}>
+              <Icon icon="lucide:book-open" className="w-4 h-4" />
+              Spell List
+            </Button>
+          </>
         )}
 
         {/* Unified Class Features */}

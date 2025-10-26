@@ -252,16 +252,12 @@ export function FeatureManagementModal({
   }, [isOpen, classData])
 
   const loadFeatures = async () => {
-    console.log('🔄 loadFeatures called for class:', classData?.name)
     setIsLoading(true)
     try {
       const subclassIds = subclasses.map(s => s.id)
-      console.log('🔍 Loading features for base class:', classData.id, 'and subclasses:', subclassIds)
       const result = await loadFeaturesForBaseWithSubclasses(classData.id, subclassIds)
       
       if (result.features) {
-        console.log('🔍 Raw features loaded:', result.features)
-        console.log('🔍 Features count:', result.features.length)
         
         // Show all features, but prioritize base class features and handle subclass display properly
         // Remove duplicates based on title and level, keeping the most relevant occurrence
@@ -309,11 +305,8 @@ export function FeatureManagementModal({
         })
         
         const finalFeatures = Array.from(uniqueFeatures.values())
-        console.log('🔍 Final features after deduplication:', finalFeatures)
-        console.log('🔍 Final features count:', finalFeatures.length)
         
         setFeatures(finalFeatures)
-        console.log('✅ Features set in state, count:', finalFeatures.length)
       } else if (result.error) {
         console.error('Error loading features:', result.error)
         toast({
@@ -351,7 +344,6 @@ export function FeatureManagementModal({
   }
 
   const handleEditFeature = (feature: ClassFeature) => {
-    console.log('✏️ Editing feature:', feature)
     setEditingFeature(feature)
     setIsCreating(false)
     setShowEditModal(true)
@@ -440,10 +432,8 @@ export function FeatureManagementModal({
       setShowEditModal(false)
       
       // Reload features with debugging and small delay to ensure DB commit
-      console.log('🔄 Reloading features after save...')
       await new Promise(resolve => setTimeout(resolve, 100)) // Small delay for DB commit
       await loadFeatures()
-      console.log('✅ Features reloaded after save')
     } catch (error) {
       console.error('Error saving feature:', error)
       toast({

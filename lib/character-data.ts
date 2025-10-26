@@ -610,7 +610,6 @@ export const getMulticlassSpellcastingAbilityModifier = (character: CharacterDat
     // Single class - use the primary class's spellcasting ability
     const spellcastingAbility = getSpellcastingAbility(character.class)
     const modifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
-    console.log(`[DEBUG] Single class ${character.class}: using ${spellcastingAbility} modifier = ${modifier}`)
     return modifier
   }
   
@@ -624,7 +623,6 @@ export const getMulticlassSpellcastingAbilityModifier = (character: CharacterDat
   
   if (characterSpellcastingClasses.length === 0) {
     // No spellcasting classes, return 0
-    console.log('[DEBUG] No spellcasting classes found, returning 0')
     return 0
   }
   
@@ -636,7 +634,6 @@ export const getMulticlassSpellcastingAbilityModifier = (character: CharacterDat
   for (const charClass of characterSpellcastingClasses) {
     const ability = getSpellcastingAbility(charClass.name)
     const modifier = calculateModifier(character[ability as keyof CharacterData] as number)
-    console.log(`[DEBUG] ${charClass.name}: ${ability} modifier = ${modifier}`)
     if (modifier > highestModifier) {
       highestModifier = modifier
       bestClass = charClass.name
@@ -644,7 +641,6 @@ export const getMulticlassSpellcastingAbilityModifier = (character: CharacterDat
     }
   }
   
-  console.log(`[DEBUG] Multiclass spellcasting: using ${bestClass}'s ${bestAbility} modifier = ${highestModifier}`)
   return highestModifier
 }
 
@@ -1025,6 +1021,56 @@ export const getSpellsKnown = (
   return 0
 }
 
+// Get spells known using class spell slots matrix (preferred method)
+export const getSpellsKnownFromClasses = async (
+  character: CharacterData,
+  classData?: any,
+  storedValue?: number
+): Promise<number> => {
+  // If there's a stored value (from database), use it
+  if (storedValue !== undefined && storedValue !== null) {
+    return storedValue
+  }
+  
+  // Handle multiclassing
+  if (character.classes && character.classes.length > 0) {
+    return getMulticlassSpellsKnownFromClasses(character)
+  }
+  
+  // For Warlocks, use the Warlock-specific calculation
+  if (character.class.toLowerCase() === "warlock") {
+    return getWarlockSpellsKnown(character.level)
+  }
+  
+  // For Artificers, use the dynamic calculation
+  if (character.class.toLowerCase() === "artificer") {
+    return calculateArtificerSpellsKnown(character)
+  }
+  
+  // For Paladins, use the dynamic calculation
+  if (character.class.toLowerCase() === "paladin") {
+    return calculatePaladinSpellsKnown(character)
+  }
+  
+  // For other classes, use the class data if available
+  if (classData?.spells_known && Array.isArray(classData.spells_known)) {
+    const levelIndex = character.level - 1
+    if (levelIndex >= 0 && levelIndex < classData.spells_known.length) {
+      const spellsKnown = classData.spells_known[levelIndex]
+      // If spells_known is 0 in the array, fall back to dynamic logic for Artificers and Paladins
+      if (spellsKnown === 0 && character.class.toLowerCase() === "artificer") {
+        return calculateArtificerSpellsKnown(character)
+      }
+      if (spellsKnown === 0 && character.class.toLowerCase() === "paladin") {
+        return calculatePaladinSpellsKnown(character)
+      }
+      return spellsKnown
+    }
+  }
+  
+  return 0
+}
+
 // Calculate spells known for multiclassed characters
 export const getMulticlassSpellsKnown = (character: CharacterData): number => {
   const spellcastingClasses = getSpellcastingClasses(character.classes)
@@ -1050,6 +1096,24 @@ export const getMulticlassSpellsKnown = (character: CharacterData): number => {
   }
   
   return totalSpellsKnown
+}
+
+// Calculate cantrips known for multiclassed characters using class spell slots matrix
+export const getMulticlassCantripsKnownFromClasses = async (character: any): Promise<{ total: number; breakdown: string; isMulticlass: boolean }> => {
+  const { getMulticlassCantripsKnownFromClasses } = await import('./spell-slot-calculator')
+  return getMulticlassCantripsKnownFromClasses(character)
+}
+
+// Calculate spells known for multiclassed characters using class spell slots matrix
+export const getMulticlassSpellsKnownFromClasses = async (character: any): Promise<{ total: number; breakdown: string; isMulticlass: boolean }> => {
+  const { getMulticlassSpellsKnownFromClasses } = await import('./spell-slot-calculator')
+  return getMulticlassSpellsKnownFromClasses(character)
+}
+
+// Check if any class has show_spells_known enabled
+export const hasAnyClassShowSpellsKnown = async (character: any): Promise<boolean> => {
+  const { hasAnyClassShowSpellsKnown } = await import('./spell-slot-calculator')
+  return hasAnyClassShowSpellsKnown(character)
 }
 
 export const classFeatureTemplates = {
@@ -1313,7 +1377,6 @@ export const getMulticlassSavingThrowProficiencies = (classes: CharacterClass[])
     proficient: proficientAbilities.has(proficiency.ability)
   }))
   
-  console.log('[DEBUG] getMulticlassSavingThrowProficiencies result:', result)
   return result
 }
 

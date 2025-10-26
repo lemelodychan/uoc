@@ -41,6 +41,7 @@ import { MoneyModal } from "@/components/edit-modals/money-modal"
 import { FeatsModal } from "@/components/edit-modals/feats-modal"
 import { SpellModal } from "@/components/edit-modals/spell-modal"
 import { SpellListModal } from "@/components/edit-modals/spell-list-modal"
+import { SpellCreationModal } from "@/components/edit-modals/spell-creation-modal"
 import { DiceRollModal } from "@/components/edit-modals/dice-roll-modal"
 import { CharacterDetailsModal } from "@/components/edit-modals/character-details-modal"
 import { CharacterDetailsContentModal } from "@/components/edit-modals/character-details-content-modal"
@@ -48,7 +49,7 @@ import { LongRestModal } from "@/components/edit-modals/long-rest-modal"
 import { LongRestResultsModal } from "@/components/edit-modals/long-rest-results-modal"
 import { EldritchCannonModal } from "@/components/edit-modals/eldritch-cannon-modal"
 import { EldritchInvocationsModal } from "@/components/edit-modals/eldritch-invocations-modal"
-import { SpellLibraryModal } from "@/components/edit-modals/spell-library-modal"
+import { SpellLibraryModal, type SpellLibraryModalRef } from "@/components/edit-modals/spell-library-modal"
 import { LevelUpModal } from "@/components/edit-modals/level-up-modal"
 import { FeatureUsageMigrationModal } from "@/components/feature-usage-migration-modal"
 import { 
@@ -114,10 +115,6 @@ function CharacterSheetContent() {
   // Get user data from global context
   const { user: currentUser, userProfile: currentUserProfile, isSuperadmin: isUserSuperadmin, isLoading: userLoading } = useUser()
 
-  // Debug superadmin override state changes
-  useEffect(() => {
-    console.log("🔄 superadminOverride state changed to:", superadminOverride)
-  }, [superadminOverride])
   
   const [basicInfoModalOpen, setBasicInfoModalOpen] = useState(false)
   const [abilitiesModalOpen, setAbilitiesModalOpen] = useState(false)
@@ -132,6 +129,7 @@ function CharacterSheetContent() {
   const [spellModalOpen, setSpellModalOpen] = useState(false)
   const [spellListModalOpen, setSpellListModalOpen] = useState(false)
   const [spellLibraryModalOpen, setSpellLibraryModalOpen] = useState(false)
+  const [spellCreationModalOpen, setSpellCreationModalOpen] = useState(false)
   const [characterDetailsModalOpen, setCharacterDetailsModalOpen] = useState(false)
   const [characterDetailsContentModalOpen, setCharacterDetailsContentModalOpen] = useState(false)
   const [characterCreationModalOpen, setCharacterCreationModalOpen] = useState(false)
@@ -197,6 +195,7 @@ function CharacterSheetContent() {
   }[] | null>(null)
   const [longRestResultsModalOpen, setLongRestResultsModalOpen] = useState(false)
   const [skillSortMode, setSkillSortMode] = useState<'alpha' | 'ability'>('ability')
+  const spellLibraryRef = useRef<SpellLibraryModalRef>(null)
 
   // Helper function to determine if a character has spellcasting abilities
   const hasSpellcastingAbilities = (character: CharacterData): boolean => {
@@ -331,19 +330,6 @@ function CharacterSheetContent() {
     activeCharacter.visibility === 'public'
   ) : false
 
-  // Debug access control
-  if (activeCharacter) {
-    console.log("🔍 Access control debug:", {
-      characterId: activeCharacter.id,
-      characterOwner: activeCharacter.userId,
-      currentUser: currentUser?.id,
-      currentUserProfile: currentUserProfile,
-      isOwner: activeCharacter.userId === currentUser?.id,
-      isSuperadmin: isUserSuperadmin,
-      superadminOverride,
-      canView: canViewActiveCharacter
-    })
-  }
   
   // Get current campaign DM for campaign-aware editing
   const canEditActiveCharacter = activeCharacter ? canEditCharacterWithCampaign(
@@ -353,13 +339,6 @@ function CharacterSheetContent() {
     selectedCampaignId
   ) : false
 
-  // Recalculate permissions when user context changes
-  useEffect(() => {
-    if (activeCharacter && currentUser) {
-      console.log("🔄 User context updated, recalculating permissions for character:", activeCharacter.name)
-      console.log("👤 Current user:", currentUser.id, "isSuperadmin:", isUserSuperadmin)
-    }
-  }, [currentUser, isUserSuperadmin, activeCharacter])
   
   // Reset superadmin override when switching to a different character
   const [previousCharacterId, setPreviousCharacterId] = useState<string>("")
@@ -370,19 +349,6 @@ function CharacterSheetContent() {
     }
   }, [activeCharacterId, previousCharacterId])
 
-  // Debug logging for active character
-  useEffect(() => {
-    if (activeCharacter) {
-      console.log('[DEBUG] Active character found:', {
-        id: activeCharacter.id,
-        name: activeCharacter.name,
-        classes: activeCharacter.classes,
-        savingThrowProficiencies: activeCharacter.savingThrowProficiencies
-      })
-    } else {
-      console.log('[DEBUG] No active character found')
-    }
-  }, [activeCharacter])
 
   const debouncedAutoSave = useCallback(async () => {
     if (!dbConnected || !activeCharacterId) {
@@ -484,10 +450,8 @@ function CharacterSheetContent() {
     
     // Apply the updates to the feature usage
     if (updates.type === 'use_slot') {
-      console.log('🔧 Using slot for feature:', featureId)
       updatedUsage = useFeatureSlot(activeCharacter, featureId, updates.amount || 1)
     } else if (updates.type === 'restore_slot') {
-      console.log('🔧 Restoring slot for feature:', featureId)
       updatedUsage = restoreFeatureSlot(activeCharacter, featureId, updates.amount || 1)
     } else if (updates.type === 'add_option') {
       updatedUsage = addFeatureOption(activeCharacter, featureId, updates.optionId)
@@ -621,7 +585,7 @@ function CharacterSheetContent() {
           
           // Preload class features for all characters in the background
           preloadForCharacters(dbCharacters).catch(error => {
-            console.warn('Failed to preload class features:', error)
+            // Failed to preload class features - non-critical
           })
 
           // Set active campaign by default
@@ -893,15 +857,30 @@ function CharacterSheetContent() {
     setSpellLibraryModalOpen(true)
   }
 
-  const handleAddSpell = (spell: any) => {
-    if (!activeCharacter) return
+  const handleAddSpell = (spell: any, characterId: string) => {
+    const targetCharacter = characters.find(c => c.id === characterId)
+    if (!targetCharacter) return
     
     const updatedSpellData = {
-      ...activeCharacter.spellData,
-      spells: [...(activeCharacter.spellData.spells || []), spell]
+      ...targetCharacter.spellData,
+      spells: [...(targetCharacter.spellData.spells || []), spell]
     }
     
-    updateCharacter({ spellData: updatedSpellData })
+    // Update the specific character
+    setCharacters(prev => prev.map(char => 
+      char.id === characterId 
+        ? { ...char, spellData: updatedSpellData }
+        : char
+    ))
+    
+    // Trigger save for that character
+    triggerAutoSave()
+    
+    // Show toast notification
+    toast({
+      title: "Spell Added",
+      description: `${spell.name} has been added to ${targetCharacter.name}'s spell list.`,
+    })
   }
 
   const handleCreateCampaign = async (campaign: Campaign) => {
@@ -1254,7 +1233,6 @@ function CharacterSheetContent() {
       // CRITICAL: Fetch fresh character data from database before applying long rest effects
       // This ensures we're working with the most up-to-date data and don't overwrite
       // any changes that were made since the modal was opened (by this user or others)
-      console.log('[Long Rest] Fetching fresh character data for', selectedCharacterIds.length, 'characters...')
       const freshCharacterPromises = selectedCharacterIds.map(id => loadCharacter(id))
       const freshCharacterResults = await Promise.all(freshCharacterPromises)
       
@@ -1277,7 +1255,6 @@ function CharacterSheetContent() {
         return character
       })
 
-      console.log('[Long Rest] Processing long rest for', freshCharactersMap.size, 'freshly loaded characters')
 
       // Update all selected characters to restore their hit points and replenish magic items
       const updatedCharacters = charactersToProcess.map(character => {
@@ -1871,7 +1848,6 @@ function CharacterSheetContent() {
       setRealtimeSubscription(subscription)
       
       return () => {
-        console.log("[Realtime] Cleaning up subscription...")
         subscription?.unsubscribe()
       }
     }
@@ -1907,7 +1883,7 @@ function CharacterSheetContent() {
         
         // Preload class features for all characters in the background
         preloadForCharacters(dbCharacters).catch(error => {
-          console.warn('Failed to preload class features:', error)
+          // Failed to preload class features - non-critical
         })
         
         // Set active campaign by default
@@ -1991,16 +1967,13 @@ function CharacterSheetContent() {
 
 
   const updateSpellData = (spellDataUpdates: Partial<SpellData>) => {
-    console.log("[v0] updateSpellData called with:", spellDataUpdates)
     
     if (!activeCharacterId) {
-      console.log("[v0] No active character ID, skipping update")
       return
     }
     
     const currentCharacter = characters.find((c) => c.id === activeCharacterId)
     if (!currentCharacter) {
-      console.log("[v0] Character not found, skipping update")
       return
     }
     
@@ -2009,7 +1982,6 @@ function CharacterSheetContent() {
       ...spellDataUpdates,
     }
     
-    console.log("[v0] Updating character with spell data:", updatedSpellData)
     // User action -> autosave
     updateCharacter({ spellData: updatedSpellData }, { autosave: true })
   }
@@ -2054,7 +2026,6 @@ function CharacterSheetContent() {
                 }
                 return features || []
               } else {
-                console.log(`[DEBUG] No class_id for ${charClass.name}, skipping`)
                 return []
               }
             })
@@ -2315,16 +2286,13 @@ function CharacterSheetContent() {
     // Load class features from database
     let classFeatures: Array<{name: string, description: string, source: string, level: number}> = []
     if (classData?.id) {
-      console.log(`[DEBUG] handleCreateCharacter: Loading features for class_id: ${classData.id}, level: ${characterData.level}`)
       const { features, error: featuresError } = await loadClassFeatures(classData.id, characterData.level)
       if (featuresError) {
         console.error("Error loading class features:", featuresError)
       } else {
         classFeatures = features || []
-        console.log(`[DEBUG] handleCreateCharacter: Loaded ${classFeatures.length} features for new character`)
       }
     } else {
-      console.log(`[DEBUG] handleCreateCharacter: No class data found for ${characterData.class} ${characterData.subclass}`)
     }
     
     // Create a temporary character object for calculations
@@ -3187,27 +3155,14 @@ function CharacterSheetContent() {
           <AccessDeniedOverlay
             isVisible={(() => {
               const isVisible = currentView === 'character' && activeCharacter && !canViewActiveCharacter
-              console.log("🎭 Overlay visibility check:", {
-                currentView,
-                hasActiveCharacter: !!activeCharacter,
-                canViewActiveCharacter,
-                isVisible,
-                superadminOverride
-              })
               return isVisible
             })()}
             currentUserProfile={currentUserProfile}
             character={activeCharacter}
             onSuperadminAccess={() => {
-              console.log("🔓 Superadmin access button clicked, setting override to true")
               setSuperadminOverride(true)
               // Force a re-render to see the state change
               setTimeout(() => {
-                console.log("🔍 After setting override, current state:", {
-                  superadminOverride: true,
-                  activeCharacterId: activeCharacter?.id,
-                  isSuperadmin: isUserSuperadmin
-                })
               }, 100)
             }}
           />
@@ -3571,11 +3526,112 @@ function CharacterSheetContent() {
 
       {/* Spell Library Modal */}
       <SpellLibraryModal
+        ref={spellLibraryRef}
         isOpen={spellLibraryModalOpen}
         onClose={() => setSpellLibraryModalOpen(false)}
         character={activeCharacter}
+        characters={characters}
+        campaigns={campaigns}
+        selectedCampaignId={selectedCampaignId}
+        currentUserId={currentUser?.id}
+        isSuperadmin={isUserSuperadmin}
         onAddSpell={handleAddSpell}
-        onCreateNewSpell={() => setSpellModalOpen(true)}
+        onCreateNewSpell={() => setSpellCreationModalOpen(true)}
+      />
+
+      {/* Spell Creation Modal */}
+      <SpellCreationModal
+        isOpen={spellCreationModalOpen}
+        onClose={() => setSpellCreationModalOpen(false)}
+        character={activeCharacter}
+        characters={characters}
+        campaigns={campaigns}
+        selectedCampaignId={selectedCampaignId}
+        currentUserId={currentUser?.id}
+        isSuperadmin={isUserSuperadmin}
+        onSave={async (spell, classes, characterId) => {
+          try {
+            // First, save to library via API
+            const response = await fetch('/api/spells', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                spell,
+                classes
+              })
+            })
+
+            if (response.ok) {
+              // Then add to character's spell list
+              handleAddSpell(spell, characterId)
+              
+              // Refresh the spell library to show the new spell
+              if (spellLibraryRef.current) {
+                spellLibraryRef.current.refreshLibrary()
+              }
+              
+              toast({
+                title: "Spell Created",
+                description: `${spell.name} has been added to the spell library and character's spell list.`,
+              })
+            } else {
+              const errorData = await response.json().catch(() => ({}))
+              toast({
+                title: "Failed to Create Spell",
+                description: errorData.error || "An error occurred while creating the spell.",
+                variant: "destructive",
+              })
+            }
+          } catch (error) {
+            console.error('Error creating spell:', error)
+            toast({
+              title: "Error",
+              description: "An unexpected error occurred while creating the spell.",
+              variant: "destructive",
+            })
+          }
+          setSpellCreationModalOpen(false)
+        }}
+        onSaveToLibraryOnly={async (spell, classes) => {
+          try {
+            // Save to library via API
+            const response = await fetch('/api/spells', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                spell,
+                classes
+              })
+            })
+
+            if (response.ok) {
+              // Refresh the spell library to show the new spell
+              if (spellLibraryRef.current) {
+                spellLibraryRef.current.refreshLibrary()
+              }
+              
+              toast({
+                title: "Spell Created",
+                description: `${spell.name} has been added to the spell library.`,
+              })
+            } else {
+              const errorData = await response.json().catch(() => ({}))
+              toast({
+                title: "Failed to Create Spell",
+                description: errorData.error || "An error occurred while creating the spell.",
+                variant: "destructive",
+              })
+            }
+          } catch (error) {
+            console.error('Error creating spell:', error)
+            toast({
+              title: "Error",
+              description: "An unexpected error occurred while creating the spell.",
+              variant: "destructive",
+            })
+          }
+          setSpellCreationModalOpen(false)
+        }}
       />
 
       {/* Level Up Modal */}

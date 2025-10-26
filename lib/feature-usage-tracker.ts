@@ -57,17 +57,9 @@ export function getFeatureUsageData(character: CharacterData): FeatureUsageData 
  */
 export function getFeatureCustomDescription(character: CharacterData, featureId: string): string | undefined {
   if (!character.classFeatures || !Array.isArray(character.classFeatures)) {
-    console.log(`🔮 getFeatureCustomDescription: No class features found for ${featureId}`)
     return undefined
   }
   
-  console.log(`🔮 getFeatureCustomDescription: Looking for feature ${featureId}`)
-  console.log(`🔮 Available class features:`, character.classFeatures.map(f => ({
-    title: f.title,
-    level: f.level,
-    class_features_skills: f.class_features_skills,
-    feature_id: f.class_features_skills && typeof f.class_features_skills === 'object' && 'id' in f.class_features_skills ? (f.class_features_skills as any).id : 'no-id'
-  })))
   
   // Find the feature in the class features
   // First try to match by ID, then by title as fallback
@@ -85,7 +77,6 @@ export function getFeatureCustomDescription(character: CharacterData, featureId:
       // Special case for genies-wrath -> Genie's Wrath
       const normalizedTitleFromId = titleFromId === 'Genies Wrath' ? 'Genie\'s Wrath' : titleFromId
       
-      console.log(`🔮 getFeatureCustomDescription: Checking title match: "${f.title}" === "${normalizedTitleFromId}"`)
       return f.title === normalizedTitleFromId
     }
     return false
@@ -93,11 +84,9 @@ export function getFeatureCustomDescription(character: CharacterData, featureId:
   
   if (feature && feature.class_features_skills && typeof feature.class_features_skills === 'object') {
     const customDescription = (feature.class_features_skills as any).customDescription
-    console.log(`🔮 getFeatureCustomDescription: Found custom description for ${featureId}: "${customDescription}"`)
     return customDescription
   }
   
-  console.log(`🔮 getFeatureCustomDescription: No custom description found for ${featureId}`)
   return undefined
 }
 
@@ -109,37 +98,31 @@ export function getFeatureMaxUses(character: CharacterData, featureId: string): 
   // First check if the feature already has maxUses in the character's usage data
   const usage = getFeatureUsage(character, featureId)
   if (usage && usage.maxUses !== undefined) {
-    console.log(`🔮 getFeatureMaxUses: Found maxUses in usage data for ${featureId}: ${usage.maxUses}`)
     return usage.maxUses
   }
   
   // Fall back to template-based calculation for common features
-  console.log(`🔮 getFeatureMaxUses: Calculating max uses for ${featureId} from character stats`)
   
   switch (featureId) {
     case 'bardic-inspiration':
       // Bardic Inspiration uses Charisma modifier
       const charismaModifier = Math.floor((character.charisma - 10) / 2)
       const maxUses = Math.max(1, charismaModifier)
-      console.log(`🔮 getFeatureMaxUses: Bardic Inspiration - Charisma: ${character.charisma}, Modifier: ${charismaModifier}, Max Uses: ${maxUses}`)
       return maxUses
       
     case 'flash-of-genius':
       // Flash of Genius uses Intelligence modifier
       const intelligenceModifier = Math.floor((character.intelligence - 10) / 2)
       const flashMaxUses = Math.max(1, intelligenceModifier)
-      console.log(`🔮 getFeatureMaxUses: Flash of Genius - Intelligence: ${character.intelligence}, Modifier: ${intelligenceModifier}, Max Uses: ${flashMaxUses}`)
       return flashMaxUses
       
     case 'divine-sense':
       // Divine Sense uses 1 + Charisma modifier
       const divineCharismaModifier = Math.floor((character.charisma - 10) / 2)
       const divineMaxUses = Math.max(1, 1 + divineCharismaModifier)
-      console.log(`🔮 getFeatureMaxUses: Divine Sense - Charisma: ${character.charisma}, Modifier: ${divineCharismaModifier}, Max Uses: ${divineMaxUses}`)
       return divineMaxUses
       
     default:
-      console.log(`🔮 getFeatureMaxUses: No max uses calculation found for ${featureId}`)
       return undefined
   }
 }

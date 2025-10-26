@@ -92,13 +92,16 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
     onSave({ spells })
   }
 
-  const handleAddSpellFromLibrary = (spell: Spell) => {
-    setSpells((prev: Spell[]) => {
-      const next = [...prev, spell]
-      onSave({ spells: next })
-      return next
-    })
-    setSpellLibraryModalOpen(false)
+  const handleAddSpellFromLibrary = (spell: Spell, characterId: string) => {
+    // Only add if this is the current character
+    if (characterId === character.id) {
+      setSpells((prev: Spell[]) => {
+        const next = [...prev, spell]
+        onSave({ spells: next })
+        return next
+      })
+      setSpellLibraryModalOpen(false)
+    }
   }
 
   const handleCreateNewSpell = async (spell: Spell, classes: string[]) => {
@@ -877,7 +880,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
         setEditingSpellClasses([])
       }}
       character={character}
-      onSave={handleCreateNewSpell}
+      onSave={(spell, classes, characterId) => handleCreateNewSpell(spell, classes)}
       onSaveToLibraryOnly={handleSaveToLibraryOnly}
       onUpdateLibrarySpell={handleUpdateLibrarySpell}
       initialSpellData={newSpell}

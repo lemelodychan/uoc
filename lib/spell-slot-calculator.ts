@@ -18,6 +18,7 @@ export interface ClassSpellData {
   spells_known: number[]
   bardic_inspiration_uses: number[]
   bardic_inspiration_die: string[]
+  show_spells_known: boolean
 }
 
 export const calculateSpellSlotsFromClass = (classData: ClassSpellData | null, level: number): SpellSlot[] => {
@@ -67,7 +68,8 @@ export const getCantripsKnownFromClass = (classData: ClassSpellData | null, leve
   
   // Ensure cantrips_known array exists and has the right length
   if (classData.cantrips_known && Array.isArray(classData.cantrips_known) && classData.cantrips_known.length >= level) {
-    return classData.cantrips_known[levelIndex] || 0
+    const result = classData.cantrips_known[levelIndex] || 0
+    return result
   }
   
   return 0
@@ -113,6 +115,109 @@ export const getBardicInspirationFromClass = (classData: ClassSpellData | null, 
   }
 }
 
+// Calculate cantrips known for multiclassed characters using class spell slots matrix
+export const getMulticlassCantripsKnownFromClasses = async (character: any): Promise<{ total: number; breakdown: string; isMulticlass: boolean }> => {
+  if (!character.classes || character.classes.length === 0) {
+    return { total: 0, breakdown: "0", isMulticlass: false }
+  }
+
+  const { getSpellcastingClasses } = require('./character-data')
+  const spellcastingClasses = getSpellcastingClasses(character.classes)
+  let totalCantripsKnown = 0
+  const classBreakdowns: string[] = []
+  
+  for (const charClass of spellcastingClasses) {
+    try {
+      // Fetch base class data (no subclass) for spell slots matrix
+      const classData = await fetchClassData(charClass.name, undefined)
+      if (classData) {
+        // Only include cantrips from classes that show spells known
+        if (classData.show_spells_known) {
+          const cantrips = getCantripsKnownFromClass(classData, charClass.level)
+          if (cantrips > 0) {
+            totalCantripsKnown += cantrips
+            classBreakdowns.push(`${cantrips}`)
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error loading class data for ${charClass.name}:`, error)
+    }
+  }
+  
+  const isMulticlass = classBreakdowns.length > 1
+  const breakdown = isMulticlass ? classBreakdowns.join(" + ") : classBreakdowns[0] || "0"
+  
+  return { total: totalCantripsKnown, breakdown, isMulticlass }
+}
+
+// Calculate spells known for multiclassed characters using class spell slots matrix
+export const getMulticlassSpellsKnownFromClasses = async (character: any): Promise<{ total: number; breakdown: string; isMulticlass: boolean }> => {
+  if (!character.classes || character.classes.length === 0) {
+    return { total: 0, breakdown: "0", isMulticlass: false }
+  }
+
+  const { getSpellcastingClasses } = require('./character-data')
+  const spellcastingClasses = getSpellcastingClasses(character.classes)
+  let totalSpellsKnown = 0
+  const classBreakdowns: string[] = []
+  
+  for (const charClass of spellcastingClasses) {
+    try {
+      // Fetch base class data (no subclass) for spell slots matrix
+      const classData = await fetchClassData(charClass.name, undefined)
+      if (classData) {
+        // Only include spells from classes that show spells known
+        if (classData.show_spells_known) {
+          const spells = getSpellsKnownFromClass(classData, charClass.level)
+          if (spells > 0) {
+            totalSpellsKnown += spells
+            classBreakdowns.push(`${spells}`)
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error loading class data for ${charClass.name}:`, error)
+    }
+  }
+  
+  const isMulticlass = classBreakdowns.length > 1
+  const breakdown = isMulticlass ? classBreakdowns.join(" + ") : classBreakdowns[0] || "0"
+  
+  return { total: totalSpellsKnown, breakdown, isMulticlass }
+}
+
+// Check if any class has show_spells_known enabled
+export const hasAnyClassShowSpellsKnown = async (character: any): Promise<boolean> => {
+  // For single-class characters, check the specific class
+  if (!character.classes || character.classes.length === 0) {
+    try {
+      const classData = await fetchClassData(character.class, undefined)
+      return classData?.show_spells_known || false
+    } catch (error) {
+      console.error(`Error loading class data for ${character.class}:`, error)
+      return false
+    }
+  }
+
+  const { getSpellcastingClasses } = require('./character-data')
+  const spellcastingClasses = getSpellcastingClasses(character.classes)
+  
+  for (const charClass of spellcastingClasses) {
+    try {
+      // Fetch base class data (no subclass) for spell slots matrix
+      const classData = await fetchClassData(charClass.name, undefined)
+      if (classData && classData.show_spells_known) {
+        return true
+      }
+    } catch (error) {
+      console.error(`Error loading class data for ${charClass.name}:`, error)
+    }
+  }
+  
+  return false
+}
+
 export const fetchClassDataById = async (classId: string): Promise<ClassSpellData | null> => {
   try {
     const supabase = createBrowserClient(
@@ -120,7 +225,7 @@ export const fetchClassDataById = async (classId: string): Promise<ClassSpellDat
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     )
 
-    const { data, error } = await supabase.from("classes").select("*").eq("id", classId).single()
+    const { data, error } = await supabase.from("classes").select("*").eq("id", classId).maybeSingle()
 
     if (error) {
       console.error("Error fetching class data:", error)
@@ -153,6 +258,7 @@ export const fetchClassDataById = async (classId: string): Promise<ClassSpellDat
       spells_known: parseSpellSlotArray(data.spells_known),
       bardic_inspiration_uses: parseSpellSlotArray(data.bardic_inspiration_uses),
       bardic_inspiration_die: data.bardic_inspiration_die || [],
+      show_spells_known: data.show_spells_known || false,
     }
 
     return classData
@@ -173,9 +279,12 @@ export const fetchClassData = async (className: string, subclass?: string): Prom
 
     if (subclass) {
       query = query.eq("subclass", subclass)
+    } else {
+      // When no subclass is provided, fetch the base class entry (subclass is null or empty)
+      query = query.is("subclass", null)
     }
 
-    const { data, error } = await query.single()
+    const { data, error } = await query.maybeSingle()
 
     if (error) {
       console.error("Error fetching class data:", error)
@@ -208,6 +317,7 @@ export const fetchClassData = async (className: string, subclass?: string): Prom
       spells_known: parseSpellSlotArray(data.spells_known),
       bardic_inspiration_uses: parseSpellSlotArray(data.bardic_inspiration_uses),
       bardic_inspiration_die: data.bardic_inspiration_die || [],
+      show_spells_known: data.show_spells_known || false,
     }
 
 

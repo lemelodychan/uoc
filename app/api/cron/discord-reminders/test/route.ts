@@ -5,15 +5,12 @@ import { createClient } from '@supabase/supabase-js'
 
 // Test endpoint to manually trigger Discord reminders
 export async function POST(req: Request) {
-  console.log('🚀 Test endpoint called!')
   const debugLogs: string[] = []
   debugLogs.push('🚀 Test endpoint called!')
   
   try {
     const body = await req.json().catch(() => ({}))
     const { campaignId } = body
-    console.log('📝 Request body:', body)
-    console.log('🎯 Campaign ID:', campaignId)
     
     // Try direct database access first
     debugLogs.push(`🔍 Environment check:`)
@@ -38,7 +35,6 @@ export async function POST(req: Request) {
     )
     
     debugLogs.push(`🔗 Testing direct database connection...`)
-    console.log(`🔗 Testing direct database connection...`)
     
     const { data: directData, error: directError } = await supabase
       .from("campaigns")
@@ -47,17 +43,14 @@ export async function POST(req: Request) {
     
     if (directError) {
       debugLogs.push(`❌ Direct database error: ${directError.message}`)
-      console.log(`❌ Direct database error: ${directError.message}`)
     } else {
       debugLogs.push(`✅ Direct database query returned ${directData?.length || 0} campaigns`)
-      console.log(`✅ Direct database query returned ${directData?.length || 0} campaigns`)
     }
     
     // Now try the loadAllCampaigns function with service role
     const { campaigns, error } = await loadAllCampaigns(true) // Use service role to bypass RLS
     if (error) {
       debugLogs.push(`❌ loadAllCampaigns error: ${error}`)
-      console.log(`❌ loadAllCampaigns error: ${error}`)
       return NextResponse.json({ error }, { status: 500 })
     }
     
@@ -67,11 +60,9 @@ export async function POST(req: Request) {
     let processed = 0
     
     debugLogs.push(`📋 Loaded ${campaigns?.length || 0} campaigns from database`)
-    console.log(`📋 Loaded ${campaigns?.length || 0} campaigns from database`)
     
     if (campaigns && campaigns.length > 0) {
       debugLogs.push(`📝 Campaign IDs: ${campaigns.map(c => c.id).join(', ')}`)
-      console.log(`📝 Campaign IDs: ${campaigns.map(c => c.id).join(', ')}`)
       
       // Debug the specific campaign data
       const targetCampaign = campaigns.find(c => c.id === campaignId)
@@ -83,14 +74,6 @@ export async function POST(req: Request) {
         debugLogs.push(`   - nextSessionTime: ${targetCampaign.nextSessionTime}`)
         debugLogs.push(`   - nextSessionTimezone: ${targetCampaign.nextSessionTimezone}`)
         debugLogs.push(`   - nextSessionNumber: ${targetCampaign.nextSessionNumber}`)
-        console.log(`🎯 Target campaign data:`, {
-          id: targetCampaign.id,
-          name: targetCampaign.name,
-          nextSessionDate: targetCampaign.nextSessionDate,
-          nextSessionTime: targetCampaign.nextSessionTime,
-          nextSessionTimezone: targetCampaign.nextSessionTimezone,
-          nextSessionNumber: targetCampaign.nextSessionNumber
-        })
       }
     }
     
@@ -101,45 +84,36 @@ export async function POST(req: Request) {
     
     debugLogs.push(`🎯 Looking for campaign ID: ${campaignId}`)
     debugLogs.push(`🔍 Found ${campaignsToTest.length} matching campaigns`)
-    console.log(`🎯 Looking for campaign ID: ${campaignId}`)
-    console.log(`🔍 Found ${campaignsToTest.length} matching campaigns`)
 
     debugLogs.push(`Testing Discord reminders at ${nowUtc.toISOString()}`)
     debugLogs.push(`Found ${campaignsToTest.length} campaigns to test`)
-    console.log(`Testing Discord reminders at ${nowUtc.toISOString()}`)
-    console.log(`Found ${campaignsToTest.length} campaigns to test`)
 
     await Promise.all(campaignsToTest.map(async (c) => {
       processed++
       const campaignLog = `\n--- Processing Campaign ${processed}: ${c.name} ---`
       debugLogs.push(campaignLog)
-      console.log(campaignLog)
       
       if (!c.discordWebhookUrl) {
         const log = '❌ No Discord webhook URL'
         debugLogs.push(log)
-        console.log(log)
         return
       }
       
       if (!c.discordNotificationsEnabled) {
         const log = '❌ Discord notifications disabled'
         debugLogs.push(log)
-        console.log(log)
         return
       }
       
       if (!c.nextSessionDate) {
         const log = '❌ No next session date'
         debugLogs.push(log)
-        console.log(log)
         return
       }
       
       if (!c.nextSessionNumber) {
         const log = '❌ No next session number'
         debugLogs.push(log)
-        console.log(log)
         return
       }
 
@@ -155,7 +129,6 @@ export async function POST(req: Request) {
         sessionUtc = fromZonedTime(localDate, c.nextSessionTimezone)
         
         debugLogs.push(`🔧 Parsed session: ${dateTimeString} in ${c.nextSessionTimezone} → ${sessionUtc.toISOString()}`)
-        console.log(`🔧 Parsed session: ${dateTimeString} in ${c.nextSessionTimezone} → ${sessionUtc.toISOString()}`)
       } else {
         // Fallback to old method
         sessionUtc = new Date(c.nextSessionDate)
@@ -164,7 +137,6 @@ export async function POST(req: Request) {
       if (isNaN(sessionUtc.getTime())) {
         const log = '❌ Invalid session date'
         debugLogs.push(log)
-        console.log(log)
         return
       }
 
@@ -182,7 +154,6 @@ export async function POST(req: Request) {
       
       logs.forEach(log => {
         debugLogs.push(log)
-        console.log(log)
       })
       
       // Timezone debugging
@@ -195,7 +166,6 @@ export async function POST(req: Request) {
       
       timezoneLogs.forEach(log => {
         debugLogs.push(log)
-        console.log(log)
       })
 
       // Send if:
@@ -218,7 +188,6 @@ export async function POST(req: Request) {
       
       analysisLogs.forEach(log => {
         debugLogs.push(log)
-        console.log(log)
       })
       
       if (!shouldSendReminder) {
@@ -231,27 +200,19 @@ export async function POST(req: Request) {
         
         reasonLogs.forEach(log => {
           debugLogs.push(log)
-          console.log(log)
         })
       }
       
       if (shouldSendReminder) {
         // Debug the session UTC time first
-        console.log(`🔍 Session UTC time: ${sessionUtc.toISOString()}`)
-        console.log(`🔍 Session UTC timestamp: ${sessionUtc.getTime()}`)
         
         const eu = formatInTimeZone(sessionUtc, 'Europe/Amsterdam', 'MMMM d, yyyy HH:mm')
         const qc = formatInTimeZone(sessionUtc, 'America/Montreal', 'MMMM d, yyyy HH:mm')
         const jp = formatInTimeZone(sessionUtc, 'Asia/Tokyo', 'MMMM d, yyyy HH:mm')
         
-        console.log(`🌍 Europe time: ${eu}`)
-        console.log(`🌍 Quebec time: ${qc}`)
-        console.log(`🌍 Tokyo time: ${jp}`)
         
         const content = `@everyone Session #${c.nextSessionNumber} of ${c.name} starts in 24 hours (Europe ${eu} / Quebec ${qc} / Tokyo ${jp})`
         
-        console.log(`📤 Sending Discord notification...`)
-        console.log(`📝 Content: ${content}`)
         
         try {
           const response = await fetch(c.discordWebhookUrl, {
@@ -263,20 +224,15 @@ export async function POST(req: Request) {
           if (response.ok) {
             await updateCampaign({ ...c, updated_at: new Date().toISOString(), discordReminderSent: true })
             sent++
-            console.log(`✅ Discord notification sent successfully!`)
           } else {
-            console.log(`❌ Discord webhook failed: ${response.status} ${response.statusText}`)
           }
         } catch (e) {
-          console.log(`❌ Discord webhook error:`, e)
         }
       } else {
-        console.log(`⏭️ Skipping - conditions not met`)
       }
 
       // After session time passes, clear fields and disable notifications
       if (nowUtc.getTime() > sessionUtc.getTime()) {
-        console.log(`🧹 Session has passed, cleaning up...`)
         await updateCampaign({
           ...c,
           updated_at: new Date().toISOString(),
@@ -292,7 +248,6 @@ export async function POST(req: Request) {
 
     const summaryLog = `\n📊 Summary: Processed ${processed} campaigns, sent ${sent} notifications`
     debugLogs.push(summaryLog)
-    console.log(summaryLog)
 
     return NextResponse.json({ 
       ok: true, 

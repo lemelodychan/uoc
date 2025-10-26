@@ -13,7 +13,7 @@ export async function POST() {
       .from('user_profiles')
       .select('display_name')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (profileError || !profile) {
       return NextResponse.json({ error: profileError?.message || 'Profile not found' }, { status: 404 })

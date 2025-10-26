@@ -122,7 +122,6 @@ export function getTemplateForExistingFeature(featureKey: string): ClassFeatureS
 export function getFeaturesForClass(className: string, level: number, subclass?: string): ClassFeatureSkill[] {
   const features: ClassFeatureSkill[] = []
 
-  console.log('🔍 Debug - getFeaturesForClass called with:', { className, level, subclass })
 
   for (const [key, mapping] of Object.entries(EXISTING_FEATURE_MAPPING)) {
     const classNameMatch = mapping.className.toLowerCase() === className.toLowerCase()
@@ -131,29 +130,16 @@ export function getFeaturesForClass(className: string, level: number, subclass?:
     // For subclass-specific features, they should match exactly
     const subclassMatch = mapping.subclass === undefined || mapping.subclass === subclass
     
-    console.log('🔍 Debug - Checking mapping:', {
-      key,
-      mappingClassName: mapping.className,
-      mappingLevel: mapping.level,
-      mappingSubclass: mapping.subclass,
-      classNameMatch,
-      levelMatch,
-      subclassMatch,
-      overallMatch: classNameMatch && levelMatch && subclassMatch
-    })
     
     if (classNameMatch && levelMatch && subclassMatch) {
       const template = FEATURE_TEMPLATES[mapping.templateId]
       if (template) {
-        console.log('🔍 Debug - Adding feature:', mapping.templateId)
         features.push(template)
       } else {
-        console.log('🔍 Debug - Template not found for:', mapping.templateId)
       }
     }
   }
 
-  console.log('🔍 Debug - Final features for', className, ':', features.map(f => f.id))
   return features
 }
 

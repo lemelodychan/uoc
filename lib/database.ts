@@ -147,10 +147,10 @@ export const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'disp
         // Use the same client; for server-side contexts use service role or session based update
         const { error: authUpdateError } = await supabase.auth.updateUser({ data: { display_name: updates.displayName } as any })
         if (authUpdateError) {
-          console.warn('Auth display name update failed:', authUpdateError.message)
+          // Auth display name update failed - non-critical
         }
       } catch (e) {
-        console.warn('Auth display name update threw:', e)
+        // Auth display name update threw - non-critical
       }
     }
 
@@ -194,25 +194,18 @@ export const syncCurrentUserProfileFromAuth = async (): Promise<{ success: boole
 // Debug function to check database state
 export const debugDatabaseState = async (): Promise<void> => {
   try {
-    console.log("🔍 DEBUG: Checking database state...")
-    
     // Check user_profiles table
     const { data: profiles, error: profilesError } = await supabase
       .from("user_profiles")
       .select("*")
-    
-    console.log("📊 user_profiles table:", { profiles, profilesError })
     
     // Check characters table
     const { data: characters, error: charactersError } = await supabase
       .from("characters")
       .select("id, name, user_id")
     
-    console.log("📊 characters table:", { characters, charactersError })
-    
     // Check current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    console.log("👤 Current user:", { user, userError })
     
   } catch (error) {
     console.error("❌ Debug error:", error)
@@ -221,7 +214,6 @@ export const debugDatabaseState = async (): Promise<void> => {
 
 export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: string }> => {
   try {
-    console.log("🔍 getAllUsers: Starting to fetch users...")
     
     // Get all user profiles
     const { data: profiles, error: profilesError } = await supabase
@@ -229,7 +221,6 @@ export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: st
       .select("*")
       .order("display_name", { ascending: true })
     
-    console.log("📊 User profiles query result:", { profiles, profilesError })
     
     if (profilesError) {
       console.error("❌ Error getting user profiles:", profilesError)
@@ -238,7 +229,6 @@ export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: st
     
     // If no profiles exist, try to get users from characters table
     if (!profiles || profiles.length === 0) {
-      console.log("⚠️ No user profiles found, checking characters table...")
       
       // Get unique user IDs from characters table
       const { data: characterData, error: characterError } = await supabase
@@ -246,7 +236,6 @@ export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: st
         .select("user_id")
         .not("user_id", "is", null)
       
-      console.log("📊 Characters query result:", { characterData, characterError })
       
       if (characterError) {
         console.error("❌ Error getting character user IDs:", characterError)
@@ -255,10 +244,8 @@ export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: st
       
       // Get unique user IDs
       const userIds = [...new Set(characterData?.map(c => c.user_id).filter(Boolean) || [])]
-      console.log("🆔 Unique user IDs from characters:", userIds)
       
       if (userIds.length === 0) {
-        console.log("⚠️ No users found in characters table either")
         return { users: [] }
       }
       
@@ -272,7 +259,6 @@ export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: st
         updatedAt: new Date().toISOString()
       }))
       
-      console.log("✅ Created temporary users:", tempUsers)
       return { users: tempUsers }
     }
     
@@ -286,7 +272,6 @@ export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: st
       updatedAt: profile.updated_at
     }))
     
-    console.log("✅ Converted user profiles:", users)
     return { users }
   } catch (error) {
     console.error("❌ Error in getAllUsers:", error)
@@ -583,7 +568,7 @@ export const saveCharacter = async (
 
 export const loadCharacter = async (characterId: string): Promise<{ character?: CharacterData; error?: string }> => {
   try {
-    const { data, error } = await supabase.from("characters").select("*").eq("id", characterId).single()
+    const { data, error } = await supabase.from("characters").select("*").eq("id", characterId).maybeSingle()
 
     if (error) {
       console.error("Error loading character:", error)
@@ -607,13 +592,10 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
     let savingThrowProficiencies
     // TEMPORARY FIX: Force recalculation for multiclass characters to fix the missing saving throws
     if (data.classes && data.classes.length > 1) {
-      console.log('[DEBUG] loadCharacter: FORCING multiclass saving throws recalculation for classes:', data.classes)
       savingThrowProficiencies = (await import('./character-data')).getMulticlassSavingThrowProficiencies(data.classes)
     } else if (data.saving_throw_proficiencies && data.saving_throw_proficiencies.length > 0) {
-      console.log('[DEBUG] loadCharacter: Using existing saving throws from database:', data.saving_throw_proficiencies)
       savingThrowProficiencies = data.saving_throw_proficiencies
     } else {
-      console.log('[DEBUG] loadCharacter: Using single class saving throws for:', data.class_name)
       savingThrowProficiencies = (await import('./character-data')).createClassBasedSavingThrowProficiencies(data.class_name)
     }
 
@@ -955,7 +937,7 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           .select("id")
           .eq("name", className)
           .is("subclass", null)
-          .single()
+          .maybeSingle()
         
         if (!baseClassError && baseClassData) {
           const { features } = await loadClassFeatures(baseClassData.id, level, subclass)
@@ -1007,13 +989,10 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
         let savingThrowProficiencies
         // TEMPORARY FIX: Force recalculation for multiclass characters to fix the missing saving throws
         if (row.classes && row.classes.length > 1) {
-          console.log('[DEBUG] loadAllCharacters: FORCING multiclass saving throws recalculation for classes:', row.classes)
           savingThrowProficiencies = (await import('./character-data')).getMulticlassSavingThrowProficiencies(row.classes)
         } else if (row.saving_throw_proficiencies && row.saving_throw_proficiencies.length > 0) {
-          console.log('[DEBUG] loadAllCharacters: Using existing saving throws from database:', row.saving_throw_proficiencies)
           savingThrowProficiencies = row.saving_throw_proficiencies
         } else {
-          console.log('[DEBUG] loadAllCharacters: Using single class saving throws for:', row.class_name)
           savingThrowProficiencies = (await import('./character-data')).createClassBasedSavingThrowProficiencies(row.class_name)
         }
 
@@ -1540,7 +1519,7 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
       .from("classes")
       .select("name, subclass")
       .eq("id", classId)
-      .single()
+      .maybeSingle()
 
     if (classError) {
       console.error("Error loading class data:", classError)
@@ -1593,7 +1572,7 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
         .eq("name", classData.name)
         .is("subclass", null) // Specifically look for the base class
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (!baseClassError && baseClassData) {
         // Load base class features
@@ -1636,7 +1615,7 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
         .eq("name", classData.name)
         .is("subclass", null) // Specifically look for the base class
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (!baseClassError && baseClassData) {
         // Load base class features
@@ -1682,7 +1661,7 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
         .eq("name", classData.name)
         .eq("subclass", subclass)
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (!subclassError && subclassData) {
         // Load subclass features
@@ -1847,19 +1826,6 @@ export const loadClassesWithDetails = async (): Promise<{
       return { error: error.message }
     }
 
-    // Debug: Log the loaded data to see what toggles are being loaded
-    console.log('Loaded classes data:', data?.map(cls => ({
-      id: cls.id,
-      name: cls.name,
-      show_spells_known: cls.show_spells_known,
-      show_sorcery_points: cls.show_sorcery_points,
-      show_martial_arts: cls.show_martial_arts,
-      show_ki_points: cls.show_ki_points,
-      show_unarmored_movement: cls.show_unarmored_movement,
-      show_rage: cls.show_rage,
-      show_rage_damage: cls.show_rage_damage,
-      is_custom: cls.is_custom
-    })))
 
     return { classes: data || [] }
   } catch (error) {
@@ -1916,24 +1882,6 @@ export const getClassDataWithSubclassPriority = (classes: any[], className: stri
 
 export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> => {
   try {
-    console.log(`💾 upsertClass called with:`, {
-      id: cls.id,
-      name: cls.name,
-      subclass: cls.subclass,
-      isBaseClass: !cls.subclass,
-      spellSlotsData: {
-        spell_slots_1: cls.spell_slots_1,
-        spell_slots_2: cls.spell_slots_2,
-        spell_slots_3: cls.spell_slots_3,
-        spell_slots_4: cls.spell_slots_4,
-        spell_slots_5: cls.spell_slots_5,
-        spell_slots_6: cls.spell_slots_6,
-        spell_slots_7: cls.spell_slots_7,
-        spell_slots_8: cls.spell_slots_8,
-        spell_slots_9: cls.spell_slots_9,
-        cantrips_known: cls.cantrips_known,
-      }
-    })
     const toStringArray = (v: any): string[] | null => {
       if (v === undefined || v === null) return null
       return Array.isArray(v) ? v.map((x) => String(x)) : [String(v)]
@@ -1995,18 +1943,6 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
     // Always include is_custom field, defaulting to true for new classes
     payload.is_custom = (cls as any).is_custom ?? true
     
-    // Debug: Log the payload to see what's being saved
-    console.log('UpsertClass payload toggles:', {
-      show_spells_known: payload.show_spells_known,
-      show_sorcery_points: payload.show_sorcery_points,
-      show_martial_arts: payload.show_martial_arts,
-      show_ki_points: payload.show_ki_points,
-      show_unarmored_movement: payload.show_unarmored_movement,
-      show_rage: payload.show_rage,
-      show_rage_damage: payload.show_rage_damage,
-      is_custom: payload.is_custom
-    })
-    console.log('UpsertClass full payload:', JSON.stringify(payload, null, 2))
     if ((cls as any).created_by !== undefined) {
       payload.created_by = (cls as any).created_by
     }
@@ -2022,7 +1958,6 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
       payload.updated_at = (cls as any).updated_at
     }
 
-    console.log("📤 Payload being sent to database:", payload)
     
     const { error } = await supabase.from("classes").upsert(payload)
     if (error) {
@@ -2033,20 +1968,6 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
 
     // Synchronize spell slots to ALL entries with the same class name (base class + all subclasses)
     if (cls.name) {
-      console.log(`🔄 Starting synchronization for class: ${cls.name}${cls.subclass ? ` (${cls.subclass})` : ' (base class)'}`)
-      console.log(`📊 Spell slot data being synchronized:`, {
-        spell_slots_1: payload.spell_slots_1,
-        spell_slots_2: payload.spell_slots_2,
-        spell_slots_3: payload.spell_slots_3,
-        spell_slots_4: payload.spell_slots_4,
-        spell_slots_5: payload.spell_slots_5,
-        spell_slots_6: payload.spell_slots_6,
-        spell_slots_7: payload.spell_slots_7,
-        spell_slots_8: payload.spell_slots_8,
-        spell_slots_9: payload.spell_slots_9,
-        cantrips_known: payload.cantrips_known,
-      })
-      
       await synchronizeSpellSlotsToSubclasses(cls.name, {
         spell_slots_1: payload.spell_slots_1,
         spell_slots_2: payload.spell_slots_2,
@@ -2060,7 +1981,6 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
         cantrips_known: payload.cantrips_known,
       })
     } else {
-      console.log(`ℹ️ Skipping synchronization - no class name provided`)
     }
 
     return { success: true, id }
@@ -2087,7 +2007,6 @@ export const synchronizeSpellSlotsToSubclasses = async (
   }
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log(`🔍 Looking for all entries with class name: "${className}"`)
     
     // Find ALL entries with this class name (base class + all subclasses)
     const { data: allClasses, error: fetchError } = await supabase
@@ -2100,10 +2019,8 @@ export const synchronizeSpellSlotsToSubclasses = async (
       return { success: false, error: fetchError.message }
     }
 
-    console.log(`📋 Found ${allClasses?.length || 0} entries:`, allClasses)
 
     if (!allClasses || allClasses.length === 0) {
-      console.log(`⚠️ No class entries found for "${className}"`)
       return { success: true }
     }
 
@@ -2121,8 +2038,6 @@ export const synchronizeSpellSlotsToSubclasses = async (
       updated_at: new Date().toISOString()
     }
 
-    console.log(`📤 Update payload being sent:`, updatePayload)
-    console.log(`🎯 Updating all entries where name = "${className}"`)
 
     // Update ALL entries with this class name (base class + all subclasses)
     const { error: updateError } = await supabase
@@ -2137,7 +2052,6 @@ export const synchronizeSpellSlotsToSubclasses = async (
 
     const baseClassCount = allClasses.filter(c => c.subclass === null).length
     const subclassCount = allClasses.filter(c => c.subclass !== null).length
-    console.log(`✅ Successfully synchronized spell slots to ${allClasses.length} total entries of ${className} (${baseClassCount} base class + ${subclassCount} subclasses)`)
     return { success: true }
   } catch (error) {
     console.error("❌ Error synchronizing spell slots to all class entries:", error)
@@ -2147,7 +2061,7 @@ export const synchronizeSpellSlotsToSubclasses = async (
 
 export const loadClassById = async (id: string): Promise<{ klass?: any; error?: string }> => {
   try {
-    const { data, error } = await supabase.from("classes").select("*").eq("id", id).single()
+    const { data, error } = await supabase.from("classes").select("*").eq("id", id).maybeSingle()
     if (error) return { error: error.message }
     return { klass: data }
   } catch (error) {
@@ -2163,7 +2077,7 @@ export const loadBaseClassByName = async (name: string): Promise<{ klass?: any; 
       .select("*")
       .eq("name", name)
       .is("subclass", null)
-      .single()
+      .maybeSingle()
     if (error) return { error: error.message }
     return { klass: data }
   } catch (error) {
@@ -2261,7 +2175,6 @@ export const loadFeaturesForBaseWithSubclasses = async (baseClassId: string, sub
     const uniq = new Map<string, any>()
     all.forEach(f => uniq.set(f.id, f))
     const merged = Array.from(uniq.values()).sort((a,b) => a.level - b.level)
-    console.log('🔍 Database returning features:', merged)
     return { features: merged }
   } catch (error) {
     console.error("Error loading base+subclass features:", error)
@@ -2294,7 +2207,6 @@ export const invalidateClassFeaturesCache = async (classId: string, className?: 
     }
     
     if (removedCount > 0) {
-      console.log(`🔄 ClassFeatures Cache INVALIDATED for class ${className || classId} (${removedCount} entries removed)`)
     }
   } catch (error) {
     console.error('Error invalidating class features cache:', error)
@@ -2335,7 +2247,6 @@ export const upsertClassFeature = async (feature: {
         .eq("id", feature.id)
       
       if (!updateError) {
-        console.log('💾 Updated existing class feature:', feature.id)
         // Invalidate cache for this class
         await invalidateClassFeaturesCache(feature.class_id)
         return { success: true, id: feature.id }
@@ -2353,7 +2264,7 @@ export const upsertClassFeature = async (feature: {
       .eq("title", feature.title)
       .eq("feature_type", feature.feature_type)
       .eq("subclass_id", normalizedSubclassId)
-      .single()
+      .maybeSingle()
     
     if (existingFeature && !findError) {
       // Update existing feature
@@ -2372,7 +2283,6 @@ export const upsertClassFeature = async (feature: {
         return { success: false, error: updateError.message }
       }
       
-      console.log('💾 Updated existing class feature by constraint:', existingFeature.id)
       // Invalidate cache for this class
       await invalidateClassFeaturesCache(feature.class_id)
       return { success: true, id: existingFeature.id }
@@ -2386,7 +2296,6 @@ export const upsertClassFeature = async (feature: {
       subclass_id: normalizedSubclassId,
       is_hidden: feature.is_hidden || false
     }
-    console.log('💾 Creating new class feature:', payload)
     const { error } = await supabase.from("class_features").insert(payload)
     if (error) {
       console.error("Error creating class feature:", error)
@@ -2673,7 +2582,6 @@ export const getCampaignNotes = async (campaignId: string): Promise<{ notes?: Ca
 
 export const createCampaignNote = async (note: Omit<CampaignNote, 'id' | 'created_at' | 'updated_at'>): Promise<{ note?: CampaignNote; error?: string }> => {
   try {
-    console.log("Creating campaign note with data:", note)
     const { data, error } = await supabase
       .from("campaign_notes")
       .insert([note])
@@ -2685,7 +2593,6 @@ export const createCampaignNote = async (note: Omit<CampaignNote, 'id' | 'create
       return { error: error.message }
     }
 
-    console.log("Successfully created campaign note:", data)
     
     // Update cache
     try {
@@ -2704,7 +2611,6 @@ export const createCampaignNote = async (note: Omit<CampaignNote, 'id' | 'create
 
 export const updateCampaignNote = async (id: string, updates: Partial<Pick<CampaignNote, 'title' | 'content' | 'session_date' | 'members_attending'>>): Promise<{ note?: CampaignNote; error?: string }> => {
   try {
-    console.log("Updating campaign note with data:", { id, updates })
     const { data, error } = await supabase
       .from("campaign_notes")
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -2717,7 +2623,6 @@ export const updateCampaignNote = async (id: string, updates: Partial<Pick<Campa
       return { error: error.message }
     }
 
-    console.log("Successfully updated campaign note:", data)
     
     // Update cache
     try {
@@ -2924,15 +2829,9 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
 
     // Load feature skills for each class the character has
     for (const charClass of character.classes || []) {
-      console.log('🔍 Debug - Loading features for class:', {
-        className: charClass.name,
-        level: charClass.level,
-        subclass: charClass.subclass
-      })
       
       // First try to load from templates/mapping
       const classFeatures = getFeaturesForClass(charClass.name, charClass.level, charClass.subclass)
-      console.log('🔍 Debug - Features found for', charClass.name, ':', classFeatures.map(f => f.id))
       
       // Ensure each feature has the correct className property
       const featuresWithClassName = classFeatures.map(feature => ({
@@ -2948,7 +2847,7 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
           .select('id')
           .eq('name', charClass.name)
           .eq('subclass', charClass.subclass || null)
-          .single()
+          .maybeSingle()
 
         if (classData) {
           const { data: features } = await supabase
@@ -2977,7 +2876,6 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
           }
         }
       } catch (dbError) {
-        console.log('🔍 Debug - Database fallback failed for', charClass.name, ':', dbError)
       }
     }
 
@@ -3067,7 +2965,7 @@ export const duplicateClass = async (
       .from('classes')
       .select('*')
       .eq('id', sourceClassId)
-      .single()
+      .maybeSingle()
 
     if (sourceError || !sourceClass) {
       return { success: false, error: "Source class not found" }
@@ -3276,7 +3174,7 @@ export const canEditClass = async (classId: string): Promise<{
       .from('classes')
       .select('is_custom, created_by')
       .eq('id', classId)
-      .single()
+      .maybeSingle()
 
     if (!classData) {
       return { canEdit: false, error: "Class not found" }

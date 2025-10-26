@@ -297,6 +297,12 @@ function evaluateFormula(formula: string, context: FormulaContext): number {
     return parseInt(formula.split(':')[1]) || 0
   }
 
+  // Handle simple numeric values
+  const numericValue = parseInt(formula)
+  if (!isNaN(numericValue)) {
+    return numericValue
+  }
+
   // Handle ability modifiers
   const abilityModifierMatch = formula.match(/^(\w+)_modifier$/)
   if (abilityModifierMatch) {

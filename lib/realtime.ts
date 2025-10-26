@@ -39,7 +39,6 @@ export const subscribeToLongRestEvents = (
   onLongRestEvent: (event: LongRestEvent) => void,
   onError?: (error: any) => void
 ) => {
-  console.log("[Realtime] Setting up database polling for long rest events...")
   
   // Clear any existing polling
   if (pollingInterval) {
@@ -66,7 +65,6 @@ export const subscribeToLongRestEvents = (
         // Process events in order, but only if we haven't seen them before
         for (const event of data) {
           if (event.id !== lastCheckedEventId) {
-            console.log("[Realtime] Found new long rest event:", event.id)
             lastCheckedEventId = event.id
             onLongRestEvent(event as LongRestEvent)
             break // Only process one event at a time to avoid conflicts
@@ -82,7 +80,6 @@ export const subscribeToLongRestEvents = (
   // Return subscription object with cleanup function
   return {
     unsubscribe: () => {
-      console.log("[Realtime] Stopping database polling...")
       if (pollingInterval) {
         clearInterval(pollingInterval)
         pollingInterval = null
@@ -102,7 +99,6 @@ export const broadcastLongRestEvent = async (
   eventData: LongRestEventData
 ): Promise<{ success: boolean; error?: string; eventId?: string }> => {
   try {
-    console.log("[Realtime] Broadcasting long rest event via database...")
     
     const { data, error } = await supabase
       .from('long_rest_events')
@@ -114,14 +110,13 @@ export const broadcastLongRestEvent = async (
         status: 'pending',
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error("[Realtime] Error broadcasting long rest event:", error)
       return { success: false, error: error.message }
     }
 
-    console.log("[Realtime] Long rest event broadcasted successfully:", data.id)
     return { success: true, eventId: data.id }
   } catch (error) {
     console.error("[Realtime] Error in broadcastLongRestEvent:", error)
@@ -139,14 +134,13 @@ export const confirmLongRestEvent = async (
   finalEventData?: any
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log("[Realtime] Confirming long rest event:", eventId, "by character:", confirmedByCharacterId)
     
     // First, check if the event exists and is still pending
     const { data: existingEvent, error: fetchError } = await supabase
       .from('long_rest_events')
       .select('*')
       .eq('id', eventId)
-      .single()
+      .maybeSingle()
 
     if (fetchError) {
       console.error("[Realtime] Error fetching event for confirmation:", fetchError)
@@ -159,7 +153,6 @@ export const confirmLongRestEvent = async (
     }
 
     if (existingEvent.status !== 'pending') {
-      console.log("[Realtime] Event already processed:", eventId, "status:", existingEvent.status)
       return { success: true } // Return success since it's already processed
     }
     
@@ -185,7 +178,6 @@ export const confirmLongRestEvent = async (
       return { success: false, error: error.message }
     }
 
-    console.log("[Realtime] Long rest event confirmed successfully")
     return { success: true }
   } catch (error) {
     console.error("[Realtime] Error in confirmLongRestEvent:", error)

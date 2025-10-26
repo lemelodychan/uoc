@@ -348,7 +348,6 @@ export function CampaignHomepage({
     
     // If the timezone conversion fails, use a fallback approach
     if (isNaN(utcDate.getTime())) {
-      console.log('Timezone conversion failed, using fallback')
       // Fallback: just store the date as-is and let the display handle it
       const fallbackDate = new Date(dateTimeString)
       const updatedCampaign = {
@@ -410,7 +409,6 @@ export function CampaignHomepage({
   const handleSendDiscordNotification = async () => {
     if (!campaign?.id) return
     
-    console.log('🎯 Sending Discord notification for campaign:', campaign.id)
     
     try {
       const response = await fetch('/api/cron/discord-reminders/test', {
@@ -419,16 +417,10 @@ export function CampaignHomepage({
         body: JSON.stringify({ campaignId: campaign.id })
       })
       
-      console.log('📡 Response status:', response.status)
-      console.log('📡 Response ok:', response.ok)
       
       const result = await response.json()
       
       // Log the debug information
-      if (result.debugLogs) {
-        console.log('🔍 Debug logs from server:')
-        result.debugLogs.forEach((log: string) => console.log(log))
-      }
       
       if (response.ok) {
         if (result.sent > 0) {
@@ -472,17 +464,6 @@ export function CampaignHomepage({
       const result = await response.json()
       
       if (response.ok) {
-        console.log('🌍 All timezone test results:', result)
-        console.log('\n📊 Summary:')
-        result.timezoneTests.forEach((test: any) => {
-          console.log(`\n${test.sourceTimezone.label} (${test.sourceTimezone.name}):`)
-          console.log(`  Source: ${test.sourceDateTime}`)
-          console.log(`  UTC: ${test.utcDateTime}`)
-          console.log(`  Europe: ${test.conversions.Europe}`)
-          console.log(`  Quebec: ${test.conversions.Quebec}`)
-          console.log(`  Tokyo: ${test.conversions.Tokyo}`)
-        })
-        
         toast({
           title: "All timezone test completed",
           description: "Check console for results",

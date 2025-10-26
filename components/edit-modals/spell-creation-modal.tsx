@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,13 +12,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Icon } from "@iconify/react"
-import type { CharacterData, Spell } from "@/lib/character-data"
+import type { CharacterData, Spell, Campaign } from "@/lib/character-data"
 
 interface SpellCreationModalProps {
   isOpen: boolean
   onClose: () => void
   character: CharacterData
-  onSave: (spell: Spell, classes: string[]) => void
+  characters?: CharacterData[]
+  campaigns?: Campaign[]
+  selectedCampaignId?: string
+  currentUserId?: string
+  isSuperadmin?: boolean
+  onSave: (spell: Spell, classes: string[], characterId: string) => void
   onSaveToLibraryOnly?: (spell: Spell, classes: string[]) => void
   onUpdateLibrarySpell?: (spellId: string, spell: Spell, classes: string[]) => void
   initialSpellData?: Partial<Spell>
@@ -82,7 +87,22 @@ const DURATION_OPTIONS = [
   "Special"
 ]
 
-export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveToLibraryOnly, onUpdateLibrarySpell, initialSpellData, initialClasses, editingSpellId }: SpellCreationModalProps) {
+export function SpellCreationModal({ 
+  isOpen, 
+  onClose, 
+  character, 
+  characters = [], 
+  campaigns = [],
+  selectedCampaignId = "all",
+  currentUserId,
+  isSuperadmin = false,
+  onSave, 
+  onSaveToLibraryOnly, 
+  onUpdateLibrarySpell, 
+  initialSpellData, 
+  initialClasses, 
+  editingSpellId 
+}: SpellCreationModalProps) {
   const [spellData, setSpellData] = useState({
     name: initialSpellData?.name || "",
     school: initialSpellData?.school || "Evocation",
@@ -102,6 +122,25 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
     higherLevel: initialSpellData?.higherLevel || ""
   })
   const [selectedClasses, setSelectedClasses] = useState<string[]>(initialClasses || [])
+  const [showCharacterDropdown, setShowCharacterDropdown] = useState(false)
+  const characterDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (characterDropdownRef.current && !characterDropdownRef.current.contains(event.target as Node)) {
+        setShowCharacterDropdown(false)
+      }
+    }
+
+    if (showCharacterDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showCharacterDropdown])
 
   // Update state when initialSpellData or initialClasses changes
   useEffect(() => {
@@ -191,7 +230,35 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
     setSelectedClasses([])
   }
 
-  const handleSave = () => {
+  // Get characters available to add spells to based on user permissions
+  const getAvailableCharacters = (): CharacterData[] => {
+    // If no characters array provided, just return the current character
+    if (!characters || characters.length === 0) {
+      return [character]
+    }
+
+    // Superadmins can see all characters
+    if (isSuperadmin) {
+      return characters
+    }
+
+    // Get the current campaign if one is selected
+    const currentCampaign = campaigns.find(c => c.id === selectedCampaignId)
+    
+    // If user is DM of the selected campaign, they can see all characters in that campaign
+    if (currentCampaign && currentCampaign.dungeonMasterId === currentUserId) {
+      return characters.filter(char => 
+        currentCampaign.characters.includes(char.id)
+      )
+    }
+
+    // Regular users can only see their own characters
+    return characters.filter(char => char.userId === currentUserId)
+  }
+
+  const availableCharacters = getAvailableCharacters()
+
+  const handleSave = (characterId: string) => {
     if (!validateForm()) return
 
     const spell = createSpellObject()
@@ -200,7 +267,7 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
     if (editingSpellId && onUpdateLibrarySpell) {
       onUpdateLibrarySpell(editingSpellId, spell, selectedClasses)
     } else {
-      onSave(spell, selectedClasses)
+      onSave(spell, selectedClasses, characterId)
     }
     
     resetForm()
@@ -513,18 +580,52 @@ export function SpellCreationModal({ isOpen, onClose, character, onSave, onSaveT
 
         <DialogFooter className="p-4 border-t justify-between items-center">
           <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <div className="flex gap-2">
-              {onSaveToLibraryOnly && !editingSpellId && (
-                <Button variant="outline" onClick={handleSaveToLibraryOnly}>
-                  Save
-                </Button>
-              )}
-              <Button onClick={handleSave}>
-                {editingSpellId ? 'Update' : 'Save and Add to Character'}
+            Cancel
+          </Button>
+          <div className="flex gap-2">
+            {onSaveToLibraryOnly && !editingSpellId && (
+              <Button variant="outline" onClick={handleSaveToLibraryOnly}>
+                Save to Library Only
               </Button>
-            </div>
+            )}
+            {!editingSpellId ? (
+              availableCharacters.length === 1 ? (
+                <Button onClick={() => handleSave(availableCharacters[0].id)}>
+                  Save and Add to Character
+                </Button>
+              ) : (
+                <div className="relative">
+                  <Button onClick={() => setShowCharacterDropdown(!showCharacterDropdown)}>
+                    Save and Add to Character
+                    <Icon icon="lucide:chevron-down" className="w-3 h-3 ml-1" />
+                  </Button>
+                  {showCharacterDropdown && (
+                    <div 
+                      ref={characterDropdownRef}
+                      className="absolute bottom-full right-0 mb-1 z-50 bg-popover border rounded-md shadow-md p-1 min-w-[224px]"
+                    >
+                      {availableCharacters.map((char) => (
+                        <button
+                          key={char.id}
+                          onClick={() => {
+                            handleSave(char.id)
+                            setShowCharacterDropdown(false)
+                          }}
+                          className="w-full flex items-center justify-between px-2 py-1.5 text-sm rounded-sm hover:bg-muted/50 hover:text-accent"
+                        >
+                          <span>{char.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            ) : (
+              <Button onClick={() => handleSave(character.id)}>
+                Update
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

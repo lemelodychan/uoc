@@ -12,13 +12,6 @@ import { initializeFeatureUsage, updateFeatureUsage } from './feature-usage-trac
  * Migrate existing character data to unified feature usage tracking
  */
 export function migrateCharacterToUnifiedUsage(character: CharacterData): CharacterData {
-  console.log('🔄 Starting migration for character:', {
-    name: character.name,
-    class: character.class,
-    level: character.level,
-    hasUnifiedUsage: !!character.classFeatureSkillsUsage,
-    unifiedUsageKeys: Object.keys(character.classFeatureSkillsUsage || {})
-  })
   
   // Start with existing unified usage data to preserve it
   const migratedUsage: Record<string, any> = character.classFeatureSkillsUsage || {}
@@ -43,7 +36,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
   
   // Migrate Bardic Inspiration (Bard)
   if (character.class.toLowerCase() === 'bard') {
-    console.log('🎭 Migrating Bard features for:', character.name)
     
     const bardicInspirationId = 'bardic-inspiration'
     // Only migrate if not already in unified system
@@ -51,11 +43,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
       const maxUses = Math.floor((character.charisma - 10) / 2) // Charisma modifier
       const currentUses = maxUses // Start with all uses available (legacy column dropped)
       
-      console.log('🎭 Adding Bardic Inspiration:', {
-        maxUses,
-        currentUses,
-        note: 'Legacy bardicInspirationUsed column has been dropped'
-      })
       
       migratedUsage[bardicInspirationId] = {
         featureName: 'Bardic Inspiration',
@@ -66,7 +53,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
         lastUpdated: new Date().toISOString()
       }
     } else {
-      console.log('🎭 Bardic Inspiration already exists in unified system')
     }
     
     // Migrate Song of Rest (Bard)
@@ -77,11 +63,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
       if (character.level >= 2) {
         const songOfRestAvailable = character.spellData?.songOfRest?.available ?? true
         
-        console.log('🎭 Adding Song of Rest:', {
-          level: character.level,
-          available: songOfRestAvailable,
-          spellData: character.spellData?.songOfRest
-        })
         
         migratedUsage[songOfRestId] = {
           featureName: 'Song of Rest',
@@ -91,10 +72,8 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
           lastUpdated: new Date().toISOString()
         }
       } else {
-        console.log('🎭 Song of Rest not available - character level too low:', character.level)
       }
     } else {
-      console.log('🎭 Song of Rest already exists in unified system')
     }
   }
   
@@ -146,7 +125,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
   
   // Migrate Warlock features
   if (character.class.toLowerCase() === 'warlock') {
-    console.log('🔮 Migrating Warlock features for:', character.name)
     
     // Migrate Genie's Wrath (Genie Warlock)
     if (character.subclass?.toLowerCase() === 'the genie') {
@@ -157,11 +135,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
         const maxUses = 1 // Genie's Wrath is typically 1 use per turn
         const currentUses = maxUses // Start with all uses available
         
-        console.log('🔮 Adding Genie\'s Wrath:', {
-          maxUses,
-          currentUses,
-          note: 'Legacy genieWrath column has been dropped, using default values'
-        })
         
         migratedUsage[genieWrathId] = {
           featureName: 'Genie\'s Wrath',
@@ -171,7 +144,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
           lastUpdated: new Date().toISOString()
         }
       } else {
-        console.log('🔮 Genie\'s Wrath already exists in unified system')
       }
     }
     
@@ -185,11 +157,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
         const maxUses = getFeatureMaxUses(character, elementalGiftId) || 1 // Default to 1 if not found
         const currentUses = maxUses // Start with all uses available
         
-        console.log('🔮 Adding Elemental Gift:', {
-          maxUses,
-          currentUses,
-          note: 'Legacy elementalGift column has been dropped, using default values'
-        })
         
         migratedUsage[elementalGiftId] = {
           featureName: 'Elemental Gift',
@@ -200,7 +167,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
           lastUpdated: new Date().toISOString()
         }
       } else {
-        console.log('🔮 Elemental Gift already exists in unified system')
       }
     }
     
@@ -213,11 +179,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
         const maxInvocations = Math.floor(character.level / 2) + 1 // Warlock progression
         const selectedInvocations = [] // Start with no invocations selected
         
-        console.log('🔮 Adding Eldritch Invocations:', {
-          maxInvocations,
-          selectedInvocations: selectedInvocations.length,
-          note: 'Legacy eldritchInvocations column has been dropped, using default values'
-        })
         
         migratedUsage[eldritchInvocationsId] = {
           featureName: 'Eldritch Invocations',
@@ -228,7 +189,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
           lastUpdated: new Date().toISOString()
         }
       } else {
-        console.log('🔮 Eldritch Invocations already exists in unified system')
       }
     }
   }
@@ -293,13 +253,6 @@ export function migrateCharacterToUnifiedUsage(character: CharacterData): Charac
     }
   }
   
-  console.log('✅ Migration complete for character:', {
-    name: character.name,
-    class: character.class,
-    level: character.level,
-    migratedFeatures: Object.keys(migratedUsage),
-    finalUsage: migratedUsage
-  })
   
   return {
     ...character,
@@ -318,12 +271,6 @@ export function needsMigration(character: CharacterData): boolean {
   
   // If character already has unified usage data, no migration needed
   if (hasUnifiedUsage) {
-    console.log('🚫 Character already has unified usage data:', {
-      name: character.name,
-      class: character.class,
-      level: character.level,
-      existingFeatures: Object.keys(character.classFeatureSkillsUsage || {})
-    })
     return false
   }
   
@@ -343,14 +290,6 @@ export function needsMigration(character: CharacterData): boolean {
   
   const needsMig = shouldHaveFeatures && !hasUnifiedUsage
   
-  console.log('🔍 Migration check for character:', {
-    name: character.name,
-    class: character.class,
-    level: character.level,
-    hasUnifiedUsage,
-    shouldHaveFeatures,
-    needsMigration: needsMig
-  })
   
   return needsMig
 }

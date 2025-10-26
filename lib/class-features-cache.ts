@@ -49,12 +49,10 @@ class ClassFeaturesCache {
     const cached = this.cache.get(key)
     
     if (cached && this.isValid(cached)) {
-      console.log(`🎯 ClassFeatures Cache HIT for ${key}`)
       return cached.features
     }
     
     if (cached) {
-      console.log(`⏰ ClassFeatures Cache EXPIRED for ${key}`)
       this.cache.delete(key)
     }
     
@@ -75,7 +73,6 @@ class ClassFeaturesCache {
     }
     
     this.cache.set(key, cached)
-    console.log(`💾 ClassFeatures Cache STORED for ${key} (${features.length} features)`)
   }
 
   /**
@@ -83,7 +80,6 @@ class ClassFeaturesCache {
    */
   clear(): void {
     this.cache.clear()
-    console.log('🗑️ ClassFeatures Cache CLEARED')
   }
 
   /**
@@ -118,7 +114,6 @@ class ClassFeaturesCache {
     }
     
     if (removedCount > 0) {
-      console.log(`🧹 ClassFeatures Cache CLEANUP removed ${removedCount} expired entries`)
     }
   }
 
@@ -140,7 +135,6 @@ class ClassFeaturesCache {
     
     if (!exists) {
       this.preloadQueue.push({ classId, level, subclass, priority })
-      console.log(`📋 ClassFeatures Cache PRELOAD queued: ${key} (${priority})`)
     }
   }
 
@@ -153,7 +147,6 @@ class ClassFeaturesCache {
     }
 
     this.isPreloading = true
-    console.log(`🚀 ClassFeatures Cache PRELOAD processing ${this.preloadQueue.length} requests`)
 
     try {
       // Sort by priority (high first)
@@ -177,12 +170,9 @@ class ClassFeaturesCache {
             )
             
             if (error) {
-              console.warn(`⚠️ ClassFeatures Cache PRELOAD failed for ${request.classId}-${request.level}:`, error)
             } else {
-              console.log(`✅ ClassFeatures Cache PRELOAD success for ${request.classId}-${request.level}`)
             }
           } catch (err) {
-            console.warn(`⚠️ ClassFeatures Cache PRELOAD error for ${request.classId}-${request.level}:`, err)
           }
         }))
 
@@ -194,7 +184,6 @@ class ClassFeaturesCache {
     } finally {
       this.preloadQueue = []
       this.isPreloading = false
-      console.log(`🏁 ClassFeatures Cache PRELOAD completed`)
     }
   }
 
@@ -232,7 +221,6 @@ class ClassFeaturesCache {
             })
           }
         } catch (error) {
-          console.warn(`Failed to get class data for ${character.class}:`, error)
         }
       }
     }
@@ -266,6 +254,5 @@ if (typeof window !== 'undefined') {
   // Add cache debugging to window object in development
   if (process.env.NODE_ENV === 'development') {
     (window as any).classFeaturesCache = classFeaturesCache
-    console.log('🔧 ClassFeatures Cache debugging available at window.classFeaturesCache')
   }
 }

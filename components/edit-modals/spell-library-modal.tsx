@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, forwardRef, useImperativeHandle } from "react"
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,14 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import { useToast } from "@/hooks/use-toast"
-import type { CharacterData, Spell } from "@/lib/character-data"
+import type { CharacterData, Spell, Campaign } from "@/lib/character-data"
 import { SPELL_SCHOOL_COLORS, getCastingTimeColor } from "@/lib/color-mapping"
 
 interface SpellLibraryModalProps {
   isOpen: boolean
   onClose: () => void
   character: CharacterData
-  onAddSpell: (spell: Spell) => void
+  characters?: CharacterData[]
+  campaigns?: Campaign[]
+  selectedCampaignId?: string
+  currentUserId?: string
+  isSuperadmin?: boolean
+  onAddSpell: (spell: Spell, characterId: string) => void
   onCreateNewSpell: () => void
   onEditSpell?: (spell: LibrarySpell) => void
 }
@@ -74,7 +79,19 @@ const SPELL_CLASSES = [
   "Barbarian"
 ]
 
-export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryModalProps>(({ isOpen, onClose, character, onAddSpell, onCreateNewSpell, onEditSpell }, ref) => {
+export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryModalProps>(({ 
+  isOpen, 
+  onClose, 
+  character, 
+  characters = [], 
+  campaigns = [],
+  selectedCampaignId = "all",
+  currentUserId,
+  isSuperadmin = false,
+  onAddSpell, 
+  onCreateNewSpell, 
+  onEditSpell 
+}, ref) => {
   const { toast } = useToast()
   const [spells, setSpells] = useState<LibrarySpell[]>([])
   const [filteredSpells, setFilteredSpells] = useState<LibrarySpell[]>([])
@@ -84,6 +101,8 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
   const [selectedLevel, setSelectedLevel] = useState<string>("all")
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   // Fetch spells from library
   useEffect(() => {
@@ -91,6 +110,26 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
       fetchSpellsFromLibrary()
     }
   }, [isOpen])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openDropdown) {
+        const dropdownEl = dropdownRefs.current[openDropdown]
+        if (dropdownEl && !dropdownEl.contains(event.target as Node)) {
+          setOpenDropdown(null)
+        }
+      }
+    }
+
+    if (openDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openDropdown])
 
   // Expose refresh function to parent component
   useImperativeHandle(ref, () => ({
@@ -149,7 +188,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
     }
   }
 
-  const handleAddSpell = (librarySpell: LibrarySpell) => {
+  const handleAddSpell = (librarySpell: LibrarySpell, targetCharacterId: string) => {
     // Convert library spell to character spell format
     const characterSpell: Spell = {
       name: librarySpell.name,
@@ -167,7 +206,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
       higherLevel: librarySpell.higher_levels || ""
     }
 
-    onAddSpell(characterSpell)
+    onAddSpell(characterSpell, targetCharacterId)
   }
 
   const handleDeleteSpell = async (spellId: string, spellName: string) => {
@@ -208,11 +247,39 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
     }
   }
 
-  const isSpellInCharacterList = (librarySpell: LibrarySpell): boolean => {
-    return character.spellData?.spells?.some(characterSpell => 
+  const isSpellInCharacterList = (librarySpell: LibrarySpell, targetCharacter: CharacterData): boolean => {
+    return targetCharacter.spellData?.spells?.some(characterSpell => 
       characterSpell.name.toLowerCase() === librarySpell.name.toLowerCase()
     ) || false
   }
+
+  // Get characters available to add spells to based on user permissions
+  const getAvailableCharacters = (): CharacterData[] => {
+    // If no characters array provided, just return the current character
+    if (!characters || characters.length === 0) {
+      return [character]
+    }
+
+    // Superadmins can see all characters
+    if (isSuperadmin) {
+      return characters
+    }
+
+    // Get the current campaign if one is selected
+    const currentCampaign = campaigns.find(c => c.id === selectedCampaignId)
+    
+    // If user is DM of the selected campaign, they can see all characters in that campaign
+    if (currentCampaign && currentCampaign.dungeonMasterId === currentUserId) {
+      return characters.filter(char => 
+        currentCampaign.characters.includes(char.id)
+      )
+    }
+
+    // Regular users can only see their own characters
+    return characters.filter(char => char.userId === currentUserId)
+  }
+
+  const availableCharacters = getAvailableCharacters()
 
   const getLevelDisplay = (level: number) => {
     return level === 0 ? "Cantrip" : `Level ${level}`
@@ -403,19 +470,66 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                       >
                                         <Icon icon="lucide:trash-2" className="w-4 h-4" />
                                       </Button>
-                                      <Button
-                                        size="sm"
-                                        className="h-8"
-                                        variant="outline"
-                                        disabled={isSpellInCharacterList(spell)}
-                                        onClick={() => handleAddSpell(spell)}
-                                      >
-                                        {isSpellInCharacterList(spell) ? (
-                                          <>✓ Added to list</>
-                                        ) : (
-                                          <><Icon icon="lucide:plus" className="w-4 h-4" />Add to spell list</>
-                                        )}
-                                      </Button>
+                                      {availableCharacters.length === 1 ? (
+                                        <Button
+                                          size="sm"
+                                          className="h-8"
+                                          variant="outline"
+                                          disabled={isSpellInCharacterList(spell, availableCharacters[0])}
+                                          onClick={() => handleAddSpell(spell, availableCharacters[0].id)}
+                                        >
+                                          {isSpellInCharacterList(spell, availableCharacters[0]) ? (
+                                            <>✓ Added to list</>
+                                          ) : (
+                                            <><Icon icon="lucide:plus" className="w-4 h-4" />Add to spell list</>
+                                          )}
+                                        </Button>
+                                      ) : (
+                                        <div className="relative">
+                                          <Button
+                                            size="sm"
+                                            className="h-8"
+                                            variant="outline"
+                                            onClick={() => setOpenDropdown(openDropdown === key ? null : key)}
+                                          >
+                                            <Icon icon="lucide:plus" className="w-4 h-4" />
+                                            Add to spell list
+                                            <Icon icon="lucide:chevron-down" className="w-3 h-3 ml-1" />
+                                          </Button>
+                                          {openDropdown === key && (
+                                            <div 
+                                              ref={(el) => { dropdownRefs.current[key] = el }}
+                                              className="absolute top-full right-0 mt-1 z-50 bg-popover border rounded-md shadow-md p-1 min-w-[224px]"
+                                            >
+                                              {availableCharacters.map((char) => {
+                                                const isAdded = isSpellInCharacterList(spell, char)
+                                                return (
+                                                  <button
+                                                    key={char.id}
+                                                    onClick={() => {
+                                                      if (!isAdded) {
+                                                        handleAddSpell(spell, char.id)
+                                                      }
+                                                      setOpenDropdown(null)
+                                                    }}
+                                                    disabled={isAdded}
+                                                    className={`w-full flex items-center justify-between px-2 py-1.5 text-sm rounded-sm ${
+                                                      isAdded 
+                                                        ? 'opacity-50 cursor-not-allowed' 
+                                                        : 'hover:bg-muted/50 hover:text-accent'
+                                                    }`}
+                                                  >
+                                                    <span>{char.name}</span>
+                                                    {isAdded && (
+                                                      <Icon icon="lucide:check" className="w-4 h-4 text-green-500" />
+                                                    )}
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2 flex-wrap text-xs">
