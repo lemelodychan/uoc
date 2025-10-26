@@ -209,6 +209,7 @@ interface ClassFeature {
   feature_skill_type?: "slots" | "points_pool" | "options_list" | "special_ux" | "skill_modifier" | "availability_toggle" // Type: what kind of feature
   subclass_id?: string | null
   subclass_name?: string // For display purposes
+  is_hidden?: boolean // Hidden features don't appear in character sheets
   class_features_skills?: {
     componentId?: string
     config?: any
@@ -341,7 +342,8 @@ export function FeatureManagementModal({
       title: '',
       description: '',
       feature_type: 'class',
-      subclass_id: null // Default to base class feature
+      subclass_id: null, // Default to base class feature
+      is_hidden: false // Default to visible
     }
     setEditingFeature(newFeature)
     setIsCreating(true)
@@ -396,6 +398,7 @@ export function FeatureManagementModal({
           feature_type: editingFeature.feature_type,
           feature_skill_type: editingFeature.feature_skill_type as "slots" | "points_pool" | "options_list" | "special_ux" | "skill_modifier" | "availability_toggle" | undefined,
           subclass_id: null, // Base class features have null subclass_id
+          is_hidden: editingFeature.is_hidden,
           class_features_skills: editingFeature.class_features_skills
         })
 
@@ -418,6 +421,7 @@ export function FeatureManagementModal({
           feature_type: editingFeature.feature_type,
           feature_skill_type: editingFeature.feature_skill_type as "slots" | "points_pool" | "options_list" | "special_ux" | "skill_modifier" | "availability_toggle" | undefined,
           subclass_id: editingFeature.subclass_id,
+          is_hidden: editingFeature.is_hidden,
           class_features_skills: editingFeature.class_features_skills
         })
 
@@ -619,6 +623,11 @@ export function FeatureManagementModal({
                                       {feature.subclass_name}
                                     </Badge>
                                   )}
+                                  {feature.is_hidden && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Hidden
+                                    </Badge>
+                                  )}
                                 </div>
                                 {feature.description && (
                                   <div className="text-sm text-muted-foreground line-clamp-3">
@@ -760,6 +769,28 @@ export function FeatureManagementModal({
                      </Select>
                    </div>
                  )}
+               </div>
+
+               <div className="grid gap-2">
+                 <Label htmlFor="is-hidden">Hidden Feature</Label>
+                 <div className="flex items-center space-x-2">
+                   <input
+                     type="checkbox"
+                     id="is-hidden"
+                     checked={editingFeature.is_hidden || false}
+                     onChange={(e) => {
+                       setEditingFeature(prev => 
+                         prev ? { ...prev, is_hidden: e.target.checked } : null
+                       )
+                     }}
+                   />
+                   <Label htmlFor="is-hidden" className="text-sm font-normal">
+                     Hide this feature from character sheet
+                   </Label>
+                 </div>
+                 <p className="text-xs text-muted-foreground">
+                   Hidden features will not appear in the character's features list but remain functional.
+                 </p>
                </div>
 
                <div className="grid gap-2">

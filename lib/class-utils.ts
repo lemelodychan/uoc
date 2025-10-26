@@ -46,6 +46,7 @@ export interface ClassData {
   source: string
   created_at: string
   updated_at: string
+  subclass_selection_level: number // Level at which subclass must be selected (1 for Cleric/Warlock, 3 for most others)
   // Legacy fields kept for backward compatibility
   spell_progression?: Record<string, any>
   max_spell_slots?: Record<string, Record<string, number>>

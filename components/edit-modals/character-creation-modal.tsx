@@ -44,6 +44,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
   })
 
   const [classes, setClasses] = useState<ClassOption[]>([])
+  const [classesData, setClassesData] = useState<Array<{id: string, name: string, subclass: string | null, subclass_selection_level?: number}>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -63,6 +64,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
         setError(loadError)
       } else {
         setClasses(loadedClasses || [])
+        setClassesData(loadedClasses || [])
       }
     } catch (err) {
       setError("Failed to load classes")
@@ -90,6 +92,12 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
     })
   }
 
+  // Helper function to get subclass selection level for a class
+  const getSubclassSelectionLevel = (className: string): number => {
+    const baseClass = classesData.find(cls => cls.name === className && cls.subclass === null)
+    return baseClass?.subclass_selection_level || 3 // Default to 3 if not found
+  }
+
   const handleCreate = () => {
     if (!formData.name.trim()) {
       setError("Character name is required")
@@ -99,10 +107,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
       setError("Class is required")
       return
     }
-    if (!formData.subclass) {
-      setError("Subclass is required")
+    
+    // Check if subclass is required based on class level
+    const requiredLevel = getSubclassSelectionLevel(formData.class)
+    const hasSubclasses = availableSubclasses.length > 0
+    if (hasSubclasses && formData.level >= requiredLevel && !formData.subclass) {
+      setError(`Subclass is required for ${formData.class} at level ${requiredLevel} and above`)
       return
     }
+    
     if (!formData.race.trim()) {
       setError("Race is required")
       return
@@ -191,7 +204,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="subclass" className="text-right">
-              Subclass *
+              Subclass {formData.class && formData.level >= getSubclassSelectionLevel(formData.class) && availableSubclasses.length > 0 ? "*" : ""}
             </Label>
             <Select
               value={formData.subclass}

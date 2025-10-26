@@ -38,7 +38,7 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
   })
   
   // Database classes state
-  const [availableClasses, setAvailableClasses] = useState<Array<{id: string, name: string, subclass: string | null}>>([])
+  const [availableClasses, setAvailableClasses] = useState<Array<{id: string, name: string, subclass: string | null, subclass_selection_level?: number}>>([])
   const [loadingClasses, setLoadingClasses] = useState(false)
 
   // Sync classes state when character changes
@@ -92,6 +92,12 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
       .filter(cls => cls.name === baseClassName && cls.subclass !== null)
       .map(cls => cls.subclass!)
       .sort()
+  }
+
+  // Helper function to get subclass selection level for a class
+  const getSubclassSelectionLevel = (baseClassName: string): number => {
+    const baseClass = availableClasses.find(cls => cls.name === baseClassName && cls.subclass === null)
+    return baseClass?.subclass_selection_level || 3 // Default to 3 if not found
   }
 
   const totalLevel = classes.reduce((sum, charClass) => sum + charClass.level, 0)
@@ -170,17 +176,20 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
       return
     }
 
-    // Validate that classes at level 3+ have subclasses (if the class has subclasses available)
+    // Validate that classes at their required level have subclasses (if the class has subclasses available)
     const invalidClasses = validClasses.filter(charClass => {
       const hasSubclasses = availableSubclasses(charClass.name).length > 0
-      const needsSubclass = charClass.level >= 3
+      const requiredLevel = getSubclassSelectionLevel(charClass.name)
+      const needsSubclass = charClass.level >= requiredLevel
       return hasSubclasses && needsSubclass && !charClass.subclass
     })
 
     if (invalidClasses.length > 0) {
+      const firstInvalidClass = invalidClasses[0]
+      const requiredLevel = getSubclassSelectionLevel(firstInvalidClass.name)
       toast({
         title: "Subclass Required",
-        description: "Classes at level 3 and above must have a subclass selected.",
+        description: `${firstInvalidClass.name} requires a subclass at level ${requiredLevel} and above.`,
         variant: "destructive",
       })
       return
@@ -267,13 +276,13 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 h-4">
                           <Label htmlFor={`subclass-${index}`}>Subclass</Label>
-                          {charClass.level >= 3 && (
+                          {charClass.name && charClass.level >= getSubclassSelectionLevel(charClass.name) && (
                             <Badge variant="destructive" className="text-xs p-0 px-1">
                               Req
                             </Badge>
                           )}
                         </div>
-                        {charClass.subclass && charClass.level < 3 && (
+                        {charClass.name && charClass.subclass && charClass.level < getSubclassSelectionLevel(charClass.name) && (
                           <Button
                             type="button"
                             variant="ghost"
@@ -289,10 +298,14 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
                         value={charClass.subclass || ""}
                         onValueChange={(value) => updateClass(index, 'subclass', value)}
                       >
-                        <SelectTrigger className={charClass.level >= 3 && !charClass.subclass ? "border-destructive w-full" : "w-full"}>
+                        <SelectTrigger className={
+                          charClass.name && charClass.level >= getSubclassSelectionLevel(charClass.name) && !charClass.subclass 
+                            ? "border-destructive w-full" 
+                            : "w-full"
+                        }>
                           <SelectValue 
                             placeholder={
-                              charClass.level >= 3 
+                              charClass.name && charClass.level >= getSubclassSelectionLevel(charClass.name)
                                 ? "Select subclass (required)" 
                                 : "Select subclass (optional)"
                             } 
@@ -306,9 +319,9 @@ export function MulticlassModal({ isOpen, onClose, character, onSave }: Multicla
                           ))}
                         </SelectContent>
                       </Select>
-                      {charClass.level >= 3 && !charClass.subclass && (
+                      {charClass.name && charClass.level >= getSubclassSelectionLevel(charClass.name) && !charClass.subclass && (
                         <p className="text-xs text-[#ce6565]">
-                          A subclass is required for this class at level 3 and above.
+                          A subclass is required for this class at level {getSubclassSelectionLevel(charClass.name)} and above.
                         </p>
                       )}
                     </div>

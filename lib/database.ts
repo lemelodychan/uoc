@@ -1559,7 +1559,8 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
       return { error: error.message }
     }
 
-    let features = data?.map(feature => ({
+    // Filter out hidden features
+    let features = data?.filter(feature => !feature.is_hidden).map(feature => ({
       id: feature.id,
       class_id: feature.class_id,
       level: feature.level,
@@ -1568,6 +1569,7 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
       feature_type: feature.feature_type,
       feature_skill_type: feature.feature_skill_type,
       subclass_id: feature.subclass_id,
+      is_hidden: feature.is_hidden,
       class_features_skills: feature.class_features_skills,
       name: feature.title,
       source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
@@ -1600,20 +1602,24 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
           .order("level", { ascending: true })
 
         if (!baseError && baseFeatures) {
-          const baseClassFeatures = baseFeatures.map(feature => ({
-            id: feature.id,
-            class_id: feature.class_id,
-            level: feature.level,
-            title: feature.title,
-            description: feature.description,
-            feature_type: feature.feature_type,
-            feature_skill_type: feature.feature_skill_type,
-            subclass_id: feature.subclass_id,
-            class_features_skills: feature.class_features_skills,
-            name: feature.title,
-            source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
-            className: classData.name
-          }))
+          // Filter out hidden features and map to feature objects
+          const baseClassFeatures = baseFeatures
+            .filter(feature => !feature.is_hidden)
+            .map(feature => ({
+              id: feature.id,
+              class_id: feature.class_id,
+              level: feature.level,
+              title: feature.title,
+              description: feature.description,
+              feature_type: feature.feature_type,
+              feature_skill_type: feature.feature_skill_type,
+              subclass_id: feature.subclass_id,
+              is_hidden: feature.is_hidden,
+              class_features_skills: feature.class_features_skills,
+              name: feature.title,
+              source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
+              className: classData.name
+            }))
           
           // Combine base class and subclass features
           features = [...baseClassFeatures, ...features]
@@ -1639,20 +1645,24 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
           .order("level", { ascending: true })
 
         if (!baseError && baseFeatures) {
-          const baseClassFeatures = baseFeatures.map(feature => ({
-            id: feature.id,
-            class_id: feature.class_id,
-            level: feature.level,
-            title: feature.title,
-            description: feature.description,
-            feature_type: feature.feature_type,
-            feature_skill_type: feature.feature_skill_type,
-            subclass_id: feature.subclass_id,
-            class_features_skills: feature.class_features_skills,
-            name: feature.title,
-            source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
-            className: classData.name
-          }))
+          // Filter out hidden features and map to feature objects
+          const baseClassFeatures = baseFeatures
+            .filter(feature => !feature.is_hidden)
+            .map(feature => ({
+              id: feature.id,
+              class_id: feature.class_id,
+              level: feature.level,
+              title: feature.title,
+              description: feature.description,
+              feature_type: feature.feature_type,
+              feature_skill_type: feature.feature_skill_type,
+              subclass_id: feature.subclass_id,
+              is_hidden: feature.is_hidden,
+              class_features_skills: feature.class_features_skills,
+              name: feature.title,
+              source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
+              className: classData.name
+            }))
           
           // Use the base class features
           features = baseClassFeatures
@@ -1681,20 +1691,24 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
           .order("level", { ascending: true })
 
         if (!subclassFeaturesError && subclassFeatures) {
-          const subclassFeaturesMapped = subclassFeatures.map(feature => ({
-            id: feature.id,
-            class_id: feature.class_id,
-            level: feature.level,
-            title: feature.title,
-            description: feature.description,
-            feature_type: feature.feature_type,
-            feature_skill_type: feature.feature_skill_type,
-            subclass_id: feature.subclass_id,
-            class_features_skills: feature.class_features_skills,
-            name: feature.title,
-            source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
-            className: classData.name
-          }))
+          // Filter out hidden features and map to feature objects
+          const subclassFeaturesMapped = subclassFeatures
+            .filter(feature => !feature.is_hidden)
+            .map(feature => ({
+              id: feature.id,
+              class_id: feature.class_id,
+              level: feature.level,
+              title: feature.title,
+              description: feature.description,
+              feature_type: feature.feature_type,
+              feature_skill_type: feature.feature_skill_type,
+              subclass_id: feature.subclass_id,
+              is_hidden: feature.is_hidden,
+              class_features_skills: feature.class_features_skills,
+              name: feature.title,
+              source: feature.feature_type === 'subclass' ? 'Subclass' : 'Class',
+              className: classData.name
+            }))
           
           // Combine base class and subclass features
           features = [...features, ...subclassFeaturesMapped]
@@ -1813,6 +1827,7 @@ export const loadClassesWithDetails = async (): Promise<{
     source?: string | null
     created_at?: string | null
     updated_at?: string | null
+    subclass_selection_level?: number | null
     // class_features column has been dropped - using separate class_features table
   }>
   error?: string
@@ -1937,6 +1952,7 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
       subclass: (cls as any).subclass ?? null,
       description: (cls as any).description ?? null,
       hit_die: cls.hit_die ?? null,
+      subclass_selection_level: (cls as any).subclass_selection_level ?? null,
       // Store as an array of Title-cased strings per DB convention, e.g., ["Charisma"]
       primary_ability: toTitleArray(cls.primary_ability),
       saving_throw_proficiencies: toStringArray(cls.saving_throw_proficiencies),
@@ -2208,15 +2224,16 @@ export const loadFeaturesForBaseWithSubclasses = async (baseClassId: string, sub
     feature_type: string; 
     feature_skill_type?: string;
     subclass_id?: string | null;
+    is_hidden?: boolean;
     class_features_skills?: any;
   }>
   error?: string
 }> => {
   try {
-    // Fetch base class features
+    // Fetch base class features (including is_hidden)
     const { data: base, error: baseErr } = await supabase
       .from("class_features")
-      .select("id, class_id, level, title, description, feature_type, feature_skill_type, subclass_id, class_features_skills")
+      .select("id, class_id, level, title, description, feature_type, feature_skill_type, subclass_id, is_hidden, class_features_skills")
       .eq("class_id", baseClassId)
 
     if (baseErr) return { error: baseErr.message }
@@ -2227,7 +2244,7 @@ export const loadFeaturesForBaseWithSubclasses = async (baseClassId: string, sub
       // Prefer schema-agnostic: fetch subclass features by class_id IN subclassIds
       const { data: fallbackFeats, error: fallbackErr } = await supabase
         .from("class_features")
-        .select("id, class_id, level, title, description, feature_type, feature_skill_type, subclass_id, class_features_skills")
+        .select("id, class_id, level, title, description, feature_type, feature_skill_type, subclass_id, is_hidden, class_features_skills")
         .in("class_id", subclassIds)
       if (fallbackErr) return { error: fallbackErr.message }
       const subFeats = (fallbackFeats || []).map((f: any) => ({ ...f, subclass_id: f.class_id, feature_type: 'subclass' }))
@@ -2290,6 +2307,7 @@ export const upsertClassFeature = async (feature: {
   feature_type: "class" | "subclass"; 
   feature_skill_type?: "slots" | "points_pool" | "options_list" | "special_ux" | "skill_modifier" | "availability_toggle";
   subclass_id?: string | null; 
+  is_hidden?: boolean;
   class_features_skills?: any 
 }): Promise<{ success: boolean; id?: string; error?: string }> => {
   try {
@@ -2308,6 +2326,7 @@ export const upsertClassFeature = async (feature: {
           feature_type: feature.feature_type,
           feature_skill_type: feature.feature_skill_type,
           subclass_id: normalizedSubclassId,
+          is_hidden: feature.is_hidden || false,
           class_features_skills: feature.class_features_skills
         })
         .eq("id", feature.id)
@@ -2340,6 +2359,7 @@ export const upsertClassFeature = async (feature: {
         .update({
           description: feature.description,
           feature_skill_type: feature.feature_skill_type,
+          is_hidden: feature.is_hidden || false,
           class_features_skills: feature.class_features_skills
         })
         .eq("id", existingFeature.id)
@@ -2360,7 +2380,8 @@ export const upsertClassFeature = async (feature: {
     const payload = { 
       ...feature, 
       id,
-      subclass_id: normalizedSubclassId
+      subclass_id: normalizedSubclassId,
+      is_hidden: feature.is_hidden || false
     }
     console.log('💾 Creating new class feature:', payload)
     const { error } = await supabase.from("class_features").insert(payload)
@@ -2929,11 +2950,16 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
         if (classData) {
           const { data: features } = await supabase
             .from('class_features')
-            .select('class_features_skills')
+            .select('class_features_skills, is_hidden')
             .eq('class_id', classData.id)
             .lte('level', charClass.level)
 
           for (const feature of features || []) {
+            // Skip hidden features
+            if (feature.is_hidden) {
+              continue
+            }
+            
             if (feature.class_features_skills) {
               const skills = Array.isArray(feature.class_features_skills) 
                 ? feature.class_features_skills 

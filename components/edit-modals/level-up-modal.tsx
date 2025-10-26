@@ -230,6 +230,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
         created_by: null,
         duplicated_from: null,
         source: 'PHB',
+        subclass_selection_level: cls.subclass_selection_level || 3,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })) || []
@@ -278,9 +279,9 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
       
       // Add any new skills that weren't already in the character's skill list
       const newSkills = selectedSkills
-        .filter(skillName => !character.skills.find(s => s.name === skillName))
+        .filter(skillName => !character.skills.find(s => skillNameToDatabaseFormat(s.name) === skillName))
         .map(skillName => ({
-          name: skillName,
+          name: formatSkillName(skillName),
           ability: getSkillAbility(skillName),
           proficiency: 'proficient' as const
         }))

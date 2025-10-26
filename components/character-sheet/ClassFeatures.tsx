@@ -125,10 +125,13 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
               </Button>
             </div>
           ) : allFeatures?.length > 0 ? (() => {
-            // Group features by class - NO FILTERING, NO SKIPPING, NO DEDUPLICATION
+            // Filter out hidden features before displaying
+            const visibleFeatures = allFeatures.filter(feature => !feature.is_hidden)
+            
+            // Group features by class
             const featuresByClass = new Map<string, any[]>()
             
-            allFeatures.forEach(feature => {
+            visibleFeatures.forEach(feature => {
               // Use the className from the feature, or fallback to the character's primary class
               const className = feature.className || character.class
               
@@ -143,7 +146,7 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
               features.sort((a, b) => (a.level || a.enabledAtLevel || 1) - (b.level || b.enabledAtLevel || 1))
             })
             
-            console.log('🔍 ClassFeatures Debug - Features by class:', featuresByClass)
+            console.log('🔍 ClassFeatures Debug - Features by class (hidden features filtered):', featuresByClass)
             
             // Render grouped features
             return Array.from(featuresByClass.entries()).map(([className, features]) => (

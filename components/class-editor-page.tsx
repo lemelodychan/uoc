@@ -173,7 +173,7 @@ export function ClassEditorPage({
                 <Icon icon="lucide:copy" className="w-4 h-4" />
                 Duplicate
               </Button>
-              <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:bg-red-50 hover:text-red-700">
+              <Button variant="outline" onClick={handleDelete} className="text-destructive hover:bg-destructive hover:text-white">
                 <Icon icon="lucide:trash-2" className="w-4 h-4" />
                 Delete
               </Button>
@@ -209,7 +209,7 @@ export function ClassEditorPage({
                 value={editingClass.name}
                 onChange={(e) => setEditingClass(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Enter class name"
-                className="bg-background"
+                className="bg-background w-[144px]"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -230,9 +230,28 @@ export function ClassEditorPage({
               </Select>
             </div>
             <div className="flex flex-col gap-2">
+              <Label htmlFor="subclass-level">Subclass Select</Label>
+              <Select
+                value={editingClass.subclass_selection_level?.toString() || "3"}
+                onValueChange={(value) => setEditingClass(prev => ({ ...prev, subclass_selection_level: parseInt(value) }))}
+              >
+                <SelectTrigger className="bg-background w-[144px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Level 1</SelectItem>
+                  <SelectItem value="2">Level 2</SelectItem>
+                  <SelectItem value="3">Level 3</SelectItem>
+                  <SelectItem value="4">Level 4</SelectItem>
+                  <SelectItem value="5">Level 5</SelectItem>
+                  <SelectItem value="6">Level 6</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2 flex-1">
               <Label htmlFor="primary-ability">Primary Ability</Label>
               <Input
-                className="bg-background"
+                className="bg-background w-[144px]"
                 id="primary-ability"
                 value={getPrimaryAbilityDisplay()}
                 onChange={(e) => handlePrimaryAbilityChange(e.target.value)}
@@ -252,7 +271,7 @@ export function ClassEditorPage({
             />
           </div>
           <div className="flex flex-row gap-4">
-            <div className="flex flex-col gap-2 flex-1">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="source">Source</Label>
               <Select
                 value={editingClass.source || 'custom'}
@@ -272,102 +291,6 @@ export function ClassEditorPage({
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="spell-progression">Spell Progression Columns</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="show-spells-known"
-                    checked={editingClass.showSpellsKnown || false}
-                    onCheckedChange={(checked) => {
-                      console.log('Spells Known toggle changed:', checked)
-                      setEditingClass(prev => ({ ...prev, showSpellsKnown: !!checked }))
-                    }}
-                  />
-                  <Label htmlFor="show-spells-known" className="text-sm font-normal">
-                    Spells Known
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="show-sorcery-points"
-                    checked={editingClass.showSorceryPoints || false}
-                    onCheckedChange={(checked) => {
-                      console.log('Sorcery Points toggle changed:', checked)
-                      setEditingClass(prev => ({ ...prev, showSorceryPoints: !!checked }))
-                    }}
-                  />
-                  <Label htmlFor="show-sorcery-points" className="text-sm font-normal">
-                    Sorcery Points
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="show-martial-arts"
-                    checked={editingClass.showMartialArts || false}
-                    onCheckedChange={(checked) => {
-                      console.log('Martial Arts toggle changed:', checked)
-                      setEditingClass(prev => ({ ...prev, showMartialArts: !!checked }))
-                    }}
-                  />
-                  <Label htmlFor="show-martial-arts" className="text-sm font-normal">
-                    Martial Arts
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="show-ki-points"
-                    checked={editingClass.showKiPoints || false}
-                    onCheckedChange={(checked) => {
-                      console.log('Ki Points toggle changed:', checked)
-                      setEditingClass(prev => ({ ...prev, showKiPoints: !!checked }))
-                    }}
-                  />
-                  <Label htmlFor="show-ki-points" className="text-sm font-normal">
-                    Ki Points
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="show-unarmored-movement"
-                    checked={editingClass.showUnarmoredMovement || false}
-                    onCheckedChange={(checked) => {
-                      console.log('Unarmored Movement toggle changed:', checked)
-                      setEditingClass(prev => ({ ...prev, showUnarmoredMovement: !!checked }))
-                    }}
-                  />
-                  <Label htmlFor="show-unarmored-movement" className="text-sm font-normal">
-                    Unarmored Movement
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="show-rage"
-                    checked={editingClass.showRage || false}
-                    onCheckedChange={(checked) => {
-                      console.log('Rage toggle changed:', checked)
-                      setEditingClass(prev => ({ ...prev, showRage: !!checked }))
-                    }}
-                  />
-                  <Label htmlFor="show-rage" className="text-sm font-normal">
-                    Rage
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="show-rage-damage"
-                    checked={editingClass.showRageDamage || false}
-                    onCheckedChange={(checked) => {
-                      console.log('Rage Damage toggle changed:', checked)
-                      setEditingClass(prev => ({ ...prev, showRageDamage: !!checked }))
-                    }}
-                  />
-                  <Label htmlFor="show-rage-damage" className="text-sm font-normal">
-                    Rage Damage
-                  </Label>
-                </div>
-              </div>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="is-custom">Custom Class</Label>
@@ -425,7 +348,103 @@ export function ClassEditorPage({
         <CardHeader>
           <CardTitle>Spell Progression</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 p-4 border bg-card rounded-lg">
+            <Label htmlFor="spell-progression">Toggle special columns:</Label>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-spells-known"
+                  checked={editingClass.showSpellsKnown || false}
+                  onCheckedChange={(checked) => {
+                    console.log('Spells Known toggle changed:', checked)
+                    setEditingClass(prev => ({ ...prev, showSpellsKnown: !!checked }))
+                  }}
+                />
+                <Label htmlFor="show-spells-known" className="text-sm font-normal">
+                  Spells Known
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-sorcery-points"
+                  checked={editingClass.showSorceryPoints || false}
+                  onCheckedChange={(checked) => {
+                    console.log('Sorcery Points toggle changed:', checked)
+                    setEditingClass(prev => ({ ...prev, showSorceryPoints: !!checked }))
+                  }}
+                />
+                <Label htmlFor="show-sorcery-points" className="text-sm font-normal">
+                  Sorcery Points <Badge variant="secondary">Sorcerer</Badge>
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-martial-arts"
+                  checked={editingClass.showMartialArts || false}
+                  onCheckedChange={(checked) => {
+                    console.log('Martial Arts toggle changed:', checked)
+                    setEditingClass(prev => ({ ...prev, showMartialArts: !!checked }))
+                  }}
+                />
+                <Label htmlFor="show-martial-arts" className="text-sm font-normal">
+                  Martial Arts <Badge variant="secondary">Monk</Badge>
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-ki-points"
+                  checked={editingClass.showKiPoints || false}
+                  onCheckedChange={(checked) => {
+                    console.log('Ki Points toggle changed:', checked)
+                    setEditingClass(prev => ({ ...prev, showKiPoints: !!checked }))
+                  }}
+                />
+                <Label htmlFor="show-ki-points" className="text-sm font-normal">
+                  Ki Points <Badge variant="secondary">Monk</Badge>
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-unarmored-movement"
+                  checked={editingClass.showUnarmoredMovement || false}
+                  onCheckedChange={(checked) => {
+                    console.log('Unarmored Movement toggle changed:', checked)
+                    setEditingClass(prev => ({ ...prev, showUnarmoredMovement: !!checked }))
+                  }}
+                />
+                <Label htmlFor="show-unarmored-movement" className="text-sm font-normal">
+                  Unarmored Movement <Badge variant="secondary">Monk</Badge>
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-rage"
+                  checked={editingClass.showRage || false}
+                  onCheckedChange={(checked) => {
+                    console.log('Rage toggle changed:', checked)
+                    setEditingClass(prev => ({ ...prev, showRage: !!checked }))
+                  }}
+                />
+                <Label htmlFor="show-rage" className="text-sm font-normal">
+                  Rage <Badge variant="secondary">Barbarian</Badge>
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-rage-damage"
+                  checked={editingClass.showRageDamage || false}
+                  onCheckedChange={(checked) => {
+                    console.log('Rage Damage toggle changed:', checked)
+                    setEditingClass(prev => ({ ...prev, showRageDamage: !!checked }))
+                  }}
+                />
+                <Label htmlFor="show-rage-damage" className="text-sm font-normal">
+                  Rage Damage <Badge variant="secondary">Barbarian</Badge>
+                </Label>
+              </div>
+            </div>
+          </div>
           <SpellSlotsGrid
             value={{
               cantripsKnown: editingClass.cantrips_known || Array(20).fill(0),
