@@ -42,6 +42,8 @@ export interface CharacterData {
   // User ownership and visibility
   userId?: string
   visibility: 'public' | 'private'
+  // NPC flag
+  isNPC?: boolean
   strength: number
   dexterity: number
   constitution: number

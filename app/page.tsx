@@ -1093,6 +1093,81 @@ function CharacterSheetContent() {
     }
   }
 
+  const handleConvertToNPC = async (characterId: string) => {
+    try {
+      const character = characters.find(c => c.id === characterId)
+      if (!character) return
+
+      const updatedCharacter = {
+        ...character,
+        isNPC: true,
+        visibility: 'private' as const,
+        userId: currentCampaign?.dungeonMasterId || character.userId
+      }
+
+      const result = await saveCharacter(updatedCharacter)
+      if (result.success) {
+        setCharacters(prev => prev.map(char => 
+          char.id === characterId ? updatedCharacter : char
+        ))
+        toast({
+          title: "Converted to NPC",
+          description: `${character.name} has been converted to an NPC.`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to convert character to NPC.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error converting character to NPC:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while converting the character.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleConvertFromNPC = async (characterId: string) => {
+    try {
+      const character = characters.find(c => c.id === characterId)
+      if (!character) return
+
+      const updatedCharacter = {
+        ...character,
+        isNPC: false,
+        visibility: 'public' as const
+      }
+
+      const result = await saveCharacter(updatedCharacter)
+      if (result.success) {
+        setCharacters(prev => prev.map(char => 
+          char.id === characterId ? updatedCharacter : char
+        ))
+        toast({
+          title: "Converted to PC",
+          description: `${character.name} has been converted to a player character.`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to convert NPC to PC.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error converting NPC to PC:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while converting the NPC.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleSetActiveCampaign = async (campaignId: string) => {
     try {
       const result = await setActiveCampaign(campaignId)
@@ -2212,6 +2287,8 @@ function CharacterSheetContent() {
     background: string
     race: string
     alignment: string
+    isNPC?: boolean
+    campaignId?: string
   }) => {
     const newId = (characters.length + 1).toString()
     
@@ -2225,6 +2302,11 @@ function CharacterSheetContent() {
       })
       return
     }
+    
+    // For NPCs, use DM as owner if available, otherwise current user
+    const ownerId = characterData.isNPC && currentCampaign?.dungeonMasterId 
+      ? currentCampaign.dungeonMasterId 
+      : user?.id
     
     // Load class data to get primary ability for spell calculations
     const { classData } = await loadClassData(characterData.class, characterData.subclass)
@@ -2256,10 +2338,11 @@ function CharacterSheetContent() {
       background: characterData.background,
       race: characterData.race,
       alignment: characterData.alignment,
-      userId: user?.id,
-      visibility: 'public',
-      // Automatically assign to current campaign if viewing a campaign
-      campaignId: currentView === 'campaign' && currentCampaign ? currentCampaign.id : undefined,
+      userId: ownerId,
+      visibility: characterData.isNPC ? 'private' : 'public',
+      isNPC: characterData.isNPC || false,
+      // Automatically assign to current campaign if viewing a campaign or if NPC
+      campaignId: characterData.campaignId || (currentView === 'campaign' && currentCampaign ? currentCampaign.id : undefined),
       strength: 10,
       dexterity: 10,
       constitution: 10,
@@ -3221,6 +3304,9 @@ function CharacterSheetContent() {
         isOpen={characterCreationModalOpen}
         onClose={() => setCharacterCreationModalOpen(false)}
         onCreateCharacter={handleCreateCharacter}
+        currentUserId={currentUser?.id}
+        dungeonMasterId={currentCampaign?.dungeonMasterId}
+        campaignId={currentView === 'campaign' ? currentCampaign?.id : undefined}
       />
       <Dialog open={featureModalOpen} onOpenChange={(open) => {
         setFeatureModalOpen(open)
@@ -3461,6 +3547,8 @@ function CharacterSheetContent() {
         onDeleteCampaign={handleDeleteCampaign}
         onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
         onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
+        onConvertToNPC={handleConvertToNPC}
+        onConvertFromNPC={handleConvertFromNPC}
         onSetActiveCampaign={handleSetActiveCampaign}
       />
 
@@ -3477,6 +3565,8 @@ function CharacterSheetContent() {
         users={users}
         onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
         onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
+        onConvertToNPC={handleConvertToNPC}
+        onConvertFromNPC={handleConvertFromNPC}
       />
 
       {/* Spell Library Modal */}

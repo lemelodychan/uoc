@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { loadAllClasses } from "@/lib/database"
+import { useUser } from "@/lib/user-context"
 
 interface ClassOption {
   id: string
@@ -23,15 +25,20 @@ interface CharacterCreationData {
   background: string
   race: string
   alignment: string
+  isNPC?: boolean
+  campaignId?: string
 }
 
 interface CharacterCreationModalProps {
   isOpen: boolean
   onClose: () => void
   onCreateCharacter: (characterData: CharacterCreationData) => void
+  currentUserId?: string
+  dungeonMasterId?: string
+  campaignId?: string
 }
 
-export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: CharacterCreationModalProps) {
+export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, currentUserId, dungeonMasterId, campaignId }: CharacterCreationModalProps) {
   const [formData, setFormData] = useState<CharacterCreationData>({
     name: "",
     class: "",
@@ -41,7 +48,11 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
     background: "",
     race: "",
     alignment: "True Neutral",
+    isNPC: false,
+    campaignId: campaignId,
   })
+  const [isNPC, setIsNPC] = useState(false)
+  const { isSuperadmin } = useUser()
 
   const [classes, setClasses] = useState<ClassOption[]>([])
   const [classesData, setClassesData] = useState<Array<{id: string, name: string, subclass: string | null, subclass_selection_level?: number}>>([])
@@ -125,7 +136,11 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
       return
     }
 
-    onCreateCharacter(formData)
+    onCreateCharacter({
+      ...formData,
+      isNPC,
+      campaignId: isNPC ? campaignId : formData.campaignId,
+    })
     onClose()
   }
 
@@ -139,7 +154,10 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
       background: "",
       race: "",
       alignment: "True Neutral",
+      isNPC: false,
+      campaignId: campaignId,
     })
+    setIsNPC(false)
     setError(null)
     onClose()
   }
@@ -295,6 +313,24 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter }: C
               </SelectContent>
             </Select>
           </div>
+
+          {((currentUserId === dungeonMasterId && campaignId) || isSuperadmin) && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">
+                NPC
+              </Label>
+              <div className="col-span-3 flex items-center space-x-2">
+                <Checkbox
+                  id="isNPC"
+                  checked={isNPC}
+                  onCheckedChange={(checked) => setIsNPC(checked as boolean)}
+                />
+                <Label htmlFor="isNPC" className="text-sm font-normal cursor-pointer">
+                  Mark as NPC (will be private and owned by DM)
+                </Label>
+              </div>
+            </div>
+          )}
         </div>
         </div>
 

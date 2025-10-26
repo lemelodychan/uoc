@@ -23,6 +23,8 @@ interface CampaignCreationModalProps {
   users?: any[]
   onAssignCharacterToCampaign?: (characterId: string, campaignId: string) => void
   onRemoveCharacterFromCampaign?: (characterId: string, campaignId: string) => void
+  onConvertToNPC?: (characterId: string) => void
+  onConvertFromNPC?: (characterId: string) => void
 }
 
 export function CampaignCreationModal({ 
@@ -33,7 +35,9 @@ export function CampaignCreationModal({
   characters = [],
   users = [],
   onAssignCharacterToCampaign,
-  onRemoveCharacterFromCampaign
+  onRemoveCharacterFromCampaign,
+  onConvertToNPC,
+  onConvertFromNPC
 }: CampaignCreationModalProps) {
   const [name, setName] = useState(editingCampaign?.name || "")
   const [description, setDescription] = useState(editingCampaign?.description || "")
@@ -279,6 +283,27 @@ export function CampaignCreationModal({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          {character.isNPC ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => onConvertFromNPC?.(character.id)}
+                            >
+                              <Icon icon="lucide:user" className="w-3 h-3 mr-1" />
+                              To PC
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => onConvertToNPC?.(character.id)}
+                            >
+                              <Icon icon="lucide:users" className="w-3 h-3 mr-1" />
+                              To NPC
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"

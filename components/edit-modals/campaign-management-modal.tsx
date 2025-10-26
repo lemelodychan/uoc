@@ -72,6 +72,8 @@ interface CampaignManagementModalProps {
   onDeleteCampaign: (campaignId: string) => void
   onAssignCharacterToCampaign: (characterId: string, campaignId: string) => void
   onRemoveCharacterFromCampaign: (characterId: string, campaignId: string) => void
+  onConvertToNPC?: (characterId: string) => void
+  onConvertFromNPC?: (characterId: string) => void
   onSetActiveCampaign: (campaignId: string) => void
 }
 
@@ -86,6 +88,8 @@ export function CampaignManagementModal({
   onDeleteCampaign,
   onAssignCharacterToCampaign,
   onRemoveCharacterFromCampaign,
+  onConvertToNPC,
+  onConvertFromNPC,
   onSetActiveCampaign
 }: CampaignManagementModalProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -303,6 +307,8 @@ export function CampaignManagementModal({
         users={users}
         onAssignCharacterToCampaign={onAssignCharacterToCampaign}
         onRemoveCharacterFromCampaign={onRemoveCharacterFromCampaign}
+        onConvertToNPC={onConvertToNPC}
+        onConvertFromNPC={onConvertFromNPC}
       />
 
       {/* Delete Confirmation Dialog */}

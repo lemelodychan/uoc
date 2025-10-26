@@ -164,7 +164,12 @@ export function CampaignHomepage({
 
   // Filter characters for this campaign
   const campaignCharacters = characters.filter(char => 
-    char.campaignId === campaign?.id
+    char.campaignId === campaign?.id && !char.isNPC
+  )
+  
+  // Filter NPCs for this campaign
+  const campaignNPCs = characters.filter(char => 
+    char.campaignId === campaign?.id && char.isNPC
   )
 
   // Group characters by status
@@ -179,6 +184,14 @@ export function CampaignHomepage({
 
   // Helper function to get character level display
   const getCharacterLevelDisplay = (character: CharacterData) => {
+    // Check for multiclassing
+    if (character.classes && character.classes.length > 1) {
+      const totalLevel = character.classes.reduce((sum, cls) => sum + cls.level, 0)
+      const classNames = character.classes.map(cls => cls.name).join('/')
+      return `Level ${totalLevel} ${classNames}`
+    }
+    
+    // Single class or legacy format
     if (character.level && character.class) {
       return `Level ${character.level} ${character.class}`
     }
@@ -1126,6 +1139,9 @@ export function CampaignHomepage({
                           <div className="flex flex-col min-w-0 gap-1">
                             <div className="flex items-center gap-2">
                               <h4 className="font-bold text-lg truncate">{character.name}</h4>
+                              {character.visibility === 'private' && (
+                                <Icon icon="lucide:lock" className="w-3 h-3 text-muted-foreground" />
+                              )}
                               {character.partyStatus === 'away' && (
                                 <Badge variant="secondary" className="text-xs">
                                   Away
@@ -1138,7 +1154,7 @@ export function CampaignHomepage({
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                              Level {character.level} {character.class}
+                              {getCharacterLevelDisplay(character)}
                             </p>
                             <p className="text-xs text-muted-foreground/70 truncate flex items-center gap-1">
                               <Icon icon="lucide:user" className="w-3 h-3" />
@@ -1159,6 +1175,64 @@ export function CampaignHomepage({
               )}
             </CardContent>
           </Card>
+
+          {/* NPCs */}
+          {campaignNPCs.length > 0 && (
+            <Card className="bg-transparent border-0 shadow-none p-0 gap-3">
+              <CardHeader className="p-0">
+                <CardTitle className="flex items-center gap-2 h-[32px]">
+                  NPCs <Badge variant="outline" className="text-xs">{campaignNPCs.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {campaignNPCs.map((npc) => (
+                    <Card 
+                      key={npc.id} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors p-3 rounded-xl"
+                      onClick={() => onSelectCharacter(npc.id)}
+                    >
+                      <CardContent className="p-0">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-16 w-16 rounded-lg">
+                            <AvatarImage src={npc.imageUrl} alt={npc.name} className="object-cover" />
+                            <AvatarFallback className="text-sm">
+                              {npc.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0 gap-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-lg truncate">{npc.name}</h4>
+                              {npc.visibility === 'private' && (
+                                <Icon icon="lucide:lock" className="w-3 h-3 text-muted-foreground" />
+                              )}
+                              {npc.partyStatus === 'away' && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Away
+                                </Badge>
+                              )}
+                              {npc.partyStatus === 'deceased' && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Deceased
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                              {getCharacterLevelDisplay(npc)}
+                            </p>
+                            <p className="text-xs text-muted-foreground/70 truncate flex items-center gap-1">
+                              <Icon icon="lucide:user" className="w-3 h-3" />
+                              {getOwnerName(npc.userId)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Session Notes */}

@@ -47,8 +47,8 @@ export function CharacterSidebar({
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
-  // Show all characters in sidebar, but we'll handle access control in the main view
-  const visibleCharacters = characters
+  // Show all characters in sidebar except NPCs, but we'll handle access control in the main view
+  const visibleCharacters = characters.filter(character => !character.isNPC)
 
   // Helper function to format character level and class display
   const getCharacterLevelDisplay = (character: CharacterData): string => {

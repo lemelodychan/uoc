@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel, getPrimaryClass } from "@/lib/character-data"
 import { MulticlassModal } from "./multiclass-modal"
 import { getCurrentUser, getAllUsers } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
+import { useUser } from "@/lib/user-context"
 
 interface BasicInfoModalProps {
   isOpen: boolean
@@ -34,11 +36,13 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     partyStatus: character.partyStatus || 'active',
     imageUrl: character.imageUrl || "",
     visibility: character.visibility || 'public',
+    isNPC: character.isNPC || false,
   })
   const [multiclassModalOpen, setMulticlassModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [users, setUsers] = useState<UserProfile[]>([])
+  const { isSuperadmin } = useUser()
 
   // Get current user and check ownership
   useEffect(() => {
@@ -86,9 +90,10 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
         partyStatus: character.partyStatus || 'active',
         imageUrl: character.imageUrl || "",
         visibility: character.visibility || 'public',
+        isNPC: character.isNPC || false,
       })
     }
-  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility])
+  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility, character.isNPC])
 
 
   const handleSave = () => {
@@ -314,6 +319,25 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+          
+          {(isOwner || isSuperadmin) && (character.campaignId || isSuperadmin) && (
+            <div className="grid grid-cols-[112px_auto] items-center gap-3">
+              <Label className="text-right">
+                Character Type
+              </Label>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isNPC"
+                  checked={formData.isNPC}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isNPC: checked as boolean })}
+                />
+                <Label htmlFor="isNPC" className="text-sm font-normal cursor-pointer flex items-center gap-2">
+                  <Icon icon="lucide:users" className="w-4 h-4" />
+                  Mark as NPC
+                </Label>
+              </div>
             </div>
           )}
         </div>
