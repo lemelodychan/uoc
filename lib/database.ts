@@ -866,6 +866,13 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
     }
 
     // Character loaded successfully - no automatic migration checks
+    
+    // Recalculate max uses for all features that depend on character stats
+    const { recalculateAllFeatureMaxUses } = await import('./feature-usage-tracker')
+    const recalculatedUsage = recalculateAllFeatureMaxUses(character)
+    if (Object.keys(recalculatedUsage).length > 0) {
+      character.classFeatureSkillsUsage = recalculatedUsage
+    }
 
     return { character }
   } catch (error) {
@@ -1419,6 +1426,15 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
         if (Object.keys(updatedUsage).length > Object.keys(character.classFeatureSkillsUsage || {}).length) {
           character.classFeatureSkillsUsage = updatedUsage
         }
+      }
+    }
+
+    // Recalculate max uses for all features that depend on character stats
+    const { recalculateAllFeatureMaxUses } = await import('./feature-usage-tracker')
+    for (const character of charactersWithFeatures) {
+      const recalculatedUsage = recalculateAllFeatureMaxUses(character)
+      if (Object.keys(recalculatedUsage).length > 0) {
+        character.classFeatureSkillsUsage = recalculatedUsage
       }
     }
 

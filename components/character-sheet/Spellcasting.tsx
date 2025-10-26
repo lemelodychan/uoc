@@ -78,6 +78,7 @@ export function Spellcasting({
   const [shouldShowSpellsKnown, setShouldShowSpellsKnown] = useState<boolean>(true)
   const [isLoadingCounts, setIsLoadingCounts] = useState(false)
 
+
   // Load class feature skills
   useEffect(() => {
     const loadFeatures = async () => {
@@ -651,11 +652,13 @@ export function Spellcasting({
   const renderSlotsFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string, className?: string) => {
     if (!skill.id) return null
     
-    // Calculate max uses using class-specific level for multiclassed characters
+    // Use updated maxUses from usage data if available, otherwise calculate from formula
     const slotConfig = skill.config as any
-    const maxUses = slotConfig?.usesFormula 
-      ? calculateUsesFromFormula(slotConfig.usesFormula, character, skill.className)
-      : getFeatureMaxUses(character, skill.id) || usage?.maxUses || 0
+    const maxUses = usage?.maxUses !== undefined 
+      ? usage.maxUses 
+      : (slotConfig?.usesFormula 
+          ? calculateUsesFromFormula(slotConfig.usesFormula, character, skill.className)
+          : getFeatureMaxUses(character, skill.id) || 0)
     const currentUses = usage?.currentUses || maxUses
 
     if (maxUses === 0) return null

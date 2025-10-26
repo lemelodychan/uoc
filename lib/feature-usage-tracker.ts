@@ -92,16 +92,10 @@ export function getFeatureCustomDescription(character: CharacterData, featureId:
 
 /**
  * Get the max uses for a slots-based feature
- * First checks character usage data, then falls back to template-based calculation
+ * Always calculates from class feature configuration, never from character usage data
  */
 export function getFeatureMaxUses(character: CharacterData, featureId: string): number | undefined {
-  // First check if the feature already has maxUses in the character's usage data
-  const usage = getFeatureUsage(character, featureId)
-  if (usage && usage.maxUses !== undefined) {
-    return usage.maxUses
-  }
-  
-  // Fall back to template-based calculation for common features
+  // Calculate max uses from class feature configuration only
   
   switch (featureId) {
     case 'bardic-inspiration':
@@ -160,6 +154,61 @@ export function updateAllDynamicFeatures(character: CharacterData): FeatureUsage
   // Add more features here as needed
   
   return updatedUsage
+}
+
+/**
+ * Recalculate max uses for all features that depend on character stats
+ * This should be called when character stats change or when loading a character
+ */
+export function recalculateAllFeatureMaxUses(character: CharacterData): FeatureUsageData {
+  let updatedUsage = { ...character.classFeatureSkillsUsage } || {}
+  
+  // List of features that depend on character stats
+  const dynamicFeatures = [
+    'bardic-inspiration',
+    'flash-of-genius', 
+    'divine-sense',
+    'elemental-gift',
+    'lay-on-hands',
+    'channel-divinity',
+    'cleansing-touch'
+  ]
+  
+  for (const featureId of dynamicFeatures) {
+    const usage = getFeatureUsage(character, featureId)
+    if (usage) {
+      const newMaxUses = getFeatureMaxUses(character, featureId)
+      if (newMaxUses !== undefined && newMaxUses !== usage.maxUses) {
+        // Update max uses and adjust current uses if needed
+        const adjustedCurrentUses = Math.min(usage.currentUses || 0, newMaxUses)
+        updatedUsage[featureId] = {
+          ...usage,
+          maxUses: newMaxUses,
+          currentUses: adjustedCurrentUses,
+          lastUpdated: new Date().toISOString()
+        }
+      }
+    }
+  }
+  
+  return updatedUsage
+}
+
+/**
+ * Force recalculation of max uses for a character and return updated character
+ * This can be called to fix max uses without reloading from database
+ */
+export function forceRecalculateCharacterMaxUses(character: CharacterData): CharacterData {
+  const recalculatedUsage = recalculateAllFeatureMaxUses(character)
+  
+  if (Object.keys(recalculatedUsage).length > 0) {
+    return {
+      ...character,
+      classFeatureSkillsUsage: recalculatedUsage
+    }
+  }
+  
+  return character
 }
 
 /**

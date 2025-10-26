@@ -508,6 +508,21 @@ function CharacterSheetContent() {
     }
   }, [])
 
+  // Force recalculation of max uses for all characters
+  const recalculateAllCharactersMaxUses = useCallback(() => {
+    const { forceRecalculateCharacterMaxUses } = require('@/lib/feature-usage-tracker')
+    
+    setCharacters((prev) => prev.map((character) => {
+      const updatedCharacter = forceRecalculateCharacterMaxUses(character)
+      return updatedCharacter
+    }))
+    
+    toast({
+      title: "Recalculated",
+      description: "Max uses recalculated for all characters.",
+    })
+  }, [])
+
   // Spell slots are now calculated during initial character load for better performance
 
   const handlePartyStatusChange = async (status: 'active' | 'away' | 'deceased') => {
@@ -2969,6 +2984,18 @@ function CharacterSheetContent() {
                     }
                   />
                 </div>
+
+                {/* Recalculate Max Uses Button */}
+                <div className="mb-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={recalculateAllCharactersMaxUses}
+                  >
+                    <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
+                    Recalculate Max Uses
+                  </Button>
+                </div>
               </div>
 
               <div className={`grid grid-cols-1 xl:grid-cols-3 gap-6 ${!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}`}>
@@ -3053,6 +3080,7 @@ function CharacterSheetContent() {
             />
 
             <Spellcasting
+              key={`spellcasting-${activeCharacter.id}-${JSON.stringify(activeCharacter.classFeatureSkillsUsage)}`}
               character={activeCharacter}
               strengthMod={strengthMod}
               dexterityMod={dexterityMod}
