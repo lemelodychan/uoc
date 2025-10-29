@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel, getPrimaryClass } from "@/lib/character-data"
@@ -25,18 +26,25 @@ interface BasicInfoModalProps {
 
 export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStatusChange }: BasicInfoModalProps) {
   const primaryClass = getPrimaryClass(character.classes)
-  const [formData, setFormData] = useState({
-    name: character.name,
-    class: primaryClass?.name || character.class,
-    subclass: primaryClass?.subclass || character.subclass || "",
-    level: calculateTotalLevel(character.classes),
-    background: character.background,
-    race: character.race,
-    alignment: character.alignment,
-    partyStatus: character.partyStatus || 'active',
-    imageUrl: character.imageUrl || "",
-    visibility: character.visibility || 'public',
-    isNPC: character.isNPC || false,
+  const [formData, setFormData] = useState(() => {
+    // Ensure aestheticImages array always has exactly 6 elements for the form
+    const existingImages = character.aestheticImages || []
+    const paddedImages = Array.from({ length: 6 }, (_, index) => existingImages[index] || "")
+    
+    return {
+      name: character.name,
+      class: primaryClass?.name || character.class,
+      subclass: primaryClass?.subclass || character.subclass || "",
+      level: calculateTotalLevel(character.classes),
+      background: character.background,
+      race: character.race,
+      alignment: character.alignment,
+      partyStatus: character.partyStatus || 'active',
+      imageUrl: character.imageUrl || "",
+      visibility: character.visibility || 'public',
+      isNPC: character.isNPC || false,
+      aestheticImages: paddedImages,
+    }
   })
   const [multiclassModalOpen, setMulticlassModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -79,6 +87,11 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   useEffect(() => {
     if (isOpen) {
       const primaryClass = getPrimaryClass(character.classes)
+      
+      // Ensure aestheticImages array always has exactly 6 elements for the form
+      const existingImages = character.aestheticImages || []
+      const paddedImages = Array.from({ length: 6 }, (_, index) => existingImages[index] || "")
+      
       setFormData({
         name: character.name,
         class: primaryClass?.name || character.class,
@@ -91,19 +104,24 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
         imageUrl: character.imageUrl || "",
         visibility: character.visibility || 'public',
         isNPC: character.isNPC || false,
+        aestheticImages: paddedImages,
       })
     }
-  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility, character.isNPC])
+  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility, character.isNPC, character.aestheticImages])
 
 
   const handleSave = () => {
     // Don't include level in updates since it should be calculated from classes
     const { level, ...formDataWithoutLevel } = formData
     
+    // Filter out empty aesthetic images for saving to database
+    const filteredAestheticImages = formData.aestheticImages.filter(url => url && url.trim() !== '')
+    
     // Only save basic info fields, not class-related fields
     const updates = { 
       ...formDataWithoutLevel, 
-      visibility: formData.visibility 
+      visibility: formData.visibility,
+      aestheticImages: filteredAestheticImages
     }
     
     onSave(updates)
@@ -117,11 +135,18 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
-        <DialogHeader className="p-4 border-b">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] p-0 gap-0">
+        <DialogHeader className="p-4">
           <DialogTitle>Edit Basic Information</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
+        <Tabs defaultValue="character" className="w-full gap-0">
+          <div className="p-4 pt-0 border-b bg-card">
+            <TabsList className="grid w-full grid-cols-2 p-1 h-fit">
+              <TabsTrigger value="character">Character Info</TabsTrigger>
+              <TabsTrigger value="aesthetic">Aesthetic</TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="character" className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="imageUrl" className="text-right">
               Image URL
@@ -340,7 +365,33 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               </div>
             </div>
           )}
-        </div>
+          </TabsContent>
+          <TabsContent value="aesthetic" className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground mb-4">
+                Add up to 6 images to display on your character sheet. These will appear above your character header.
+              </div>
+              {formData.aestheticImages.map((url, index) => (
+                <div key={index} className="grid grid-cols-[80px_auto] items-center gap-3">
+                  <Label htmlFor={`aestheticImage${index}`} className="text-right text-sm">
+                    Image {index + 1}
+                  </Label>
+                  <Input
+                    id={`aestheticImage${index}`}
+                    value={url}
+                    onChange={(e) => {
+                      const newImages = [...formData.aestheticImages]
+                      newImages[index] = e.target.value
+                      setFormData({ ...formData, aestheticImages: newImages })
+                    }}
+                    className="w-full"
+                    placeholder="https://..."
+                  />
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
         <DialogFooter className="p-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel

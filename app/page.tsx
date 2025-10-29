@@ -22,6 +22,7 @@ import { FeaturesModal } from "@/components/edit-modals/features-modal"
 import { EquipmentModal } from "@/components/edit-modals/equipment-modal"
 import { LanguagesModal } from "@/components/edit-modals/languages-modal"
 import { CharacterHeader } from "@/components/character-sheet/CharacterHeader"
+import { AestheticImages } from "@/components/character-sheet/AestheticImages"
 import { AbilityScores } from "@/components/character-sheet/AbilityScores"
 import { SavingThrows } from "@/components/character-sheet/SavingThrows"
 import { Skills } from "@/components/character-sheet/Skills"
@@ -2959,17 +2960,20 @@ function CharacterSheetContent() {
               </div>
               
               <div className={!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}>
-                <CharacterHeader
-                  character={activeCharacter}
-                  proficiencyBonus={proficiencyBonus}
-                  onEdit={() => setBasicInfoModalOpen(true)}
-                  onOpenBiography={() => setCharacterDetailsContentModalOpen(true)}
-                  onOpenPortrait={() => setPortraitModalOpen(true)}
-                  onLevelUp={() => setLevelUpModalOpen(true)}
-                  canEdit={canEditActiveCharacter}
-                  levelUpEnabled={currentCampaign?.levelUpModeEnabled || false}
-                  campaign={currentCampaign}
-                />
+                <div className="mb-6 rounded-lg border rounded-lg flex flex-col gap-0 overflow-hidden">
+                  <AestheticImages character={activeCharacter} />
+                  <CharacterHeader
+                    character={activeCharacter}
+                    proficiencyBonus={proficiencyBonus}
+                    onEdit={() => setBasicInfoModalOpen(true)}
+                    onOpenBiography={() => setCharacterDetailsContentModalOpen(true)}
+                    onOpenPortrait={() => setPortraitModalOpen(true)}
+                    onLevelUp={() => setLevelUpModalOpen(true)}
+                    canEdit={canEditActiveCharacter}
+                    levelUpEnabled={currentCampaign?.levelUpModeEnabled || false}
+                    campaign={currentCampaign}
+                  />
+                </div>
                 
                 {/* Migration Button - only show if character needs migration */}
                 <div className="mb-4">
@@ -2985,17 +2989,19 @@ function CharacterSheetContent() {
                   />
                 </div>
 
-                {/* Recalculate Max Uses Button */}
-                <div className="mb-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={recalculateAllCharactersMaxUses}
-                  >
-                    <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
-                    Recalculate Max Uses
-                  </Button>
-                </div>
+                {/* Recalculate Max Uses Button - Superadmin only */}
+                {isUserSuperadmin && (
+                  <div className="mb-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={recalculateAllCharactersMaxUses}
+                    >
+                      <Icon icon="lucide:refresh-cw" className="w-4 h-4 mr-2" />
+                      Recalculate Max Uses
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className={`grid grid-cols-1 xl:grid-cols-3 gap-6 ${!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}`}>

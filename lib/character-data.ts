@@ -77,6 +77,7 @@ export interface CharacterData {
   notes?: string
   // Character portrait URL
   imageUrl?: string
+  aestheticImages?: string[] // Array of up to 6 image URLs
   proficiencyBonus?: number
   savingThrowProficiencies: SavingThrowProficiency[]
   skills: Skill[]

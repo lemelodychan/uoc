@@ -37,7 +37,7 @@ export function CharacterHeader({
   const showLevelUpButton = canEdit && levelUpEnabled
   const levelUpCompleted = character.levelUpCompleted || false
   return (
-    <Card className="mb-6">
+    <Card className="rounded-none border-0">
       <CardHeader className="pb-0">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
