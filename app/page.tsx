@@ -2990,7 +2990,7 @@ function CharacterSheetContent() {
                 </div>
 
                 {/* Recalculate Max Uses Button - Superadmin only */}
-                {isUserSuperadmin && (
+                {/* {isUserSuperadmin && (
                   <div className="mb-4">
                     <Button 
                       variant="outline" 
@@ -3001,7 +3001,7 @@ function CharacterSheetContent() {
                       Recalculate Max Uses
                     </Button>
                   </div>
-                )}
+                )} */}
               </div>
 
               <div className={`grid grid-cols-1 xl:grid-cols-3 gap-6 ${!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}`}>
