@@ -2912,12 +2912,16 @@ function CharacterSheetContent() {
                 setCurrentView('campaign')
               } else {
                 setCurrentView('character')
+                // Scroll to top when switching to character view
+                window.scrollTo({ top: 0, behavior: 'smooth' })
               }
             }}
             activeCharacterId={activeCharacterId}
             onSelectCharacter={(id) => {
               setActiveCharacterIdWithStorage(id)
               setCurrentView('character')
+              // Scroll to top when opening a character sheet
+              window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
             onCreateCharacter={createNewCharacter}
             onStartLongRest={handleStartLongRest}
@@ -2976,7 +2980,7 @@ function CharacterSheetContent() {
                 </div>
                 
                 {/* Migration Button - only show if character needs migration */}
-                <div className="mb-4">
+{/*                 <div className="mb-4">
                   <FeatureUsageMigrationModal
                     characters={[activeCharacter]}
                     onCharacterUpdate={async (character) => updateCharacter(character)}
@@ -2987,7 +2991,7 @@ function CharacterSheetContent() {
                       </Button>
                     }
                   />
-                </div>
+                </div> */}
 
                 {/* Recalculate Max Uses Button - Superadmin only */}
                 {/* {isUserSuperadmin && (
@@ -3165,8 +3169,14 @@ function CharacterSheetContent() {
               onSelectCharacter={(id) => {
                 setActiveCharacterId(id)
                 setCurrentView('character')
+                // Scroll to top when opening a character sheet
+                window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
-              onBackToCharacters={() => setCurrentView('character')}
+              onBackToCharacters={() => {
+                setCurrentView('character')
+                // Scroll to top when going back to characters
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
               onEditCampaign={handleEditCampaign}
               onCreateCharacter={createNewCharacter}
               currentUserId={currentUser?.id}
