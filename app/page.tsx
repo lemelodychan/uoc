@@ -110,6 +110,16 @@ function CharacterSheetContent() {
   const [currentView, setCurrentView] = useState<'character' | 'campaign' | 'management'>('campaign')
   const [appView, setAppView] = useState<'campaign' | 'management'>('campaign')
   
+  // Ref for the main scrollable container
+  const mainRef = useRef<HTMLElement>(null)
+  
+  // Helper function to scroll the main container to top
+  const scrollToTop = () => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'auto' })
+    }
+  }
+  
   // Get URL search parameters
   const searchParams = useSearchParams()
   
@@ -2913,7 +2923,7 @@ function CharacterSheetContent() {
               } else {
                 setCurrentView('character')
                 // Scroll to top when switching to character view
-                window.scrollTo({ top: 0, behavior: 'smooth' })
+                scrollToTop()
               }
             }}
             activeCharacterId={activeCharacterId}
@@ -2921,7 +2931,7 @@ function CharacterSheetContent() {
               setActiveCharacterIdWithStorage(id)
               setCurrentView('character')
               // Scroll to top when opening a character sheet
-              window.scrollTo({ top: 0, behavior: 'smooth' })
+              scrollToTop()
             }}
             onCreateCharacter={createNewCharacter}
             onStartLongRest={handleStartLongRest}
@@ -2934,7 +2944,7 @@ function CharacterSheetContent() {
           />
         )}
 
-        <main className={`flex-1 p-6 relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
+        <main ref={mainRef} className={`flex-1 p-6 relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
           {appView === 'management' ? (
             <ManagementInterface
               campaigns={campaigns}
@@ -3170,12 +3180,12 @@ function CharacterSheetContent() {
                 setActiveCharacterId(id)
                 setCurrentView('character')
                 // Scroll to top when opening a character sheet
-                window.scrollTo({ top: 0, behavior: 'smooth' })
+                scrollToTop()
               }}
               onBackToCharacters={() => {
                 setCurrentView('character')
                 // Scroll to top when going back to characters
-                window.scrollTo({ top: 0, behavior: 'smooth' })
+                scrollToTop()
               }}
               onEditCampaign={handleEditCampaign}
               onCreateCharacter={createNewCharacter}
