@@ -2969,7 +2969,7 @@ function CharacterSheetContent() {
                 </button>
                 <Icon icon="lucide:chevron-right" className="w-4 h-4" />
                 <span className="text-muted-foreground">
-                  Character: {activeCharacter.name}
+                  {activeCharacter.isNPC ? `NPC: ${activeCharacter.name}` : `Character: ${activeCharacter.name}`}
                 </span>
               </div>
               

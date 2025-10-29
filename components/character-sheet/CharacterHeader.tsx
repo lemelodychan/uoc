@@ -52,6 +52,12 @@ export function CharacterHeader({
             <div className="flex flex-col items-between gap-2">
               <div className="flex items-center gap-2">
                 <CardTitle className="text-3xl font-bold font-display">{character.name}</CardTitle>
+                {character.isNPC && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Icon icon="lucide:users" className="w-3 h-3" />
+                    NPC
+                  </Badge>
+                )}
                 {character.visibility === 'private' && (
                   <Badge variant="secondary" className="flex items-center gap-1">
                     <Icon icon="lucide:lock" className="w-3 h-3" />
