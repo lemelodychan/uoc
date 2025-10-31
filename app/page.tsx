@@ -85,6 +85,7 @@ import {
   type ToolProficiency,
 } from "@/lib/character-data"
 import { saveCharacter, loadCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
+import type { UserProfile } from "@/lib/user-profiles"
 import { useClassFeaturesPreloader } from "@/hooks/use-class-features"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
@@ -594,7 +595,22 @@ function CharacterSheetContent() {
       try {
         const { characters: dbCharacters, error: loadError } = await loadAllCharacters()
         const { campaigns: dbCampaigns, error: campaignLoadError } = await loadAllCampaigns()
-        const { users: dbUsers, error: usersLoadError } = await getAllUsers()
+        
+        // Fetch users from API route to get last_login synced from Auth
+        let dbUsers: UserProfile[] | undefined = undefined
+        let usersLoadError: string | undefined = undefined
+        try {
+          const usersRes = await fetch('/api/users/list')
+          if (usersRes.ok) {
+            const data = await usersRes.json()
+            dbUsers = data.users
+          } else {
+            const errorData = await usersRes.json().catch(() => ({}))
+            usersLoadError = errorData.error || 'Failed to load users'
+          }
+        } catch (e: any) {
+          usersLoadError = e?.message || 'Failed to load users'
+        }
         
         if (loadError) {
           console.error("Failed to load characters:", loadError)

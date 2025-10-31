@@ -7,6 +7,7 @@ export interface UserProfile {
   permissionLevel: 'superadmin' | 'editor' | 'viewer'
   createdAt: string
   updatedAt: string
+  lastLogin?: string
 }
 
 export type PermissionLevel = 'superadmin' | 'editor' | 'viewer'

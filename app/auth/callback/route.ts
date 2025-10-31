@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase-server"
-import { syncCurrentUserProfileFromAuth } from "@/lib/database"
+import { syncCurrentUserProfileFromAuth, updateLastLogin } from "@/lib/database"
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -13,6 +13,8 @@ export async function GET(request: Request) {
     const supabase = createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // Update last_login timestamp on authentication
+      try { await updateLastLogin() } catch {}
       // Best-effort profile sync after login
       try { await syncCurrentUserProfileFromAuth() } catch {}
       const forwardedHost = request.headers.get("x-forwarded-host") // original origin before load balancer

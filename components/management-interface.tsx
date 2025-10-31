@@ -12,6 +12,7 @@ import type { UserProfile, PermissionLevel } from "@/lib/user-profiles"
 import { useUser } from "@/lib/user-context"
 import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin } from "@/lib/database"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
 import { ClassDuplicationModal } from "./edit-modals/class-duplication-modal"
@@ -627,9 +628,9 @@ function CampaignManagement({
   const canEdit = userProfile?.permissionLevel !== 'viewer'
   
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-row gap-4 items-center justify-between">
-        <h2 className="text-2xl font-semibold">Campaigns</h2>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-row gap-4 items-start justify-between">
+        <h2 className="text-2xl font-bold">Campaigns</h2>
         {canEdit && (
           <Button onClick={onCreateCampaign}>
             <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
@@ -753,216 +754,218 @@ function ClassManagement({
   onManageFeatures: (classData: ClassData) => void
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-0">
       {/* Invisible div at the top for scrolling reference */}
       <div ref={classListTopRef} className="h-0" />
-      <div className="flex flex-row gap-4 items-center justify-between">
-        <h2 className="text-2xl font-semibold">Classes</h2>
-        {canEdit && (
-          <Button onClick={onCreateClass}>
-            <Icon icon="lucide:plus" className="w-4 h-4" />
-            Create Class
-          </Button>
-        )}
-      </div>  
-
       <div className="flex flex-col gap-4">
-        {(() => {
-          // Group classes by name and only show base classes
-          const baseClasses = classes.filter(c => c.subclass === null)
-          const classGroups = baseClasses.map(baseClass => {
-            const subclasses = classes.filter(c => c.name === baseClass.name && c.subclass !== null)
-            return {
-              baseClass,
-              subclasses,
-              subclassCount: subclasses.length
-            }
-          })
-          
-          return classGroups.map(({ baseClass, subclasses, subclassCount }) => (
-            <Card 
-              key={baseClass.id}
-              ref={(el) => {
-                if (el) {
-                  classCardRefs.current.set(baseClass.id, el)
-                } else {
-                  classCardRefs.current.delete(baseClass.id)
-                }
-              }}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-semibold">{baseClass.name}</span>
-                        {baseClass.is_custom && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Icon icon="lucide:user-plus" className="w-3 h-3 mr-1" />
-                            Custom
-                          </Badge>
+        <div className="flex flex-row gap-4 items-start justify-between">
+          <h2 className="text-2xl font-bold">Classes</h2>
+          {canEdit && (
+            <Button onClick={onCreateClass}>
+              <Icon icon="lucide:plus" className="w-4 h-4" />
+              Create Class
+            </Button>
+          )}
+        </div>  
+
+        <div className="flex flex-col gap-4">
+          {(() => {
+            // Group classes by name and only show base classes
+            const baseClasses = classes.filter(c => c.subclass === null)
+            const classGroups = baseClasses.map(baseClass => {
+              const subclasses = classes.filter(c => c.name === baseClass.name && c.subclass !== null)
+              return {
+                baseClass,
+                subclasses,
+                subclassCount: subclasses.length
+              }
+            })
+            
+            return classGroups.map(({ baseClass, subclasses, subclassCount }) => (
+              <Card 
+                key={baseClass.id}
+                ref={(el) => {
+                  if (el) {
+                    classCardRefs.current.set(baseClass.id, el)
+                  } else {
+                    classCardRefs.current.delete(baseClass.id)
+                  }
+                }}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold">{baseClass.name}</span>
+                          {baseClass.is_custom && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Icon icon="lucide:user-plus" className="w-3 h-3 mr-1" />
+                              Custom
+                            </Badge>
+                          )}
+                        </div>
+                        {subclassCount > 0 && (
+                          <div className="font-body flex items-center gap-1 text-xs text-muted-foreground">
+                            <Icon icon="lucide:layers" className="w-3 h-3" />
+                            <span>{subclassCount} subclass{subclassCount !== 1 ? 'es' : ''}</span>
+                          </div>
                         )}
                       </div>
-                      {subclassCount > 0 && (
-                        <div className="font-body flex items-center gap-1 text-xs text-muted-foreground">
-                          <Icon icon="lucide:layers" className="w-3 h-3" />
-                          <span>{subclassCount} subclass{subclassCount !== 1 ? 'es' : ''}</span>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {canEdit && (
-                      <Button className="font-body" size="sm" variant="outline" onClick={() => onEditClass(baseClass)}>
-                        <Icon icon="lucide:edit" className="w-4 h-4" />
-                        Edit class
-                      </Button>
-                    )}
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => onManageSubclasses(baseClass)}
-                      title={canEdit ? "Manage Subclasses" : "View Subclasses"}
-                      className="font-body"
-                    >
-                      <Icon icon="lucide:layers" className="w-4 h-4" />
-                      {canEdit ? "Edit subclasses" : "View subclasses"}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => onManageFeatures(baseClass)}
-                      title={canEdit ? "Manage Features" : "View Features"}
-                      className="font-body"
-                    >
-                      <Icon icon="lucide:star" className="w-4 h-4" />
-                      {canEdit ? "Manage features" : "View features"}
-                    </Button>
-                    {canEdit && (
+                    <div className="flex gap-2">
+                      {canEdit && (
+                        <Button className="font-body" size="sm" variant="outline" onClick={() => onEditClass(baseClass)}>
+                          <Icon icon="lucide:edit" className="w-4 h-4" />
+                          Edit class
+                        </Button>
+                      )}
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
-                        onClick={async () => {
-                          if (confirm(`Are you sure you want to delete "${baseClass.name}" and all its subclasses? This action cannot be undone.`)) {
-                            try {
-                              // Delete base class and all subclasses
-                              const allClassIds = [baseClass.id, ...subclasses.map(s => s.id)]
-                              await Promise.all(allClassIds.map(id => onDeleteClass(id)))
-                              // Reload classes list to show updated data
-                              await onReloadClasses()
-                            } catch (error) {
-                              console.error('Error deleting class:', error)
-                            }
-                          }
-                        }}
+                        onClick={() => onManageSubclasses(baseClass)}
+                        title={canEdit ? "Manage Subclasses" : "View Subclasses"}
+                        className="font-body"
                       >
-                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                        <Icon icon="lucide:layers" className="w-4 h-4" />
+                        {canEdit ? "Edit subclasses" : "View subclasses"}
                       </Button>
-                    )}
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Description */}
-                {baseClass.description && (
-                  <p className="text-muted-foreground mb-4 line-clamp-2">
-                    {baseClass.description}
-                  </p>
-                )}
-                
-                {/* Class Stats */}
-                <div className="flex flex-wrap items-center gap-4 text-sm">
-                  {/* Hit Die */}
-                  <div className="flex items-center gap-1">
-                    <Icon icon="lucide:dice-6" className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Hit Die:</span>
-                    <Badge variant="outline" className="text-xs">
-                      d{baseClass.hit_die || 8}
-                    </Badge>
-                  </div>
-                  
-                  {/* Primary Ability */}
-                  <div className="flex items-center gap-1">
-                    <Icon icon="lucide:zap" className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Primary:</span>
-                    <Badge variant="outline" className="text-xs">
-                      {(() => {
-                        if (!baseClass.primary_ability) return 'None'
-                        if (Array.isArray(baseClass.primary_ability)) {
-                          return baseClass.primary_ability
-                            .filter(ability => ability && ability.trim())
-                            .map(ability => ability.charAt(0).toUpperCase() + ability.slice(1).toLowerCase())
-                            .join(', ') || 'None'
-                        }
-                        // Handle string case
-                        const abilityStr = String(baseClass.primary_ability)
-                        return abilityStr.charAt(0).toUpperCase() + abilityStr.slice(1).toLowerCase()
-                      })()}
-                    </Badge>
-                  </div>
-                  
-                  {/* Source */}
-                  <div className="flex items-center gap-1">
-                    <Icon icon="lucide:book" className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Source:</span>
-                    <Badge variant="outline" className="text-xs">
-                      {baseClass.source && baseClass.source !== 'custom' ? baseClass.source.toUpperCase() : 'Custom'}
-                    </Badge>
-                  </div>
-                </div>
-                
-                {/* Subclasses List */}
-                {/* {subclassCount > 0 && (
-                  <div className="mt-4 pt-3 border-t border-border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon icon="lucide:layers" className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground">Subclasses:</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {subclasses.map((subclass) => (
-                        <Badge key={subclass.id} variant="outline" className="text-xs">
-                          {subclass.subclass}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )} */}
-                
-                {/* Footer Info */}
-                <div className="mt-3 pt-3 border-t border-border">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <div className="flex items-center gap-4">
-                      <span>Base Class</span>
-                      {subclassCount > 0 && (
-                        <span>{subclassCount} subclass{subclassCount !== 1 ? 'es' : ''} available</span>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => onManageFeatures(baseClass)}
+                        title={canEdit ? "Manage Features" : "View Features"}
+                        className="font-body"
+                      >
+                        <Icon icon="lucide:star" className="w-4 h-4" />
+                        {canEdit ? "Manage features" : "View features"}
+                      </Button>
+                      {canEdit && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
+                          onClick={async () => {
+                            if (confirm(`Are you sure you want to delete "${baseClass.name}" and all its subclasses? This action cannot be undone.`)) {
+                              try {
+                                // Delete base class and all subclasses
+                                const allClassIds = [baseClass.id, ...subclasses.map(s => s.id)]
+                                await Promise.all(allClassIds.map(id => onDeleteClass(id)))
+                                // Reload classes list to show updated data
+                                await onReloadClasses()
+                              } catch (error) {
+                                console.error('Error deleting class:', error)
+                              }
+                            }
+                          }}
+                        >
+                          <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                        </Button>
                       )}
                     </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {/* Description */}
+                  {baseClass.description && (
+                    <p className="text-muted-foreground mb-4 line-clamp-2">
+                      {baseClass.description}
+                    </p>
+                  )}
+                  
+                  {/* Class Stats */}
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                    {/* Hit Die */}
                     <div className="flex items-center gap-1">
-                      <Icon icon="lucide:calendar" className="w-3 h-3" />
-                      <span>Updated {(() => {
-                        try {
-                          const date = new Date(baseClass.updated_at)
-                          if (isNaN(date.getTime())) return 'Unknown'
-                          return date.toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })
-                        } catch (error) {
-                          return 'Unknown'
-                        }
-                      })()}</span>
+                      <Icon icon="lucide:dice-6" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Hit Die:</span>
+                      <Badge variant="outline" className="text-xs">
+                        d{baseClass.hit_die || 8}
+                      </Badge>
+                    </div>
+                    
+                    {/* Primary Ability */}
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:zap" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Primary:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(() => {
+                          if (!baseClass.primary_ability) return 'None'
+                          if (Array.isArray(baseClass.primary_ability)) {
+                            return baseClass.primary_ability
+                              .filter(ability => ability && ability.trim())
+                              .map(ability => ability.charAt(0).toUpperCase() + ability.slice(1).toLowerCase())
+                              .join(', ') || 'None'
+                          }
+                          // Handle string case
+                          const abilityStr = String(baseClass.primary_ability)
+                          return abilityStr.charAt(0).toUpperCase() + abilityStr.slice(1).toLowerCase()
+                        })()}
+                      </Badge>
+                    </div>
+                    
+                    {/* Source */}
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:book" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Source:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {baseClass.source && baseClass.source !== 'custom' ? baseClass.source.toUpperCase() : 'Custom'}
+                      </Badge>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        })()}
+                  
+                  {/* Subclasses List */}
+                  {/* {subclassCount > 0 && (
+                    <div className="mt-4 pt-3 border-t border-border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Icon icon="lucide:layers" className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground">Subclasses:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {subclasses.map((subclass) => (
+                          <Badge key={subclass.id} variant="outline" className="text-xs">
+                            {subclass.subclass}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )} */}
+                  
+                  {/* Footer Info */}
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-4">
+                        <span>Base Class</span>
+                        {subclassCount > 0 && (
+                          <span>{subclassCount} subclass{subclassCount !== 1 ? 'es' : ''} available</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Icon icon="lucide:calendar" className="w-3 h-3" />
+                        <span>Updated {(() => {
+                          try {
+                            const date = new Date(baseClass.updated_at)
+                            if (isNaN(date.getTime())) return 'Unknown'
+                            return date.toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })
+                          } catch (error) {
+                            return 'Unknown'
+                          }
+                        })()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          })()}
+        </div>
       </div>
     </div>
   )
@@ -1072,40 +1075,48 @@ function UserManagement({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-row gap-4 items-center justify-between">
-        <h2 className="text-2xl font-semibold">Users</h2>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-row gap-4 items-start justify-between">
+        <h2 className="text-2xl font-bold">Users</h2>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="min-w-[720px] grid grid-cols-12 gap-2 px-2 py-2 text-xs text-muted-foreground border-b">
-          <div className="col-span-4">Display Name</div>
-          <div className="col-span-5">User ID</div>
+      <div className="overflow-x-aut flex flex-col gap-1">
+        <div className="min-w-[720px] grid grid-cols-12 gap-2 px-2 py-2 text-xs text-muted-foreground">
+          <div className="col-span-3">Display Name</div>
+          <div className="col-span-3">User ID</div>
           <div className="col-span-2">Permission</div>
-          <div className="col-span-1 text-right">Actions</div>
+          <div className="col-span-1">Created At</div>
+          <div className="col-span-1">Last Login</div>
+          <div className="col-span-2"></div>
         </div>
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-0 border rounded-lg">
           {users.map((u) => {
             const draft = drafts[u.userId]
             const isSaving = savingIds.has(u.userId)
             return (
-              <div key={u.userId} className="min-w-[720px] grid grid-cols-12 gap-2 items-center px-2 py-2 border-b">
-                <div className="col-span-4">
+              <div key={u.userId} className="min-w-[720px] grid grid-cols-12 gap-2 items-center px-2 py-2 border-b last:border-b-0">
+                <div className="col-span-3 px-2">
                   <span>{u.displayName || ''}</span>
                 </div>
-                <div className="col-span-5">
+                <div className="col-span-3">
                   <code className="text-xs break-all">{u.userId}</code>
                 </div>
                 <div className="col-span-2">
-                  <Badge variant="outline" className="text-xs">{u.permissionLevel}</Badge>
+                  <Badge variant="secondary" className="text-xs">{u.permissionLevel}</Badge>
                 </div>
-                <div className="col-span-1 text-right">
+                <div className="col-span-1 text-xs text-muted-foreground">
+                  {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}
+                </div>
+                <div className="col-span-1 text-xs text-muted-foreground">
+                  {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
+                </div>
+                <div className="col-span-2 text-right">
                   {isSuperadmin && (
-                    <div className="flex items-center justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => openEdit(u.userId)}>
+                    <div className="flex items-center justify-end gap-2 w-full">
+                      <Button size="sm" className="w-8 h-8" variant="outline" onClick={() => openEdit(u.userId)}>
                         <Icon icon="lucide:edit" className="w-4 h-4" />
                       </Button>
-                      <Button size="sm" variant="outline" className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white" onClick={() => handleDelete(u.userId)} disabled={deletingId === u.userId}>
+                      <Button size="sm" variant="outline" className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8" onClick={() => handleDelete(u.userId)} disabled={deletingId === u.userId}>
                         {deletingId === u.userId ? (
                           <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
                         ) : (
@@ -1122,12 +1133,12 @@ function UserManagement({
       </div>
 
       <Dialog open={!!editUserId} onOpenChange={(open) => { if (!open) setEditUserId(null) }}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-0">
+          <DialogHeader className="p-4 border-b">
             <DialogTitle>Edit User</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-3 px-4">
+            <div className="flex flex-col gap-2">
               <label className="text-sm text-muted-foreground">Display Name</label>
               <input
                 className="w-full border rounded px-2 py-1 bg-background"
@@ -1136,26 +1147,30 @@ function UserManagement({
                 placeholder="Display name"
               />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <label className="text-sm text-muted-foreground">Permission</label>
-              <select
-                className="w-full border rounded px-2 py-1 bg-background"
+              <Select
                 value={editPermissionLevel}
-                onChange={(e) => setEditPermissionLevel(e.target.value as PermissionLevel)}
+                onValueChange={(value) => setEditPermissionLevel(value as PermissionLevel)}
               >
-                <option value="viewer">viewer</option>
-                <option value="editor">editor</option>
-                <option value="superadmin">superadmin</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="viewer">viewer</SelectItem>
+                  <SelectItem value="editor">editor</SelectItem>
+                  <SelectItem value="superadmin">superadmin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="p-4 border-t">
             <Button variant="outline" onClick={() => setEditUserId(null)}>Cancel</Button>
             <Button onClick={() => editUserId && handleSave(editUserId)} disabled={!isSuperadmin || (editUserId ? savingIds.has(editUserId) : false)}>
               {editUserId && savingIds.has(editUserId) ? (
                 <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
               ) : (
-                <Icon icon="lucide:save" className="w-4 h-4 mr-2" />
+                <Icon icon="lucide:save" className="w-4 h-4" />
               )}
               Save
             </Button>

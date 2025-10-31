@@ -36,6 +36,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
         setUser(currentUser)
 
+        // Update last_login timestamp when user is authenticated
+        // This captures cases where user refreshes page or returns to app
+        try { await updateLastLogin() } catch {}
+
         // Get user profile
         const { profile, error: profileError } = await getCurrentUserProfile()
         if (profileError) {

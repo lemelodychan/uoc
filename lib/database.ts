@@ -77,7 +77,8 @@ export const getCurrentUserProfile = async (): Promise<{ profile?: UserProfile; 
         displayName: profile.display_name,
         permissionLevel: profile.permission_level,
         createdAt: profile.created_at,
-        updatedAt: profile.updated_at
+        updatedAt: profile.updated_at,
+        lastLogin: profile.last_login || undefined
       }
     }
   } catch (error) {
@@ -248,6 +249,32 @@ export const deleteUserProfileByAdmin = async (
   }
 }
 
+/**
+ * Update the last_login timestamp for the current authenticated user
+ */
+export const updateLastLogin = async (): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: authError?.message || "No authenticated user" }
+    }
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ last_login: new Date().toISOString() })
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('Error updating last_login:', error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (e) {
+    console.error('Error in updateLastLogin:', e)
+    return { success: false, error: 'Failed to update last login' }
+  }
+}
+
 export const syncCurrentUserProfileFromAuth = async (): Promise<{ success: boolean; error?: string }> => {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -265,6 +292,7 @@ export const syncCurrentUserProfileFromAuth = async (): Promise<{ success: boole
         display_name: displayName,
         permission_level: 'viewer',
         updated_at: new Date().toISOString(),
+        last_login: new Date().toISOString(),
       }, { onConflict: 'user_id' })
 
     if (error) {
@@ -356,7 +384,8 @@ export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: st
       displayName: profile.display_name,
       permissionLevel: profile.permission_level,
       createdAt: profile.created_at,
-      updatedAt: profile.updated_at
+      updatedAt: profile.updated_at,
+      lastLogin: profile.last_login || undefined
     }))
     
     return { users }

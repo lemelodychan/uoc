@@ -3,6 +3,7 @@
 import { useState, Suspense, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
+import { updateLastLogin } from "@/lib/database"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -71,7 +72,7 @@ function LoginForm() {
     setMessage(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -79,6 +80,8 @@ function LoginForm() {
       if (error) {
         setMessage({ type: "error", text: error.message })
       } else {
+        // Update last_login timestamp on authentication
+        try { await updateLastLogin() } catch {}
         router.push("/")
         router.refresh()
       }
