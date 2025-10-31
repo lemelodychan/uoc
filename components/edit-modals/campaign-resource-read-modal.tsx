@@ -13,6 +13,7 @@ interface CampaignResourceReadModalProps {
   onEdit: () => void
   onDelete: () => void
   authorName: string
+  canEdit?: boolean
 }
 
 export function CampaignResourceReadModal({
@@ -21,7 +22,8 @@ export function CampaignResourceReadModal({
   resource,
   onEdit,
   onDelete,
-  authorName
+  authorName,
+  canEdit = true
 }: CampaignResourceReadModalProps) {
   if (!resource) return null
 
@@ -83,26 +85,28 @@ export function CampaignResourceReadModal({
           )}
         </div>
 
-        <div className="flex justify-between p-4 border-t gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            className="flex items-center gap-2 text-destructive hover:text-destructive"
-          >
-            <Icon icon="lucide:trash-2" className="w-4 h-4" />
-            Delete
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onEdit}
-            className="flex items-center gap-2"
-          >
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="flex justify-between p-4 border-t gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDelete}
+              className="flex items-center gap-2 text-destructive hover:text-destructive"
+            >
+              <Icon icon="lucide:trash-2" className="w-4 h-4" />
+              Delete
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEdit}
+              className="flex items-center gap-2"
+            >
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          </div>
+        )}
 
       </DialogContent>
     </Dialog>

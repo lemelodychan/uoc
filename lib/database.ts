@@ -98,7 +98,7 @@ export const createUserProfile = async (): Promise<{ success: boolean; error?: s
       .insert([{
         user_id: user.id,
         display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-        permission_level: 'editor'
+        permission_level: 'viewer'
       }])
 
     if (error) {
@@ -161,6 +161,93 @@ export const updateUserProfile = async (updates: Partial<Pick<UserProfile, 'disp
   }
 }
 
+export const updateUserProfileByAdmin = async (
+  targetUserId: string,
+  updates: Partial<Pick<UserProfile, 'displayName' | 'permissionLevel'>>
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: authError?.message || "No authenticated user" }
+    }
+
+    // Ensure caller is superadmin
+    const { data: callerProfile, error: callerError } = await supabase
+      .from('user_profiles')
+      .select('permission_level')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (callerError) {
+      return { success: false, error: callerError.message }
+    }
+    if (!callerProfile || callerProfile.permission_level !== 'superadmin') {
+      return { success: false, error: 'Forbidden: superadmin required' }
+    }
+
+    const updateData: any = { updated_at: new Date().toISOString() }
+    if (updates.displayName !== undefined) updateData.display_name = updates.displayName
+    if (updates.permissionLevel !== undefined) updateData.permission_level = updates.permissionLevel
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .update(updateData)
+      .eq('user_id', targetUserId)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    // Try to reflect display name to auth metadata for the target user if we can (best-effort)
+    // Note: client session cannot update other users' auth metadata; this is best-effort and may be a no-op.
+    try {
+      if (updates.displayName !== undefined && targetUserId === user.id) {
+        await supabase.auth.updateUser({ data: { display_name: updates.displayName } as any })
+      }
+    } catch {}
+
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: 'Failed to update user profile' }
+  }
+}
+
+export const deleteUserProfileByAdmin = async (
+  targetUserId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: authError?.message || 'No authenticated user' }
+    }
+
+    const { data: callerProfile, error: callerError } = await supabase
+      .from('user_profiles')
+      .select('permission_level')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (callerError) {
+      return { success: false, error: callerError.message }
+    }
+    if (!callerProfile || callerProfile.permission_level !== 'superadmin') {
+      return { success: false, error: 'Forbidden: superadmin required' }
+    }
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .delete()
+      .eq('user_id', targetUserId)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: 'Failed to delete user profile' }
+  }
+}
+
 export const syncCurrentUserProfileFromAuth = async (): Promise<{ success: boolean; error?: string }> => {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -176,7 +263,7 @@ export const syncCurrentUserProfileFromAuth = async (): Promise<{ success: boole
       .upsert({
         user_id: user.id,
         display_name: displayName,
-        permission_level: 'editor',
+        permission_level: 'viewer',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
 
@@ -292,16 +379,17 @@ export const canViewCharacter = (character: CharacterData, userId?: string): boo
   return canAccessPrivateSheet(character.userId, userId)
 }
 
-export const canEditCharacter = (character: CharacterData, userId?: string): boolean => {
-  // Use role-based editing permissions
-  return canEditCharacterRole(character.userId, userId)
+export const canEditCharacter = (character: CharacterData, userId?: string, permissionLevel?: 'superadmin' | 'editor' | 'viewer'): boolean => {
+  // View-only users cannot edit anything regardless of ownership
+  return canEditCharacterRole(character.userId, userId, permissionLevel)
 }
 
 export const canEditCharacterWithCampaign = (
   character: CharacterData, 
   userId?: string, 
   campaignDmId?: string,
-  currentCampaignId?: string
+  currentCampaignId?: string,
+  permissionLevel?: 'superadmin' | 'editor' | 'viewer'
 ): boolean => {
   // Use campaign-aware editing permissions
   return canEditCharacterInCampaign(
@@ -309,7 +397,8 @@ export const canEditCharacterWithCampaign = (
     userId, 
     campaignDmId,
     character.campaignId,
-    currentCampaignId
+    currentCampaignId,
+    permissionLevel
   )
 }
 
@@ -3186,6 +3275,10 @@ export const canEditClass = async (classId: string): Promise<{
 
     if (profile?.permission_level === 'superadmin') {
       return { canEdit: true }
+    }
+    // View-only users cannot edit classes
+    if (profile?.permission_level === 'viewer') {
+      return { canEdit: false }
     }
 
     // Check if user owns this custom class

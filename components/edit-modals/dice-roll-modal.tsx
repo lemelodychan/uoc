@@ -16,6 +16,7 @@ interface DiceRollModalProps {
   onClose: () => void
   character: CharacterData
   onUpdateHP: (newHP: number) => void
+  canEdit?: boolean
 }
 
 type DiceType = "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100"
@@ -153,7 +154,7 @@ const calculateAutoModifier = (character: CharacterData, rollType: RollType, sav
   }
 }
 
-export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRollModalProps) {
+export function DiceRollModal({ isOpen, onClose, character, onUpdateHP, canEdit = true }: DiceRollModalProps) {
   const [diceType, setDiceType] = useState<DiceType>("d20")
   const [numDice, setNumDice] = useState(1)
   const [rollType, setRollType] = useState<RollType>("other")
@@ -257,7 +258,7 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP }: DiceRo
                   </span>
                 </div>
                 {/* HP Integration */}
-                {(rollType === "damage" || rollType === "healing") && (
+                {(rollType === "damage" || rollType === "healing") && canEdit && (
                     <Button
                       variant="outline"
                       size="sm"

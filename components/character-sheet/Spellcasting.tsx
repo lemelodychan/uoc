@@ -29,6 +29,7 @@ interface SpellcastingProps {
   onToggleFeatSpellSlot: (featIndex: number, slotIndex: number) => void
   hasSpellcastingAbilities: (character: CharacterData) => boolean
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
+  canEdit?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -64,6 +65,7 @@ export function Spellcasting({
   onEdit, 
   onOpenSpellList,
   onToggleSpellSlot,
+  canEdit = true,
   onToggleFeatSpellSlot,
   hasSpellcastingAbilities,
   onUpdateFeatureUsage
@@ -684,6 +686,7 @@ export function Spellcasting({
               <button
                 key={i}
                 onClick={() => {
+                  if (!canEdit) return
                   if (onUpdateFeatureUsage && skill.id) {
                     onUpdateFeatureUsage(skill.id, { 
                       type: isAvailable ? 'use_slot' : 'restore_slot', 
@@ -691,10 +694,11 @@ export function Spellcasting({
                     })
                   }
                 }}
+                disabled={!canEdit}
                 className={`w-4 h-4 rounded border-2 transition-colors ${
                   isAvailable
-                    ? `${classColors.available} cursor-pointer`
-                    : `${classColors.used} hover:border-border/80 cursor-pointer`
+                    ? `${classColors.available} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                    : `${classColors.used} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
                 }`}
                 title={isAvailable ? "Available" : "Used"}
               />
@@ -736,6 +740,7 @@ export function Spellcasting({
             max={maxPoints}
             value={currentPoints}
             onChange={(e) => {
+              if (!canEdit) return
               const newValue = Math.max(0, Math.min(maxPoints, parseInt(e.target.value) || 0))
               if (onUpdateFeatureUsage && skill.id) {
                 onUpdateFeatureUsage(skill.id, { 
@@ -747,6 +752,7 @@ export function Spellcasting({
                 })
               }
             }}
+            disabled={!canEdit}
             className="w-16 px-2 py-1 text-sm border rounded text-center bg-card"
             title={`Remaining ${skill.title} points`}
           />
@@ -766,8 +772,9 @@ export function Spellcasting({
 
     return (
       <div 
-        className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors bg-background" 
+        className={`p-2 border rounded transition-colors bg-background ${canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed opacity-50'}`}
         onClick={() => {
+          if (!canEdit) return
           if (onUpdateFeatureUsage && skill.id) {
             onUpdateFeatureUsage(skill.id, { 
               type: 'toggle_availability'
@@ -841,10 +848,12 @@ export function Spellcasting({
              (isBarbarian(character) && !hasSpellcastingAbilities(character)) ? "Barbarian Abilities" :
              "Spellcasting"}
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onEdit}>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
             <Icon icon="lucide:edit" className="w-4 h-4" />
             Edit
           </Button>
+          )}
         </div>
       </CardHeader>
 
@@ -963,11 +972,15 @@ export function Spellcasting({
                       return (
                         <button
                           key={i}
-                          onClick={() => onToggleSpellSlot(slot.level, i)}
+                          onClick={() => {
+                            if (!canEdit) return
+                            onToggleSpellSlot(slot.level, i)
+                          }}
+                          disabled={!canEdit}
                           className={`w-4 h-4 rounded border-2 transition-colors ${
                             isAvailable
-                              ? `${getCombatColor('spellSlotAvailable')} cursor-pointer`
-                              : `${getCombatColor('spellSlotUsed')} hover:border-border/80 cursor-pointer`
+                              ? `${getCombatColor('spellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                              : `${getCombatColor('spellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
                           }`}
                           title={isAvailable ? "Available" : "Used"}
                         />
@@ -998,11 +1011,15 @@ export function Spellcasting({
                       return (
                         <button
                           key={i}
-                          onClick={() => onToggleFeatSpellSlot(featIndex, i)}
+                          onClick={() => {
+                            if (!canEdit) return
+                            onToggleFeatSpellSlot(featIndex, i)
+                          }}
+                          disabled={!canEdit}
                           className={`w-4 h-4 rounded border-2 transition-colors ${
                             isAvailable
-                              ? `${getCombatColor('featSpellSlotAvailable')} cursor-pointer`
-                              : `${getCombatColor('featSpellSlotUsed')} hover:border-border/80 cursor-pointer`
+                              ? `${getCombatColor('featSpellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                              : `${getCombatColor('featSpellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
                           }`}
                           title={isAvailable ? "Available" : "Used"}
                         />

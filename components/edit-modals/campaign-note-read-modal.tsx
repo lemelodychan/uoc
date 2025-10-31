@@ -97,26 +97,28 @@ export function CampaignNoteReadModal({
           )}
         </div>
 
-        <div className="flex justify-between p-4 border-t gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            className="flex items-center gap-2 text-destructive hover:text-destructive"
-          >
-            <Icon icon="lucide:trash-2" className="w-4 h-4" />
-            Delete
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onEdit}
-            className="flex items-center gap-2"
-          >
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="flex justify-between p-4 border-t gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDelete}
+              className="flex items-center gap-2 text-destructive hover:text-destructive"
+            >
+              <Icon icon="lucide:trash-2" className="w-4 h-4" />
+              Delete
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEdit}
+              className="flex items-center gap-2"
+            >
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          </div>
+        )}
 
       </DialogContent>
     </Dialog>

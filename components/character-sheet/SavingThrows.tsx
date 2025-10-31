@@ -12,6 +12,7 @@ interface SavingThrowsProps {
   proficiencyBonus: number
   onUpdateSavingThrows: (savingThrowProficiencies: any[]) => void
   onTriggerAutoSave: () => void
+  canEdit?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -22,7 +23,8 @@ export function SavingThrows({
   character, 
   proficiencyBonus, 
   onUpdateSavingThrows, 
-  onTriggerAutoSave 
+  onTriggerAutoSave,
+  canEdit = true
 }: SavingThrowsProps) {
   return (
     <Card className="flex flex-col gap-3">
@@ -51,6 +53,7 @@ export function SavingThrows({
                         id={`${savingThrow.ability}-save`}
                         checked={savingThrow.proficient}
                         onChange={(e) => {
+                          if (!canEdit) return
                           const updatedSavingThrows = character.savingThrowProficiencies.map(st =>
                             st.ability === savingThrow.ability
                               ? { ...st, proficient: e.target.checked }
@@ -59,6 +62,7 @@ export function SavingThrows({
                           onUpdateSavingThrows(updatedSavingThrows)
                           onTriggerAutoSave()
                         }}
+                        disabled={!canEdit}
                         className="w-3 h-3 rounded border-border"
                       />
                       <Label htmlFor={`${savingThrow.ability}-save`} className="sr-only">

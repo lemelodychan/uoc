@@ -25,6 +25,7 @@ interface SpellListModalProps {
   onClose: () => void
   character: CharacterData
   onSave: (updates: Partial<SpellData>) => void
+  canEdit?: boolean
 }
 
 const spellSchools = [
@@ -41,7 +42,7 @@ const spellSchools = [
 const castingTimeOptions = ["1 Action", "1 Bonus Action", "1 Reaction"]
 const ritualCastingTimes = ["1 Minute", "10 Minutes", "1 Hour", "8 Hours", "12 Hours", "24 Hours"]
 
-export function SpellListModal({ isOpen, onClose, character, onSave }: SpellListModalProps) {
+export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = true }: SpellListModalProps) {
   const { toast } = useToast()
   const spellLibraryRef = useRef<SpellLibraryModalRef>(null)
   const [spells, setSpells] = useState<Spell[]>(character.spellData.spells || [])
@@ -491,10 +492,14 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                     </div>
                                     <div className="flex items-center gap-2">
                                       {spell.level > 0 && (
-                                        <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => togglePrepared(spell)} variant="outline" size="sm">{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
+                                        <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => canEdit && togglePrepared(spell)} variant="outline" size="sm" disabled={!canEdit}>{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
                                       )}
-                                      <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
-                                      <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
+                                      {canEdit && (
+                                        <>
+                                          <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
+                                          <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -565,10 +570,14 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
                                       </div>
                                       <div className="flex items-center gap-2">
                                         {spell.level > 0 && (
-                                          <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => togglePrepared(spell)} variant="outline" size="sm">{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
+                                          <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => canEdit && togglePrepared(spell)} variant="outline" size="sm" disabled={!canEdit}>{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
                                         )}
-                                        <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
-                                        <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
+                                        {canEdit && (
+                                          <>
+                                            <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
+                                            <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -605,45 +614,47 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
             <div className="text-sm text-muted-foreground w-full">
               {spells.length} spell{spells.length !== 1 ? 's' : ''} in your list
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSpellLibraryModalOpen(true)}
-              >
-                <Icon icon="lucide:book-open" className="w-4 h-4" />
-                Browse Library
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  // Clear any editing state when creating a new spell
-                  setEditIndex(null)
-                  setEditingSpellId(null)
-                  setEditingSpellClasses([])
-                  setNewSpell({
-                    name: "",
-                    level: 0,
-                    school: "Abjuration",
-                    isPrepared: false,
-                    castingTime: "1 Action",
-                    range: "",
-                    duration: "",
-                    components: { v: false, s: false, m: false, material: "" },
-                    saveThrow: "",
-                    damage: "",
-                    tag: "",
-                    description: "",
-                    higherLevel: "",
-                  })
-                  setNewSpellModalOpen(true)
-                }}
-              >
-                <Icon icon="lucide:plus" className="w-4 h-4" />
-                Create Custom
-              </Button>
-            </div>
+            {canEdit && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSpellLibraryModalOpen(true)}
+                >
+                  <Icon icon="lucide:book-open" className="w-4 h-4" />
+                  Browse Library
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Clear any editing state when creating a new spell
+                    setEditIndex(null)
+                    setEditingSpellId(null)
+                    setEditingSpellClasses([])
+                    setNewSpell({
+                      name: "",
+                      level: 0,
+                      school: "Abjuration",
+                      isPrepared: false,
+                      castingTime: "1 Action",
+                      range: "",
+                      duration: "",
+                      components: { v: false, s: false, m: false, material: "" },
+                      saveThrow: "",
+                      damage: "",
+                      tag: "",
+                      description: "",
+                      higherLevel: "",
+                    })
+                    setNewSpellModalOpen(true)
+                  }}
+                >
+                  <Icon icon="lucide:plus" className="w-4 h-4" />
+                  Create Custom
+                </Button>
+              </div>
+            )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -869,6 +880,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave }: SpellList
         setSpellCreationModalOpen(true)
       }}
       onEditSpell={handleEditLibrarySpell}
+      canEdit={canEdit}
     />
 
     {/* Spell Creation Modal */}

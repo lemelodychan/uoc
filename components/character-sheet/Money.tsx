@@ -9,9 +9,10 @@ import { getCombatColor } from "@/lib/color-mapping"
 interface MoneyProps {
   character: CharacterData
   onEdit: () => void
+  canEdit?: boolean
 }
 
-export function Money({ character, onEdit }: MoneyProps) {
+export function Money({ character, onEdit, canEdit = true }: MoneyProps) {
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">
@@ -20,10 +21,12 @@ export function Money({ character, onEdit }: MoneyProps) {
             <Icon icon="lucide:coins" className="w-5 h-5" />
             Money
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

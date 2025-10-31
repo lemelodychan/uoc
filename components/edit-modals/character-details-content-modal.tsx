@@ -13,9 +13,10 @@ interface CharacterDetailsContentModalProps {
   onClose: () => void
   character: CharacterData
   onSave: (updates: Partial<CharacterData>) => void
+  canEdit?: boolean
 }
 
-export function CharacterDetailsContentModal({ isOpen, onClose, character, onSave }: CharacterDetailsContentModalProps) {
+export function CharacterDetailsContentModal({ isOpen, onClose, character, onSave, canEdit = true }: CharacterDetailsContentModalProps) {
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     personalityTraits: character.personalityTraits || "",
@@ -61,7 +62,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h4 className="font-medium text-md">{title}</h4>
-          {!isEditing && (
+          {canEdit && !isEditing && (
             <Button variant="outline" size="sm" onClick={() => startEditing(field)}>
               <Icon icon="lucide:edit" className="w-4 h-4 mr-2" />
               Edit
@@ -69,7 +70,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
           )}
         </div>
         
-        {isEditing ? (
+        {isEditing && canEdit ? (
           <div className="flex flex-col gap-4">
             <RichTextEditor
               value={formData[field]}

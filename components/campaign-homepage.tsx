@@ -93,8 +93,9 @@ export function CampaignHomepage({
   const sessionMenuRef = useRef<HTMLDivElement>(null)
   
   // User context and toast
-  const { isSuperadmin } = useUser()
+  const { isSuperadmin, userProfile } = useUser()
   const { toast } = useToast()
+  const canEdit = userProfile?.permissionLevel !== 'viewer'
   
   // Use campaign notes hook with caching
   const { 
@@ -684,24 +685,28 @@ export function CampaignHomepage({
             </div>
           </div>
           <div className="flex self-start justify-start content-start gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onEditCampaign}
-              className="flex items-center gap-2"
-            >
-              <Icon icon="lucide:edit" className="w-4 h-4" />
-              Edit Campaign
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={onCreateCharacter}
-              className="flex items-center gap-2"
-            >
-              <Icon icon="lucide:user-plus" className="w-4 h-4" />
-              Add new Character
-            </Button>
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onEditCampaign}
+                className="flex items-center gap-2"
+              >
+                <Icon icon="lucide:edit" className="w-4 h-4" />
+                Edit Campaign
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onCreateCharacter}
+                className="flex items-center gap-2"
+              >
+                <Icon icon="lucide:user-plus" className="w-4 h-4" />
+                Add new Character
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -732,6 +737,7 @@ export function CampaignHomepage({
                 variant="secondary"
                 size="sm"
                 onClick={onStartLongRest}
+                disabled={!canEdit}
                 className="flex items-center gap-2"
               >
                 <Icon icon="lucide:moon" className="w-4 h-4" />
@@ -1235,10 +1241,12 @@ export function CampaignHomepage({
                     />
                     {sortOrder === 'asc' ? 'Oldest' : 'Latest'}
                   </Button>
-                  <Button onClick={handleCreateNote} size="sm" className="flex items-center gap-2">
-                    <Icon icon="lucide:plus" className="w-4 h-4" />
-                    New Note
-                  </Button>
+                  {canEdit && (
+                    <Button onClick={handleCreateNote} size="sm" className="flex items-center gap-2">
+                      <Icon icon="lucide:plus" className="w-4 h-4" />
+                      New Note
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -1262,10 +1270,12 @@ export function CampaignHomepage({
                   <p className="text-muted-foreground mb-4">
                     Start documenting your campaign sessions with notes.
                   </p>
-                  <Button onClick={handleCreateNote}>
-                    <Icon icon="lucide:plus" className="w-4 h-4" />
-                    Create First Note
-                  </Button>
+                  {canEdit && (
+                    <Button onClick={handleCreateNote}>
+                      <Icon icon="lucide:plus" className="w-4 h-4" />
+                      Create First Note
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <ScrollArea>
@@ -1300,25 +1310,27 @@ export function CampaignHomepage({
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditNote(note)}
-                                className="h-9 p-0"
-                              >
-                                <Icon icon="lucide:edit" className="w-4 h-4" />
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteNote(note.id)}
-                                className="h-9 w-9 p-0 text-destructive hover:text-destructive"
-                              >
-                                <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                              </Button>
-                            </div>
+                            {canEdit && (
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditNote(note)}
+                                  className="h-9 p-0"
+                                >
+                                  <Icon icon="lucide:edit" className="w-4 h-4" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteNote(note.id)}
+                                  className="h-9 w-9 p-0 text-destructive hover:text-destructive"
+                                >
+                                  <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </CardHeader>
                       </Card>
@@ -1337,7 +1349,7 @@ export function CampaignHomepage({
             <CardHeader className="p-0">
               <div className="flex items-center justify-between h-[32px]">
                 <CardTitle>Resources</CardTitle>
-                {!!currentUserId && (
+                {canEdit && (
                   <div className="flex items-center gap-2">
                     <Button size="sm" onClick={handleOpenAddLink} className="flex items-center gap-2" variant="outline">
                       <Icon icon="lucide:plus" className="w-4 h-4" />
@@ -1367,7 +1379,7 @@ export function CampaignHomepage({
                     >
                       <Icon icon="lucide:link" className="w-3 h-3" />
                       <span className="truncate max-w-[200px]">{link.title}</span>
-                      {isDungeonMaster && (
+                      {canEdit && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1386,7 +1398,7 @@ export function CampaignHomepage({
                   <Icon icon="lucide:library" className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-semibold mb-2">No Documents Yet</h3>
                   <p className="text-muted-foreground mb-4">Add documents for campaign lore, rules, and information.</p>
-                  {!!currentUserId && (
+                  {canEdit && (
                     <Button onClick={handleCreateResource}>
                       <Icon icon="lucide:plus" className="w-4 h-4" />
                       Create First Document
@@ -1468,7 +1480,7 @@ export function CampaignHomepage({
         onEdit={handleEditFromRead}
         onDelete={handleDeleteFromRead}
         authorName={readingNote ? getAuthorName(readingNote.author_id) : ''}
-        canEdit={readingNote ? readingNote.author_id === currentUserId : false}
+        canEdit={canEdit && readingNote ? readingNote.author_id === currentUserId : false}
       />
 
       {/* Campaign Resource Modal */}
@@ -1495,6 +1507,7 @@ export function CampaignHomepage({
         onEdit={handleEditResourceFromRead}
         onDelete={handleDeleteResourceFromRead}
         authorName={readingResource ? getAuthorName(readingResource.author_id) : ''}
+        canEdit={canEdit && readingResource ? readingResource.author_id === currentUserId : false}
       />
 
       {/* Campaign Link Modal */}

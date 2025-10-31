@@ -16,6 +16,7 @@ interface AbilityScoresProps {
   wisdomMod: number
   charismaMod: number
   onEdit: () => void
+  canEdit?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -31,7 +32,8 @@ export function AbilityScores({
   intelligenceMod, 
   wisdomMod, 
   charismaMod, 
-  onEdit 
+  onEdit,
+  canEdit = true
 }: AbilityScoresProps) {
   return (
     <Card className="flex flex-col gap-3">
@@ -41,10 +43,12 @@ export function AbilityScores({
             <Icon icon="lucide:brain" className="w-5 h-5" />
             Ability Scores
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

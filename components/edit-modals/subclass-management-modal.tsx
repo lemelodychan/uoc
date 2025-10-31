@@ -20,6 +20,7 @@ interface SubclassManagementModalProps {
   onClose: () => void
   baseClass: ClassData
   allClasses: ClassData[]
+  canEdit?: boolean
   onSave: () => void
 }
 
@@ -28,6 +29,7 @@ export function SubclassManagementModal({
   onClose,
   baseClass,
   allClasses,
+  canEdit = true,
   onSave
 }: SubclassManagementModalProps) {
   const [subclasses, setSubclasses] = useState<ClassData[]>([])
@@ -214,24 +216,26 @@ export function SubclassManagementModal({
                               </p>
                             )}
                           </div>
-                          <div className="flex gap-2 ml-4">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditSubclass(subclass)}
-                              className="w-8 h-8"
-                            >
-                              <Icon icon="lucide:edit" className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeleteSubclass(subclass)}
-                              className="w-8 h-8 text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
-                            >
-                              <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          {canEdit && (
+                            <div className="flex gap-2 ml-4">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditSubclass(subclass)}
+                                className="w-8 h-8"
+                              >
+                                <Icon icon="lucide:edit" className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteSubclass(subclass)}
+                                className="w-8 h-8 text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
+                              >
+                                <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -243,14 +247,16 @@ export function SubclassManagementModal({
           </div>
         </div>
 
-        <DialogFooter className="p-4 border-t">
-          <div className="flex gap-2 justify-end">
-            <Button onClick={handleCreateSubclass}>
-              <Icon icon="lucide:plus" className="w-4 h-4" />
-              Create Subclass
-            </Button>
-          </div>
-        </DialogFooter>
+        {canEdit && (
+          <DialogFooter className="p-4 border-t">
+            <div className="flex gap-2 justify-end">
+              <Button onClick={handleCreateSubclass}>
+                <Icon icon="lucide:plus" className="w-4 h-4" />
+                Create Subclass
+              </Button>
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
 
       {/* Subclass Edit Modal */}
@@ -275,9 +281,10 @@ export function SubclassManagementModal({
                 <Input
                   id="subclass-name"
                   value={editingSubclass.subclass || ''}
-                  onChange={(e) => setEditingSubclass(prev => 
+                  onChange={(e) => canEdit && setEditingSubclass(prev => 
                     prev ? { ...prev, subclass: e.target.value } : null
                   )}
+                  disabled={!canEdit}
                   placeholder="e.g., Battle Smith, Artillerist, Alchemist"
                 />
               </div>
@@ -287,9 +294,10 @@ export function SubclassManagementModal({
                 <Textarea
                   id="subclass-description"
                   value={editingSubclass.description || ''}
-                  onChange={(e) => setEditingSubclass(prev => 
+                  onChange={(e) => canEdit && setEditingSubclass(prev => 
                     prev ? { ...prev, description: e.target.value } : null
                   )}
+                  disabled={!canEdit}
                   placeholder="Describe this subclass and its unique features..."
                   rows={4}
                 />
@@ -319,9 +327,10 @@ export function SubclassManagementModal({
                   <Checkbox
                     id="subclass-spellcasting"
                     checked={editingSubclass.showSpellsKnown || false}
-                    onCheckedChange={(checked) => setEditingSubclass(prev => 
+                    onCheckedChange={(checked) => canEdit && setEditingSubclass(prev => 
                       prev ? { ...prev, showSpellsKnown: !!checked } : null
                     )}
+                    disabled={!canEdit}
                   />
                   <Label htmlFor="subclass-spellcasting" className="text-sm font-medium">
                     Enable Spellcasting for this Subclass
@@ -358,6 +367,7 @@ export function SubclassManagementModal({
                       rageDamage: editingSubclass.rage_damage || [],
                     }}
                     onChange={(data) => {
+                      if (!canEdit) return
                       setEditingSubclass(prev => prev ? {
                         ...prev,
                         spells_known: data.spellsKnown || null,
@@ -369,7 +379,7 @@ export function SubclassManagementModal({
                         rage_damage: data.rageDamage || null,
                       } : null)
                     }}
-                    readonly={false}
+                    readonly={!canEdit}
                   />
                 </div>
               )}
@@ -380,19 +390,21 @@ export function SubclassManagementModal({
             <Button variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button onClick={handleSaveSubclass} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Icon icon="lucide:save" className="w-4 h-4" />
-                  Save
-                </>
-              )}
-            </Button>
+            {canEdit && (
+              <Button onClick={handleSaveSubclass} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="lucide:save" className="w-4 h-4" />
+                    Save
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -27,6 +27,7 @@ interface CharacterSidebarProps {
   currentUserId?: string
   currentView?: 'character' | 'campaign' | 'management'
   onViewChange?: (view: 'character' | 'campaign' | 'management') => void
+  canEdit?: boolean
 }
 
 export function CharacterSidebar({
@@ -44,6 +45,7 @@ export function CharacterSidebar({
   currentUserId,
   currentView = 'character',
   onViewChange,
+  canEdit = true,
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -433,6 +435,7 @@ export function CharacterSidebar({
         <Button
           onClick={onStartLongRest}
           variant="secondary"
+          disabled={!canEdit}
           className={`w-full ${
             isCollapsed ? "px-2" : ""
           }`}

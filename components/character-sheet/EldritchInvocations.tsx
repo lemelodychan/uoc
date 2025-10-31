@@ -12,9 +12,10 @@ interface EldritchInvocationsProps {
   character: CharacterData
   onEdit: () => void
   onOpenFeatureModal: (content: { title: string; description: string }) => void
+  canEdit?: boolean
 }
 
-export function EldritchInvocations({ character, onEdit, onOpenFeatureModal }: EldritchInvocationsProps) {
+export function EldritchInvocations({ character, onEdit, onOpenFeatureModal, canEdit = true }: EldritchInvocationsProps) {
   // Check if character has the eldritch invocations feature (level 2+ Warlock)
   const hasEldritchInvocations = hasClassFeature(character, 'eldritch-invocations', 2)
   const warlockLevel = getClassLevel(character, 'warlock')
@@ -44,15 +45,17 @@ export function EldritchInvocations({ character, onEdit, onOpenFeatureModal }: E
             <Icon icon="lucide:sparkles" className="w-5 h-5" />
             Eldritch Invocations
           </CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onEdit}
-            disabled={warlockLevel < 2}
-          >
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onEdit}
+              disabled={warlockLevel < 2}
+            >
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">

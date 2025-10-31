@@ -13,9 +13,10 @@ interface EldritchCannonProps {
   character: CharacterData
   onEdit: () => void
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
+  canEdit?: boolean
 }
 
-export function EldritchCannon({ character, onEdit, onUpdateFeatureUsage }: EldritchCannonProps) {
+export function EldritchCannon({ character, onEdit, onUpdateFeatureUsage, canEdit = true }: EldritchCannonProps) {
   // Check if character has the eldritch cannon feature (level 3+ Artillerist)
   const hasEldritchCannon = hasClassFeature(character, 'eldritch-cannon', 3)
   const artificerLevel = getClassLevel(character, 'artificer')
@@ -40,15 +41,17 @@ export function EldritchCannon({ character, onEdit, onUpdateFeatureUsage }: Eldr
             <Icon icon="lucide:zap" className="w-5 h-5" />
             Eldritch Cannon
           </CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onEdit}
-            disabled={artificerLevel < 3}
-          >
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            {activeCannon ? "Edit" : "Create"}
-          </Button>
+          {canEdit && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onEdit}
+              disabled={artificerLevel < 3}
+            >
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              {activeCannon ? "Edit" : "Create"}
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

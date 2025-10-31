@@ -14,6 +14,7 @@ interface FeaturesTraitsProps {
   onEdit: () => void
   onToggleFeatureUse: (featureIndex: number, slotIndex: number) => void
   onOpenFeatureModal: (content: { title: string; description: string; needsAttunement?: boolean; maxUses?: number; dailyRecharge?: string; usesPerLongRest?: number | string; refuelingDie?: string }) => void
+  canEdit?: boolean
 }
 
 const getFeatureUsesPerLongRest = (feature: any, character: CharacterData): number => {
@@ -45,7 +46,8 @@ export function FeaturesTraits({
   character, 
   onEdit, 
   onToggleFeatureUse, 
-  onOpenFeatureModal 
+  onOpenFeatureModal,
+  canEdit = true
 }: FeaturesTraitsProps) {
   const [featureOverflowMap, setFeatureOverflowMap] = useState<Record<number, boolean>>({})
 
@@ -57,10 +59,12 @@ export function FeaturesTraits({
             <Icon icon="lucide:user-star" className="w-5 h-5" /> 
             Features & Traits
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -79,11 +83,15 @@ export function FeaturesTraits({
                       return (
                         <button
                           key={i}
-                          onClick={() => onToggleFeatureUse(index, i)}
+                          onClick={() => {
+                            if (!canEdit) return
+                            onToggleFeatureUse(index, i)
+                          }}
+                          disabled={!canEdit}
                           className={`w-4 h-4 rounded border-2 transition-colors ${
                             isAvailable
-                              ? `${getCombatColor('featureSlotAvailable')} cursor-pointer`
-                              : `${getCombatColor('featureSlotUsed')} hover:border-border/80 cursor-pointer`
+                              ? `${getCombatColor('featureSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                              : `${getCombatColor('featureSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
                           }`}
                           title={isAvailable ? "Available" : "Used"}
                         />

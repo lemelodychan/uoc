@@ -9,9 +9,10 @@ import type { CharacterData } from "@/lib/character-data"
 interface LanguagesProps {
   character: CharacterData
   onEdit: () => void
+  canEdit?: boolean
 }
 
-export function Languages({ character, onEdit }: LanguagesProps) {
+export function Languages({ character, onEdit, canEdit = true }: LanguagesProps) {
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">
@@ -20,10 +21,12 @@ export function Languages({ character, onEdit }: LanguagesProps) {
             <Icon icon="lucide:globe" className="w-5 h-5" />
             Languages
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

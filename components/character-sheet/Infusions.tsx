@@ -15,9 +15,10 @@ interface InfusionsProps {
   onEdit: () => void
   onOpenFeatureModal: (content: { title: string; description: string; needsAttunement?: boolean; maxUses?: number; dailyRecharge?: string; usesPerLongRest?: number | string; refuelingDie?: string }) => void
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
+  canEdit?: boolean
 }
 
-export function Infusions({ character, onEdit, onOpenFeatureModal, onUpdateFeatureUsage }: InfusionsProps) {
+export function Infusions({ character, onEdit, onOpenFeatureModal, onUpdateFeatureUsage, canEdit = true }: InfusionsProps) {
   // Check if character has the infusions feature (level 2+ Artificer)
   const hasInfusions = hasClassFeature(character, 'infusions', 2)
   const artificerLevel = getClassLevel(character, 'artificer')
@@ -44,15 +45,17 @@ export function Infusions({ character, onEdit, onOpenFeatureModal, onUpdateFeatu
             <Icon icon="lucide:wrench" className="w-5 h-5" />
             Infusions
           </CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onEdit}
-            disabled={artificerLevel < 2}
-          >
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onEdit}
+              disabled={artificerLevel < 2}
+            >
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">

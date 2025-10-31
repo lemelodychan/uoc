@@ -25,6 +25,7 @@ interface SpellLibraryModalProps {
   onAddSpell: (spell: Spell, characterId: string) => void
   onCreateNewSpell: () => void
   onEditSpell?: (spell: LibrarySpell) => void
+  canEdit?: boolean
 }
 
 export interface SpellLibraryModalRef {
@@ -90,7 +91,8 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
   isSuperadmin = false,
   onAddSpell, 
   onCreateNewSpell, 
-  onEditSpell 
+  onEditSpell,
+  canEdit = true
 }, ref) => {
   const { toast } = useToast()
   const [spells, setSpells] = useState<LibrarySpell[]>([])
@@ -452,7 +454,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      {onEditSpell && (
+                                      {canEdit && onEditSpell && (
                                         <Button
                                           size="sm"
                                           variant="outline"
@@ -462,15 +464,17 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                           <Icon icon="lucide:edit" className="w-4 h-4" />
                                         </Button>
                                       )}
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleDeleteSpell(spell.id, spell.name)}
-                                        className="h-8 text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
-                                      >
-                                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                                      </Button>
-                                      {availableCharacters.length === 1 ? (
+                                      {canEdit && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleDeleteSpell(spell.id, spell.name)}
+                                          className="h-8 text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
+                                        >
+                                          <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                      {canEdit && availableCharacters.length === 1 ? (
                                         <Button
                                           size="sm"
                                           className="h-8"
@@ -484,7 +488,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                             <><Icon icon="lucide:plus" className="w-4 h-4" />Add to spell list</>
                                           )}
                                         </Button>
-                                      ) : (
+                                      ) : canEdit && (
                                         <div className="relative">
                                           <Button
                                             size="sm"
@@ -598,12 +602,14 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
           </div>
         </div>
 
-        <DialogFooter className="p-4 border-t">
-          <Button onClick={onCreateNewSpell} variant="outline">
-            <Icon icon="lucide:plus" className="w-4 h-4" />
-            Add missing Spell
-          </Button>
-        </DialogFooter>
+        {canEdit && (
+          <DialogFooter className="p-4 border-t">
+            <Button onClick={onCreateNewSpell} variant="outline">
+              <Icon icon="lucide:plus" className="w-4 h-4" />
+              Add missing Spell
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

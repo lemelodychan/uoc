@@ -347,7 +347,8 @@ function CharacterSheetContent() {
     activeCharacter, 
     currentUser?.id, 
     currentCampaign?.dungeonMasterId,
-    selectedCampaignId
+    selectedCampaignId,
+    currentUserProfile?.permissionLevel
   ) : false
 
   
@@ -2941,6 +2942,7 @@ function CharacterSheetContent() {
             currentUserId={currentUser?.id}
             currentView={currentView}
             onViewChange={setCurrentView}
+            canEdit={currentUserProfile?.permissionLevel !== 'viewer'}
           />
         )}
 
@@ -3030,6 +3032,7 @@ function CharacterSheetContent() {
                 wisdomMod={wisdomMod}
                 charismaMod={charismaMod}
                 onEdit={() => setAbilitiesModalOpen(true)}
+                canEdit={canEditActiveCharacter}
               />
 
               <SavingThrows
@@ -3037,6 +3040,7 @@ function CharacterSheetContent() {
                 proficiencyBonus={proficiencyBonus}
                 onUpdateSavingThrows={(savingThrowProficiencies) => updateCharacter({ savingThrowProficiencies })}
                 onTriggerAutoSave={triggerAutoSave}
+                canEdit={canEditActiveCharacter}
               />
 
               <Skills
@@ -3045,6 +3049,7 @@ function CharacterSheetContent() {
                 skillSortMode={skillSortMode}
                 onSetSkillSortMode={setSkillSortMode}
                 onUpdateSkillProficiency={updateSkillProficiency}
+                canEdit={canEditActiveCharacter}
               />
 
               <FeaturesTraits
@@ -3056,6 +3061,7 @@ function CharacterSheetContent() {
                   setFeatureModalIsClassFeature(false)
                   setFeatureModalOpen(true)
                 }}
+                canEdit={canEditActiveCharacter}
               />
 
               <Feats
@@ -3066,16 +3072,19 @@ function CharacterSheetContent() {
                   setFeatureModalIsClassFeature(false)
                   setFeatureModalOpen(true)
                 }}
+                canEdit={canEditActiveCharacter}
               />
 
               <Money
                 character={activeCharacter}
                 onEdit={() => setMoneyModalOpen(true)}
+                canEdit={canEditActiveCharacter}
               />
 
               <Languages
                 character={activeCharacter}
                 onEdit={() => setLanguagesModalOpen(true)}
+                canEdit={canEditActiveCharacter}
               />
 
           </div>
@@ -3086,17 +3095,20 @@ function CharacterSheetContent() {
               character={activeCharacter}
               onEdit={() => setCombatModalOpen(true)}
               onToggleHitDie={toggleHitDie}
+              canEdit={canEditActiveCharacter}
             />
 
             <Weapons
               character={activeCharacter}
               onEdit={() => setWeaponsModalOpen(true)}
+              canEdit={canEditActiveCharacter}
             />
 
             <EldritchCannonComponent
               character={activeCharacter}
               onEdit={() => setEldritchCannonModalOpen(true)}
               onUpdateFeatureUsage={updateFeatureUsage}
+              canEdit={canEditActiveCharacter}
             />
 
             <Spellcasting
@@ -3115,6 +3127,7 @@ function CharacterSheetContent() {
               onToggleFeatSpellSlot={toggleFeatSpellSlot}
               hasSpellcastingAbilities={hasSpellcastingAbilities}
               onUpdateFeatureUsage={updateFeatureUsage}
+              canEdit={canEditActiveCharacter}
             />
 
             <ToolsProficiencies
@@ -3128,6 +3141,7 @@ function CharacterSheetContent() {
                 setFeatureModalOpen(true)
               }}
               onTriggerAutoSave={triggerAutoSave}
+              canEdit={canEditActiveCharacter}
             />
 
           </div>
@@ -3145,6 +3159,7 @@ function CharacterSheetContent() {
                 // Refresh logic is handled in the component
               }}
               onUpdateFeatureUsage={updateFeatureUsage}
+              canEdit={canEditActiveCharacter}
             />
 
             <Infusions
@@ -3155,6 +3170,7 @@ function CharacterSheetContent() {
                 setFeatureModalOpen(true)
               }}
               onUpdateFeatureUsage={updateFeatureUsage}
+              canEdit={canEditActiveCharacter}
             />
 
             <EldritchInvocations
@@ -3164,6 +3180,7 @@ function CharacterSheetContent() {
                 setFeatureModalContent(content)
                 setFeatureModalOpen(true)
               }}
+              canEdit={canEditActiveCharacter}
             />
           </div>
 
@@ -3236,12 +3253,14 @@ function CharacterSheetContent() {
         onClose={() => setCharacterDetailsModalOpen(false)}
         character={activeCharacter}
         onSave={updateCharacter}
+        canEdit={canEditActiveCharacter}
       />
       <CharacterDetailsContentModal
         isOpen={characterDetailsContentModalOpen}
         onClose={() => setCharacterDetailsContentModalOpen(false)}
         character={activeCharacter}
         onSave={updateCharacter}
+        canEdit={canEditActiveCharacter}
       />
       <AbilitiesModal
         isOpen={abilitiesModalOpen}
@@ -3308,6 +3327,7 @@ function CharacterSheetContent() {
         onClose={() => setSpellListModalOpen(false)}
         character={activeCharacter}
         onSave={updateSpellData}
+        canEdit={canEditActiveCharacter}
       />
       <CharacterCreationModal
         isOpen={characterCreationModalOpen}
@@ -3406,7 +3426,7 @@ function CharacterSheetContent() {
           </div>
 
           {/* Footer (fixed above scroll, only for class features) */}
-          {featureModalContent && featureModalIsClassFeature && (
+          {featureModalContent && featureModalIsClassFeature && canEditActiveCharacter && (
             <div className="p-4 bg-card border-t flex items-center justify-end gap-2">
               <Button
                 variant="outline"
@@ -3435,45 +3455,48 @@ function CharacterSheetContent() {
           <div className="flex flex-col gap-4 p-4 overflow-y-auto p-4 max-h-[50vh]">
               <RichTextEditor
                 value={featureNotesDraft}
-                onChange={setFeatureNotesDraft}
+                onChange={(value) => canEditActiveCharacter && setFeatureNotesDraft(value)}
               />
               <div className="space-y-3">
                 <label className="text-xs text-muted-foreground">Image URL (optional)</label>
                 <input
                   type="url"
                   value={featureImageDraft}
-                  onChange={(e) => setFeatureImageDraft(e.target.value)}
+                  onChange={(e) => canEditActiveCharacter && setFeatureImageDraft(e.target.value)}
+                  disabled={!canEditActiveCharacter}
                   className="w-full p-2 text-sm border rounded bg-card"
                   placeholder="https://example.com/image.png"
                 />
               </div>
           </div>
-          <div className="p-4 bg-card border-t flex items-center justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setFeatureNotesModalOpen(false)}>Cancel</Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                if (!featureModalContent?.title) return
-                const key = featureModalContent.title
-                setCharacters(prev => prev.map(char =>
-                  char.id === activeCharacter.id ? {
-                    ...char,
-                    featureNotes: {
-                      ...(char.featureNotes || {}),
-                      [key]: {
-                        content: featureNotesDraft,
-                        imageUrl: featureImageDraft || undefined,
+          {canEditActiveCharacter && (
+            <div className="p-4 bg-card border-t flex items-center justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setFeatureNotesModalOpen(false)}>Cancel</Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (!featureModalContent?.title) return
+                  const key = featureModalContent.title
+                  setCharacters(prev => prev.map(char =>
+                    char.id === activeCharacter.id ? {
+                      ...char,
+                      featureNotes: {
+                        ...(char.featureNotes || {}),
+                        [key]: {
+                          content: featureNotesDraft,
+                          imageUrl: featureImageDraft || undefined,
+                        },
                       },
-                    },
-                  } : char
-                ))
-                setFeatureNotesModalOpen(false)
-                triggerAutoSave()
-              }}
-            >
-              Save
-            </Button>
-          </div>
+                    } : char
+                  ))
+                  setFeatureNotesModalOpen(false)
+                  triggerAutoSave()
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -3542,6 +3565,7 @@ function CharacterSheetContent() {
         onClose={() => setDiceRollModalOpen(false)}
         character={activeCharacter}
         onUpdateHP={handleUpdateHP}
+        canEdit={canEditActiveCharacter}
       />
 
       {/* Campaign Management Modal */}
@@ -3591,6 +3615,7 @@ function CharacterSheetContent() {
         isSuperadmin={isUserSuperadmin}
         onAddSpell={handleAddSpell}
         onCreateNewSpell={() => setSpellCreationModalOpen(true)}
+        canEdit={currentUserProfile?.permissionLevel !== 'viewer'}
       />
 
       {/* Spell Creation Modal */}

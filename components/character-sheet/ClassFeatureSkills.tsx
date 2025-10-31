@@ -15,6 +15,7 @@ interface ClassFeatureSkillsProps {
   usage: FeatureSkillUsage
   onUpdateUsage: (skillId: string, updates: Partial<FeatureSkillUsage[string]>) => void
   onOpenFeatureModal?: (content: { title: string; description: string }) => void
+  canEdit?: boolean
 }
 
 export function ClassFeatureSkills({ 
@@ -22,7 +23,8 @@ export function ClassFeatureSkills({
   featureSkills, 
   usage, 
   onUpdateUsage,
-  onOpenFeatureModal 
+  onOpenFeatureModal,
+  canEdit = true
 }: ClassFeatureSkillsProps) {
   if (!featureSkills || featureSkills.length === 0) {
     return null
@@ -45,6 +47,7 @@ export function ClassFeatureSkills({
             usage={usage[skill.id]}
             onUpdateUsage={(updates) => onUpdateUsage(skill.id, updates)}
             onOpenFeatureModal={onOpenFeatureModal}
+            canEdit={canEdit}
           />
         ))}
       </CardContent>
@@ -58,6 +61,7 @@ interface FeatureSkillRendererProps {
   usage?: FeatureSkillUsage[string]
   onUpdateUsage: (updates: Partial<FeatureSkillUsage[string]>) => void
   onOpenFeatureModal?: (content: { title: string; description: string }) => void
+  canEdit?: boolean
 }
 
 function FeatureSkillRenderer({ 
@@ -65,19 +69,20 @@ function FeatureSkillRenderer({
   character, 
   usage, 
   onUpdateUsage,
-  onOpenFeatureModal 
+  onOpenFeatureModal,
+  canEdit = true
 }: FeatureSkillRendererProps) {
   const currentUsage = usage || {}
 
   switch (skill.featureType) {
     case 'slots':
-      return <SlotsRenderer skill={skill} character={character} usage={currentUsage} onUpdateUsage={onUpdateUsage} onOpenFeatureModal={onOpenFeatureModal} />
+      return <SlotsRenderer skill={skill} character={character} usage={currentUsage} onUpdateUsage={onUpdateUsage} onOpenFeatureModal={onOpenFeatureModal} canEdit={canEdit} />
     case 'points_pool':
-      return <PointsPoolRenderer skill={skill} character={character} usage={currentUsage} onUpdateUsage={onUpdateUsage} onOpenFeatureModal={onOpenFeatureModal} />
+      return <PointsPoolRenderer skill={skill} character={character} usage={currentUsage} onUpdateUsage={onUpdateUsage} onOpenFeatureModal={onOpenFeatureModal} canEdit={canEdit} />
     case 'options_list':
-      return <OptionsListRenderer skill={skill} character={character} usage={currentUsage} onUpdateUsage={onUpdateUsage} onOpenFeatureModal={onOpenFeatureModal} />
+      return <OptionsListRenderer skill={skill} character={character} usage={currentUsage} onUpdateUsage={onUpdateUsage} onOpenFeatureModal={onOpenFeatureModal} canEdit={canEdit} />
     case 'special_ux':
-      return <SpecialUXRenderer skill={skill} character={character} usage={currentUsage} onUpdateUsage={onUpdateUsage} onOpenFeatureModal={onOpenFeatureModal} />
+      return <SpecialUXRenderer skill={skill} character={character} usage={currentUsage} onUpdateUsage={onUpdateUsage} onOpenFeatureModal={onOpenFeatureModal} canEdit={canEdit} />
     default:
       return null
   }
@@ -89,13 +94,15 @@ function SlotsRenderer({
   character, 
   usage, 
   onUpdateUsage,
-  onOpenFeatureModal 
+  onOpenFeatureModal,
+  canEdit = true
 }: FeatureSkillRendererProps) {
   const config = skill.config as any
   const maxUses = calculateUsesFromFormula(config.usesFormula, character, skill.className)
   const currentUses = usage.currentUses ?? maxUses
 
   const handleToggleUse = (index: number) => {
+    if (!canEdit) return
     const newCurrentUses = currentUses > index ? index : index + 1
     onUpdateUsage({ currentUses: newCurrentUses })
   }
@@ -144,10 +151,11 @@ function SlotsRenderer({
               <button
                 key={i}
                 onClick={() => handleToggleUse(i)}
+                disabled={!canEdit}
                 className={`w-6 h-6 rounded border-2 transition-colors ${
                   isAvailable
-                    ? `${getCombatColor('featureAvailable')} cursor-pointer`
-                    : `${getCombatColor('featureUsed')} hover:border-border/80 cursor-pointer`
+                    ? `${getCombatColor('featureAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                    : `${getCombatColor('featureUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
                 }`}
                 title={isAvailable ? "Available" : "Used"}
               />
@@ -168,22 +176,21 @@ function PointsPoolRenderer({
   character, 
   usage, 
   onUpdateUsage,
-  onOpenFeatureModal 
+  onOpenFeatureModal,
+  canEdit = true
 }: FeatureSkillRendererProps) {
   const config = skill.config as any
   const maxPoints = calculateUsesFromFormula(config.totalFormula, character, skill.className)
   const currentPoints = usage.currentPoints ?? maxPoints
 
   const handleIncrement = () => {
-    if (currentPoints < maxPoints) {
-      onUpdateUsage({ currentPoints: currentPoints + 1 })
-    }
+    if (!canEdit || currentPoints >= maxPoints) return
+    onUpdateUsage({ currentPoints: currentPoints + 1 })
   }
 
   const handleDecrement = () => {
-    if (currentPoints > 0) {
-      onUpdateUsage({ currentPoints: currentPoints - 1 })
-    }
+    if (!canEdit || currentPoints <= 0) return
+    onUpdateUsage({ currentPoints: currentPoints - 1 })
   }
 
   return (
@@ -214,7 +221,7 @@ function PointsPoolRenderer({
           variant="outline"
           size="sm"
           onClick={handleDecrement}
-          disabled={currentPoints <= 0}
+          disabled={!canEdit || currentPoints <= 0}
         >
           <Icon icon="lucide:minus" className="w-4 h-4" />
         </Button>
@@ -232,7 +239,7 @@ function PointsPoolRenderer({
           variant="outline"
           size="sm"
           onClick={handleIncrement}
-          disabled={currentPoints >= maxPoints}
+          disabled={!canEdit || currentPoints >= maxPoints}
         >
           <Icon icon="lucide:plus" className="w-4 h-4" />
         </Button>

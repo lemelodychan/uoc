@@ -14,6 +14,7 @@ interface SkillsProps {
   skillSortMode: 'alpha' | 'ability'
   onSetSkillSortMode: (mode: 'alpha' | 'ability') => void
   onUpdateSkillProficiency: (skillName: string, proficiencyType: "proficient" | "expertise", checked: boolean) => void
+  canEdit?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -25,7 +26,8 @@ export function Skills({
   proficiencyBonus, 
   skillSortMode, 
   onSetSkillSortMode, 
-  onUpdateSkillProficiency 
+  onUpdateSkillProficiency,
+  canEdit = true
 }: SkillsProps) {
   const abilityOrder = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"] as const
   const sortedSkills = [...character.skills].sort((a, b) => {
@@ -48,10 +50,12 @@ export function Skills({
             <Icon icon="lucide:brain" className="w-5 h-5" />
             Skills
           </CardTitle>
-          <div className="inline-flex gap-1 rounded-md bg-muted p-1 absolute right-4 top-4">
-            <Button size="sm" className="text-xs px-2 py-1 h-6" variant={skillSortMode === 'alpha' ? 'outline' : 'ghost'} onClick={() => onSetSkillSortMode('alpha')}>A–Z</Button>
-            <Button size="sm" className="text-xs px-2 py-1 h-6" variant={skillSortMode === 'ability' ? 'outline' : 'ghost'} onClick={() => onSetSkillSortMode('ability')}>Ability</Button>
-          </div>
+          {canEdit && (
+            <div className="inline-flex gap-1 rounded-md bg-muted p-1 absolute right-4 top-4">
+              <Button size="sm" className="text-xs px-2 py-1 h-6" variant={skillSortMode === 'alpha' ? 'outline' : 'ghost'} onClick={() => onSetSkillSortMode('alpha')}>A–Z</Button>
+              <Button size="sm" className="text-xs px-2 py-1 h-6" variant={skillSortMode === 'ability' ? 'outline' : 'ghost'} onClick={() => onSetSkillSortMode('ability')}>Ability</Button>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -79,7 +83,11 @@ export function Skills({
                                   type="checkbox"
                                   id={`${skill.name}-prof`}
                                   checked={isProficient}
-                                  onChange={(e) => onUpdateSkillProficiency(skill.name, 'proficient', e.target.checked)}
+                                  onChange={(e) => {
+                                    if (!canEdit) return
+                                    onUpdateSkillProficiency(skill.name, 'proficient', e.target.checked)
+                                  }}
+                                  disabled={!canEdit}
                                   className="w-3 h-3 rounded border-border"
                                 />
                                 <Label htmlFor={`${skill.name}-prof`} className="sr-only">
@@ -91,7 +99,11 @@ export function Skills({
                                   type="checkbox"
                                   id={`${skill.name}-exp`}
                                   checked={hasExpertise}
-                                  onChange={(e) => onUpdateSkillProficiency(skill.name, 'expertise', e.target.checked)}
+                                  onChange={(e) => {
+                                    if (!canEdit) return
+                                    onUpdateSkillProficiency(skill.name, 'expertise', e.target.checked)
+                                  }}
+                                  disabled={!canEdit}
                                   className="w-3 h-3 rounded border-border"
                                 />
                                 <Label htmlFor={`${skill.name}-exp`} className="sr-only">

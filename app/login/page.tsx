@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, Suspense, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,18 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    const checkUser = async () => {
+      const supabaseClient = createClient()
+      const { data: { user } } = await supabaseClient.auth.getUser()
+      if (user) {
+        router.replace("/")
+      }
+    }
+    checkUser()
+  }, [router])
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault()

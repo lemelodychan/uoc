@@ -4,15 +4,16 @@ export interface UserProfile {
   id: number
   userId: string
   displayName?: string
-  permissionLevel: 'superadmin' | 'editor'
+  permissionLevel: 'superadmin' | 'editor' | 'viewer'
   createdAt: string
   updatedAt: string
 }
 
-export type PermissionLevel = 'superadmin' | 'editor'
+export type PermissionLevel = 'superadmin' | 'editor' | 'viewer'
 
 // Permission level hierarchy
 export const PERMISSION_LEVELS: Record<PermissionLevel, number> = {
+  viewer: 0,
   editor: 1,
   superadmin: 2
 }

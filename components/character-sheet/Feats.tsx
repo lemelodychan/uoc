@@ -9,9 +9,10 @@ interface FeatsProps {
   character: CharacterData
   onEdit: () => void
   onOpenFeatureModal: (content: { title: string; description: string }) => void
+  canEdit?: boolean
 }
 
-export function Feats({ character, onEdit, onOpenFeatureModal }: FeatsProps) {
+export function Feats({ character, onEdit, onOpenFeatureModal, canEdit = true }: FeatsProps) {
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">
@@ -20,10 +21,12 @@ export function Feats({ character, onEdit, onOpenFeatureModal }: FeatsProps) {
             <Icon icon="lucide:star" className="w-5 h-5" />
             Feats
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

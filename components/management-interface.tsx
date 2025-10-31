@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Icon } from "@iconify/react"
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
-import type { UserProfile } from "@/lib/user-profiles"
-import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass } from "@/lib/database"
+import type { UserProfile, PermissionLevel } from "@/lib/user-profiles"
+import { useUser } from "@/lib/user-context"
+import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin } from "@/lib/database"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
 import { ClassDuplicationModal } from "./edit-modals/class-duplication-modal"
@@ -59,6 +61,9 @@ export function ManagementInterface({
   const [showFeatureManagementModal, setShowFeatureManagementModal] = useState(false)
   const [selectedClassForFeatures, setSelectedClassForFeatures] = useState<ClassData | null>(null)
   const { toast } = useToast()
+  const [localUsers, setLocalUsers] = useState<UserProfile[]>(users)
+  const { userProfile } = useUser()
+  const canEdit = userProfile?.permissionLevel !== 'viewer'
   
   // Refs for scroll management
   const classListTopRef = useRef<HTMLDivElement>(null)
@@ -108,6 +113,7 @@ export function ManagementInterface({
           subclass: dbClass.subclass,
           description: dbClass.description || null,
           hit_die: dbClass.hit_die || 8,
+          subclass_selection_level: dbClass.subclass_selection_level ?? 3,
           primary_ability: Array.isArray(dbClass.primary_ability) 
             ? dbClass.primary_ability 
             : dbClass.primary_ability 
@@ -258,7 +264,7 @@ export function ManagementInterface({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 p-2 gap-2 h-fit rounded-xl">
+        <TabsList className="grid w-full grid-cols-3 p-2 gap-2 h-fit rounded-xl">
           <TabsTrigger value="campaigns" className="flex items-center gap-2 p-2 rounded-lg">
             <Icon icon="lucide:users" className="w-4 h-4" />
             Campaign Management
@@ -272,6 +278,10 @@ export function ManagementInterface({
             >
               Beta
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2 p-2 rounded-lg">
+            <Icon icon="lucide:id-card" className="w-4 h-4" />
+            User Management
           </TabsTrigger>
         </TabsList>
 
@@ -295,6 +305,7 @@ export function ManagementInterface({
               classes={classes}
               classListTopRef={classListTopRef}
               classCardRefs={classCardRefs}
+              canEdit={canEdit}
               onEditClass={async (classData) => {
                 // Scroll to top when entering edit mode
                 classListTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -426,6 +437,7 @@ export function ManagementInterface({
             editingClass && (
               <ClassEditorPage
                 classData={editingClass}
+                canEdit={canEdit}
                 onSave={async (classData) => {
                   try {
                     const result = await dbUpsertClass(classData)
@@ -485,6 +497,13 @@ export function ManagementInterface({
               />
             )
           )}
+        </TabsContent>
+
+        <TabsContent value="users" className="flex-1 min-h-0 flex flex-col gap-0">
+          <UserManagement
+            users={localUsers}
+            onUsersChange={setLocalUsers}
+          />
         </TabsContent>
       </Tabs>
 
@@ -557,6 +576,7 @@ export function ManagementInterface({
           }}
           baseClass={selectedBaseClass}
           allClasses={classes}
+          canEdit={canEdit}
           onSave={async () => {
             // Reload classes after subclass changes
             await loadClasses()
@@ -575,6 +595,7 @@ export function ManagementInterface({
           }}
           classData={selectedClassForFeatures}
           allClasses={classes}
+          canEdit={canEdit}
           onSave={async () => {
             // Reload classes after feature changes
             await loadClasses()
@@ -602,14 +623,19 @@ function CampaignManagement({
   onEditCampaign: (campaign: Campaign) => void
   onDeleteCampaign: (campaign: Campaign) => void
 }) {
+  const { userProfile } = useUser()
+  const canEdit = userProfile?.permissionLevel !== 'viewer'
+  
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-row gap-4 items-center justify-between">
         <h2 className="text-2xl font-semibold">Campaigns</h2>
-        <Button onClick={onCreateCampaign}>
-          <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
-          Create Campaign
-        </Button>
+        {canEdit && (
+          <Button onClick={onCreateCampaign}>
+            <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
+            Create Campaign
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4">
@@ -618,14 +644,16 @@ function CampaignManagement({
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 {campaign.name}
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => onEditCampaign(campaign)}>
-                    <Icon icon="lucide:edit" className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => onDeleteCampaign(campaign)}>
-                    <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                  </Button>
-                </div>
+                {canEdit && (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => onEditCampaign(campaign)}>
+                      <Icon icon="lucide:edit" className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => onDeleteCampaign(campaign)}>
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -705,6 +733,7 @@ function ClassManagement({
   classes, 
   classListTopRef,
   classCardRefs,
+  canEdit = true,
   onEditClass,
   onCreateClass,
   onDeleteClass,
@@ -715,6 +744,7 @@ function ClassManagement({
   classes: ClassData[]
   classListTopRef: React.RefObject<HTMLDivElement>
   classCardRefs: React.MutableRefObject<Map<string, HTMLDivElement>>
+  canEdit?: boolean
   onEditClass: (classData: ClassData) => void
   onCreateClass: () => void
   onDeleteClass: (classId: string) => void
@@ -728,10 +758,12 @@ function ClassManagement({
       <div ref={classListTopRef} className="h-0" />
       <div className="flex flex-row gap-4 items-center justify-between">
         <h2 className="text-2xl font-semibold">Classes</h2>
-        <Button onClick={onCreateClass}>
-          <Icon icon="lucide:plus" className="w-4 h-4" />
-          Create Class
-        </Button>
+        {canEdit && (
+          <Button onClick={onCreateClass}>
+            <Icon icon="lucide:plus" className="w-4 h-4" />
+            Create Class
+          </Button>
+        )}
       </div>  
 
       <div className="flex flex-col gap-4">
@@ -780,50 +812,54 @@ function ClassManagement({
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button className="font-body" size="sm" variant="outline" onClick={() => onEditClass(baseClass)}>
-                      <Icon icon="lucide:edit" className="w-4 h-4" />
-                      Edit class
-                    </Button>
+                    {canEdit && (
+                      <Button className="font-body" size="sm" variant="outline" onClick={() => onEditClass(baseClass)}>
+                        <Icon icon="lucide:edit" className="w-4 h-4" />
+                        Edit class
+                      </Button>
+                    )}
                     <Button 
                       size="sm" 
                       variant="outline" 
                       onClick={() => onManageSubclasses(baseClass)}
-                      title="Manage Subclasses"
+                      title={canEdit ? "Manage Subclasses" : "View Subclasses"}
                       className="font-body"
                     >
                       <Icon icon="lucide:layers" className="w-4 h-4" />
-                      Edit subclasses
+                      {canEdit ? "Edit subclasses" : "View subclasses"}
                     </Button>
                     <Button 
                       size="sm" 
                       variant="outline" 
                       onClick={() => onManageFeatures(baseClass)}
-                      title="Manage Features"
+                      title={canEdit ? "Manage Features" : "View Features"}
                       className="font-body"
                     >
                       <Icon icon="lucide:star" className="w-4 h-4" />
-                      Manage features
+                      {canEdit ? "Manage features" : "View features"}
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
-                      onClick={async () => {
-                        if (confirm(`Are you sure you want to delete "${baseClass.name}" and all its subclasses? This action cannot be undone.`)) {
-                          try {
-                            // Delete base class and all subclasses
-                            const allClassIds = [baseClass.id, ...subclasses.map(s => s.id)]
-                            await Promise.all(allClassIds.map(id => onDeleteClass(id)))
-                            // Reload classes list to show updated data
-                            await onReloadClasses()
-                          } catch (error) {
-                            console.error('Error deleting class:', error)
+                    {canEdit && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
+                        onClick={async () => {
+                          if (confirm(`Are you sure you want to delete "${baseClass.name}" and all its subclasses? This action cannot be undone.`)) {
+                            try {
+                              // Delete base class and all subclasses
+                              const allClassIds = [baseClass.id, ...subclasses.map(s => s.id)]
+                              await Promise.all(allClassIds.map(id => onDeleteClass(id)))
+                              // Reload classes list to show updated data
+                              await onReloadClasses()
+                            } catch (error) {
+                              console.error('Error deleting class:', error)
+                            }
                           }
-                        }
-                      }}
-                    >
-                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                    </Button>
+                        }}
+                      >
+                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </CardTitle>
               </CardHeader>
@@ -932,4 +968,201 @@ function ClassManagement({
   )
 }
 
+
+// User Management Component
+function UserManagement({
+  users,
+  onUsersChange
+}: {
+  users: UserProfile[]
+  onUsersChange: (users: UserProfile[]) => void
+}) {
+  const { isSuperadmin } = useUser()
+  const { toast } = useToast()
+  const [drafts, setDrafts] = useState<Record<string, { displayName?: string; permissionLevel: PermissionLevel }>>(() => {
+    const map: Record<string, { displayName?: string; permissionLevel: PermissionLevel }> = {}
+    users.forEach(u => {
+      map[u.userId] = { displayName: u.displayName || '', permissionLevel: u.permissionLevel }
+    })
+    return map
+  })
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  const [editUserId, setEditUserId] = useState<string | null>(null)
+  const [editDisplayName, setEditDisplayName] = useState<string>("")
+  const [editPermissionLevel, setEditPermissionLevel] = useState<PermissionLevel>("editor")
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const next: Record<string, { displayName?: string; permissionLevel: PermissionLevel }> = {}
+    users.forEach(u => {
+      next[u.userId] = { displayName: u.displayName || '', permissionLevel: u.permissionLevel }
+    })
+    setDrafts(next)
+  }, [users])
+
+  const updateDraft = (userId: string, update: Partial<{ displayName?: string; permissionLevel: PermissionLevel }>) => {
+    setDrafts(prev => ({
+      ...prev,
+      [userId]: { ...prev[userId], ...update }
+    }))
+  }
+
+  const openEdit = (userId: string) => {
+    const d = drafts[userId]
+    setEditUserId(userId)
+    setEditDisplayName(d?.displayName || '')
+    setEditPermissionLevel(d?.permissionLevel || 'editor')
+  }
+
+  const handleSave = async (userId: string) => {
+    if (!isSuperadmin) return
+    const draft = { displayName: editDisplayName, permissionLevel: editPermissionLevel }
+    setSavingIds(prev => new Set(prev).add(userId))
+    try {
+      const res = await fetch(`/api/users/update/${encodeURIComponent(userId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: draft.displayName?.trim() || undefined,
+          permissionLevel: draft.permissionLevel
+        })
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || 'Failed to update user')
+      }
+
+      const nextUsers = users.map(u => u.userId === userId ? {
+        ...u,
+        displayName: draft.displayName,
+        permissionLevel: draft.permissionLevel
+      } : u)
+      onUsersChange(nextUsers)
+      toast({ title: 'Saved', description: 'User updated successfully.' })
+      setDrafts(prev => ({ ...prev, [userId]: { displayName: draft.displayName, permissionLevel: draft.permissionLevel } }))
+      setEditUserId(null)
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to update user', variant: 'destructive' })
+    } finally {
+      setSavingIds(prev => {
+        const next = new Set(prev)
+        next.delete(userId)
+        return next
+      })
+    }
+  }
+
+  const handleDelete = async (userId: string) => {
+    if (!isSuperadmin) return
+    if (!confirm('Are you sure you want to delete this user? This will also remove their auth and cannot be undone.')) return
+    setDeletingId(userId)
+    try {
+      const res = await fetch(`/api/users/delete/${encodeURIComponent(userId)}`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || 'Failed to delete user')
+      }
+      onUsersChange(users.filter(u => u.userId !== userId))
+      toast({ title: 'Deleted', description: 'User deleted (auth + profile).' })
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to delete user', variant: 'destructive' })
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-row gap-4 items-center justify-between">
+        <h2 className="text-2xl font-semibold">Users</h2>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[720px] grid grid-cols-12 gap-2 px-2 py-2 text-xs text-muted-foreground border-b">
+          <div className="col-span-4">Display Name</div>
+          <div className="col-span-5">User ID</div>
+          <div className="col-span-2">Permission</div>
+          <div className="col-span-1 text-right">Actions</div>
+        </div>
+        <div className="flex flex-col">
+          {users.map((u) => {
+            const draft = drafts[u.userId]
+            const isSaving = savingIds.has(u.userId)
+            return (
+              <div key={u.userId} className="min-w-[720px] grid grid-cols-12 gap-2 items-center px-2 py-2 border-b">
+                <div className="col-span-4">
+                  <span>{u.displayName || ''}</span>
+                </div>
+                <div className="col-span-5">
+                  <code className="text-xs break-all">{u.userId}</code>
+                </div>
+                <div className="col-span-2">
+                  <Badge variant="outline" className="text-xs">{u.permissionLevel}</Badge>
+                </div>
+                <div className="col-span-1 text-right">
+                  {isSuperadmin && (
+                    <div className="flex items-center justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => openEdit(u.userId)}>
+                        <Icon icon="lucide:edit" className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white" onClick={() => handleDelete(u.userId)} disabled={deletingId === u.userId}>
+                        {deletingId === u.userId ? (
+                          <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <Dialog open={!!editUserId} onOpenChange={(open) => { if (!open) setEditUserId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-muted-foreground">Display Name</label>
+              <input
+                className="w-full border rounded px-2 py-1 bg-background"
+                value={editDisplayName}
+                onChange={(e) => setEditDisplayName(e.target.value)}
+                placeholder="Display name"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-muted-foreground">Permission</label>
+              <select
+                className="w-full border rounded px-2 py-1 bg-background"
+                value={editPermissionLevel}
+                onChange={(e) => setEditPermissionLevel(e.target.value as PermissionLevel)}
+              >
+                <option value="viewer">viewer</option>
+                <option value="editor">editor</option>
+                <option value="superadmin">superadmin</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditUserId(null)}>Cancel</Button>
+            <Button onClick={() => editUserId && handleSave(editUserId)} disabled={!isSuperadmin || (editUserId ? savingIds.has(editUserId) : false)}>
+              {editUserId && savingIds.has(editUserId) ? (
+                <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+              ) : (
+                <Icon icon="lucide:save" className="w-4 h-4 mr-2" />
+              )}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
 

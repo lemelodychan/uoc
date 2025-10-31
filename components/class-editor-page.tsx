@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 
 interface ClassEditorPageProps {
   classData: ClassData
+  canEdit?: boolean
   onSave: (classData: Partial<ClassData>) => void
   onCancel: () => void
   onDelete: (classId: string) => void
@@ -25,6 +26,7 @@ interface ClassEditorPageProps {
 
 export function ClassEditorPage({
   classData,
+  canEdit = true,
   onSave,
   onCancel,
   onDelete,
@@ -138,25 +140,29 @@ export function ClassEditorPage({
                 <Icon icon="lucide:copy" className="w-4 h-4" />
                 Duplicate
               </Button>
-              <Button variant="outline" onClick={handleDelete} className="text-destructive hover:bg-destructive hover:text-white">
-                <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                Delete
-              </Button>
+              {canEdit && (
+                <Button variant="outline" onClick={handleDelete} className="text-destructive hover:bg-destructive hover:text-white">
+                  <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                  Delete
+                </Button>
+              )}
             </>
           )}
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Icon icon="lucide:save" className="w-4 h-4" />
-                Save
-              </>
-            )}
-          </Button>
+          {canEdit && (
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Icon icon="lucide:save" className="w-4 h-4" />
+                  Save
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -435,6 +441,7 @@ export function ClassEditorPage({
             showRage={editingClass.showRage || false}
             showRageDamage={editingClass.showRageDamage || false}
             onChange={(spellData) => {
+              if (!canEdit) return
               setEditingClass(prev => ({
                 ...prev,
                 cantrips_known: spellData.cantripsKnown,
@@ -459,6 +466,7 @@ export function ClassEditorPage({
                 rage_damage: spellData.rageDamage || null
               }))
             }}
+            readonly={!canEdit}
           />
         </CardContent>
       </Card>

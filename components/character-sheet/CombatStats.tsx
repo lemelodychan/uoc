@@ -12,13 +12,14 @@ interface CombatStatsProps {
   character: CharacterData
   onEdit: () => void
   onToggleHitDie: (classIndex: number, dieIndex: number) => void
+  canEdit?: boolean
 }
 
 const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
-export function CombatStats({ character, onEdit, onToggleHitDie }: CombatStatsProps) {
+export function CombatStats({ character, onEdit, onToggleHitDie, canEdit = true }: CombatStatsProps) {
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">
@@ -27,10 +28,12 @@ export function CombatStats({ character, onEdit, onToggleHitDie }: CombatStatsPr
             <Icon icon="lucide:biceps-flexed" className="w-5 h-5" />
             Combat Stats
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4 grid grid-cols-2 gap-4 items-start">
@@ -153,11 +156,15 @@ export function CombatStats({ character, onEdit, onToggleHitDie }: CombatStatsPr
                         return (
                           <button
                             key={dieIndex}
-                            onClick={() => onToggleHitDie(classIndex, dieIndex)}
+                            onClick={() => {
+                              if (!canEdit) return
+                              onToggleHitDie(classIndex, dieIndex)
+                            }}
+                            disabled={!canEdit}
                             className={`w-3 h-3 rounded border transition-colors ${
                               isAvailable
-                                ? `${getCombatColor('hitDieAvailable')} cursor-pointer hover:opacity-80`
-                                : `${getCombatColor('hitDieUsed')} cursor-pointer hover:border-border/80`
+                                ? `${getCombatColor('hitDieAvailable')} ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
+                                : `${getCombatColor('hitDieUsed')} ${canEdit ? 'cursor-pointer hover:border-border/80' : 'cursor-not-allowed opacity-50'}`
                             }`}
                             title={isAvailable ? "Available" : "Used"}
                           />

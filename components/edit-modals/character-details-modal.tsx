@@ -12,9 +12,10 @@ interface CharacterDetailsModalProps {
   onClose: () => void
   character: CharacterData
   onSave: (updates: Partial<CharacterData>) => void
+  canEdit?: boolean
 }
 
-export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: CharacterDetailsModalProps) {
+export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canEdit = true }: CharacterDetailsModalProps) {
   const [formData, setFormData] = useState({
     personalityTraits: character.personalityTraits || "",
     ideals: character.ideals || "",
@@ -52,7 +53,7 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
             <Label htmlFor="personalityTraits">Personality Traits</Label>
             <RichTextEditor
               content={formData.personalityTraits}
-              onChange={(content) => setFormData({ ...formData, personalityTraits: content })}
+              onChange={(content) => canEdit && setFormData({ ...formData, personalityTraits: content })}
               placeholder="Describe your character's personality traits..."
             />
           </div>
@@ -61,7 +62,7 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
             <Label htmlFor="ideals">Ideals</Label>
             <RichTextEditor
               content={formData.ideals}
-              onChange={(content) => setFormData({ ...formData, ideals: content })}
+              onChange={(content) => canEdit && setFormData({ ...formData, ideals: content })}
               placeholder="What drives your character? What principles do they believe in?"
             />
           </div>
@@ -70,7 +71,7 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
             <Label htmlFor="bonds">Bonds</Label>
             <RichTextEditor
               content={formData.bonds}
-              onChange={(content) => setFormData({ ...formData, bonds: content })}
+              onChange={(content) => canEdit && setFormData({ ...formData, bonds: content })}
               placeholder="What connects your character to the world? People, places, or things they care about..."
             />
           </div>
@@ -79,7 +80,7 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
             <Label htmlFor="flaws">Flaws</Label>
             <RichTextEditor
               content={formData.flaws}
-              onChange={(content) => setFormData({ ...formData, flaws: content })}
+              onChange={(content) => canEdit && setFormData({ ...formData, flaws: content })}
               placeholder="What are your character's weaknesses or vices?"
             />
           </div>
@@ -88,7 +89,7 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
             <Label htmlFor="backstory">Backstory</Label>
             <RichTextEditor
               content={formData.backstory}
-              onChange={(content) => setFormData({ ...formData, backstory: content })}
+              onChange={(content) => canEdit && setFormData({ ...formData, backstory: content })}
               placeholder="Tell your character's story. Where did they come from? What shaped them?"
             />
           </div>
@@ -97,17 +98,19 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave }: Ch
             <Label htmlFor="notes">Notes</Label>
             <RichTextEditor
               content={formData.notes}
-              onChange={(content) => setFormData({ ...formData, notes: content })}
+              onChange={(content) => canEdit && setFormData({ ...formData, notes: content })}
               placeholder="Any additional notes, reminders, or information about your character..."
             />
           </div>
         </div>
-        <DialogFooter className="p-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>Save Changes</Button>
-        </DialogFooter>
+        {canEdit && (
+          <DialogFooter className="p-4 border-t">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>Save Changes</Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

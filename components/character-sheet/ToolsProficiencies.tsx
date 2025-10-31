@@ -18,6 +18,7 @@ interface ToolsProficienciesProps {
   onToggleMagicItemUse: (itemIndex: number, slotIndex: number) => void
   onOpenFeatureModal: (content: { title: string; description: string; needsAttunement?: boolean; maxUses?: number; dailyRecharge?: string; usesPerLongRest?: number | string; refuelingDie?: string }) => void
   onTriggerAutoSave: () => void
+  canEdit?: boolean
 }
 
 export function ToolsProficiencies({ 
@@ -27,7 +28,8 @@ export function ToolsProficiencies({
   onUpdateToolProficiency,
   onToggleMagicItemUse,
   onOpenFeatureModal,
-  onTriggerAutoSave
+  onTriggerAutoSave,
+  canEdit = true
 }: ToolsProficienciesProps) {
   return (
     <Card className="flex flex-col gap-3">
@@ -37,10 +39,12 @@ export function ToolsProficiencies({
             <Icon icon="lucide:shield" className="w-5 h-5" />
             Equipment
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Icon icon="lucide:edit" className="w-4 h-4" />
-            Edit
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Icon icon="lucide:edit" className="w-4 h-4" />
+              Edit
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex flex-col">
@@ -60,6 +64,7 @@ export function ToolsProficiencies({
                     type="checkbox"
                     checked={Boolean(character.equipmentProficiencies?.[item.key as keyof typeof character.equipmentProficiencies])}
                     onChange={(e) => {
+                      if (!canEdit) return
                       const value = e.target.checked
                       onUpdateEquipmentProficiencies({
                         lightArmor: character.equipmentProficiencies?.lightArmor ?? false,
@@ -73,6 +78,7 @@ export function ToolsProficiencies({
                       })
                       onTriggerAutoSave()
                     }}
+                    disabled={!canEdit}
                     className="w-3 h-3 rounded border-border"
                   />
                   {item.label}
@@ -91,6 +97,7 @@ export function ToolsProficiencies({
                     type="checkbox"
                     checked={Boolean(character.equipmentProficiencies?.[item.key as keyof typeof character.equipmentProficiencies])}
                     onChange={(e) => {
+                      if (!canEdit) return
                       const value = e.target.checked
                       onUpdateEquipmentProficiencies({
                         lightArmor: character.equipmentProficiencies?.lightArmor ?? false,
@@ -104,6 +111,7 @@ export function ToolsProficiencies({
                       })
                       onTriggerAutoSave()
                     }}
+                    disabled={!canEdit}
                     className="w-3 h-3 rounded border-border"
                   />
                   {item.label}
@@ -131,7 +139,11 @@ export function ToolsProficiencies({
                             type="checkbox"
                             id={`${tool.name}-prof`}
                             checked={isProficient}
-                            onChange={(e) => onUpdateToolProficiency(tool.name, "proficient", e.target.checked)}
+                            onChange={(e) => {
+                              if (!canEdit) return
+                              onUpdateToolProficiency(tool.name, "proficient", e.target.checked)
+                            }}
+                            disabled={!canEdit}
                             className="w-3 h-3 rounded border-border"
                           />
                           <Label htmlFor={`${tool.name}-prof`} className="sr-only">
@@ -143,7 +155,11 @@ export function ToolsProficiencies({
                             type="checkbox"
                             id={`${tool.name}-exp`}
                             checked={hasExpertise}
-                            onChange={(e) => onUpdateToolProficiency(tool.name, "expertise", e.target.checked)}
+                            onChange={(e) => {
+                              if (!canEdit) return
+                              onUpdateToolProficiency(tool.name, "expertise", e.target.checked)
+                            }}
+                            disabled={!canEdit}
                             className="w-3 h-3 rounded border-border"
                           />
                           <Label htmlFor={`${tool.name}-exp`} className="sr-only">
@@ -186,11 +202,15 @@ export function ToolsProficiencies({
                           return (
                             <button
                               key={i}
-                              onClick={() => onToggleMagicItemUse(index, i)}
+                              onClick={() => {
+                                if (!canEdit) return
+                                onToggleMagicItemUse(index, i)
+                              }}
+                              disabled={!canEdit}
                               className={`w-4 h-4 rounded border-2 transition-colors ${
                                 isAvailable
-                                  ? `${getCombatColor('magicItemSlotAvailable')} cursor-pointer`
-                                  : `${getCombatColor('magicItemSlotUsed')} hover:border-border/80 cursor-pointer`
+                                  ? `${getCombatColor('magicItemSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                                  : `${getCombatColor('magicItemSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
                               }`}
                               title={isAvailable ? "Available" : "Used"}
                             />

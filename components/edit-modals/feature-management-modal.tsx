@@ -222,6 +222,7 @@ interface FeatureManagementModalProps {
   onClose: () => void
   classData: ClassData
   allClasses: ClassData[]
+  canEdit?: boolean
   onSave: () => void
 }
 
@@ -230,6 +231,7 @@ export function FeatureManagementModal({
   onClose,
   classData,
   allClasses,
+  canEdit = true,
   onSave
 }: FeatureManagementModalProps) {
   const [features, setFeatures] = useState<ClassFeature[]>([])
@@ -625,22 +627,24 @@ export function FeatureManagementModal({
                                   </div>
                                 )}
                               </div>
-                              <div className="flex gap-2 ml-4">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleEditFeature(feature)}
-                                >
-                                  <Icon icon="lucide:edit" className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDeleteFeature(feature)}
-                                >
-                                  <Icon icon="lucide:trash-2" className="w-4 h-4" />
-                                </Button>
-                              </div>
+                              {canEdit && (
+                                <div className="flex gap-2 ml-4">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditFeature(feature)}
+                                  >
+                                    <Icon icon="lucide:edit" className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteFeature(feature)}
+                                  >
+                                    <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -656,14 +660,16 @@ export function FeatureManagementModal({
           </div>
         </div>
 
-        <DialogFooter className="p-4 border-t">
-          <div className="flex gap-2 justify-between items-center">
-            <Button onClick={handleCreateFeature}>
-              <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
-              Create Feature
-            </Button>
-          </div>
-        </DialogFooter>
+        {canEdit && (
+          <DialogFooter className="p-4 border-t">
+            <div className="flex gap-2 justify-between items-center">
+              <Button onClick={handleCreateFeature}>
+                <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
+                Create Feature
+              </Button>
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
 
       {/* Feature Edit Modal */}
@@ -689,9 +695,10 @@ export function FeatureManagementModal({
                   <Input
                     id="feature-title"
                     value={editingFeature.title}
-                    onChange={(e) => setEditingFeature(prev => 
+                    onChange={(e) => canEdit && setEditingFeature(prev => 
                       prev ? { ...prev, title: e.target.value } : null
                     )}
+                    disabled={!canEdit}
                     placeholder="e.g., Action Surge, Second Wind, Fighting Style"
                   />
                 </div>
@@ -700,9 +707,10 @@ export function FeatureManagementModal({
                   <Label htmlFor="feature-level">Level</Label>
                   <Select
                     value={editingFeature.level.toString()}
-                    onValueChange={(value) => setEditingFeature(prev => 
+                    onValueChange={(value) => canEdit && setEditingFeature(prev => 
                       prev ? { ...prev, level: parseInt(value) } : null
                     )}
+                    disabled={!canEdit}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -723,9 +731,10 @@ export function FeatureManagementModal({
                    <Label htmlFor="feature-scope">Feature Scope</Label>
                    <Select
                      value={editingFeature.feature_type}
-                     onValueChange={(value: "class" | "subclass") => setEditingFeature(prev => 
+                     onValueChange={(value: "class" | "subclass") => canEdit && setEditingFeature(prev => 
                        prev ? { ...prev, feature_type: value } : null
                      )}
+                     disabled={!canEdit}
                    >
                      <SelectTrigger>
                        <SelectValue />
@@ -742,9 +751,10 @@ export function FeatureManagementModal({
                      <Label htmlFor="subclass-select">Subclass *</Label>
                      <Select
                        value={editingFeature.subclass_id || ''}
-                       onValueChange={(value) => setEditingFeature(prev => 
+                       onValueChange={(value) => canEdit && setEditingFeature(prev => 
                          prev ? { ...prev, subclass_id: value } : null
                        )}
+                       disabled={!canEdit}
                      >
                        <SelectTrigger>
                          <SelectValue placeholder="Select subclass" />
@@ -769,10 +779,12 @@ export function FeatureManagementModal({
                      id="is-hidden"
                      checked={editingFeature.is_hidden || false}
                      onChange={(e) => {
+                       if (!canEdit) return
                        setEditingFeature(prev => 
                          prev ? { ...prev, is_hidden: e.target.checked } : null
                        )
                      }}
+                     disabled={!canEdit}
                    />
                    <Label htmlFor="is-hidden" className="text-sm font-normal">
                      Hide this feature from character sheet
@@ -836,7 +848,7 @@ export function FeatureManagementModal({
                 <Label htmlFor="feature-description">Description</Label>
                 <RichTextEditor
                   value={editingFeature.description}
-                  onChange={(value) => setEditingFeature(prev => 
+                  onChange={(value) => canEdit && setEditingFeature(prev => 
                     prev ? { ...prev, description: value } : null
                   )}
                   placeholder="Describe this feature and its effects..."
@@ -1886,19 +1898,21 @@ export function FeatureManagementModal({
             <Button variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button onClick={handleSaveFeature} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Icon icon="lucide:loader-2" className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Icon icon="lucide:save" className="w-4 h-4" />
-                  Save
+            {canEdit && (
+              <Button onClick={handleSaveFeature} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Icon icon="lucide:loader-2" className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="lucide:save" className="w-4 h-4" />
+                    Save
                   </>
                 )}
               </Button>
+            )}
             </div>
           </DialogFooter>
         </DialogContent>

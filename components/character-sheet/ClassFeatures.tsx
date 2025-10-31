@@ -19,9 +19,10 @@ interface FeatureSlotUsageProps {
   feature: any
   character: CharacterData
   onUpdateUsage: (featureId: string, updates: any) => void
+  canEdit?: boolean
 }
 
-function FeatureSlotUsage({ feature, character, onUpdateUsage }: FeatureSlotUsageProps) {
+function FeatureSlotUsage({ feature, character, onUpdateUsage, canEdit = true }: FeatureSlotUsageProps) {
   const featureUsage = getFeatureUsage(character, feature.id)
   const currentUses = featureUsage?.currentUses || 0
   const maxUses = featureUsage?.maxUses || 0
@@ -49,7 +50,7 @@ function FeatureSlotUsage({ feature, character, onUpdateUsage }: FeatureSlotUsag
           size="sm"
           className="h-6 w-6 p-0"
           onClick={handleRestoreSlot}
-          disabled={currentUses <= 0}
+          disabled={!canEdit || currentUses <= 0}
         >
           <Icon icon="lucide:minus" className="w-3 h-3" />
         </Button>
@@ -61,7 +62,7 @@ function FeatureSlotUsage({ feature, character, onUpdateUsage }: FeatureSlotUsag
           size="sm"
           className="h-6 w-6 p-0"
           onClick={handleUseSlot}
-          disabled={currentUses >= maxUses}
+          disabled={!canEdit || currentUses >= maxUses}
         >
           <Icon icon="lucide:plus" className="w-3 h-3" />
         </Button>
@@ -76,10 +77,11 @@ interface ClassFeaturesProps {
   onOpenFeatureModal: (content: { title: string; description: string }) => void
   onCleanupFeatures?: () => Promise<void>
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
+  canEdit?: boolean
 }
 
 
-export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal, onCleanupFeatures, onUpdateFeatureUsage }: ClassFeaturesProps) {
+export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal, onCleanupFeatures, onUpdateFeatureUsage, canEdit = true }: ClassFeaturesProps) {
   // Use the new class features hook with caching
   const { 
     features: allFeatures, 
@@ -188,6 +190,7 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
                           feature={feature}
                           character={character}
                           onUpdateUsage={onUpdateFeatureUsage}
+                          canEdit={canEdit}
                         />
                       )}
                       
