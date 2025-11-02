@@ -37,7 +37,8 @@ export interface CharacterData {
   // New multiclassing support
   classes: CharacterClass[]
   background: string
-  race: string
+  race: string // Legacy field - kept for backward compatibility, use raceIds instead
+  raceIds?: Array<{id: string, isMain: boolean}> // Array of up to 2 race objects with main status
   alignment: string
   // User ownership and visibility
   userId?: string
@@ -397,11 +398,11 @@ export const calculateProficiencyBonus = (level: number): number => {
 export const calculateSkillBonus = (character: CharacterData, skill: Skill): number => {
   const abilityScore = character[skill.ability]
   const abilityModifier = calculateModifier(abilityScore)
-  const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level)
+  const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level || 1)
 
   // Check if character is a Bard (single class or multiclass)
-  const isBard = character.class.toLowerCase() === "bard" || 
-    character.classes?.some(c => c.name.toLowerCase() === "bard")
+  const isBard = (character.class?.toLowerCase() === "bard" || 
+    character.classes?.some(c => c.name.toLowerCase() === "bard")) ?? false
 
   switch (skill.proficiency) {
     case "proficient":
@@ -418,8 +419,9 @@ export const calculateSkillBonus = (character: CharacterData, skill: Skill): num
 }
 
 export const calculateToolBonus = (character: CharacterData, tool: ToolProficiency): number => {
-  const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level)
-  const isArtificer = character.class.toLowerCase() === "artificer"
+  const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level || 1)
+  const isArtificer = (character.class?.toLowerCase() === "artificer" || 
+    character.classes?.some(c => c.name.toLowerCase() === "artificer")) ?? false
   const hasToolExpertise = isArtificer && character.level >= 6
 
   // If a manual modifier is set, treat it as the base proficiency-derived bonus and

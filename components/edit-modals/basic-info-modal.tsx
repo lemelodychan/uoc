@@ -12,7 +12,7 @@ import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel, getPrimaryClass } from "@/lib/character-data"
 import { MulticlassModal } from "./multiclass-modal"
-import { getCurrentUser, getAllUsers } from "@/lib/database"
+import { getCurrentUser, getAllUsers, loadAllRaces } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
 import { useUser } from "@/lib/user-context"
 
@@ -51,6 +51,10 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
       aestheticImages: paddedImages,
     }
   })
+  const [raceIds, setRaceIds] = useState<Array<{id: string, isMain: boolean}>>(
+    character.raceIds?.map(r => typeof r === 'string' ? {id: r, isMain: true} : r) || []
+  )
+  const [races, setRaces] = useState<Array<{id: string, name: string}>>([])
   const [multiclassModalOpen, setMulticlassModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [isOwner, setIsOwner] = useState(false)
@@ -71,7 +75,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     getUser()
   }, [character.userId])
 
-  // Load users when modal opens
+  // Load users and races when modal opens
   useEffect(() => {
     if (isOpen) {
       getAllUsers().then(({ users, error }) => {
@@ -81,8 +85,32 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
           setUsers(users || [])
         }
       })
+      loadRaces()
     }
   }, [isOpen])
+
+  // Set main race to first race when 2 races are selected and no main is set
+  useEffect(() => {
+    if (raceIds.length === 2 && !raceIds.some(r => r.isMain)) {
+      setRaceIds([{...raceIds[0], isMain: true}, raceIds[1]])
+    } else if (raceIds.length === 1 && !raceIds[0]?.isMain) {
+      setRaceIds([{...raceIds[0], isMain: true}])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceIds.length, raceIds.some(r => r.isMain)])
+
+  const loadRaces = async () => {
+    try {
+      const { races: loadedRaces, error: loadError } = await loadAllRaces()
+      if (loadError) {
+        console.error("Error loading races:", loadError)
+      } else {
+        setRaces(loadedRaces || [])
+      }
+    } catch (err) {
+      console.error("Failed to load races:", err)
+    }
+  }
 
 
   const getOwnerDisplayName = (): string => {
@@ -111,17 +139,20 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
         class: primaryClass?.name || character.class,
         subclass: primaryClass?.subclass || character.subclass || "",
         level: calculateTotalLevel(character.classes),
-        background: character.background,
-        race: character.race,
-        alignment: character.alignment,
-        partyStatus: character.partyStatus || 'active',
-        imageUrl: character.imageUrl || "",
-        visibility: character.visibility || 'public',
-        isNPC: character.isNPC || false,
-        aestheticImages: paddedImages,
-      })
+      background: character.background,
+      race: character.race,
+      alignment: character.alignment,
+      partyStatus: character.partyStatus || 'active',
+      imageUrl: character.imageUrl || "",
+      visibility: character.visibility || 'public',
+      isNPC: character.isNPC || false,
+      aestheticImages: paddedImages,
+    })
+    setRaceIds(
+      character.raceIds?.map(r => typeof r === 'string' ? {id: r, isMain: true} : r) || []
+    )
     }
-  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility, character.isNPC, character.aestheticImages])
+  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.raceIds, character.alignment, character.partyStatus, character.imageUrl, character.visibility, character.isNPC, character.aestheticImages])
 
 
   const handleImageUpload = async (file: File, isAesthetic: boolean = false, aestheticIndex?: number) => {
@@ -201,7 +232,8 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     const updates = { 
       ...formDataWithoutLevel, 
       visibility: formData.visibility,
-      aestheticImages: preservedAestheticImages
+      aestheticImages: preservedAestheticImages,
+      raceIds: raceIds.length > 0 ? raceIds : undefined
     }
     
     onSave(updates)
@@ -364,12 +396,121 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
             <Label htmlFor="race" className="text-right">
               Race
             </Label>
-            <Input
-              id="race"
-              value={formData.race}
-              onChange={(e) => setFormData({ ...formData, race: e.target.value })}
-              className="w-full"
-            />
+            <div className="w-full space-y-2">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={raceIds[0]?.id || ""}
+                  onValueChange={(value) => {
+                    if (value) {
+                      // If selecting a first race, keep the second race if it exists
+                      const newRaceIds: Array<{id: string, isMain: boolean}> = [
+                        {id: value, isMain: raceIds[0]?.isMain || false},
+                        raceIds[1]
+                      ].filter(Boolean) as Array<{id: string, isMain: boolean}>
+                      // If we had 2 races and the first was main, keep it as main
+                      if (raceIds.length === 2 && raceIds[0]?.isMain) {
+                        newRaceIds[0].isMain = true
+                        if (newRaceIds[1]) newRaceIds[1].isMain = false
+                      } else if (newRaceIds.length === 1) {
+                        newRaceIds[0].isMain = true
+                      }
+                      setRaceIds(newRaceIds)
+                    } else {
+                      // If clearing the first race, clear both
+                      setRaceIds([])
+                    }
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select first race" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {races.map((race) => (
+                      <SelectItem 
+                        key={race.id} 
+                        value={race.id}
+                        disabled={raceIds[1]?.id === race.id} // Only disable if it's the second race
+                      >
+                        {race.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {raceIds.length === 2 && raceIds[0] && (
+                  <div className="flex items-center space-x-1">
+                    <Checkbox
+                      id="main-race-1"
+                      checked={raceIds[0]?.isMain || false}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setRaceIds([
+                            {...raceIds[0], isMain: true},
+                            {...raceIds[1], isMain: false}
+                          ])
+                        }
+                      }}
+                    />
+                    <Label htmlFor="main-race-1" className="text-xs cursor-pointer whitespace-nowrap">
+                      Main
+                    </Label>
+                  </div>
+                )}
+              </div>
+              {raceIds.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={raceIds[1]?.id || undefined}
+                    onValueChange={(value) => {
+                      if (value && value !== "__clear__") {
+                        const newRaceIds: Array<{id: string, isMain: boolean}> = [
+                          raceIds[0],
+                          {id: value, isMain: false}
+                        ]
+                        setRaceIds(newRaceIds)
+                      } else if (value === "__clear__") {
+                        // Remove second race, ensure first is main
+                        setRaceIds([{...raceIds[0], isMain: true}])
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select second race (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__clear__">None</SelectItem>
+                      {races.map((race) => (
+                        <SelectItem 
+                          key={race.id} 
+                          value={race.id}
+                          disabled={raceIds[0]?.id === race.id} // Only disable if it's the first race
+                        >
+                          {race.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {raceIds.length === 2 && raceIds[1] && (
+                    <div className="flex items-center space-x-1">
+                      <Checkbox
+                        id="main-race-2"
+                        checked={raceIds[1]?.isMain || false}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setRaceIds([
+                              {...raceIds[0], isMain: false},
+                              {...raceIds[1], isMain: true}
+                            ])
+                          }
+                        }}
+                      />
+                      <Label htmlFor="main-race-2" className="text-xs cursor-pointer whitespace-nowrap">
+                        Main
+                      </Label>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="alignment" className="text-right">

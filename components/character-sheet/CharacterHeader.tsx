@@ -1,11 +1,13 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel } from "@/lib/character-data"
+import { loadAllRaces } from "@/lib/database"
 
 interface CharacterHeaderProps {
   character: CharacterData
@@ -36,6 +38,38 @@ export function CharacterHeader({
 }: CharacterHeaderProps) {
   const showLevelUpButton = canEdit && levelUpEnabled
   const levelUpCompleted = character.levelUpCompleted || false
+  const [races, setRaces] = useState<Array<{id: string, name: string}>>([])
+
+  // Load races to get names for display
+  useEffect(() => {
+    loadAllRaces().then(({ races: loadedRaces }) => {
+      if (loadedRaces) {
+        setRaces(loadedRaces)
+      }
+    })
+  }, [])
+
+  // Format race display based on raceIds
+  const formatRaceDisplay = (): string => {
+    if (character.raceIds && character.raceIds.length > 0) {
+      const raceNames = character.raceIds.map(raceObj => {
+        const race = races.find(r => r.id === raceObj.id)
+        return race ? race.name : raceObj.id
+      })
+
+      if (raceNames.length === 1) {
+        return raceNames[0]
+      } else if (raceNames.length === 2) {
+        const mainRace = character.raceIds.find(r => r.isMain)
+        const otherRace = character.raceIds.find(r => !r.isMain)
+        const mainRaceName = races.find(r => r.id === mainRace?.id)?.name || mainRace?.id || raceNames[0]
+        const otherRaceName = races.find(r => r.id === otherRace?.id)?.name || otherRace?.id || raceNames[1]
+        return `${mainRaceName}, ${otherRaceName}`
+      }
+    }
+    // Fallback to legacy race field
+    return character.race || "Unknown"
+  }
   return (
     <Card className="rounded-none border-0">
       <CardHeader className="pb-0">
@@ -79,7 +113,7 @@ export function CharacterHeader({
                 </Badge>
               </div>
               <span className="text-sm text-muted-foreground px-1">
-                {character.race}・{character.background}・{character.alignment}
+                {formatRaceDisplay()}・{character.background}・{character.alignment}
               </span>
             </div>
           </div>

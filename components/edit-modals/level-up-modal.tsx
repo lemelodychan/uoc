@@ -375,7 +375,8 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
       })
       
       // Load features for the selected class's new level only
-      const { features } = await loadClassFeatures(selectedClass.class_id || '', selectedClassNewLevel, selectedClass.subclass)
+      // includeHidden = true to include ASI features during level up
+      const { features } = await loadClassFeatures(selectedClass.class_id || '', selectedClassNewLevel, selectedClass.subclass, true)
       if (features) {
         // Filter to only show features that are exactly at the selected class's new level
         const newLevelFeatures = features.filter(feature => feature.level === selectedClassNewLevel)

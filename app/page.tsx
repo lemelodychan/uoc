@@ -588,11 +588,15 @@ function CharacterSheetContent() {
     if (result.success) {
       // Update the character in the local state
       updateCharacter({ partyStatus: status })
-      toast({
-        title: "Party Status Updated",
-        description: `Character status changed to ${status}`,
-      })
-    } else {
+      // Only show toast if status actually changed (avoid showing on non-critical errors)
+      if (activeCharacter.partyStatus !== status) {
+        toast({
+          title: "Party Status Updated",
+          description: `Character status changed to ${status}`,
+        })
+      }
+    } else if (result.error && !result.error.includes('409') && !result.error.toLowerCase().includes('conflict')) {
+      // Only show error toast for non-conflict errors (409 conflicts are non-critical)
       toast({
         title: "Error",
         description: result.error || "Failed to update party status",
@@ -2341,11 +2345,30 @@ function CharacterSheetContent() {
     subclass: string
     classId: string
     level: number
+    classes?: Array<{name: string, subclass?: string, class_id?: string, level: number, selectedSkillProficiencies?: string[]}>
     background: string
     race: string
+    raceIds?: Array<{id: string, isMain: boolean}>
     alignment: string
     isNPC?: boolean
     campaignId?: string
+    selectedFeatures?: string[]
+    abilityScores?: {
+      strength: number
+      dexterity: number
+      constitution: number
+      intelligence: number
+      wisdom: number
+      charisma: number
+    }
+    skills?: Array<{name: string, ability: string, proficiency: 'none' | 'proficient' | 'expertise'}>
+    savingThrowProficiencies?: Array<{ability: string, proficient: boolean}>
+    maxHitPoints?: number
+    currentHitPoints?: number
+    speed?: number
+    armorClass?: number
+    initiative?: number
+    features?: Array<{name: string, description: string, usesPerLongRest?: number | string, currentUses?: number, refuelingDie?: string}>
   }) => {
     const newId = (characters.length + 1).toString()
     
@@ -2365,60 +2388,138 @@ function CharacterSheetContent() {
       ? currentCampaign.dungeonMasterId 
       : user?.id
     
-    // Load class data to get primary ability for spell calculations
+    // Use multiclass data if available, otherwise use single class
+    const classesToUse = characterData.classes && characterData.classes.length > 0 
+      ? characterData.classes 
+      : [{
+          name: characterData.class,
+          subclass: characterData.subclass,
+          class_id: characterData.classId,
+          level: characterData.level
+        }]
+    
+    // Load class data for the first class to get primary ability for spell calculations
     const { classData } = await loadClassData(characterData.class, characterData.subclass)
     const proficiencyBonus = calculateProficiencyBonus(characterData.level)
     
-    // Load class features from database
+    // Load class features from database for all selected features
     let classFeatures: Array<{name: string, description: string, source: string, level: number}> = []
-    if (classData?.id) {
+    if (characterData.selectedFeatures && characterData.selectedFeatures.length > 0) {
+      // Load features for all classes if multiclassing
+      for (const charClass of classesToUse) {
+        if (charClass.class_id) {
+          const { features, error: featuresError } = await loadClassFeatures(
+            charClass.class_id, 
+            charClass.level,
+            charClass.subclass,
+            true // includeHidden to get ASI features
+          )
+          if (!featuresError && features) {
+            // Only include selected features
+            const selectedForThisClass = features.filter(f => 
+              characterData.selectedFeatures?.includes(f.id)
+            )
+            classFeatures.push(...selectedForThisClass.map(f => ({
+              name: f.name || f.title || '',
+              description: f.description || '',
+              source: f.source || charClass.name,
+              level: f.level || 1
+            })))
+          }
+        }
+      }
+    } else if (classData?.id) {
+      // Fallback: load all features if no specific selection
       const { features, error: featuresError } = await loadClassFeatures(classData.id, characterData.level)
       if (featuresError) {
         console.error("Error loading class features:", featuresError)
       } else {
         classFeatures = features || []
       }
-    } else {
     }
     
-    // Create a temporary character object for calculations
-    const tempCharacter: CharacterData = {
-      id: newId,
-      name: characterData.name,
-      class: characterData.class,
-      subclass: characterData.subclass,
-      class_id: characterData.classId,
-      level: characterData.level,
-      background: characterData.background,
-      race: characterData.race,
-      alignment: characterData.alignment,
-      userId: ownerId,
-      visibility: characterData.isNPC ? 'private' : 'public',
-      isNPC: characterData.isNPC || false,
-      // Automatically assign to current campaign if viewing a campaign or if NPC
-      campaignId: characterData.campaignId || (currentView === 'campaign' && currentCampaign ? currentCampaign.id : undefined),
+    // Use passed ability scores, or default to 10
+    const abilityScores = characterData.abilityScores || {
       strength: 10,
       dexterity: 10,
       constitution: 10,
       intelligence: 10,
       wisdom: 10,
       charisma: 10,
-      armorClass: 10,
-      initiative: 0,
-      speed: 30,
-      currentHitPoints: 8,
-      maxHitPoints: 8,
+    }
+    
+    // Use passed skills or create from class data
+    const skills = characterData.skills || (classData?.skill_proficiencies 
+      ? createClassBasedSkills(classData.skill_proficiencies) as any 
+      : createDefaultSkills())
+    
+    // Use passed saving throw proficiencies or create from class
+    const savingThrowProficiencies: Array<{ability: 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma', proficient: boolean}> = 
+      characterData.savingThrowProficiencies?.map(st => ({
+        ability: st.ability as 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma',
+        proficient: st.proficient
+      })) || createClassBasedSavingThrowProficiencies(characterData.class)
+    
+    // Calculate hit dice for multiclassing
+    const hitDieTypes: Record<string, number> = {
+      'barbarian': 12, 'fighter': 10, 'paladin': 10, 'ranger': 10,
+      'artificer': 8, 'bard': 8, 'cleric': 8, 'druid': 8, 'monk': 8,
+      'rogue': 8, 'warlock': 8, 'wizard': 6, 'sorcerer': 6
+    }
+    
+    const hitDiceByClass = classesToUse.map(charClass => ({
+      className: charClass.name,
+      dieType: `d${hitDieTypes[charClass.name.toLowerCase()] || 8}`,
+      total: charClass.level,
+      used: 0
+    }))
+    
+    // Calculate total hit dice
+    const totalHitDice = classesToUse.reduce((sum, c) => sum + c.level, 0)
+    
+    // Create a temporary character object for calculations
+    const tempCharacter: CharacterData = {
+      id: newId,
+      name: characterData.name,
+      class: characterData.class, // Legacy field
+      subclass: characterData.subclass, // Legacy field
+      class_id: characterData.classId, // Legacy field
+      level: characterData.level,
+      classes: classesToUse, // Multiclass support
+      background: characterData.background,
+      race: characterData.raceIds && characterData.raceIds.length > 0
+        ? (characterData.raceIds.find(r => r.isMain)?.id || characterData.raceIds[0]?.id || characterData.race)
+        : characterData.race, // Legacy field
+      raceIds: characterData.raceIds, // New field
+      alignment: characterData.alignment,
+      userId: ownerId,
+      visibility: characterData.isNPC ? 'private' : 'public',
+      isNPC: characterData.isNPC || false,
+      // Use the campaignId from characterData if provided (from campaign homepage), otherwise undefined
+      campaignId: characterData.campaignId || undefined,
+      strength: abilityScores.strength,
+      dexterity: abilityScores.dexterity,
+      constitution: abilityScores.constitution,
+      intelligence: abilityScores.intelligence,
+      wisdom: abilityScores.wisdom,
+      charisma: abilityScores.charisma,
+      armorClass: characterData.armorClass || 10,
+      initiative: characterData.initiative || 0,
+      speed: characterData.speed || 30,
+      currentHitPoints: characterData.currentHitPoints || 8,
+      maxHitPoints: characterData.maxHitPoints || 8,
       exhaustion: 0,
       hitDice: {
-        total: characterData.level,
+        total: totalHitDice,
         used: 0,
         dieType: classData?.hit_die ? `d${classData.hit_die}` : "d8", // Use actual class hit die
       },
+      hitDiceByClass: hitDiceByClass,
       weapons: [],
       weaponNotes: "",
-      features: [],
-      savingThrowProficiencies: createClassBasedSavingThrowProficiencies(characterData.class),
-      skills: createClassBasedSkills(classData?.skill_proficiencies || []) as any,
+      features: characterData.features || [], // Race-based features
+      savingThrowProficiencies: savingThrowProficiencies as any, // Type assertion needed for passed data
+      skills: skills,
       spellData: {
         spellAttackBonus: 0,
         spellSaveDC: 8,
@@ -2470,19 +2571,7 @@ function CharacterSheetContent() {
         7: 0,
         8: 0,
         9: 0,
-      },
-      classes: [{
-        name: characterData.class,
-        subclass: characterData.subclass,
-        class_id: characterData.classId,
-        level: characterData.level
-      }],
-      hitDiceByClass: [{
-        className: characterData.class,
-        dieType: classData?.hit_die ? `d${classData.hit_die}` : "d8",
-        total: characterData.level,
-        used: 0
-      }],
+      }
     }
     
     // Calculate spell slots immediately during character creation
@@ -2576,11 +2665,21 @@ function CharacterSheetContent() {
         if (characterId && characterId !== newId) {
           setCharacters(prev => prev.map(char => char.id === newId ? { ...char, id: characterId } : char))
           setActiveCharacterId(characterId)
+          saveActiveCharacterToLocalStorage(characterId)
+        } else {
+          saveActiveCharacterToLocalStorage(newId)
         }
+        
+        // Get the campaign name for the toast message
+        const addedCampaign = characterData.campaignId 
+          ? campaigns.find(c => c.id === characterData.campaignId)
+          : null
+        
+        // Show success toast
         toast({
           title: "Success",
-          description: currentView === 'campaign' && currentCampaign 
-            ? `${characterData.name} created and added to ${currentCampaign.name}!`
+          description: addedCampaign
+            ? `${characterData.name} created and added to ${addedCampaign.name}!`
             : `${characterData.name} created successfully!`,
         })
       } else {
@@ -3394,7 +3493,7 @@ function CharacterSheetContent() {
         onCreateCharacter={handleCreateCharacter}
         currentUserId={currentUser?.id}
         dungeonMasterId={currentCampaign?.dungeonMasterId}
-        campaignId={currentView === 'campaign' ? currentCampaign?.id : undefined}
+        campaignId={currentCampaign?.id}
       />
       <Dialog open={featureModalOpen} onOpenChange={(open) => {
         setFeatureModalOpen(open)

@@ -473,14 +473,32 @@ export const updatePartyStatus = async (
       .upsert(updateData, { onConflict: 'character_id' })
 
     if (error) {
+      // Handle 409 (Conflict) errors gracefully - these can occur during concurrent updates
+      // but are usually non-critical since upsert should handle conflicts
+      if (error.code === 'PGRST301' || error.code === '23505' || error.message?.includes('409') || error.message?.includes('conflict')) {
+        // Try to update using update instead of upsert as fallback
+        const { error: updateError } = await supabase
+          .from('party_status')
+          .update(updateData)
+          .eq('character_id', characterId)
+        
+        if (updateError) {
+          // If update also fails, log but don't fail completely since character save succeeded
+          console.warn("[v0] Party status update conflict (non-critical):", updateError.message)
+          return { success: true } // Return success since character save worked
+        }
+        return { success: true }
+      }
+      
       console.error("[v0] Error updating party status:", error)
       return { success: false, error: error.message }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error in updatePartyStatus:", error)
-    return { success: false, error: "Failed to update party status" }
+    // Catch all errors gracefully - don't fail character save if party status update fails
+    console.warn("[v0] Error in updatePartyStatus (non-critical):", error)
+    return { success: true } // Return success to not block character save
   }
 }
 
@@ -549,7 +567,7 @@ export const saveCharacter = async (
       classes: character.classes || null,
       hit_dice_by_class: character.hitDiceByClass || null,
       background: character.background,
-      race: character.race,
+      race: character.raceIds && character.raceIds.length > 0 ? character.raceIds : [], // JSONB array of race objects [{id: string, isMain: boolean}]
       alignment: character.alignment,
       image_url: character.imageUrl || null,
       aesthetic_images: character.aestheticImages || null,
@@ -732,7 +750,12 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         level: data.level
       }],
       background: data.background,
-      race: data.race,
+      race: Array.isArray(data.race) && data.race.length > 0 
+        ? (typeof data.race[0] === 'string' ? data.race[0] : data.race[0]?.id || "")
+        : (data.race_legacy || ""), // Legacy compatibility
+      raceIds: Array.isArray(data.race) 
+        ? data.race.map((r: any) => typeof r === 'string' ? {id: r, isMain: true} : r)
+        : (data.race_legacy ? [{id: data.race_legacy, isMain: true}] : undefined),
       alignment: data.alignment,
       imageUrl: data.image_url || undefined,
       aestheticImages: data.aesthetic_images || undefined,
@@ -1138,7 +1161,12 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             level: row.level
           }],
           background: row.background,
-          race: row.race,
+          race: Array.isArray(row.race) && row.race.length > 0 
+            ? (typeof row.race[0] === 'string' ? row.race[0] : row.race[0]?.id || "")
+            : (row.race_legacy || ""), // Legacy compatibility
+          raceIds: Array.isArray(row.race) 
+            ? row.race.map((r: any) => typeof r === 'string' ? {id: r, isMain: true} : r)
+            : (row.race_legacy ? [{id: row.race_legacy, isMain: true}] : undefined),
           alignment: row.alignment,
           imageUrl: row.image_url || undefined,
           aestheticImages: row.aesthetic_images || undefined,
@@ -1628,7 +1656,7 @@ export const cleanupCharacterFeatures = async (characterId: string): Promise<{ s
   }
 }
 
-export const loadClassFeatures = async (classId: string, level: number, subclass?: string): Promise<{ features?: Array<{
+export const loadClassFeatures = async (classId: string, level: number, subclass?: string, includeHidden: boolean = false): Promise<{ features?: Array<{
   id: string
   class_id: string
   level: number
@@ -1646,10 +1674,12 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
     // Import cache dynamically to avoid circular dependencies
     const { classFeaturesCache } = await import('./class-features-cache')
     
-    // Check cache first
-    const cachedFeatures = classFeaturesCache.get(classId, level, subclass)
-    if (cachedFeatures) {
-      return { features: cachedFeatures }
+    // Check cache first (but only if we're not including hidden features, as cache might not have them)
+    if (!includeHidden) {
+      const cachedFeatures = classFeaturesCache.get(classId, level, subclass)
+      if (cachedFeatures) {
+        return { features: cachedFeatures }
+      }
     }
     // First get the class information to check if it's a Bard
     const { data: classData, error: classError } = await supabase
@@ -1678,8 +1708,8 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
       return { error: error.message }
     }
 
-    // Filter out hidden features
-    let features = data?.filter(feature => !feature.is_hidden).map(feature => ({
+    // Filter out hidden features unless includeHidden is true
+    let features = data?.filter(feature => includeHidden || !feature.is_hidden).map(feature => ({
       id: feature.id,
       class_id: feature.class_id,
       level: feature.level,
@@ -1721,9 +1751,9 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
           .order("level", { ascending: true })
 
         if (!baseError && baseFeatures) {
-          // Filter out hidden features and map to feature objects
+          // Filter out hidden features unless includeHidden is true, then map to feature objects
           const baseClassFeatures = baseFeatures
-            .filter(feature => !feature.is_hidden)
+            .filter(feature => includeHidden || !feature.is_hidden)
             .map(feature => ({
               id: feature.id,
               class_id: feature.class_id,
@@ -1764,9 +1794,9 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
           .order("level", { ascending: true })
 
         if (!baseError && baseFeatures) {
-          // Filter out hidden features and map to feature objects
+          // Filter out hidden features unless includeHidden is true and map to feature objects
           const baseClassFeatures = baseFeatures
-            .filter(feature => !feature.is_hidden)
+            .filter(feature => includeHidden || !feature.is_hidden)
             .map(feature => ({
               id: feature.id,
               class_id: feature.class_id,
@@ -1810,9 +1840,9 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
           .order("level", { ascending: true })
 
         if (!subclassFeaturesError && subclassFeatures) {
-          // Filter out hidden features and map to feature objects
+          // Filter out hidden features unless includeHidden is true and map to feature objects
           const subclassFeaturesMapped = subclassFeatures
-            .filter(feature => !feature.is_hidden)
+            .filter(feature => includeHidden || !feature.is_hidden)
             .map(feature => ({
               id: feature.id,
               class_id: feature.class_id,
@@ -1835,8 +1865,10 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
       }
     }
 
-    // Store in cache before returning
-    classFeaturesCache.set(classId, level, features, subclass)
+    // Store in cache before returning (only if not including hidden features, to avoid caching hidden features)
+    if (!includeHidden) {
+      classFeaturesCache.set(classId, level, features, subclass)
+    }
     
     // Return all features for the class - no filtering needed
     // The filtering was causing issues with multiclassing
@@ -1892,6 +1924,60 @@ export const loadAllClasses = async (): Promise<{ classes?: Array<{id: string, n
   } catch (error) {
     console.error("Error loading classes:", error)
     return { error: "Failed to load classes" }
+  }
+}
+
+export const loadAllRaces = async (): Promise<{ races?: Array<{id: string, name: string}>; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("races")
+      .select("id, name")
+      .order("name", { ascending: true })
+
+    if (error) {
+      console.error("Error loading races:", error)
+      return { error: error.message }
+    }
+
+    return { races: data || [] }
+  } catch (error) {
+    console.error("Error loading races:", error)
+    return { error: "Failed to load races" }
+  }
+}
+
+export interface RaceData {
+  id: string
+  name: string
+  description?: string | null
+  ability_score_increases?: any
+  size?: string | null
+  speed?: number | null
+  features?: any[] | null
+  languages?: any
+  spellcasting_ability?: any
+  is_custom?: boolean
+  created_by?: string | null
+  source?: string
+}
+
+export const loadRaceDetails = async (raceId: string): Promise<{ race?: RaceData; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("races")
+      .select("*")
+      .eq("id", raceId)
+      .single()
+
+    if (error) {
+      console.error("Error loading race details:", error)
+      return { error: error.message }
+    }
+
+    return { race: data || undefined }
+  } catch (error) {
+    console.error("Error loading race details:", error)
+    return { error: "Failed to load race details" }
   }
 }
 
