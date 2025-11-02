@@ -81,7 +81,7 @@ export function CampaignNoteModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="!max-w-[800px] !w-full max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent className="!max-w-[90vw] !w-full max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             {editingNote ? "Edit Session Note" : "Create Session Note"}

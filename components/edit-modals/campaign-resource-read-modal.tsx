@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { WysiwygEditor } from "@/components/ui/wysiwyg-editor"
 import type { CampaignResource } from "@/lib/database"
+import { useEffect, useRef } from "react"
 
 interface CampaignResourceReadModalProps {
   isOpen: boolean
@@ -25,6 +26,29 @@ export function CampaignResourceReadModal({
   authorName,
   canEdit = true
 }: CampaignResourceReadModalProps) {
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  // Add image styling after content is rendered
+  // Must be called before early return to follow rules of hooks
+  useEffect(() => {
+    if (contentRef.current && resource?.content) {
+      const images = contentRef.current.querySelectorAll('img')
+      images.forEach((img) => {
+        // Ensure images have proper attributes
+        if (!img.alt) {
+          img.alt = 'Campaign resource image'
+        }
+        
+        // Ensure images have border-radius
+        img.style.borderRadius = '8px'
+        img.style.display = 'block'
+        img.style.maxWidth = '100%'
+        img.style.height = 'auto'
+        img.style.objectFit = 'contain'
+      })
+    }
+  }, [resource?.content, isOpen])
+
   if (!resource) return null
 
   const formatDate = (dateString: string) => {
@@ -70,6 +94,7 @@ export function CampaignResourceReadModal({
           </div>
 
           <div 
+            ref={contentRef}
             className="prose max-w-none"
             dangerouslySetInnerHTML={{ __html: resource.content }}
             style={{
@@ -86,7 +111,7 @@ export function CampaignResourceReadModal({
         </div>
 
         {canEdit && (
-          <div className="flex justify-between p-4 border-t gap-2">
+          <div className="flex justify-between p-4 border-t gap-2 bg-card">
             <Button
               variant="outline"
               size="sm"

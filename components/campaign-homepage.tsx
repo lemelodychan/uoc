@@ -308,13 +308,20 @@ export function CampaignHomepage({
   }
 
   const handleSaveNote = async (note: Omit<CampaignNote, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingNote) {
-      await onUpdateNote?.(editingNote.id, { 
+    if (editingNote && editingNote.id) {
+      const result = await onUpdateNote?.(editingNote.id, { 
         title: note.title, 
         content: note.content,
         session_date: note.session_date,
         members_attending: note.members_attending
       })
+      
+      // If update fails with "Note not found", it might have been deleted
+      // In that case, we should refresh the notes list
+      if (result?.error && result.error.includes("Note not found")) {
+        console.warn("Note not found during update, refreshing notes list")
+        refreshNotes()
+      }
     } else {
       await onCreateNote?.(note)
     }

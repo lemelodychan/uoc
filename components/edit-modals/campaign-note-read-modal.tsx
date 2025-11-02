@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { WysiwygEditor } from "@/components/ui/wysiwyg-editor"
 import type { CampaignNote } from "@/lib/database"
+import { useEffect, useRef } from "react"
 
 interface CampaignNoteReadModalProps {
   isOpen: boolean
@@ -25,6 +26,56 @@ export function CampaignNoteReadModal({
   authorName,
   canEdit
 }: CampaignNoteReadModalProps) {
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  // Add error handlers to images after content is rendered
+  // Must be called before early return to follow rules of hooks
+  useEffect(() => {
+    if (contentRef.current && note?.content) {
+      const images = contentRef.current.querySelectorAll('img')
+      console.log(`Found ${images.length} images in note content`)
+      
+      images.forEach((img, index) => {
+        console.log(`Image ${index + 1}:`, {
+          src: img.src,
+          alt: img.alt,
+          width: img.width,
+          height: img.height,
+          style: img.style.cssText,
+          attributes: Array.from(img.attributes).map(attr => `${attr.name}="${attr.value}"`).join(', ')
+        })
+        
+        // Ensure images have proper attributes
+        if (!img.alt) {
+          img.alt = 'Campaign note image'
+        }
+        
+        // Add error handler
+        img.onerror = () => {
+          console.error('Image failed to load:', img.src)
+          img.style.display = 'none'
+          // Optionally show a placeholder
+          const placeholder = document.createElement('div')
+          placeholder.className = 'text-muted-foreground text-sm p-4 border rounded'
+          placeholder.textContent = `Image failed to load: ${img.src}`
+          img.parentNode?.insertBefore(placeholder, img)
+        }
+
+        // Ensure images are visible and properly styled
+        img.style.display = 'block'
+        img.style.maxWidth = '100%'
+        img.style.height = 'auto'
+        img.style.objectFit = 'contain'
+        img.style.borderRadius = '8px'
+        
+        // Log if image loads successfully
+        img.onload = () => {
+          console.log(`Image ${index + 1} loaded successfully:`, img.src)
+        }
+      })
+    }
+  }, [note?.content, isOpen])
+
   if (!note) return null
 
   const formatDate = (dateString: string) => {
@@ -75,13 +126,14 @@ export function CampaignNoteReadModal({
           </div>
         </DialogHeader>
 
-        <div className="flex flex-col overflow-auto p-4 bg-background max-h-[70vh]">
+        <div className="flex flex-col overflow-auto p-4 bg-background max-h-[80vh]">
           {/* Hidden editor to load CSS styles */}
           <div style={{ display: 'none' }}>
             <WysiwygEditor value="" onChange={() => {}} />
           </div>
           
           <div 
+            ref={contentRef}
             className="prose max-w-none"
             dangerouslySetInnerHTML={{ __html: note.content }}
             style={{
@@ -98,7 +150,7 @@ export function CampaignNoteReadModal({
         </div>
 
         {canEdit && (
-          <div className="flex justify-between p-4 border-t gap-2">
+          <div className="flex justify-between p-4 border-t gap-2 bg-card">
             <Button
               variant="outline"
               size="sm"

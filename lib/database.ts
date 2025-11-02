@@ -2748,28 +2748,86 @@ export const createCampaignNote = async (note: Omit<CampaignNote, 'id' | 'create
 
 export const updateCampaignNote = async (id: string, updates: Partial<Pick<CampaignNote, 'title' | 'content' | 'session_date' | 'members_attending'>>): Promise<{ note?: CampaignNote; error?: string }> => {
   try {
-    const { data, error } = await supabase
+    if (!id) {
+      console.error("updateCampaignNote called with empty id")
+      return { error: "Note ID is required" }
+    }
+
+    // First check if the note exists and fetch it
+    const { data: existingNote, error: checkError } = await supabase
+      .from("campaign_notes")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (checkError) {
+      console.error("Error checking if note exists:", checkError)
+      return { error: checkError.message }
+    }
+
+    if (!existingNote) {
+      console.error(`Note with id ${id} not found in database`)
+      return { error: `Note not found (ID: ${id})` }
+    }
+
+    const { error: updateError } = await supabase
       .from("campaign_notes")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
-      .select()
-      .single()
 
-    if (error) {
-      console.error("Error updating campaign note:", error)
-      return { error: error.message }
+    if (updateError) {
+      console.error("Error updating campaign note:", updateError)
+      return { error: updateError.message }
     }
+
+    // Fetch the updated note separately (in case RLS blocks the select after update)
+    const { data, error: selectError } = await supabase
+      .from("campaign_notes")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (selectError) {
+      console.error("Error fetching updated note:", selectError)
+      // Update succeeded, but couldn't fetch - construct the note from existing + updates
+      if (existingNote) {
+        // Use the updates we know were applied
+        const constructedNote = {
+          ...existingNote,
+          ...updates,
+          updated_at: new Date().toISOString()
+        } as CampaignNote
+        return { note: constructedNote }
+      }
+      return { error: selectError.message }
+    }
+
+    if (!data) {
+      console.error(`Update succeeded but note ${id} not found after fetch`)
+      // Update succeeded, construct note from existing + updates
+      if (existingNote) {
+        const constructedNote = {
+          ...existingNote,
+          ...updates,
+          updated_at: new Date().toISOString()
+        } as CampaignNote
+        return { note: constructedNote }
+      }
+      return { error: "Note not found after update" }
+    }
+
+    const updatedNote = data
 
     
     // Update cache
     try {
       const { updateNoteInCache } = await import('./campaign-notes-cache')
-      updateNoteInCache(data.campaign_id, id, data)
+      updateNoteInCache(updatedNote.campaign_id, id, updatedNote)
     } catch (cacheError) {
       console.warn("Failed to update cache after updating note:", cacheError)
     }
     
-    return { note: data }
+    return { note: updatedNote }
   } catch (error) {
     console.error("Error in updateCampaignNote:", error)
     return { error: "Failed to update campaign note" }
@@ -2848,16 +2906,71 @@ export const createCampaignResource = async (resource: Omit<CampaignResource, 'i
 
 export const updateCampaignResource = async (id: string, updates: Partial<Pick<CampaignResource, 'title' | 'content'>>): Promise<{ resource?: CampaignResource; error?: string }> => {
   try {
-    const { data, error } = await supabase
+    if (!id) {
+      console.error("updateCampaignResource called with empty id")
+      return { error: "Resource ID is required" }
+    }
+
+    // First check if the resource exists and fetch it
+    const { data: existingResource, error: checkError } = await supabase
+      .from("campaign_resources")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (checkError) {
+      console.error("Error checking if resource exists:", checkError)
+      return { error: checkError.message }
+    }
+
+    if (!existingResource) {
+      console.error(`Resource with id ${id} not found in database`)
+      return { error: `Resource not found (ID: ${id})` }
+    }
+
+    const { error: updateError } = await supabase
       .from("campaign_resources")
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id)
-      .select()
-      .single()
 
-    if (error) {
-      console.error("Error updating campaign resource:", error)
-      return { error: error.message }
+    if (updateError) {
+      console.error("Error updating campaign resource:", updateError)
+      return { error: updateError.message }
+    }
+
+    // Fetch the updated resource separately (in case RLS blocks the select after update)
+    const { data, error: selectError } = await supabase
+      .from("campaign_resources")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (selectError) {
+      console.error("Error fetching updated resource:", selectError)
+      // Update succeeded, but couldn't fetch - construct the resource from existing + updates
+      if (existingResource) {
+        const constructedResource = {
+          ...existingResource,
+          ...updates,
+          updated_at: new Date().toISOString()
+        } as CampaignResource
+        return { resource: constructedResource }
+      }
+      return { error: selectError.message }
+    }
+
+    if (!data) {
+      console.error(`Update succeeded but resource ${id} not found after fetch`)
+      // Update succeeded, construct resource from existing + updates
+      if (existingResource) {
+        const constructedResource = {
+          ...existingResource,
+          ...updates,
+          updated_at: new Date().toISOString()
+        } as CampaignResource
+        return { resource: constructedResource }
+      }
+      return { error: "Resource not found after update" }
     }
 
     return { resource: data }

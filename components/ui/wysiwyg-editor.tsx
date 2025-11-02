@@ -7,9 +7,11 @@ import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import Placeholder from '@tiptap/extension-placeholder'
+import { CustomImage } from '@/lib/tiptap-image-extension'
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
-import { useEffect } from "react"
+import { useEffect, useState, useRef } from "react"
+import { Input } from "@/components/ui/input"
 
 interface WysiwygEditorProps {
   value: string
@@ -19,6 +21,10 @@ interface WysiwygEditorProps {
 }
 
 export function WysiwygEditor({ value, onChange, placeholder, className }: WysiwygEditorProps) {
+  const [selectedImageAttrs, setSelectedImageAttrs] = useState<{ src?: string; align?: string; width?: string; height?: string } | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+
   const TableConfigured = Table.configure({
     resizable: true,
     HTMLAttributes: { class: 'tiptap-table' },
@@ -31,10 +37,20 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
         ...this.parent?.(),
         backgroundColor: {
           default: null,
-          parseHTML: (element: any) => element.getAttribute('data-bg') || element.style?.backgroundColor || null,
+          parseHTML: (element: any) => {
+            const bg = element.getAttribute('data-bg') || element.style?.backgroundColor || null
+            // Filter out rgba(255, 255, 255, 0.2) and similar default backgrounds
+            if (bg && (bg.includes('rgba(255, 255, 255') || bg.includes('rgba(255,255,255'))) {
+              return null
+            }
+            return bg
+          },
           renderHTML: (attributes: any) => {
             const { backgroundColor } = attributes
-            if (!backgroundColor) return {}
+            // Don't render backgroundColor if it's a default transparent white
+            if (!backgroundColor || backgroundColor.includes('rgba(255, 255, 255') || backgroundColor.includes('rgba(255,255,255')) {
+              return {}
+            }
             return {
               style: `background-color: ${backgroundColor};`,
               'data-bg': backgroundColor,
@@ -52,6 +68,7 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
       TableRow,
       TableHeader,
       TableCellExtended,
+      CustomImage,
       Placeholder.configure({
         placeholder: placeholder || 'Start writing...',
       }),
@@ -67,6 +84,106 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
       },
     },
   })
+
+  // Track image selection and highlight selected images
+  useEffect(() => {
+    if (!editor) return
+
+    const updateImageSelection = () => {
+      const { state, view } = editor
+      const { selection } = state
+      const { $from, $to } = selection
+      
+      // Remove highlight from all images first
+      const allImages = view.dom.querySelectorAll('img')
+      allImages.forEach((img: Element) => {
+        img.classList.remove('image-selected')
+      })
+      
+      // Check if selection contains an image node
+      let imageNode = null
+      let imagePos = null
+      state.doc.nodesBetween($from.pos, $to.pos, (node: any, pos: number) => {
+        if (node.type.name === 'image') {
+          imageNode = { node, pos }
+          imagePos = pos
+        }
+      })
+      
+      // Also check if cursor is right after an image
+      if (!imageNode && $from.pos > 0) {
+        const prevNode = state.doc.nodeAt($from.pos - 1)
+        if (prevNode && prevNode.type.name === 'image') {
+          imageNode = { node: prevNode, pos: $from.pos - 1 }
+          imagePos = $from.pos - 1
+        }
+      }
+      
+      // Also check if cursor is right before an image
+      if (!imageNode && $from.pos < state.doc.content.size) {
+        const nextNode = state.doc.nodeAt($from.pos)
+        if (nextNode && nextNode.type.name === 'image') {
+          imageNode = { node: nextNode, pos: $from.pos }
+          imagePos = $from.pos
+        }
+      }
+      
+      if (imageNode && imagePos !== null) {
+        // Highlight the selected image
+        const nodeView = view.nodeDOM(imagePos)
+        if (nodeView && nodeView instanceof HTMLElement) {
+          nodeView.classList.add('image-selected')
+        }
+        
+        // Extract numeric values from width/height (remove "px" for display)
+        const widthValue = imageNode.node.attrs.width 
+          ? imageNode.node.attrs.width.replace('px', '').replace('%', '')
+          : ''
+        const heightValue = imageNode.node.attrs.height 
+          ? imageNode.node.attrs.height.replace('px', '').replace('%', '')
+          : ''
+        
+        setSelectedImageAttrs({
+          src: imageNode.node.attrs.src,
+          align: imageNode.node.attrs.align || 'left',
+          width: widthValue,
+          height: heightValue,
+        })
+      } else {
+        setSelectedImageAttrs(null)
+      }
+    }
+
+    // Handle image clicks to ensure proper selection
+    const handleImageClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (target.tagName === 'IMG') {
+        const { view } = editor
+        const pos = view.posAtDOM(target, 0)
+        if (pos !== null && pos !== undefined) {
+          const $pos = view.state.doc.resolve(pos)
+          const node = $pos.nodeAfter || $pos.nodeBefore
+          if (node && node.type.name === 'image') {
+            const imagePos = node === $pos.nodeAfter ? $pos.pos : $pos.pos - 1
+            // Select the image node - TipTap will handle highlighting via selectionUpdate
+            editor.commands.setNodeSelection(imagePos)
+          }
+        }
+      }
+    }
+
+    editor.on('selectionUpdate', updateImageSelection)
+    editor.on('update', updateImageSelection)
+    
+    const editorElement = editor.view.dom
+    editorElement.addEventListener('click', handleImageClick)
+
+    return () => {
+      editor.off('selectionUpdate', updateImageSelection)
+      editor.off('update', updateImageSelection)
+      editorElement.removeEventListener('click', handleImageClick)
+    }
+  }, [editor])
 
   // Add tab functionality for list nesting
   useEffect(() => {
@@ -102,6 +219,49 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
     }
   }, [editor])
 
+  // Handle image upload
+  const handleImageUpload = async (file: File) => {
+    try {
+      setUploadingImage(true)
+      const { user } = await import('@/lib/database').then(m => m.getCurrentUser())
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('folder', 'session-notes-images')
+
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.details || result.error || 'Failed to upload image')
+      }
+
+      editor?.chain().focus().setImage({ src: result.url }).run()
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert(error instanceof Error ? error.message : 'Failed to upload image')
+    } finally {
+      setUploadingImage(false)
+      if (imageInputRef.current) {
+        imageInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleImageUpload(file)
+    }
+  }
+
   if (!editor) {
     return (
       <div className={className}>
@@ -120,7 +280,7 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
   return (
     <div className={className}>
       {/* Toolbar */}
-      <div className="flex gap-1 p-2 border rounded-t-md bg-card">
+      <div className="flex flex-wrap gap-1 p-2 border rounded-t-md bg-card">
         <Button
           type="button"
           variant="ghost"
@@ -289,6 +449,139 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
         >
           <Icon icon="lucide:remove-formatting" className="w-4 h-4" />
         </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        {/* Image controls */}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageFileChange}
+          className="hidden"
+          id="wysiwygImageInput"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => imageInputRef.current?.click()}
+          disabled={uploadingImage}
+          className="h-8 w-8 p-0"
+          title="Insert Image"
+        >
+          {uploadingImage ? (
+            <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+          ) : (
+            <Icon icon="lucide:image" className="w-4 h-4" />
+          )}
+        </Button>
+        {/* Image alignment controls (shown when image is selected) */}
+        {selectedImageAttrs && (
+          <>
+            <div className="w-px h-6 bg-border mx-1" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => editor?.chain().focus().setImageAlign('left').run()}
+              className={`h-8 w-8 p-0 ${selectedImageAttrs.align === 'left' ? 'bg-accent' : ''}`}
+              title="Align Left"
+            >
+              <Icon icon="lucide:align-left" className="w-4 h-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => editor?.chain().focus().setImageAlign('center').run()}
+              className={`h-8 w-8 p-0 ${selectedImageAttrs.align === 'center' ? 'bg-accent' : ''}`}
+              title="Align Center"
+            >
+              <Icon icon="lucide:align-center" className="w-4 h-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => editor?.chain().focus().setImageAlign('right').run()}
+              className={`h-8 w-8 p-0 ${selectedImageAttrs.align === 'right' ? 'bg-accent' : ''}`}
+              title="Align Right"
+            >
+              <Icon icon="lucide:align-right" className="w-4 h-4" />
+            </Button>
+            <div className="flex items-center gap-1 px-2">
+              <label className="text-xs text-muted-foreground">W:</label>
+              <Input
+                type="text"
+                placeholder="auto"
+                value={selectedImageAttrs.width || ''}
+                onChange={(e) => {
+                  const width = e.target.value
+                  // Allow empty string or any number (with or without px)
+                  // Allow typing any value, validate and apply on blur
+                  setSelectedImageAttrs(prev => prev ? { ...prev, width } : null)
+                }}
+                onBlur={(e) => {
+                  const width = e.target.value.trim()
+                  // Extract numeric value (remove px, %, etc. and keep only digits)
+                  const numericValue = width.replace(/[^\d]/g, '')
+                  // Update the image node with the numeric value
+                  if (numericValue) {
+                    editor?.chain().focus().setImageSize(numericValue, selectedImageAttrs.height || undefined).run()
+                    // Update state to show just the number
+                    setSelectedImageAttrs(prev => prev ? { ...prev, width: numericValue } : null)
+                  } else {
+                    // Clear width if empty
+                    editor?.chain().focus().setImageSize('', selectedImageAttrs.height || undefined).run()
+                    setSelectedImageAttrs(prev => prev ? { ...prev, width: '' } : null)
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Allow Enter to apply changes
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur()
+                  }
+                }}
+                className="h-6 w-20 text-xs"
+              />
+              <span className="text-xs text-muted-foreground">px</span>
+              <label className="text-xs text-muted-foreground ml-1">H:</label>
+              <Input
+                type="text"
+                placeholder="auto"
+                value={selectedImageAttrs.height || ''}
+                onChange={(e) => {
+                  const height = e.target.value
+                  // Allow empty string or any number (with or without px)
+                  // Allow typing any value, validate and apply on blur
+                  setSelectedImageAttrs(prev => prev ? { ...prev, height } : null)
+                }}
+                onBlur={(e) => {
+                  const height = e.target.value.trim()
+                  // Extract numeric value (remove px, %, etc. and keep only digits)
+                  const numericValue = height.replace(/[^\d]/g, '')
+                  // Update the image node with the numeric value
+                  if (numericValue) {
+                    editor?.chain().focus().setImageSize(selectedImageAttrs.width || '', numericValue).run()
+                    // Update state to show just the number
+                    setSelectedImageAttrs(prev => prev ? { ...prev, height: numericValue } : null)
+                  } else {
+                    // Clear height if empty
+                    editor?.chain().focus().setImageSize(selectedImageAttrs.width || '', '').run()
+                    setSelectedImageAttrs(prev => prev ? { ...prev, height: '' } : null)
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Allow Enter to apply changes
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur()
+                  }
+                }}
+                className="h-6 w-20 text-xs"
+              />
+              <span className="text-xs text-muted-foreground">px</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Editor */}
@@ -322,11 +615,19 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           vertical-align: top;
           word-wrap: break-word;
           font-size: 0.9em;
+          background-color: hsl(var(--card)) !important;
+        }
+        
+        /* Override any inline background styles, especially rgba(255, 255, 255, 0.2) */
+        .ProseMirror th[style*="background"],
+        .ProseMirror td[style*="background"],
+        .ProseMirror th[style*="rgba(255"],
+        .ProseMirror td[style*="rgba(255"] {
+          background-color: hsl(var(--card)) !important;
         }
 
         .ProseMirror th {
           font-weight: 600;
-          background-color: rgba(148, 163, 184, 0.15);
         }
 
         .ProseMirror .tableWrapper {
@@ -375,19 +676,23 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           vertical-align: top;
           word-wrap: break-word;
           font-size: 0.9em;
+          background-color: hsl(var(--card)) !important;
+        }
+        
+        /* Override any inline background styles, especially rgba(255, 255, 255, 0.2) */
+        .prose th[style*="background"],
+        .prose td[style*="background"],
+        .prose th[style*="rgba(255"],
+        .prose td[style*="rgba(255"] {
+          background-color: hsl(var(--card)) !important;
         }
 
         .prose th {
           font-weight: 600;
-          background-color: rgba(148, 163, 184, 0.15);
         }
 
         .prose th p {
           margin: 0;
-        }
-
-        .dark .prose th {
-          background-color: rgba(148, 163, 184, 0.12);
         }
 
         .ProseMirror p {
@@ -499,6 +804,80 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           color: #9ca3af;
           pointer-events: none;
           height: 0;
+        }
+
+        /* Image styling */
+        .ProseMirror img {
+          max-width: 100%;
+          height: auto;
+          display: block;
+          margin: 0.75rem 0;
+          border-radius: 8px;
+          border: 1px solid var(--border);
+        }
+
+        .ProseMirror img[data-align="left"] {
+          float: left;
+          margin-right: 1rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .ProseMirror img[data-align="right"] {
+          float: right;
+          margin-left: 1rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .ProseMirror img[data-align="center"] {
+          display: block;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .ProseMirror img.ProseMirror-selectednode,
+        .ProseMirror img.image-selected {
+          outline: 3px solid hsl(var(--ring));
+          outline-offset: 3px;
+          box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+        }
+
+        /* Image styling in view mode */
+        .prose img {
+          max-width: 100% !important;
+          height: auto !important;
+          display: block !important;
+          margin: 0.75rem 0 !important;
+          object-fit: contain;
+          border-radius: 8px !important;
+          border: 1px solid var(--border);
+        }
+
+        .prose img[data-align="left"] {
+          float: left !important;
+          margin-right: 1rem !important;
+          margin-bottom: 0.75rem !important;
+          display: block !important;
+        }
+
+        .prose img[data-align="right"] {
+          float: right !important;
+          margin-left: 1rem !important;
+          margin-bottom: 0.75rem !important;
+          display: block !important;
+        }
+
+        .prose img[data-align="center"] {
+          display: block !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+          float: none !important;
+        }
+
+        /* Ensure images without data-align attribute are visible */
+        .prose img:not([data-align]) {
+          display: block !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
         }
 
         /* Focus styles */

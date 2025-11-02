@@ -156,6 +156,8 @@ function CharacterSheetContent() {
   const [featureNotesModalOpen, setFeatureNotesModalOpen] = useState(false)
   const [featureNotesDraft, setFeatureNotesDraft] = useState<string>("")
   const [featureImageDraft, setFeatureImageDraft] = useState<string>("")
+  const [uploadingFeatureImage, setUploadingFeatureImage] = useState(false)
+  const featureImageInputRef = useRef<HTMLInputElement>(null)
   const [featureOverflowMap, setFeatureOverflowMap] = useState<Record<number, boolean>>({})
   const [portraitModalOpen, setPortraitModalOpen] = useState(false)
   const [longRestModalOpen, setLongRestModalOpen] = useState(false)
@@ -432,6 +434,47 @@ function CharacterSheetContent() {
     autoSaveTimeoutRef.current = setTimeout(debouncedAutoSave, 1000)
   }, [debouncedAutoSave])
 
+  const handleFeatureImageUpload = async (file: File) => {
+    try {
+      setUploadingFeatureImage(true)
+
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('folder', 'feature-notes-images')
+
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: uploadFormData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        const errorMessage = result.details 
+          ? `${result.error}: ${result.details}` 
+          : result.error || 'Failed to upload image'
+        throw new Error(errorMessage)
+      }
+
+      setFeatureImageDraft(result.url)
+    } catch (error) {
+      console.error('Error uploading feature image:', error)
+      alert(error instanceof Error ? error.message : 'Failed to upload image')
+    } finally {
+      setUploadingFeatureImage(false)
+    }
+  }
+
+  const handleFeatureImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleFeatureImageUpload(file)
+    }
+    // Reset input so same file can be selected again
+    if (featureImageInputRef.current) {
+      featureImageInputRef.current.value = ''
+    }
+  }
 
   const updateCharacter = (updates: Partial<CharacterData>, options?: { autosave?: boolean }) => {
     setCharacters((prev) => prev.map((char) => {
@@ -3420,7 +3463,7 @@ function CharacterSheetContent() {
                       )}
                       {hasContent ? (
                         <div className="rounded-lg w-full border text-sm p-3 bg-card col-span-2 flex flex-col gap-3">
-                          <div className="text-md font-semibold text-black flex items-center gap-1"><Icon icon="lucide:notebook-pen" className="w-4 h-4" />Custom notes</div>
+                          <div className="text-md font-semibold flex items-center gap-1"><Icon icon="lucide:notebook-pen" className="w-4 h-4" />Custom notes</div>
                           <RichTextDisplay content={note!.content as string} className="text-sm font-mono" />
                         </div>
                       ) : (
@@ -3475,14 +3518,60 @@ function CharacterSheetContent() {
               />
               <div className="space-y-3">
                 <label className="text-xs text-muted-foreground">Image URL (optional)</label>
-                <input
-                  type="url"
-                  value={featureImageDraft}
-                  onChange={(e) => canEditActiveCharacter && setFeatureImageDraft(e.target.value)}
-                  disabled={!canEditActiveCharacter}
-                  className="w-full p-2 text-sm border rounded bg-card"
-                  placeholder="https://example.com/image.png"
-                />
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={featureImageDraft}
+                      onChange={(e) => canEditActiveCharacter && setFeatureImageDraft(e.target.value)}
+                      disabled={!canEditActiveCharacter}
+                      className="flex-1 p-2 text-sm border rounded bg-card"
+                      placeholder="https://... or upload an image"
+                    />
+                    <input
+                      ref={featureImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFeatureImageFileChange}
+                      className="hidden"
+                      id="featureImageFileInput"
+                      disabled={!canEditActiveCharacter}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => featureImageInputRef.current?.click()}
+                      disabled={uploadingFeatureImage || !canEditActiveCharacter}
+                      className="h-[38px] whitespace-nowrap"
+                    >
+                      {uploadingFeatureImage ? (
+                        <>
+                          <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin mr-2" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Icon icon="lucide:upload" className="w-4 h-4 mr-2" />
+                          Upload
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  {featureImageDraft && (
+                    <div className="relative w-full h-32 border rounded-md overflow-hidden bg-muted">
+                      <img
+                        src={featureImageDraft}
+                        alt="Feature image preview"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
           </div>
           {canEditActiveCharacter && (
