@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,8 +28,13 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   const primaryClass = getPrimaryClass(character.classes)
   const [formData, setFormData] = useState(() => {
     // Ensure aestheticImages array always has exactly 6 elements for the form
+    // Preserve order and empty slots - pad to 6 elements if shorter, preserve exact order if exists
     const existingImages = character.aestheticImages || []
-    const paddedImages = Array.from({ length: 6 }, (_, index) => existingImages[index] || "")
+    const paddedImages = Array.from({ length: 6 }, (_, index) => {
+      // If we have an existing array, use it (preserving empty strings)
+      // Otherwise, pad with empty strings
+      return existingImages[index] !== undefined ? existingImages[index] : ""
+    })
     
     return {
       name: character.name,
@@ -51,6 +56,10 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   const [isOwner, setIsOwner] = useState(false)
   const [users, setUsers] = useState<UserProfile[]>([])
   const { isSuperadmin } = useUser()
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadingAestheticIndex, setUploadingAestheticIndex] = useState<number | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const aestheticInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Get current user and check ownership
   useEffect(() => {
@@ -89,8 +98,13 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
       const primaryClass = getPrimaryClass(character.classes)
       
       // Ensure aestheticImages array always has exactly 6 elements for the form
+      // Preserve order and empty slots - pad to 6 elements if shorter, preserve exact order if exists
       const existingImages = character.aestheticImages || []
-      const paddedImages = Array.from({ length: 6 }, (_, index) => existingImages[index] || "")
+      const paddedImages = Array.from({ length: 6 }, (_, index) => {
+        // If we have an existing array, use it (preserving empty strings)
+        // Otherwise, pad with empty strings
+        return existingImages[index] !== undefined ? existingImages[index] : ""
+      })
       
       setFormData({
         name: character.name,
@@ -110,18 +124,84 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
   }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.alignment, character.partyStatus, character.imageUrl, character.visibility, character.isNPC, character.aestheticImages])
 
 
+  const handleImageUpload = async (file: File, isAesthetic: boolean = false, aestheticIndex?: number) => {
+    try {
+      if (isAesthetic && aestheticIndex !== undefined) {
+        setUploadingAestheticIndex(aestheticIndex)
+      } else {
+        setUploadingImage(true)
+      }
+
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('folder', isAesthetic ? 'aesthetic-images' : 'character-images')
+
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: uploadFormData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        const errorMessage = result.details 
+          ? `${result.error}: ${result.details}` 
+          : result.error || 'Failed to upload image'
+        throw new Error(errorMessage)
+      }
+
+      if (isAesthetic && aestheticIndex !== undefined) {
+        const newImages = [...formData.aestheticImages]
+        newImages[aestheticIndex] = result.url
+        setFormData({ ...formData, aestheticImages: newImages })
+      } else {
+        setFormData({ ...formData, imageUrl: result.url })
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert(error instanceof Error ? error.message : 'Failed to upload image')
+    } finally {
+      setUploadingImage(false)
+      setUploadingAestheticIndex(null)
+    }
+  }
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleImageUpload(file, false)
+    }
+    // Reset input so same file can be selected again
+    if (imageInputRef.current) {
+      imageInputRef.current.value = ''
+    }
+  }
+
+  const handleAestheticFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleImageUpload(file, true, index)
+    }
+    // Reset input so same file can be selected again
+    if (aestheticInputRefs.current[index]) {
+      aestheticInputRefs.current[index]!.value = ''
+    }
+  }
+
   const handleSave = () => {
     // Don't include level in updates since it should be calculated from classes
     const { level, ...formDataWithoutLevel } = formData
     
-    // Filter out empty aesthetic images for saving to database
-    const filteredAestheticImages = formData.aestheticImages.filter(url => url && url.trim() !== '')
+    // Preserve aesthetic images array with empty strings to maintain order
+    // This allows users to fill slots 1 and 3 without slot 2 being lost
+    // Empty strings will be filtered out when displaying, but order is preserved
+    const preservedAestheticImages = formData.aestheticImages.map(url => url?.trim() || '')
     
     // Only save basic info fields, not class-related fields
     const updates = { 
       ...formDataWithoutLevel, 
       visibility: formData.visibility,
-      aestheticImages: filteredAestheticImages
+      aestheticImages: preservedAestheticImages
     }
     
     onSave(updates)
@@ -135,7 +215,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[600px] max-h-[95vh] p-0 gap-0">
         <DialogHeader className="p-4">
           <DialogTitle>Edit Basic Information</DialogTitle>
         </DialogHeader>
@@ -146,18 +226,63 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               <TabsTrigger value="aesthetic">Aesthetic</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="character" className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
+          <TabsContent value="character" className="grid gap-4 p-4 max-h-[65vh] overflow-y-auto">
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="imageUrl" className="text-right">
-              Image URL
+              Profile Image
             </Label>
-            <Input
-              id="imageUrl"
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              className="w-full"
-              placeholder="https://..."
-            />
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <Input
+                  id="imageUrl"
+                  value={formData.imageUrl}
+                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                  className="flex-1"
+                  placeholder="https://... or upload an image"
+                />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  className="hidden"
+                  id="imageFileInput"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="h-[38px] whitespace-nowrap"
+                >
+                  {uploadingImage ? (
+                    <>
+                      <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin mr-2" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Icon icon="lucide:upload" className="w-4 h-4 mr-2" />
+                      Upload
+                    </>
+                  )}
+                </Button>
+              </div>
+              {formData.imageUrl && (
+                <div className="relative w-full h-32 border rounded-md overflow-hidden bg-muted">
+                  <img
+                    src={formData.imageUrl}
+                    alt="Profile preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="name" className="text-right">
@@ -366,27 +491,77 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
             </div>
           )}
           </TabsContent>
-          <TabsContent value="aesthetic" className="grid gap-4 p-4 max-h-[50vh] overflow-y-auto">
+          <TabsContent value="aesthetic" className="grid gap-4 p-4 max-h-[65vh] overflow-y-auto">
             <div className="space-y-4">
               <div className="text-sm text-muted-foreground mb-4">
                 Add up to 6 images to display on your character sheet. These will appear above your character header.
               </div>
               {formData.aestheticImages.map((url, index) => (
-                <div key={index} className="grid grid-cols-[80px_auto] items-center gap-3">
-                  <Label htmlFor={`aestheticImage${index}`} className="text-right text-sm">
-                    Image {index + 1}
-                  </Label>
-                  <Input
-                    id={`aestheticImage${index}`}
-                    value={url}
-                    onChange={(e) => {
-                      const newImages = [...formData.aestheticImages]
-                      newImages[index] = e.target.value
-                      setFormData({ ...formData, aestheticImages: newImages })
-                    }}
-                    className="w-full"
-                    placeholder="https://..."
-                  />
+                <div key={index} className="space-y-2">
+                  <div className="grid grid-cols-[80px_auto] items-center gap-3">
+                    <Label htmlFor={`aestheticImage${index}`} className="text-right text-sm">
+                      Image {index + 1}
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id={`aestheticImage${index}`}
+                        value={url}
+                        onChange={(e) => {
+                          const newImages = [...formData.aestheticImages]
+                          newImages[index] = e.target.value
+                          setFormData({ ...formData, aestheticImages: newImages })
+                        }}
+                        className="flex-1"
+                        placeholder="https://... or upload an image"
+                      />
+                      <input
+                        ref={(el) => {
+                          aestheticInputRefs.current[index] = el
+                        }}
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleAestheticFileChange(e, index)}
+                        className="hidden"
+                        id={`aestheticFileInput${index}`}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => aestheticInputRefs.current[index]?.click()}
+                        disabled={uploadingAestheticIndex === index}
+                        className="h-[38px] whitespace-nowrap"
+                      >
+                        {uploadingAestheticIndex === index ? (
+                          <>
+                            <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin mr-2" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Icon icon="lucide:upload" className="w-4 h-4 mr-2" />
+                            Upload
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  {url && (
+                    <div className="grid grid-cols-[80px_auto] gap-3">
+                      <div></div>
+                      <div className="relative w-full h-24 border rounded-md overflow-hidden bg-muted">
+                        <img
+                          src={url}
+                          alt={`Aesthetic preview ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -13,13 +13,18 @@ export function AestheticImages({ character }: AestheticImagesProps) {
     return null
   }
 
-  // Filter out empty strings and limit to 6 images
-  const validImages = character.aestheticImages
-    .filter(url => url && url.trim() !== '')
-    .slice(0, 6)
+  // Ensure we have exactly 6 slots, preserving order and empty slots
+  // Pad to 6 elements if shorter, but preserve exact order from database
+  const images = Array.from({ length: 6 }, (_, index) => {
+    return character.aestheticImages[index] !== undefined 
+      ? character.aestheticImages[index] 
+      : ""
+  })
 
-  // Don't render if no valid images after filtering
-  if (validImages.length === 0) {
+  // Check if we have any valid images at all
+  const hasValidImages = images.some(url => url && url.trim() !== '')
+  
+  if (!hasValidImages) {
     return null
   }
 
@@ -27,26 +32,27 @@ export function AestheticImages({ character }: AestheticImagesProps) {
     <Card className="p-0 rounded-none border-0 border-b overflow-hidden">
       <CardContent className="p-0">
         <div className="grid grid-cols-6 gap-0">
-          {validImages.map((imageUrl, index) => (
-            <div key={index} className="relative group h-[112px]">
-              <img
-                src={imageUrl}
-                alt={`Aesthetic image ${index + 1}`}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  // Hide the image if it fails to load
-                  const target = e.target as HTMLImageElement
-                  target.style.display = 'none'
-                }}
-              />
-            </div>
-          ))}
-          {/* Fill remaining slots with empty placeholders if less than 6 images */}
-          {Array.from({ length: 6 - validImages.length }).map((_, index) => (
-            <div key={`empty-${index}`} className="h-[112px] flex items-center justify-center">
-              <div className="text-muted-foreground/40 text-xs">Empty</div>
-            </div>
-          ))}
+          {images.map((imageUrl, index) => {
+            const hasImage = imageUrl && imageUrl.trim() !== ''
+            return (
+              <div key={index} className={`relative group h-[112px] ${!hasImage ? 'flex items-center justify-center' : ''}`}>
+                {hasImage ? (
+                  <img
+                    src={imageUrl}
+                    alt={`Aesthetic image ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Hide the image if it fails to load
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
+                  />
+                ) : (
+                  <div className="text-muted-foreground/40 text-xs">Empty</div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </CardContent>
     </Card>
