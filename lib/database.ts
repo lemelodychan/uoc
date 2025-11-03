@@ -2048,6 +2048,10 @@ export const upsertRace = async (race: Partial<RaceData> & { id?: string }): Pro
         return { success: false, error: updateError.message }
       }
 
+      try {
+        const { racesCache } = await import('./races-cache')
+        if (race.id && race.name) racesCache.upsert(race.id, race.name)
+      } catch {}
       return { success: true, id: race.id }
     } else {
       // Create new race
@@ -2065,6 +2069,10 @@ export const upsertRace = async (race: Partial<RaceData> & { id?: string }): Pro
         return { success: false, error: insertError.message }
       }
 
+      try {
+        const { racesCache } = await import('./races-cache')
+        if (id && race.name) racesCache.upsert(id, race.name)
+      } catch {}
       return { success: true, id }
     }
   } catch (error) {
@@ -2095,6 +2103,10 @@ export const deleteRace = async (raceId: string): Promise<{ success: boolean; er
       return { success: false, error: error.message }
     }
 
+    try {
+      const { racesCache } = await import('./races-cache')
+      racesCache.remove(raceId)
+    } catch {}
     return { success: true }
   } catch (error) {
     console.error("Error deleting race:", error)

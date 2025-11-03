@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel } from "@/lib/character-data"
-import { loadAllRaces } from "@/lib/database"
+import { racesCache } from "@/lib/races-cache"
 
 interface CharacterHeaderProps {
   character: CharacterData
@@ -38,32 +38,35 @@ export function CharacterHeader({
 }: CharacterHeaderProps) {
   const showLevelUpButton = canEdit && levelUpEnabled
   const levelUpCompleted = character.levelUpCompleted || false
-  const [races, setRaces] = useState<Array<{id: string, name: string}>>([])
+  const [racesById, setRacesById] = useState<Record<string, string> | null>(racesCache.get())
 
-  // Load races to get names for display
+  // Load races cache on mount and subscribe to updates
   useEffect(() => {
-    loadAllRaces().then(({ races: loadedRaces }) => {
-      if (loadedRaces) {
-        setRaces(loadedRaces)
-      }
-    })
+    let unsub: (() => void) | undefined
+    racesCache.ensureLoaded()
+    unsub = racesCache.subscribe((map) => setRacesById(map))
+    return () => { if (unsub) unsub() }
   }, [])
 
   // Format race display based on raceIds
   const formatRaceDisplay = (): string => {
     if (character.raceIds && character.raceIds.length > 0) {
-      const raceNames = character.raceIds.map(raceObj => {
-        const race = races.find(r => r.id === raceObj.id)
-        return race ? race.name : raceObj.id
-      })
+      // If races not loaded yet, avoid flashing IDs; show legacy race or placeholder
+      if (!racesById) {
+        return character.race || ""
+      }
+
+      const raceNames = character.raceIds
+        .map(raceObj => racesById[raceObj.id])
+        .filter((name): name is string => Boolean(name))
 
       if (raceNames.length === 1) {
         return raceNames[0]
       } else if (raceNames.length === 2) {
         const mainRace = character.raceIds.find(r => r.isMain)
         const otherRace = character.raceIds.find(r => !r.isMain)
-        const mainRaceName = races.find(r => r.id === mainRace?.id)?.name || mainRace?.id || raceNames[0]
-        const otherRaceName = races.find(r => r.id === otherRace?.id)?.name || otherRace?.id || raceNames[1]
+        const mainRaceName = (mainRace && racesById[mainRace.id]) || raceNames[0]
+        const otherRaceName = (otherRace && racesById[otherRace.id]) || raceNames[1]
         return `${mainRaceName}, ${otherRaceName}`
       }
     }

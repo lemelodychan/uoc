@@ -392,8 +392,8 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               className="w-full"
             />
           </div>
-          <div className="grid grid-cols-[112px_auto] items-center gap-3">
-            <Label htmlFor="race" className="text-right">
+          <div className="grid grid-cols-[112px_auto] items-start gap-3">
+            <Label htmlFor="race" className="text-right min-h-9">
               Race
             </Label>
             <div className="w-full space-y-2">

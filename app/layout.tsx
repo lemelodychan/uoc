@@ -5,6 +5,7 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"
 import { UserProvider } from "@/lib/user-context"
+import { RaceCacheBootstrap } from "@/components/race-cache-bootstrap"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -47,6 +48,7 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <ThemeProvider>
           <UserProvider>
+            <RaceCacheBootstrap />
             {children}
             <Toaster />
           </UserProvider>
