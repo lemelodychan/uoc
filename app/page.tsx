@@ -3272,7 +3272,7 @@ function CharacterSheetContent() {
             />
 
             <Spellcasting
-              key={`spellcasting-${activeCharacter.id}-${JSON.stringify(activeCharacter.classFeatureSkillsUsage)}`}
+              key={`spellcasting-${activeCharacter.id}`}
               character={activeCharacter}
               strengthMod={strengthMod}
               dexterityMod={dexterityMod}

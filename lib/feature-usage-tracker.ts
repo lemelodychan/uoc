@@ -679,7 +679,12 @@ export function toggleFeatureAvailability(
 ): FeatureUsageData {
   const usage = getFeatureUsage(character, featureId)
   if (!usage) {
-    return getFeatureUsageData(character)
+    // Initialize availability if missing and set to false on first toggle
+    return updateFeatureUsage(character, featureId, {
+      featureType: 'availability_toggle',
+      isAvailable: false,
+      lastUpdated: new Date().toISOString()
+    })
   }
   
   // Handle different feature types

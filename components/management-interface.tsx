@@ -116,17 +116,6 @@ export function ManagementInterface({
       if (result.classes) {
         // Transform the database result to match ClassData interface
         const transformedClasses: ClassData[] = result.classes.map(dbClass => {
-          // Debug: Log the transformation for toggles
-          console.log(`Transforming class ${dbClass.name}:`, {
-            show_spells_known: dbClass.show_spells_known,
-            show_sorcery_points: dbClass.show_sorcery_points,
-            show_martial_arts: dbClass.show_martial_arts,
-            show_ki_points: dbClass.show_ki_points,
-            show_unarmored_movement: dbClass.show_unarmored_movement,
-            show_rage: dbClass.show_rage,
-            show_rage_damage: dbClass.show_rage_damage,
-            is_custom: dbClass.is_custom
-          })
           
           return {
           id: dbClass.id,
@@ -449,17 +438,6 @@ export function ManagementInterface({
                   max_spell_slots: result.klass.max_spell_slots,
                 }
                 
-                console.log('Transformed class for editing:', {
-                  name: transformedClass.name,
-                  showSpellsKnown: transformedClass.showSpellsKnown,
-                  showSorceryPoints: transformedClass.showSorceryPoints,
-                  showMartialArts: transformedClass.showMartialArts,
-                  showKiPoints: transformedClass.showKiPoints,
-                  showUnarmoredMovement: transformedClass.showUnarmoredMovement,
-                  showRage: transformedClass.showRage,
-                  showRageDamage: transformedClass.showRageDamage,
-                  is_custom: transformedClass.is_custom
-                })
                 
                 setEditingClass(transformedClass)
                 setClassEditorView('editor')

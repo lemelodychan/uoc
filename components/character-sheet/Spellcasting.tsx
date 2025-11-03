@@ -675,8 +675,34 @@ export function Spellcasting({
       <div className="flex items-center justify-between p-2 border rounded gap-1 bg-background">
         <div className="flex gap-1 flex-col">
           <span className="text-sm font-medium">{skill.title}</span>
-          <span className="text-xs text-muted-foreground">
-            {customDescription || skill.subtitle || skill.customDescription}
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            {(() => {
+              const baseDesc = customDescription || skill.subtitle || (skill as any).customDescription || ''
+              // For Bardic Inspiration, append the current die size based on Bard level and die progression
+              if (skill.id === 'bardic-inspiration') {
+                const bardLevel = (() => {
+                  if (character.classes && character.classes.length > 0) {
+                    const bardClass = character.classes.find(cls => cls.name.toLowerCase() === 'bard')
+                    return bardClass ? bardClass.level : (character.class.toLowerCase() === 'bard' ? character.level : 0)
+                  }
+                  return character.class.toLowerCase() === 'bard' ? character.level : 0
+                })()
+                const dieProgression = Array.isArray((slotConfig || {}).dieType) ? (slotConfig as any).dieType as string[] : undefined
+                const die = dieProgression && bardLevel > 0 
+                  ? dieProgression[Math.min(bardLevel - 1, dieProgression.length - 1)] || '1d6'
+                  : '1d6'
+                return (
+                  <>
+                    <Badge variant="secondary" className="text-[12px] leading-none h-5 px-1.5 py-0 align-middle">
+                    {`1${die}`}
+                    </Badge>
+                    {baseDesc ? ' ' : ''}
+                    {baseDesc}
+                  </>
+                )
+              }
+              return baseDesc
+            })()}
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -768,7 +794,7 @@ export function Spellcasting({
   const renderAvailabilityToggleFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string) => {
     if (!skill.id) return null
     
-    const available = usage?.isAvailable ?? true
+    const available = (usage?.isAvailable ?? (usage?.customState?.available as boolean | undefined)) ?? true
 
     return (
       <div 

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
+import { getClassLevel } from "@/lib/character-data"
+import { getFeatureUsage } from "@/lib/feature-usage-tracker"
 import { getCombatColor } from "@/lib/color-mapping"
 
 interface CombatStatsProps {
@@ -187,6 +189,37 @@ export function CombatStats({ character, onEdit, onToggleHitDie, canEdit = true 
             </div>
           </div>
         )}
+
+        {/* Rogue Sneak Attack dice (slot-based display) */}
+        {(() => {
+          // Determine whether to show: either has Rogue levels or explicit usage exists
+          const usage = getFeatureUsage(character, 'sneak-attack')
+          const rogueLevel = getClassLevel(character.classes || [], 'Rogue') || (character.class?.toLowerCase() === 'rogue' ? character.level : 0)
+          const hasSneakAttack = (usage?.featureType === 'slots') || rogueLevel > 0
+          if (!hasSneakAttack) return null
+
+          // Dice scaling anchored to Rogue level for multiclassing
+          // Base 1d6 at 1st, +1d6 at 3,5,7,...,19 → floor((rogueLevel+1)/2)
+          const rulesDice = Math.floor((rogueLevel + 1) / 2)
+
+          // If unified usage exists for sneak-attack as slots, prefer it
+          const maxDice = usage?.featureType === 'slots' && typeof usage.maxUses === 'number' ? usage.maxUses : rulesDice
+          const currentDice = usage?.featureType === 'slots' && typeof usage.currentUses === 'number' ? usage.currentUses : maxDice
+          const show = maxDice > 0
+          if (!show) return null
+
+          return (
+            <div className="flex items-start gap-3 col-span-2 mb-0">
+              <Icon icon="lucide:crosshair" className={`w-5 h-10 py-2.5 ${getCombatColor('featureAvailable')}`} />
+              <div className="flex flex-col gap-1">
+                <div className="text-sm text-muted-foreground">Sneak Attack</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold font-mono">{maxDice}d6</span>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Combat Notes - Only show if notes exist */}
         {character.otherTools && character.otherTools.trim() !== "" && (
