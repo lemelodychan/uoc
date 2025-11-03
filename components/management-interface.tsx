@@ -4,13 +4,13 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Icon } from "@iconify/react"
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
 import type { UserProfile, PermissionLevel } from "@/lib/user-profiles"
 import { useUser } from "@/lib/user-context"
-import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin } from "@/lib/database"
+import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin, loadRacesWithDetails, upsertRace as dbUpsertRace, deleteRace as dbDeleteRace, loadRaceDetails } from "@/lib/database"
+import type { RaceData } from "@/lib/database"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
@@ -19,6 +19,7 @@ import { ClassDuplicationModal } from "./edit-modals/class-duplication-modal"
 import { ClassFeatureSkillModal } from "./edit-modals/class-feature-skill-modal"
 import { CampaignCreationModal } from "./edit-modals/campaign-creation-modal"
 import { ClassEditorPage } from "./class-editor-page"
+import { RaceEditorPage } from "./race-editor-page"
 import { SubclassManagementModal } from "@/components/edit-modals/subclass-management-modal"
 import { FeatureManagementModal } from "@/components/edit-modals/feature-management-modal"
 import { ProficiencyCheckboxes, SAVING_THROW_OPTIONS, SKILL_OPTIONS, EQUIPMENT_OPTIONS } from "@/components/ui/proficiency-checkboxes"
@@ -66,6 +67,12 @@ export function ManagementInterface({
   const { userProfile } = useUser()
   const canEdit = userProfile?.permissionLevel !== 'viewer'
   
+  // Race management state
+  const [races, setRaces] = useState<RaceData[]>([])
+  const [editingRace, setEditingRace] = useState<RaceData | null>(null)
+  const [raceEditorView, setRaceEditorView] = useState<'list' | 'editor'>('list')
+  const [lastEditedRaceId, setLastEditedRaceId] = useState<string | null>(null)
+  
   // Refs for scroll management
   const classListTopRef = useRef<HTMLDivElement>(null)
   const classCardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -74,6 +81,19 @@ export function ManagementInterface({
   useEffect(() => {
     loadClasses()
   }, [])
+
+  // Load races on mount
+  useEffect(() => {
+    loadRaces()
+  }, [])
+
+  // Reload races when switching to races tab (if in list view)
+  useEffect(() => {
+    if (activeTab === 'races' && raceEditorView === 'list') {
+      loadRaces()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   // Scroll to the last edited class when returning to list view
   useEffect(() => {
@@ -255,137 +275,194 @@ export function ManagementInterface({
     setShowFeatureManagementModal(true)
   }
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold">Management</h1>
-        <p className="text-muted-foreground">
-          Manage campaigns, classes, subclasses, and their features
-        </p>
-      </div>
+  const loadRaces = async () => {
+    try {
+      const result = await loadRacesWithDetails()
+      if (result.races) {
+        setRaces(result.races)
+      } else if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error loading races:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load races",
+        variant: "destructive"
+      })
+    }
+  }
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 p-2 gap-2 h-fit rounded-xl">
-          <TabsTrigger value="campaigns" className="flex items-center gap-2 p-2 rounded-lg">
+  return (
+    <div className="relative flex flex-row gap-6 h-full !overflow-auto">
+
+      {/* Sidebar Navigation */}
+      <div className="w-72 bg-card flex-shrink-0 border-r border-t fixed left-[0px] top-[64px] h-[calc(100vh-64px)]">
+        <nav className="flex flex-col gap-2 px-4 pt-4">
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('campaigns')}
+            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
+              activeTab === 'campaigns' ? 'text-primary' : ''
+            }`}
+          >
             <Icon icon="lucide:users" className="w-4 h-4" />
-            Campaign Management
-          </TabsTrigger>
-          <TabsTrigger value="classes" className="flex items-center gap-2 p-2 rounded-lg">
+            Campaigns
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('classes')}
+            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
+              activeTab === 'classes' ? 'text-primary' : ''
+            }`}
+          >
             <Icon icon="lucide:book-open" className="w-4 h-4" />
-            Class Management
+            Classes
             <Badge 
               variant="secondary" 
-              className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-2"
+              className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto"
             >
               Beta
             </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2 p-2 rounded-lg">
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('races')}
+            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
+              activeTab === 'races' ? 'text-primary' : ''
+            }`}
+          >
+            <Icon icon="lucide:users-round" className="w-4 h-4" />
+            Races
+            <Badge 
+              variant="secondary" 
+              className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto"
+            >
+              Beta
+            </Badge>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('users')}
+            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
+              activeTab === 'users' ? 'text-primary' : ''
+            }`}
+          >
             <Icon icon="lucide:id-card" className="w-4 h-4" />
-            User Management
-          </TabsTrigger>
-        </TabsList>
+            Users
+          </Button>
+        </nav>
+      </div>
 
-        <TabsContent value="campaigns" className="flex-1 min-h-0 flex flex-col gap-0">
-          <CampaignManagement 
-            campaigns={campaigns} 
-            characters={characters} 
-            users={users}
-            onCreateCampaign={() => setShowCampaignCreationModal(true)}
-            onEditCampaign={(campaign) => {
-              setEditingCampaign(campaign)
-              setShowCampaignCreationModal(true)
-            }}
-            onDeleteCampaign={onDeleteCampaign}
-          />
-        </TabsContent>
+      {/* Content Area */}
+      <div className="flex-1 w-full ml-72 h-fit !overflow-visible p-6">
+        {activeTab === 'campaigns' && (
+          <div className="flex flex-col gap-0">
+            <CampaignManagement 
+              campaigns={campaigns} 
+              characters={characters} 
+              users={users}
+              onCreateCampaign={() => setShowCampaignCreationModal(true)}
+              onEditCampaign={(campaign) => {
+                setEditingCampaign(campaign)
+                setShowCampaignCreationModal(true)
+              }}
+              onDeleteCampaign={onDeleteCampaign}
+            />
+          </div>
+        )}
 
-        <TabsContent value="classes" className="flex-1 min-h-0 flex flex-col gap-0">
-          {classEditorView === 'list' ? (
-            <ClassManagement 
-              classes={classes}
-              classListTopRef={classListTopRef}
-              classCardRefs={classCardRefs}
-              canEdit={canEdit}
-              onEditClass={async (classData) => {
-                // Scroll to top when entering edit mode
-                classListTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        {activeTab === 'classes' && (
+          <div className="flex flex-col gap-0">
+            {classEditorView === 'list' ? (
+              <ClassManagement 
+                classes={classes}
+                classListTopRef={classListTopRef}
+                classCardRefs={classCardRefs}
+                canEdit={canEdit}
+                onEditClass={async (classData) => {
+              // Scroll to top when entering edit mode
+              classListTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              
+              // Fetch fresh data from database
+              const result = await loadClassById(classData.id)
+              if (result.klass) {
+                // Transform the raw database data to ClassData format
+                const transformedClass: ClassData = {
+                  id: result.klass.id,
+                  name: result.klass.name,
+                  subclass: result.klass.subclass,
+                  description: result.klass.description || null,
+                  hit_die: result.klass.hit_die || 8,
+                  subclass_selection_level: result.klass.subclass_selection_level || 3,
+                  primary_ability: Array.isArray(result.klass.primary_ability) 
+                    ? result.klass.primary_ability 
+                    : result.klass.primary_ability 
+                      ? [result.klass.primary_ability] 
+                      : [],
+                  saving_throw_proficiencies: result.klass.saving_throw_proficiencies || [],
+                  skill_proficiencies: result.klass.skill_proficiencies,
+                  equipment_proficiencies: result.klass.equipment_proficiencies,
+                  starting_equipment: result.klass.starting_equipment,
+                  spell_slots_1: result.klass.spell_slots_1,
+                  spell_slots_2: result.klass.spell_slots_2,
+                  spell_slots_3: result.klass.spell_slots_3,
+                  spell_slots_4: result.klass.spell_slots_4,
+                  spell_slots_5: result.klass.spell_slots_5,
+                  spell_slots_6: result.klass.spell_slots_6,
+                  spell_slots_7: result.klass.spell_slots_7,
+                  spell_slots_8: result.klass.spell_slots_8,
+                  spell_slots_9: result.klass.spell_slots_9,
+                  cantrips_known: Array.isArray(result.klass.cantrips_known) ? result.klass.cantrips_known : null,
+                  spells_known: Array.isArray(result.klass.spells_known) ? result.klass.spells_known : null,
+                  // Column toggles for spell progression matrix
+                  showSpellsKnown: result.klass.show_spells_known ?? false,
+                  showSorceryPoints: result.klass.show_sorcery_points ?? false,
+                  showMartialArts: result.klass.show_martial_arts ?? false,
+                  showKiPoints: result.klass.show_ki_points ?? false,
+                  showUnarmoredMovement: result.klass.show_unarmored_movement ?? false,
+                  showRage: result.klass.show_rage ?? false,
+                  showRageDamage: result.klass.show_rage_damage ?? false,
+                  // Sorcerer-specific fields
+                  sorcery_points: Array.isArray(result.klass.sorcery_points) ? result.klass.sorcery_points : null,
+                  // Monk-specific fields
+                  martial_arts_dice: Array.isArray(result.klass.martial_arts_dice) ? result.klass.martial_arts_dice : null,
+                  ki_points: Array.isArray(result.klass.ki_points) ? result.klass.ki_points : null,
+                  unarmored_movement: Array.isArray(result.klass.unarmored_movement) ? result.klass.unarmored_movement : null,
+                  // Barbarian-specific fields
+                  rage_uses: Array.isArray(result.klass.rage_uses) ? result.klass.rage_uses : null,
+                  rage_damage: Array.isArray(result.klass.rage_damage) ? result.klass.rage_damage : null,
+                  // Custom class support fields
+                  is_custom: result.klass.is_custom ?? false,
+                  created_by: result.klass.created_by ?? null,
+                  duplicated_from: result.klass.duplicated_from ?? null,
+                  source: result.klass.source ?? 'custom',
+                  created_at: result.klass.created_at ?? new Date().toISOString(),
+                  updated_at: result.klass.updated_at ?? new Date().toISOString(),
+                  // Legacy fields
+                  spell_progression: result.klass.spell_progression,
+                  max_spell_slots: result.klass.max_spell_slots,
+                }
                 
-                // Fetch fresh data from database
-                const result = await loadClassById(classData.id)
-                if (result.klass) {
-                  // Transform the raw database data to ClassData format
-                  const transformedClass: ClassData = {
-                    id: result.klass.id,
-                    name: result.klass.name,
-                    subclass: result.klass.subclass,
-                    description: result.klass.description || null,
-                    hit_die: result.klass.hit_die || 8,
-                    subclass_selection_level: result.klass.subclass_selection_level || 3,
-                    primary_ability: Array.isArray(result.klass.primary_ability) 
-                      ? result.klass.primary_ability 
-                      : result.klass.primary_ability 
-                        ? [result.klass.primary_ability] 
-                        : [],
-                    saving_throw_proficiencies: result.klass.saving_throw_proficiencies || [],
-                    skill_proficiencies: result.klass.skill_proficiencies,
-                    equipment_proficiencies: result.klass.equipment_proficiencies,
-                    starting_equipment: result.klass.starting_equipment,
-                    spell_slots_1: result.klass.spell_slots_1,
-                    spell_slots_2: result.klass.spell_slots_2,
-                    spell_slots_3: result.klass.spell_slots_3,
-                    spell_slots_4: result.klass.spell_slots_4,
-                    spell_slots_5: result.klass.spell_slots_5,
-                    spell_slots_6: result.klass.spell_slots_6,
-                    spell_slots_7: result.klass.spell_slots_7,
-                    spell_slots_8: result.klass.spell_slots_8,
-                    spell_slots_9: result.klass.spell_slots_9,
-                    cantrips_known: Array.isArray(result.klass.cantrips_known) ? result.klass.cantrips_known : null,
-                    spells_known: Array.isArray(result.klass.spells_known) ? result.klass.spells_known : null,
-                    // Column toggles for spell progression matrix
-                    showSpellsKnown: result.klass.show_spells_known ?? false,
-                    showSorceryPoints: result.klass.show_sorcery_points ?? false,
-                    showMartialArts: result.klass.show_martial_arts ?? false,
-                    showKiPoints: result.klass.show_ki_points ?? false,
-                    showUnarmoredMovement: result.klass.show_unarmored_movement ?? false,
-                    showRage: result.klass.show_rage ?? false,
-                    showRageDamage: result.klass.show_rage_damage ?? false,
-                    // Sorcerer-specific fields
-                    sorcery_points: Array.isArray(result.klass.sorcery_points) ? result.klass.sorcery_points : null,
-                    // Monk-specific fields
-                    martial_arts_dice: Array.isArray(result.klass.martial_arts_dice) ? result.klass.martial_arts_dice : null,
-                    ki_points: Array.isArray(result.klass.ki_points) ? result.klass.ki_points : null,
-                    unarmored_movement: Array.isArray(result.klass.unarmored_movement) ? result.klass.unarmored_movement : null,
-                    // Barbarian-specific fields
-                    rage_uses: Array.isArray(result.klass.rage_uses) ? result.klass.rage_uses : null,
-                    rage_damage: Array.isArray(result.klass.rage_damage) ? result.klass.rage_damage : null,
-                    // Custom class support fields
-                    is_custom: result.klass.is_custom ?? false,
-                    created_by: result.klass.created_by ?? null,
-                    duplicated_from: result.klass.duplicated_from ?? null,
-                    source: result.klass.source ?? 'custom',
-                    created_at: result.klass.created_at ?? new Date().toISOString(),
-                    updated_at: result.klass.updated_at ?? new Date().toISOString(),
-                    // Legacy fields
-                    spell_progression: result.klass.spell_progression,
-                    max_spell_slots: result.klass.max_spell_slots,
-                  }
-                  
-                  console.log('Transformed class for editing:', {
-                    name: transformedClass.name,
-                    showSpellsKnown: transformedClass.showSpellsKnown,
-                    showSorceryPoints: transformedClass.showSorceryPoints,
-                    showMartialArts: transformedClass.showMartialArts,
-                    showKiPoints: transformedClass.showKiPoints,
-                    showUnarmoredMovement: transformedClass.showUnarmoredMovement,
-                    showRage: transformedClass.showRage,
-                    showRageDamage: transformedClass.showRageDamage,
-                    is_custom: transformedClass.is_custom
-                  })
-                  
-                  setEditingClass(transformedClass)
-                  setClassEditorView('editor')
-                } else {
+                console.log('Transformed class for editing:', {
+                  name: transformedClass.name,
+                  showSpellsKnown: transformedClass.showSpellsKnown,
+                  showSorceryPoints: transformedClass.showSorceryPoints,
+                  showMartialArts: transformedClass.showMartialArts,
+                  showKiPoints: transformedClass.showKiPoints,
+                  showUnarmoredMovement: transformedClass.showUnarmoredMovement,
+                  showRage: transformedClass.showRage,
+                  showRageDamage: transformedClass.showRageDamage,
+                  is_custom: transformedClass.is_custom
+                })
+                
+                setEditingClass(transformedClass)
+                setClassEditorView('editor')
+              } else {
                   toast({
                     title: "Error",
                     description: result.error || "Failed to load class data",
@@ -394,38 +471,38 @@ export function ManagementInterface({
                 }
               }}
               onCreateClass={() => {
-                // Scroll to top when creating a new class
-                classListTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                
-                setEditingClass({
-                  id: '', // Will be generated by database
-                  name: '',
-                  subclass: null,
-                  description: null,
-                  hit_die: 8,
-                  primary_ability: [],
-                  saving_throw_proficiencies: [],
-                  skill_proficiencies: null,
-                  equipment_proficiencies: null,
-                  starting_equipment: null,
-                  spell_slots_1: null,
-                  spell_slots_2: null,
-                  spell_slots_3: null,
-                  spell_slots_4: null,
-                  spell_slots_5: null,
-                  spell_slots_6: null,
-                  spell_slots_7: null,
-                  spell_slots_8: null,
-                  spell_slots_9: null,
-                  cantrips_known: null,
-                  spells_known: null,
-                  is_custom: true, // Mark as custom class
-                  created_by: null,
-                  duplicated_from: null,
-                  source: 'custom',
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                  subclass_selection_level: 3
+              // Scroll to top when creating a new class
+              classListTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              
+              setEditingClass({
+                id: '', // Will be generated by database
+                name: '',
+                subclass: null,
+                description: null,
+                hit_die: 8,
+                primary_ability: [],
+                saving_throw_proficiencies: [],
+                skill_proficiencies: null,
+                equipment_proficiencies: null,
+                starting_equipment: null,
+                spell_slots_1: null,
+                spell_slots_2: null,
+                spell_slots_3: null,
+                spell_slots_4: null,
+                spell_slots_5: null,
+                spell_slots_6: null,
+                spell_slots_7: null,
+                spell_slots_8: null,
+                spell_slots_9: null,
+                cantrips_known: null,
+                spells_known: null,
+                is_custom: true, // Mark as custom class
+                created_by: null,
+                duplicated_from: null,
+                source: 'custom',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                subclass_selection_level: 3
                 })
                 setClassEditorView('editor')
               }}
@@ -434,36 +511,36 @@ export function ManagementInterface({
               onManageSubclasses={handleManageSubclasses}
               onManageFeatures={handleManageFeatures}
             />
-          ) : (
-            editingClass && (
-              <ClassEditorPage
-                classData={editingClass}
-                canEdit={canEdit}
-                onSave={async (classData) => {
-                  try {
-                    const result = await dbUpsertClass(classData)
-                    
-                    // Check if the save was successful
-                    if (!result.success) {
-                      throw new Error(result.error || 'Failed to save class')
-                    }
-                    
-                    // Store the ID of the class we just saved
-                    const savedClassId = result.id || classData.id
-                    if (savedClassId) {
-                      setLastEditedClassId(savedClassId)
-                    }
-                    
-                    // Reload classes list to show updated data
-                    await loadClasses()
-                    setClassEditorView('list')
-                    setEditingClass(null)
-                    toast({
-                      title: "Success",
-                      description: `Class "${classData.name}" saved successfully`,
-                    })
-                  } catch (error) {
-                    console.error('Error saving class:', error)
+            ) : (
+              editingClass && (
+                <ClassEditorPage
+                  classData={editingClass}
+                  canEdit={canEdit}
+                  onSave={async (classData) => {
+                try {
+                  const result = await dbUpsertClass(classData)
+                  
+                  // Check if the save was successful
+                  if (!result.success) {
+                    throw new Error(result.error || 'Failed to save class')
+                  }
+                  
+                  // Store the ID of the class we just saved
+                  const savedClassId = result.id || classData.id
+                  if (savedClassId) {
+                    setLastEditedClassId(savedClassId)
+                  }
+                  
+                  // Reload classes list to show updated data
+                  await loadClasses()
+                  setClassEditorView('list')
+                  setEditingClass(null)
+                  toast({
+                    title: "Success",
+                    description: `Class "${classData.name}" saved successfully`,
+                  })
+                } catch (error) {
+                  console.error('Error saving class:', error)
                     throw error // Re-throw to let ClassEditorPage handle the error display
                   }
                 }}
@@ -474,39 +551,154 @@ export function ManagementInterface({
                   classListTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                 }}
                 onDelete={async (classId) => {
-                  try {
-                    const classToDelete = classes.find(c => c.id === classId)
-                    await deleteClass(classId)
-                    // Reload classes list to show updated data
-                    await loadClasses()
-                    setClassEditorView('list')
-                    setEditingClass(null)
-                    toast({
-                      title: "Success",
-                      description: `Class "${classToDelete?.name || 'Unknown'}" deleted successfully`,
-                    })
-                  } catch (error) {
-                    console.error('Error deleting class:', error)
-                    toast({
-                      title: "Error",
-                      description: "Failed to delete class",
-                      variant: "destructive"
+                try {
+                  const classToDelete = classes.find(c => c.id === classId)
+                  await deleteClass(classId)
+                  // Reload classes list to show updated data
+                  await loadClasses()
+                  setClassEditorView('list')
+                  setEditingClass(null)
+                  toast({
+                    title: "Success",
+                    description: `Class "${classToDelete?.name || 'Unknown'}" deleted successfully`,
+                  })
+                } catch (error) {
+                  console.error('Error deleting class:', error)
+                  toast({
+                    title: "Error",
+                    description: "Failed to delete class",
+                    variant: "destructive"
                     })
                   }
                 }}
                 onDuplicate={() => setShowClassDuplicationModal(true)}
               />
+              )
+            )}
+          </div>
+        )}
+
+        {activeTab === 'races' && (
+          <div className="flex-1 min-h-0 flex flex-col gap-0">
+            {raceEditorView === 'list' ? (
+              <RaceManagement 
+                races={races}
+                canEdit={canEdit}
+                onEditRace={async (raceData) => {
+              const result = await loadRaceDetails(raceData.id)
+              if (result.race) {
+                setEditingRace(result.race)
+                setRaceEditorView('editor')
+              } else {
+                  toast({
+                    title: "Error",
+                    description: result.error || "Failed to load race data",
+                    variant: "destructive"
+                  })
+                }
+              }}
+              onCreateRace={() => {
+              setEditingRace({
+                id: '',
+                name: '',
+                description: null,
+                ability_score_increases: null,
+                size: null,
+                speed: 30,
+                features: null,
+                languages: null,
+                spellcasting_ability: null,
+                is_custom: false,
+                created_by: null,
+                source: "Player's Handbook"
+                })
+                setRaceEditorView('editor')
+              }}
+              onDeleteRace={async (raceId) => {
+              try {
+                await dbDeleteRace(raceId)
+                await loadRaces()
+                toast({
+                  title: "Success",
+                  description: "Race deleted successfully"
+                })
+              } catch (error) {
+                toast({
+                  title: "Error",
+                  description: "Failed to delete race",
+                  variant: "destructive"
+                })
+              }
+            }}
+                onReloadRaces={loadRaces}
+              />
+            ) : (
+              editingRace && (
+                <RaceEditorPage
+                  raceData={editingRace}
+                  canEdit={canEdit}
+                  onSave={async (raceData) => {
+                try {
+                  const result = await dbUpsertRace(raceData)
+                  if (!result.success) {
+                    throw new Error(result.error || 'Failed to save race')
+                  }
+                  const savedRaceId = result.id || raceData.id
+                  if (savedRaceId) {
+                    setLastEditedRaceId(savedRaceId)
+                  }
+                  // Reload races to refresh the list
+                  await loadRaces()
+                  // Switch to list view after races are loaded
+                  setRaceEditorView('list')
+                  setEditingRace(null)
+                  toast({
+                    title: "Success",
+                    description: `Race "${raceData.name}" saved successfully`,
+                  })
+                } catch (error) {
+                    console.error('Error saving race:', error)
+                    throw error
+                  }
+                }}
+                onCancel={() => {
+                  setRaceEditorView('list')
+                  setEditingRace(null)
+                }}
+                onDelete={async (raceId) => {
+                try {
+                  await dbDeleteRace(raceId)
+                  await loadRaces()
+                  setRaceEditorView('list')
+                  setEditingRace(null)
+                  toast({
+                    title: "Success",
+                    description: "Race deleted successfully",
+                  })
+                } catch (error) {
+                  console.error('Error deleting race:', error)
+                  toast({
+                    title: "Error",
+                    description: "Failed to delete race",
+                      variant: "destructive"
+                    })
+                  }
+                }}
+              />
             )
           )}
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="users" className="flex-1 min-h-0 flex flex-col gap-0">
-          <UserManagement
-            users={localUsers}
-            onUsersChange={setLocalUsers}
-          />
-        </TabsContent>
-      </Tabs>
+        {activeTab === 'users' && (
+          <div className="flex-1 min-h-0 flex flex-col gap-0">
+            <UserManagement
+              users={localUsers}
+              onUsersChange={setLocalUsers}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Class Duplication Modal */}
       {showClassDuplicationModal && editingClass && (
@@ -628,12 +820,12 @@ function CampaignManagement({
   const canEdit = userProfile?.permissionLevel !== 'viewer'
   
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-row gap-4 items-start justify-between">
-        <h2 className="text-2xl font-bold">Campaigns</h2>
+        <h2 className="text-3xl font-display font-bold">Campaigns</h2>
         {canEdit && (
           <Button onClick={onCreateCampaign}>
-            <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
+            <Icon icon="lucide:plus" className="w-4 h-4" />
             Create Campaign
           </Button>
         )}
@@ -754,12 +946,13 @@ function ClassManagement({
   onManageFeatures: (classData: ClassData) => void
 }) {
   return (
-    <div className="flex flex-col gap-0">
+    <div className="flex flex-col gap-0 !overflow-visible">
       {/* Invisible div at the top for scrolling reference */}
       <div ref={classListTopRef} className="h-0" />
-      <div className="flex flex-col gap-4">
+
+      <div className="flex flex-col gap-6 !overflow-visible">
         <div className="flex flex-row gap-4 items-start justify-between">
-          <h2 className="text-2xl font-bold">Classes</h2>
+          <h2 className="text-3xl font-display font-bold">Class Management</h2>
           {canEdit && (
             <Button onClick={onCreateClass}>
               <Icon icon="lucide:plus" className="w-4 h-4" />
@@ -972,6 +1165,229 @@ function ClassManagement({
 }
 
 
+// Race Management Component
+function RaceManagement({ 
+  races,
+  canEdit = true,
+  onEditRace,
+  onCreateRace,
+  onDeleteRace,
+  onReloadRaces
+}: {
+  races: RaceData[]
+  canEdit?: boolean
+  onEditRace: (raceData: RaceData) => void
+  onCreateRace: () => void
+  onDeleteRace: (raceId: string) => void
+  onReloadRaces: () => Promise<void>
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-row gap-4 items-start justify-between">
+        <h2 className="text-3xl font-display font-bold">Race Management</h2>
+        {canEdit && (
+          <Button onClick={onCreateRace}>
+            <Icon icon="lucide:plus" className="w-4 h-4" />
+            Create Race
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {races.map((race) => (
+          <Card key={race.id}>
+            <div className="flex flex-row gap-0 h-full">
+              {/* Race Image */}
+              {race.image_url && (
+                <div className="flex pl-4">
+                  <img
+                    src={race.image_url}
+                    alt={race.name}
+                    className="w-30 !h-full !max-h-full overflow-hidden object-cover border rounded-lg"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
+                  />
+                </div>
+              )}
+              
+              {/* Card Content */}
+              <div className="flex-1 flex flex-col gap-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-semibold">{race.name}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {canEdit && (
+                        <Button size="sm" variant="outline" onClick={() => onEditRace(race)} className="h-8">
+                          <Icon icon="lucide:edit" className="w-4 h-4" />
+                          Edit
+                        </Button>
+                      )}
+                      {canEdit && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"
+                          onClick={async () => {
+                            if (confirm(`Are you sure you want to delete "${race.name}"? This action cannot be undone.`)) {
+                              await onDeleteRace(race.id)
+                              await onReloadRaces()
+                            }
+                          }}
+                        >
+                          <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {/* Description */}
+                  {race.description && (
+                    <p className="text-muted-foreground mb-4 line-clamp-2 text-sm">
+                      {race.description.replace(/<[^>]*>/g, '').substring(0, 400)}
+                      {race.description.length > 400 ? '...' : ''}
+                    </p>
+                  )}
+                  
+                  <div className="flex flex-col gap-2">
+                    {/* Race Stats */}
+                    <div className="flex flex-wrap items-center gap-4 text-xs">
+                      {/* Size */}
+                      {race.size && (
+                        <div className="flex items-center gap-1">
+                          <Icon icon="healthicons:body-outline-24px" className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Size:</span>
+                          <Badge variant="outline" className="text-xs">
+                            {(() => {
+                              let sizeValue = race.size
+                              
+                              // Try to parse if it's a JSON string
+                              if (typeof sizeValue === 'string') {
+                                try {
+                                  const parsed = JSON.parse(sizeValue)
+                                  sizeValue = parsed
+                                } catch {
+                                  // Not JSON, keep as string
+                                }
+                              }
+                              
+                              // Handle different size formats
+                              if (Array.isArray(sizeValue)) {
+                                return sizeValue.join(', ')
+                              }
+                              if (typeof sizeValue === 'object' && sizeValue !== null) {
+                                // Handle choice object with options
+                                const sizeObj = sizeValue as any
+                                if (sizeObj.options && Array.isArray(sizeObj.options)) {
+                                  return sizeObj.options.join(', ')
+                                }
+                                // Fallback to stringified object if it's an unexpected object
+                                return JSON.stringify(sizeValue)
+                              }
+                              // Handle string case
+                              return String(sizeValue)
+                            })()}
+                          </Badge>
+                        </div>
+                      )}
+                      
+                      {/* Speed */}
+                      {race.speed && (
+                        <div className="flex items-center gap-1">
+                          <Icon icon="healthicons:walking-outline-24px" className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Speed:</span>
+                          <Badge variant="outline" className="text-xs">
+                            {race.speed} ft.
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Spellcasting Ability */}
+                      {race.spellcasting_ability && (
+                        <div className="flex items-center gap-1">
+                          <Icon icon="lucide:sparkles" className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Spellcasting:</span>
+                          <Badge variant="outline" className="text-xs">
+                            {(() => {
+                              if (typeof race.spellcasting_ability === 'string') {
+                                return race.spellcasting_ability.charAt(0).toUpperCase() + race.spellcasting_ability.slice(1)
+                              }
+                              if (typeof race.spellcasting_ability === 'object' && race.spellcasting_ability !== null) {
+                                const spellObj = race.spellcasting_ability as any
+                                // Handle choice object with options array
+                                if (spellObj.type === 'choice' && 'options' in spellObj && Array.isArray(spellObj.options)) {
+                                  return spellObj.options.map((opt: any) => 
+                                    typeof opt === 'string' 
+                                      ? opt
+                                      : String(opt)
+                                  ).join(', ')
+                                }
+                                // If it has a single ability property, use that
+                                if ('ability' in spellObj && typeof spellObj.ability === 'string') {
+                                  return spellObj.ability.charAt(0).toUpperCase() + spellObj.ability.slice(1)
+                                }
+                                // Fallback to stringified object if it's an unexpected object
+                                return JSON.stringify(race.spellcasting_ability)
+                              }
+                              return String(race.spellcasting_ability)
+                            })()}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Features Count */}
+                      {race.features && Array.isArray(race.features) && (
+                        <div className="flex items-center gap-1">
+                          <Icon icon="lucide:star" className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Features:</span>
+                          <Badge variant="outline" className="text-xs">
+                            {race.features.length}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between mt-1 border-t pt-3">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Icon icon="lucide:book" className="w-3 h-3" />
+                        <span className="text-muted-foreground">Source:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {race.source && race.source !== 'custom' ? race.source : 'Custom'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Icon icon="lucide:calendar" className="w-3 h-3" />
+                        <span>Updated {(() => {
+                          try {
+                            // Races table may not have updated_at, so handle gracefully
+                            return 'Recently'
+                          } catch (error) {
+                            return 'Unknown'
+                          }
+                        })()}</span>
+                      </div>
+                    </div>
+                  </div>
+                    
+                </CardContent>
+              </div>
+            </div>
+          </Card>
+        ))}
+        {races.length === 0 && (
+          <div className="text-center text-muted-foreground py-8">
+            No races found. Create your first race to get started.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // User Management Component
 function UserManagement({
   users,
@@ -1075,9 +1491,9 @@ function UserManagement({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-row gap-4 items-start justify-between">
-        <h2 className="text-2xl font-bold">Users</h2>
+        <h2 className="text-3xl font-display font-bold">User Management</h2>
       </div>
 
       <div className="overflow-x-aut flex flex-col gap-1">
@@ -1089,7 +1505,7 @@ function UserManagement({
           <div className="col-span-1">Last Login</div>
           <div className="col-span-2"></div>
         </div>
-        <div className="flex flex-col gap-0 border rounded-lg">
+        <div className="flex flex-col gap-0 border rounded-lg bg-card">
           {users.map((u) => {
             const draft = drafts[u.userId]
             const isSaving = savingIds.has(u.userId)

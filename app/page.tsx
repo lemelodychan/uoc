@@ -2369,6 +2369,8 @@ function CharacterSheetContent() {
     armorClass?: number
     initiative?: number
     features?: Array<{name: string, description: string, usesPerLongRest?: number | string, currentUses?: number, refuelingDie?: string}>
+    feats?: Array<{name: string, description: string}>
+    languages?: string
   }) => {
     const newId = (characters.length + 1).toString()
     
@@ -2544,10 +2546,10 @@ function CharacterSheetContent() {
         className: characterData.class
       })),
       toolsProficiencies: [] as any,
-      feats: [],
+      feats: characterData.feats || [],
       equipment: "",
       magicItems: [],
-      languages: "",
+      languages: characterData.languages || "",
       otherTools: "",
       money: {
         gold: 0,
@@ -3104,7 +3106,7 @@ function CharacterSheetContent() {
           />
         )}
 
-        <main ref={mainRef} className={`flex-1 p-6 relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
+        <main ref={mainRef} className={`flex-1 ${appView !== 'management' ? 'p-6' : ''} relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
           {appView === 'management' ? (
             <ManagementInterface
               campaigns={campaigns}

@@ -14,7 +14,7 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { FeatEditModal } from "./feat-edit-modal"
 import type { CharacterData, CharacterClass } from "@/lib/character-data"
 import { calculateModifier, calculateProficiencyBonus, calculateSkillBonus, getHitDiceByClass, calculateTotalLevel, isSingleClass } from "@/lib/character-data"
-import { loadClassFeatures, loadClassesWithDetails } from "@/lib/database"
+import { loadClassFeatures, loadClassesWithDetails, loadRaceDetails, type RaceData } from "@/lib/database"
 import type { ClassData } from "@/lib/class-utils"
 
 interface LevelUpModalProps {
@@ -88,6 +88,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   const [availableClasses, setAvailableClasses] = useState<ClassData[]>([])
   const [newClassSelection, setNewClassSelection] = useState<NewClassSelection | null>(null)
   const [isLoadingClasses, setIsLoadingClasses] = useState(false)
+  const [mainRaceData, setMainRaceData] = useState<RaceData | null>(null)
 
   // Function to reset all state to initial values
   // Always uses character's current active level + 1 as the starting point
@@ -117,6 +118,31 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     setNewClassSelection(null)
     setIsLoadingClasses(false)
   }
+
+  // Load main race data when modal opens
+  useEffect(() => {
+    if (isOpen && character.raceIds && character.raceIds.length > 0) {
+      const mainRaceId = character.raceIds.find(r => r.isMain)?.id || character.raceIds[0]?.id
+      if (mainRaceId) {
+        loadRaceDetails(mainRaceId).then(({ race }) => {
+          if (race) {
+            setMainRaceData(race)
+          }
+        })
+      } else {
+        setMainRaceData(null)
+      }
+    } else if (isOpen && character.race) {
+      // Fallback to legacy race field
+      loadRaceDetails(character.race).then(({ race }) => {
+        if (race) {
+          setMainRaceData(race)
+        }
+      })
+    } else {
+      setMainRaceData(null)
+    }
+  }, [isOpen, character.id, character.raceIds, character.race])
 
   // Reset state when modal opens or closes
   useEffect(() => {
@@ -569,9 +595,30 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
       ) || []
     }
 
-    // Update max HP
-    const newMaxHP = editableCharacter.maxHitPoints + hpRollResult.total
-    const newCurrentHP = editableCharacter.currentHitPoints + hpRollResult.total
+    // Calculate level-based HP bonus from race features (e.g., Dwarven Toughness)
+    // When leveling up, add 1 HP per level for each hp_bonus_per_level feature
+    const levelBasedHpBonus = mainRaceData && mainRaceData.features && Array.isArray(mainRaceData.features)
+      ? mainRaceData.features.reduce((bonus: number, feature: any) => {
+          if (feature.hp_bonus_per_level) {
+            return bonus + 1 // Add 1 HP per level up
+          }
+          return bonus
+        }, 0)
+      : 0
+    
+    // Also check character's existing race features (in case they were stored in features array)
+    const existingRaceFeatureBonus = editableCharacter.features?.reduce((bonus: number, feature: any) => {
+      if (feature.hpBonusPerLevel || feature.hp_bonus_per_level) {
+        return bonus + 1 // Add 1 HP per level up
+      }
+      return bonus
+    }, 0) || 0
+    
+    const totalLevelBasedBonus = levelBasedHpBonus + existingRaceFeatureBonus
+    
+    // Update max HP: add the roll result plus the level-based bonus
+    const newMaxHP = editableCharacter.maxHitPoints + hpRollResult.total + totalLevelBasedBonus
+    const newCurrentHP = editableCharacter.currentHitPoints + hpRollResult.total + totalLevelBasedBonus
 
     // Add new features
     const updatedClassFeatures = [
@@ -1205,10 +1252,44 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                   {hpRollResult && (
                     <div className="bg-muted/50 rounded-lg p-4 text-center">
                       <div className="text-2xl font-bold text-primary mb-2">
-                        +{hpRollResult.total} HP
+                        +{(() => {
+                          const levelBasedHpBonus = (mainRaceData && mainRaceData.features && Array.isArray(mainRaceData.features)
+                            ? mainRaceData.features.reduce((bonus: number, feature: any) => {
+                                if (feature.hp_bonus_per_level) {
+                                  return bonus + 1
+                                }
+                                return bonus
+                              }, 0)
+                            : 0) + (editableCharacter.features?.reduce((bonus: number, feature: any) => {
+                              if (feature.hpBonusPerLevel || feature.hp_bonus_per_level) {
+                                return bonus + 1
+                              }
+                              return bonus
+                            }, 0) || 0)
+                          return hpRollResult.total + levelBasedHpBonus
+                        })()} HP
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {hpRollResult.roll} {formatModifier(hpRollResult.constitutionModifier)} (CON modifier)
+                        {(() => {
+                          const levelBasedHpBonus = (mainRaceData && mainRaceData.features && Array.isArray(mainRaceData.features)
+                            ? mainRaceData.features.reduce((bonus: number, feature: any) => {
+                                if (feature.hp_bonus_per_level) {
+                                  return bonus + 1
+                                }
+                                return bonus
+                              }, 0)
+                            : 0) + (editableCharacter.features?.reduce((bonus: number, feature: any) => {
+                              if (feature.hpBonusPerLevel || feature.hp_bonus_per_level) {
+                                return bonus + 1
+                              }
+                              return bonus
+                            }, 0) || 0)
+                          if (levelBasedHpBonus > 0) {
+                            return <span className="text-primary ml-2">+{levelBasedHpBonus} (race bonus)</span>
+                          }
+                          return null
+                        })()}
                       </div>
                     </div>
                   )}

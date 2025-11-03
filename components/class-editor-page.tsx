@@ -111,7 +111,7 @@ export function ClassEditorPage({
           onClick={onCancel}
           className="hover:text-primary transition-colors hover:cursor-pointer"
         >
-          Management
+          Class Management
         </button>
         <Icon icon="lucide:chevron-right" className="w-4 h-4" />
         <span className="text-muted-foreground">
@@ -122,7 +122,7 @@ export function ClassEditorPage({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-3xl font-display font-bold">
             {editingClass.id ? `Edit ${editingClass.name}` : 'Create New Class'}
           </h1>
           <p className="text-muted-foreground">

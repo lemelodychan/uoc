@@ -1951,7 +1951,11 @@ export interface RaceData {
   name: string
   description?: string | null
   ability_score_increases?: any
-  size?: string | null
+  size?:
+    | string
+    | string[]
+    | { type: 'choice'; options: string[]; description?: string }
+    | null
   speed?: number | null
   features?: any[] | null
   languages?: any
@@ -1959,6 +1963,7 @@ export interface RaceData {
   is_custom?: boolean
   created_by?: string | null
   source?: string
+  image_url?: string | null
 }
 
 export const loadRaceDetails = async (raceId: string): Promise<{ race?: RaceData; error?: string }> => {
@@ -1978,6 +1983,122 @@ export const loadRaceDetails = async (raceId: string): Promise<{ race?: RaceData
   } catch (error) {
     console.error("Error loading race details:", error)
     return { error: "Failed to load race details" }
+  }
+}
+
+// Admin: Race Management Functions
+export const loadRacesWithDetails = async (): Promise<{
+  races?: RaceData[]
+  error?: string
+}> => {
+  try {
+    const { data, error } = await supabase
+      .from("races")
+      .select("*")
+      .order("name", { ascending: true })
+
+    if (error) {
+      console.error("Error loading races with details:", error)
+      return { error: error.message }
+    }
+
+    return { races: data || [] }
+  } catch (error) {
+    console.error("Error loading races with details:", error)
+    return { error: "Failed to load races with details" }
+  }
+}
+
+export const upsertRace = async (race: Partial<RaceData> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const isSuperadminUser = await isSuperadmin(user.id)
+    if (!isSuperadminUser) {
+      return { success: false, error: "Only superadmins can edit races" }
+    }
+
+    const payload: any = {
+      name: race.name,
+      description: race.description || null,
+      ability_score_increases: race.ability_score_increases || null,
+      size: race.size || null,
+      speed: race.speed || null,
+      features: race.features || null,
+      languages: race.languages || null,
+      spellcasting_ability: race.spellcasting_ability || null,
+      is_custom: race.is_custom ?? false,
+      source: race.source || 'custom',
+      image_url: race.image_url || null,
+      updated_at: new Date().toISOString()
+    }
+
+    if (race.id) {
+      // Update existing race
+      const { error: updateError } = await supabase
+        .from("races")
+        .update(payload)
+        .eq("id", race.id)
+
+      if (updateError) {
+        console.error("Error updating race:", updateError)
+        return { success: false, error: updateError.message }
+      }
+
+      return { success: true, id: race.id }
+    } else {
+      // Create new race
+      const id = globalThis.crypto.randomUUID()
+      payload.id = id
+      payload.created_by = user.id
+      payload.created_at = new Date().toISOString()
+
+      const { error: insertError } = await supabase
+        .from("races")
+        .insert([payload])
+
+      if (insertError) {
+        console.error("Error creating race:", insertError)
+        return { success: false, error: insertError.message }
+      }
+
+      return { success: true, id }
+    }
+  } catch (error) {
+    console.error("Error upserting race:", error)
+    return { success: false, error: "Failed to upsert race" }
+  }
+}
+
+export const deleteRace = async (raceId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const isSuperadminUser = await isSuperadmin(user.id)
+    if (!isSuperadminUser) {
+      return { success: false, error: "Only superadmins can delete races" }
+    }
+
+    const { error } = await supabase
+      .from("races")
+      .delete()
+      .eq("id", raceId)
+
+    if (error) {
+      console.error("Error deleting race:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting race:", error)
+    return { success: false, error: "Failed to delete race" }
   }
 }
 

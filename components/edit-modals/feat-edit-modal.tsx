@@ -23,8 +23,9 @@ export function FeatEditModal({ isOpen, onClose, character, featIndex, onSave }:
 
   // Initialize form when modal opens
   useEffect(() => {
-    if (isOpen && featIndex !== null && character.feats[featIndex]) {
-      const feat = character.feats[featIndex]
+    const feats = character.feats || []
+    if (isOpen && featIndex !== null && feats[featIndex]) {
+      const feat = feats[featIndex]
       setName(feat.name)
       setDescription(feat.description)
     } else if (isOpen && featIndex === null) {
@@ -35,16 +36,17 @@ export function FeatEditModal({ isOpen, onClose, character, featIndex, onSave }:
   }, [isOpen, featIndex, character.feats])
 
   const handleSave = () => {
+    const feats = character.feats || []
     if (featIndex === null) {
       // Add new feat
       const newFeat = {
         name,
         description
       }
-      onSave({ feats: [...character.feats, newFeat] })
+      onSave({ feats: [...feats, newFeat] })
     } else {
       // Update existing feat
-      const updatedFeats = character.feats.map((feat, index) => 
+      const updatedFeats = feats.map((feat, index) => 
         index === featIndex 
           ? { ...feat, name, description }
           : feat
@@ -56,14 +58,16 @@ export function FeatEditModal({ isOpen, onClose, character, featIndex, onSave }:
 
   const handleDelete = () => {
     if (featIndex !== null) {
-      const updatedFeats = character.feats.filter((_, index) => index !== featIndex)
+      const feats = character.feats || []
+      const updatedFeats = feats.filter((_, index) => index !== featIndex)
       onSave({ feats: updatedFeats })
       onClose()
     }
   }
 
   const isEditing = featIndex !== null
-  const feat = isEditing ? character.feats[featIndex] : null
+  const feats = character.feats || []
+  const feat = isEditing ? feats[featIndex] : null
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
