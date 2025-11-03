@@ -317,4 +317,47 @@
                 color var(--duration-base) var(--ease-in-out),
                 box-shadow var(--duration-base) var(--ease-in-out);
   }
+
+  /* Prose (TipTap view) table styles - global so modals render correctly */
+  .prose table {
+    width: calc(100% - 1.5rem) !important;
+    max-width: calc(100% - 1.5rem) !important;
+    table-layout: fixed;
+    margin: 0.75rem 0;
+    background-color: var(--card);
+    overflow: hidden;
+  }
+  .prose th,
+  .prose td {
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    vertical-align: top;
+    word-wrap: break-word;
+    font-size: 0.9em;
+    background-color: hsl(var(--card)) !important;
+  }
+  .prose th { font-weight: 600; }
+  /* Ensure images and alignment within prose render consistently */
+  .prose img { max-width: 100% !important; height: auto !important; display: block !important; margin: 0.75rem 0 !important; border-radius: 8px !important; border: 1px solid var(--border); }
+  .prose img[data-align="left"] { float: left !important; margin-right: 1rem !important; margin-bottom: 0.75rem !important; }
+  .prose img[data-align="right"] { float: right !important; margin-left: 1rem !important; margin-bottom: 0.75rem !important; }
+  .prose img[data-align="center"] { display: block !important; margin-left: auto !important; margin-right: auto !important; float: none !important; }
+  /* Force full width but allow column widths */
+  .prose table[style*="width"],
+  .prose .tiptap-table[style*="width"] { width: calc(100% - 1.5rem) !important; }
+}
+
+.prose p:not(:first-child) {
+  margin: 0.75rem 0;
+}
+
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  padding-left: 1rem;
 }

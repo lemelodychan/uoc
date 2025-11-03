@@ -91,6 +91,60 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
     refresh: refreshFeatures 
   } = useClassFeatures(character)
 
+  // Map of class name -> selected subclass class_id (to filter subclass features)
+  const [subclassIdByClass, setSubclassIdByClass] = useState<Record<string, string | null>>({})
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadSubclassIds = async () => {
+      const nextMap: Record<string, string | null> = {}
+
+      // Handle multiclass first
+      if (character.classes && character.classes.length > 0) {
+        for (const charClass of character.classes) {
+          const className = charClass.name
+          const subclassName = charClass.subclass
+          if (!subclassName) {
+            nextMap[className] = null
+            continue
+          }
+          try {
+            const { loadClassData } = await import("@/lib/database")
+            const { classData } = await loadClassData(className, subclassName)
+            nextMap[className] = classData?.id || null
+          } catch {
+            nextMap[className] = null
+          }
+        }
+      } else {
+        // Legacy single-class path
+        const className = character.class
+        const subclassName = (character as any).subclass
+        if (subclassName) {
+          try {
+            const { loadClassData } = await import("@/lib/database")
+            const { classData } = await loadClassData(className, subclassName)
+            nextMap[className] = classData?.id || null
+          } catch {
+            nextMap[className] = null
+          }
+        } else {
+          nextMap[className] = null
+        }
+      }
+
+      if (!isCancelled) {
+        setSubclassIdByClass(nextMap)
+      }
+    }
+
+    loadSubclassIds()
+    return () => {
+      isCancelled = true
+    }
+  }, [character.classes, character.class, (character as any).subclass])
+
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader>
@@ -129,11 +183,31 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
           ) : allFeatures?.length > 0 ? (() => {
             // Filter out hidden features before displaying
             const visibleFeatures = allFeatures.filter(feature => !feature.is_hidden)
-            
+
+            // Further filter subclass features to only the selected subclass (if any)
+            const filteredFeatures = visibleFeatures.filter((feature: any) => {
+              const className = feature.className || character.class
+              const isSubclassFeature = (feature.source?.toLowerCase() === 'subclass') || feature.enabledBySubclass || feature.feature_type === 'subclass'
+
+              if (!isSubclassFeature) return true
+
+              // Require a selected subclass for this class to show subclass features
+              const selectedSubclass = getClassSubclass(character.classes || [], className)
+              if (!selectedSubclass) return false
+
+              // If feature has a specific subclass_id, ensure it matches the selected subclass's class_id
+              const selectedSubclassId = subclassIdByClass[className]
+              if (feature.subclass_id && selectedSubclassId) {
+                return feature.subclass_id === selectedSubclassId
+              }
+              // If no subclass_id on feature, allow it (legacy data)
+              return true
+            })
+
             // Group features by class
             const featuresByClass = new Map<string, any[]>()
-            
-            visibleFeatures.forEach(feature => {
+
+            filteredFeatures.forEach(feature => {
               // Use the className from the feature, or fallback to the character's primary class
               const className = feature.className || character.class
               

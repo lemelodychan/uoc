@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { WysiwygEditor } from "@/components/ui/wysiwyg-editor"
 import { JsonCodeEditor } from "@/components/ui/json-code-editor"
 import { Icon } from "@iconify/react"
 import { CampaignCreationModal } from "./campaign-creation-modal"
@@ -1217,7 +1217,7 @@ function ClassManagement() {
             </div>
             <div className="grid gap-1">
               <Label htmlFor="feature-description">Description</Label>
-              <RichTextEditor maxHeight={240} value={editingFeature?.description ?? ""} onChange={(val) => setEditingFeature(prev => prev ? { ...prev, description: val } : prev)} />
+              <WysiwygEditor value={editingFeature?.description ?? ""} onChange={(val) => setEditingFeature(prev => prev ? { ...prev, description: val } : prev)} />
             </div>
           </div>
           <div className="flex justify-end gap-2">

@@ -8,6 +8,7 @@ import type { CharacterData } from "@/lib/character-data"
 import type { ClassFeatureSkill, FeatureSkillUsage } from "@/lib/class-feature-types"
 import { calculateUsesFromFormula } from "@/lib/class-feature-templates"
 import { getCombatColor } from "@/lib/color-mapping"
+import { getClassSubclass } from "@/lib/character-data"
 
 interface ClassFeatureSkillsProps {
   character: CharacterData
@@ -26,7 +27,19 @@ export function ClassFeatureSkills({
   onOpenFeatureModal,
   canEdit = true
 }: ClassFeatureSkillsProps) {
-  if (!featureSkills || featureSkills.length === 0) {
+  // Filter subclass-only skills to the character's selected subclass for that class
+  const filteredSkills = (featureSkills || []).filter((skill) => {
+    // If not gated by subclass, always include
+    if (!skill.enabledBySubclass) return true
+
+    const className = skill.className || character.class
+    const selectedSubclass = getClassSubclass(character.classes || [], className) || (character as any).subclass
+    if (!selectedSubclass) return false
+
+    return selectedSubclass.toLowerCase() === String(skill.enabledBySubclass).toLowerCase()
+  })
+
+  if (!filteredSkills || filteredSkills.length === 0) {
     return null
   }
 
@@ -39,7 +52,7 @@ export function ClassFeatureSkills({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {featureSkills.map((skill) => (
+        {filteredSkills.map((skill) => (
           <FeatureSkillRenderer
             key={skill.id}
             skill={skill}

@@ -37,6 +37,7 @@ import { ToolsProficiencies } from "@/components/character-sheet/ToolsProficienc
 import { ClassFeatures } from "@/components/character-sheet/ClassFeatures"
 import { Infusions } from "@/components/character-sheet/Infusions"
 import { EldritchInvocations } from "@/components/character-sheet/EldritchInvocations"
+import { Metamagic } from "@/components/character-sheet/Metamagic"
 import { EldritchCannon as EldritchCannonComponent } from "@/components/character-sheet/EldritchCannon"
 import { MoneyModal } from "@/components/edit-modals/money-modal"
 import { FeatsModal } from "@/components/edit-modals/feats-modal"
@@ -50,6 +51,7 @@ import { LongRestModal } from "@/components/edit-modals/long-rest-modal"
 import { LongRestResultsModal } from "@/components/edit-modals/long-rest-results-modal"
 import { EldritchCannonModal } from "@/components/edit-modals/eldritch-cannon-modal"
 import { EldritchInvocationsModal } from "@/components/edit-modals/eldritch-invocations-modal"
+import { MetamagicModal } from "@/components/edit-modals/metamagic-modal"
 import { SpellLibraryModal, type SpellLibraryModalRef } from "@/components/edit-modals/spell-library-modal"
 import { LevelUpModal } from "@/components/edit-modals/level-up-modal"
 import { FeatureUsageMigrationModal } from "@/components/feature-usage-migration-modal"
@@ -165,6 +167,7 @@ function CharacterSheetContent() {
   const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
   const [eldritchCannonModalOpen, setEldritchCannonModalOpen] = useState(false)
   const [eldritchInvocationsModalOpen, setEldritchInvocationsModalOpen] = useState(false)
+  const [metamagicModalOpen, setMetamagicModalOpen] = useState(false)
   const [diceRollModalOpen, setDiceRollModalOpen] = useState(false)
   const [levelUpModalOpen, setLevelUpModalOpen] = useState(false)
   const [campaignManagementModalOpen, setCampaignManagementModalOpen] = useState(false)
@@ -3342,6 +3345,16 @@ function CharacterSheetContent() {
               }}
               canEdit={canEditActiveCharacter}
             />
+
+            <Metamagic
+              character={activeCharacter}
+              onEdit={() => setMetamagicModalOpen(true)}
+              onOpenFeatureModal={(content) => {
+                setFeatureModalContent(content)
+                setFeatureModalOpen(true)
+              }}
+              canEdit={canEditActiveCharacter}
+            />
           </div>
 
             </div>
@@ -3761,6 +3774,14 @@ function CharacterSheetContent() {
       <EldritchInvocationsModal
         isOpen={eldritchInvocationsModalOpen}
         onClose={() => setEldritchInvocationsModalOpen(false)}
+        character={activeCharacter}
+        onSave={updateCharacter}
+      />
+
+      {/* Metamagic Modal */}
+      <MetamagicModal
+        isOpen={metamagicModalOpen}
+        onClose={() => setMetamagicModalOpen(false)}
         character={activeCharacter}
         onSave={updateCharacter}
       />

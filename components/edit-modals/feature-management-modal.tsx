@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { WysiwygEditor } from "@/components/ui/wysiwyg-editor"
+import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { Icon } from "@iconify/react"
 import { useToast } from "@/hooks/use-toast"
 import type { ClassData } from "@/lib/class-utils"
@@ -623,7 +624,7 @@ export function FeatureManagementModal({
                                 </div>
                                 {feature.description && (
                                   <div className="text-sm text-muted-foreground line-clamp-3">
-                                    {renderMarkdownPreview(feature.description)}
+                                    <RichTextDisplay content={feature.description} />
                                   </div>
                                 )}
                               </div>
@@ -846,13 +847,12 @@ export function FeatureManagementModal({
 
               <div className="grid gap-2">
                 <Label htmlFor="feature-description">Description</Label>
-                <RichTextEditor
+                <WysiwygEditor
                   value={editingFeature.description}
                   onChange={(value) => canEdit && setEditingFeature(prev => 
                     prev ? { ...prev, description: value } : null
                   )}
                   placeholder="Describe this feature and its effects..."
-                  rows={6}
                 />
               </div>
 

@@ -1461,6 +1461,23 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             selectedOptions: []
           })
         }
+
+        // Initialize Metamagic (Sorcerer level 3+)
+        if (!updatedUsage['metamagic']) {
+          // Determine sorcerer level (supports multiclass)
+          const sorcererClass = character.classes?.find(c => c.name.toLowerCase() === 'sorcerer')
+          const sorcererLevel = sorcererClass?.level || (character.class.toLowerCase() === 'sorcerer' ? character.level : 0)
+          if (sorcererLevel >= 3) {
+            const maxKnown = sorcererLevel >= 17 ? 4 : sorcererLevel >= 10 ? 3 : 2
+            updatedUsage = addSingleFeature(character, 'metamagic', {
+              featureName: 'Metamagic',
+              featureType: 'options_list',
+              enabledAtLevel: 3,
+              maxSelections: maxKnown,
+              selectedOptions: []
+            })
+          }
+        }
         
         // Update character with initialized features
         // Only update if new features were added (don't overwrite existing data)

@@ -337,11 +337,31 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           type="button"
           variant="ghost"
           size="sm"
+          onClick={() => editor.chain().focus().addColumnBefore().run()}
+          className="h-8 w-8 p-0"
+          title="Add Column Before"
+        >
+          <Icon icon="lucide:panel-left" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => editor.chain().focus().addRowAfter().run()}
           className="h-8 w-8 p-0"
           title="Add Row"
         >
           <Icon icon="lucide:rows-3" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().addRowBefore().run()}
+          className="h-8 w-8 p-0"
+          title="Add Row Before"
+        >
+          <Icon icon="lucide:panel-top" className="w-4 h-4" />
         </Button>
         <div className="w-px h-6 bg-border mx-1" />
         <Button
@@ -386,6 +406,38 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           title="Clear Cell Background"
         >
           <Icon icon="lucide:eraser" className="w-4 h-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        {/* Delete row/column/table */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().deleteColumn().run()}
+          className="h-8 w-8 p-0"
+          title="Delete Column"
+        >
+          <Icon icon="lucide:trash-2" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().deleteRow().run()}
+          className="h-8 w-8 p-0"
+          title="Delete Row"
+        >
+          <Icon icon="lucide:trash" className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().deleteTable().run()}
+          className="h-8 w-8 p-0"
+          title="Delete Table"
+        >
+          <Icon icon="lucide:table-properties" className="w-4 h-4" />
         </Button>
         <Button
           type="button"
@@ -602,11 +654,18 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
         }
 
         .ProseMirror table {
-          width: 100%;
+          width: 100% !important;
           border-collapse: collapse;
           table-layout: fixed;
           margin: 0.75rem 0;
         }
+
+        /* Force tables to use full width even if inline styles set widths */
+        .ProseMirror table[style*="width"],
+        .ProseMirror .tiptap-table[style*="width"] {
+          width: 100% !important;
+        }
+        /* Allow column widths via colgroup when resizing; only force total table width */
 
         .ProseMirror th,
         .ProseMirror td {
@@ -661,11 +720,11 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
 
         /* Prose output tables */
         .prose table {
-          width: 100%;
+          width: calc(100% - 1.5rem) !important;
+          max-width: calc(100% - 1.5rem) !important;
           table-layout: fixed;
           margin: 0.75rem 0;
           background-color: var(--card);
-          border-radius: 16px;
           overflow: hidden;
         }
 
@@ -678,6 +737,10 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           font-size: 0.9em;
           background-color: hsl(var(--card)) !important;
         }
+
+        /* Force full-width for rendered tables but allow col/column widths */
+        .prose table[style*="width"],
+        .prose .tiptap-table[style*="width"] { width: calc(100% - 1.5rem) !important; }
         
         /* Override any inline background styles, especially rgba(255, 255, 255, 0.2) */
         .prose th[style*="background"],
