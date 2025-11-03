@@ -1112,7 +1112,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       setAbilityScoreChoices(choices)
       
       // Apply to editable character
-      let updatedCharacter = { ...editableCharacter }
+      let updatedCharacter: Partial<CharacterData> = {
+        ...editableCharacter,
+        strength: base.strength,
+        dexterity: base.dexterity,
+        constitution: base.constitution,
+        intelligence: base.intelligence,
+        wisdom: base.wisdom,
+        charisma: base.charisma,
+      }
       choices.forEach(choice => {
         const abilityKey = choice.ability.toLowerCase() as keyof CharacterData
         updatedCharacter[abilityKey] = (base[abilityKey] || POINT_BUY_BASE) + choice.increase
@@ -1135,7 +1143,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       setAbilityScoreChoices(choices)
       
       // Apply to editable character
-      let updatedCharacter = { ...editableCharacter }
+      let updatedCharacter: Partial<CharacterData> = {
+        ...editableCharacter,
+        strength: base.strength,
+        dexterity: base.dexterity,
+        constitution: base.constitution,
+        intelligence: base.intelligence,
+        wisdom: base.wisdom,
+        charisma: base.charisma,
+      }
       choices.forEach(choice => {
         const abilityKey = choice.ability.toLowerCase() as keyof CharacterData
         updatedCharacter[abilityKey] = (base[abilityKey] || POINT_BUY_BASE) + choice.increase
@@ -1153,6 +1169,17 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       // Custom pattern (e.g., Half-Elf)
       // DON'T add fixed ASI to choices array - it's applied separately and shouldn't be in user selections
       const choices: AbilityScoreChoice[] = []
+      
+      // Always reset all six abilities to base first
+      setEditableCharacter(prev => ({
+        ...prev,
+        strength: base.strength,
+        dexterity: base.dexterity,
+        constitution: base.constitution,
+        intelligence: base.intelligence,
+        wisdom: base.wisdom,
+        charisma: base.charisma,
+      }))
       
       if (asi.fixed) {
         // Apply fixed increase - use base value from parameter, or POINT_BUY_BASE if not provided
@@ -1230,13 +1257,13 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         
         // Recalculate all ability scores from base (start fresh, don't use editableCharacter)
         let updatedCharacter: Partial<CharacterData> = {
+          ...editableCharacter, // Preserve other fields first
           strength: baseScore,
           dexterity: baseScore,
           constitution: baseScore,
           intelligence: baseScore,
           wisdom: baseScore,
           charisma: baseScore,
-          ...editableCharacter // Preserve other fields
         }
         // Apply fixed ASI first if exists
         const fixedAbilityKey = mainRaceData?.ability_score_increases?.type === 'custom' && mainRaceData.ability_score_increases.fixed
@@ -1272,13 +1299,13 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         
         // Recalculate all ability scores from base (start fresh, don't use editableCharacter)
         let updatedCharacter: Partial<CharacterData> = {
+          ...editableCharacter, // Preserve other fields first
           strength: baseScore,
           dexterity: baseScore,
           constitution: baseScore,
           intelligence: baseScore,
           wisdom: baseScore,
           charisma: baseScore,
-          ...editableCharacter // Preserve other fields
         }
         // Apply fixed ASI first if exists
         const fixedAbilityKey = mainRaceData?.ability_score_increases?.type === 'custom' && mainRaceData.ability_score_increases.fixed
@@ -2975,8 +3002,17 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                                         updated.splice(index - 1, 0, { ability: value, increase: 1 })
                                                         
                                                         // Recalculate ability scores
-                                                        let updatedCharacter: Partial<CharacterData> = { ...editableCharacter }
+                                                        // Reset all abilities to base before applying fixed and choice increases
                                                         const baseScore = POINT_BUY_BASE
+                                                        let updatedCharacter: Partial<CharacterData> = {
+                                                          ...editableCharacter,
+                                                          strength: baseScore,
+                                                          dexterity: baseScore,
+                                                          constitution: baseScore,
+                                                          intelligence: baseScore,
+                                                          wisdom: baseScore,
+                                                          charisma: baseScore,
+                                                        }
                                                         
                                                         if (mainRaceData?.ability_score_increases?.type === 'custom' && mainRaceData.ability_score_increases.fixed) {
                                                           const fixedAbility = mainRaceData.ability_score_increases.fixed.ability.toLowerCase()
