@@ -258,6 +258,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               <TabsTrigger value="aesthetic">Aesthetic</TabsTrigger>
             </TabsList>
           </div>
+
           <TabsContent value="character" className="grid gap-4 p-4 max-h-[65vh] overflow-y-auto">
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="imageUrl" className="text-right">
@@ -632,6 +633,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
             </div>
           )}
           </TabsContent>
+
           <TabsContent value="aesthetic" className="grid gap-4 p-4 max-h-[65vh] overflow-y-auto">
             <div className="space-y-4">
               <div className="text-sm text-muted-foreground mb-4">
@@ -643,66 +645,66 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                     <Label htmlFor={`aestheticImage${index}`} className="text-right text-sm">
                       Image {index + 1}
                     </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id={`aestheticImage${index}`}
-                        value={url}
-                        onChange={(e) => {
-                          const newImages = [...formData.aestheticImages]
-                          newImages[index] = e.target.value
-                          setFormData({ ...formData, aestheticImages: newImages })
-                        }}
-                        className="flex-1"
-                        placeholder="https://... or upload an image"
-                      />
-                      <input
-                        ref={(el) => {
-                          aestheticInputRefs.current[index] = el
-                        }}
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleAestheticFileChange(e, index)}
-                        className="hidden"
-                        id={`aestheticFileInput${index}`}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => aestheticInputRefs.current[index]?.click()}
-                        disabled={uploadingAestheticIndex === index}
-                        className="h-[38px] whitespace-nowrap"
-                      >
-                        {uploadingAestheticIndex === index ? (
-                          <>
-                            <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin mr-2" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Icon icon="lucide:upload" className="w-4 h-4 mr-2" />
-                            Upload
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  {url && (
-                    <div className="grid grid-cols-[80px_auto] gap-3">
-                      <div></div>
-                      <div className="relative w-full h-24 border rounded-md overflow-hidden bg-muted">
-                        <img
-                          src={url}
-                          alt={`Aesthetic preview ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.style.display = 'none'
+
+                    <div className="flex flex-row items-start gap-2">
+                      {url && (
+                        <div className="relative w-32 h-20 border rounded-md overflow-hidden bg-muted">
+                          <img
+                            src={url}
+                            alt={`Aesthetic preview ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-2 w-full">
+                        <Input
+                          id={`aestheticImage${index}`}
+                          value={url}
+                          onChange={(e) => {
+                            const newImages = [...formData.aestheticImages]
+                            newImages[index] = e.target.value
+                            setFormData({ ...formData, aestheticImages: newImages })
                           }}
+                          className="flex w-full h-9"
+                          placeholder="https://... or upload an image"
                         />
+                        <input
+                          ref={(el) => {
+                            aestheticInputRefs.current[index] = el
+                          }}
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleAestheticFileChange(e, index)}
+                          className="hidden"
+                          id={`aestheticFileInput${index}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => aestheticInputRefs.current[index]?.click()}
+                          disabled={uploadingAestheticIndex === index}
+                          className="h-9 w-fit whitespace-nowrap"
+                        >
+                          {uploadingAestheticIndex === index ? (
+                            <>
+                              <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Icon icon="lucide:upload" className="w-4 h-4" />
+                              Upload
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
