@@ -301,22 +301,23 @@ export function ManagementInterface({
     <div className="relative flex flex-row gap-6 h-full !overflow-auto">
 
       {/* Sidebar Navigation */}
-      <div className="w-72 bg-card flex-shrink-0 border-r border-t fixed left-[0px] top-[64px] h-[calc(100vh-64px)]">
-        <nav className="flex flex-col gap-2 px-4 pt-4">
+      <div className="w-72 bg-card flex flex-col gap-1 py-4 flex-shrink-0 border-r border-t fixed left-[0px] top-[64px] h-[calc(100vh-64px)]">
+        <div className="text-lg font-bold font-display px-4">Settings</div>
+        <nav className="flex flex-col gap-0 px-4">
           <Button
             variant="outline"
             onClick={() => setActiveTab('campaigns')}
-            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
+            className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'campaigns' ? 'text-primary' : ''
             }`}
           >
-            <Icon icon="lucide:users" className="w-4 h-4" />
+            <Icon icon="iconoir:hexagon-dice" className="w-4 h-4" />
             Campaigns
           </Button>
           <Button
             variant="outline"
             onClick={() => setActiveTab('classes')}
-            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
+            className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'classes' ? 'text-primary' : ''
             }`}
           >
@@ -332,7 +333,7 @@ export function ManagementInterface({
           <Button
             variant="outline"
             onClick={() => setActiveTab('races')}
-            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
+            className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'races' ? 'text-primary' : ''
             }`}
           >
@@ -348,7 +349,7 @@ export function ManagementInterface({
           <Button
             variant="outline"
             onClick={() => setActiveTab('users')}
-            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
+            className={`rounded-none border-0 w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'users' ? 'text-primary' : ''
             }`}
           >
@@ -976,6 +977,7 @@ function ClassManagement({
             
             return classGroups.map(({ baseClass, subclasses, subclassCount }) => (
               <Card 
+                className="relative"
                 key={baseClass.id}
                 ref={(el) => {
                   if (el) {
@@ -1006,7 +1008,7 @@ function ClassManagement({
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 absolute right-4 top-4">
                       {canEdit && (
                         <Button className="font-body" size="sm" variant="outline" onClick={() => onEditClass(baseClass)}>
                           <Icon icon="lucide:edit" className="w-4 h-4" />
@@ -1018,7 +1020,7 @@ function ClassManagement({
                         variant="outline" 
                         onClick={() => onManageSubclasses(baseClass)}
                         title={canEdit ? "Manage Subclasses" : "View Subclasses"}
-                        className="font-body"
+                        className="font-body h-8"
                       >
                         <Icon icon="lucide:layers" className="w-4 h-4" />
                         {canEdit ? "Edit subclasses" : "View subclasses"}
@@ -1028,7 +1030,7 @@ function ClassManagement({
                         variant="outline" 
                         onClick={() => onManageFeatures(baseClass)}
                         title={canEdit ? "Manage Features" : "View Features"}
-                        className="font-body"
+                        className="font-body h-8"
                       >
                         <Icon icon="lucide:star" className="w-4 h-4" />
                         {canEdit ? "Manage features" : "View features"}
@@ -1037,7 +1039,7 @@ function ClassManagement({
                         <Button 
                           size="sm" 
                           variant="outline" 
-                          className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white"
+                          className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"
                           onClick={async () => {
                             if (confirm(`Are you sure you want to delete "${baseClass.name}" and all its subclasses? This action cannot be undone.`)) {
                               try {
@@ -1221,7 +1223,7 @@ function RaceManagement({
                     </div>
                     <div className="flex gap-2">
                       {canEdit && (
-                        <Button size="sm" variant="outline" onClick={() => onEditRace(race)} className="h-8">
+                        <Button size="sm" variant="outline" onClick={() => onEditRace(race)} className="h-8 font-body">
                           <Icon icon="lucide:edit" className="w-4 h-4" />
                           Edit
                         </Button>
