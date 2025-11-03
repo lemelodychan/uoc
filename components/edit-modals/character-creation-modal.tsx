@@ -1027,8 +1027,14 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
             if (feature.feature_skill_type === 'choice' && feature.skill_options) {
               // Choice-based skill proficiency - don't auto-select, store options
               // Will be handled in UI
+            } else if (Array.isArray(feature.skill_options) && feature.skill_options.length > 0) {
+              // Fixed multiple skill proficiencies
+              feature.skill_options.forEach((opt: string) => {
+                const skillName = (opt || '').toLowerCase().replace(/\s+/g, '_')
+                if (skillName) newProficiencies.skills.push(skillName)
+              })
             } else if (feature.feature_skill_type) {
-              // Fixed skill proficiency
+              // Fixed single skill proficiency (backward compatibility)
               const skillName = feature.feature_skill_type.toLowerCase().replace(/\s+/g, '_')
               newProficiencies.skills.push(skillName)
             }
@@ -3386,7 +3392,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                           })
                           .filter((f: any) => {
                             // Only include features that have something to render
-                            return (f.feature_skill_type === 'choice' && f.skill_options) || f.feature_skill_type
+                            return (f.feature_skill_type === 'choice' && f.skill_options) || f.feature_skill_type || (Array.isArray(f.skill_options) && f.skill_options.length > 0)
                           })
                         
                         // Get all non-proficiency features (traits, spells, etc.)
@@ -3587,6 +3593,22 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                             </div>
                                           )
                                         })}
+                                      </div>
+                                    </div>
+                                  )
+                                } else if (Array.isArray(feature.skill_options) && feature.feature_skill_type !== 'choice' && feature.skill_options.length > 0) {
+                                  return (
+                                    <div key={`skill-fixed-multi-${index}`} className="py-3 px-4 border rounded-lg bg-card flex flex-col gap-2 order-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium">Skill Proficiency</span>
+                                      </div>
+                                      {feature.description && (
+                                        <p className="text-sm text-muted-foreground mb-1">{feature.description}</p>
+                                      )}
+                                      <div className="flex flex-wrap gap-2 mt-1">
+                                        {feature.skill_options.map((skill: string, sIdx: number) => (
+                                          <Badge key={sIdx} variant="secondary">{skill}</Badge>
+                                        ))}
                                       </div>
                                     </div>
                                   )

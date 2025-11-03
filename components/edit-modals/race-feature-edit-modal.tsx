@@ -96,7 +96,7 @@ export function RaceFeatureEditModal({
   featureIndex, 
   onSave 
 }: RaceFeatureEditModalProps) {
-  const [featureType, setFeatureType] = useState<'skill_proficiency' | 'weapon_proficiency' | 'tool_proficiency' | 'trait' | 'spell' | 'choice' | 'feat'>('trait')
+  const [featureType, setFeatureType] = useState<'skill_proficiency' | 'weapon_proficiency' | 'tool_proficiency' | 'trait' | 'spell' | 'choice' | 'feat' | 'custom_proficiency'>('trait')
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   
@@ -113,6 +113,7 @@ export function RaceFeatureEditModal({
   const [selectedTools, setSelectedTools] = useState<string[]>([])
   const [toolMaxSelections, setToolMaxSelections] = useState<number>(1)
   const [customTool, setCustomTool] = useState("")
+  const [customProficiencyName, setCustomProficiencyName] = useState("")
   
   // Regular feature fields
   const [usesPerLongRest, setUsesPerLongRest] = useState<number | string>(0)
@@ -204,6 +205,7 @@ export function RaceFeatureEditModal({
       setRefuelingDie("")
       setHpBonusPerLevel(false)
       setChoiceOptions([])
+      setCustomProficiencyName("")
       setEditingOptionIndex(null)
       setEditingOption(null)
     }
@@ -213,7 +215,7 @@ export function RaceFeatureEditModal({
     const savedFeature: RaceFeature = {
       name,
       description,
-      feature_type: featureType,
+      feature_type: featureType === 'custom_proficiency' ? 'tool_proficiency' : featureType,
       uses_per_long_rest: usesPerLongRest || undefined,
       refueling_die: refuelingDie || undefined,
       hp_bonus_per_level: hpBonusPerLevel || undefined
@@ -224,11 +226,19 @@ export function RaceFeatureEditModal({
       if (skillType === 'choice') {
         savedFeature.skill_options = selectedSkills
         savedFeature.max_selections = maxSelections
+      } else {
+        // Fixed skill proficiencies: allow multiple selections
+        savedFeature.skill_options = selectedSkills
       }
     } else if (featureType === 'weapon_proficiency') {
       savedFeature.weapons = selectedWeapons
-    } else if (featureType === 'tool_proficiency') {
-      if (toolType === 'choice') {
+    } else if (featureType === 'tool_proficiency' || featureType === 'custom_proficiency') {
+      if (featureType === 'custom_proficiency') {
+        const trimmed = customProficiencyName.trim()
+        if (trimmed.length > 0) {
+          savedFeature.tools = [trimmed]
+        }
+      } else if (toolType === 'choice') {
         savedFeature.tool_choice_type = 'choice'
         savedFeature.tool_options = selectedTools
         savedFeature.max_selections = toolMaxSelections
@@ -384,9 +394,25 @@ export function RaceFeatureEditModal({
                 <SelectItem value="spell">Spell</SelectItem>
                 <SelectItem value="choice">Choice</SelectItem>
                 <SelectItem value="feat">Feat</SelectItem>
+                <SelectItem value="custom_proficiency">Custom Proficiency (Tools section)</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {/* Custom Proficiency (Tools section) */}
+          {featureType === 'custom_proficiency' && (
+            <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
+              <Label className="text-md font-medium">Custom Proficiency</Label>
+              <div className="flex flex-col gap-2">
+                <Label>Proficiency name</Label>
+                <Input
+                  placeholder="e.g., Vehicles (Land), Herbalism Kit, Dragonchess"
+                  value={customProficiencyName}
+                  onChange={(e) => setCustomProficiencyName(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Will appear under Tools Proficiencies on the character sheet.</p>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="feature-name">Name *</Label>
@@ -415,18 +441,14 @@ export function RaceFeatureEditModal({
               
               <div className="flex flex-row gap-4">
                 <div className="flex flex-col gap-2">
-                  <Label>Skill Type</Label>
+                  <Label>Mode</Label>
                   <Select value={skillType} onValueChange={setSkillType}>
                     <SelectTrigger className="w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="choice">Choice (Player selects)</SelectItem>
-                      {SKILL_OPTIONS.map(skill => (
-                        <SelectItem key={skill.value} value={skill.value}>
-                          {skill.label}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="choice">Player choice from a list</SelectItem>
+                      <SelectItem value="fixed">All skills from a list</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -457,6 +479,26 @@ export function RaceFeatureEditModal({
                           onCheckedChange={() => toggleSkill(skill.value)}
                         />
                         <Label htmlFor={`skill-${skill.value}`} className="text-sm font-normal cursor-pointer">
+                          {skill.label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {skillType !== 'choice' && (
+                <div className="flex flex-col gap-3">
+                  <Label>Adds proficiency to the following skills:</Label>
+                  <div className="grid grid-cols-3 gap-2 max-h-[240px] overflow-y-auto p-3 border rounded bg-background">
+                    {SKILL_OPTIONS.map(skill => (
+                      <div key={skill.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`fixed-skill-${skill.value}`}
+                          checked={selectedSkills.includes(skill.value)}
+                          onCheckedChange={() => toggleSkill(skill.value)}
+                        />
+                        <Label htmlFor={`fixed-skill-${skill.value}`} className="text-sm font-normal cursor-pointer">
                           {skill.label}
                         </Label>
                       </div>
