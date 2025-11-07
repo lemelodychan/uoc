@@ -37,6 +37,14 @@ export interface CharacterData {
   // New multiclassing support
   classes: CharacterClass[]
   background: string
+  backgroundId?: string // New field for background ID reference
+  backgroundData?: {
+    defining_events?: Array<{ number: number; text: string }>
+    personality_traits?: Array<{ number: number; text: string }>
+    ideals?: Array<{ number: number; text: string }>
+    bonds?: Array<{ number: number; text: string }>
+    flaws?: Array<{ number: number; text: string }>
+  }
   race: string // Legacy field - kept for backward compatibility, use raceIds instead
   raceIds?: Array<{id: string, isMain: boolean}> // Array of up to 2 race objects with main status
   alignment: string

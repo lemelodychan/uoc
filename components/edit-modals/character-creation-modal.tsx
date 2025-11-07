@@ -11,10 +11,10 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Icon } from "@iconify/react"
-import { loadAllClasses, loadAllRaces, loadRaceDetails, loadClassesWithDetails, loadClassFeatures } from "@/lib/database"
+import { loadAllClasses, loadAllRaces, loadRaceDetails, loadClassesWithDetails, loadClassFeatures, loadBackgroundsWithDetails, loadBackgroundDetails, type BackgroundData } from "@/lib/database"
 import { useUser } from "@/lib/user-context"
 import type { CharacterData } from "@/lib/character-data"
-import { createDefaultSkills, calculateModifier, calculateSkillBonus, createClassBasedSavingThrowProficiencies, createDefaultSavingThrowProficiencies, calculateProficiencyBonus } from "@/lib/character-data"
+import { createDefaultSkills, calculateModifier, calculateSkillBonus, createClassBasedSavingThrowProficiencies, createDefaultSavingThrowProficiencies, calculateProficiencyBonus, getMulticlassEquipmentProficiencies } from "@/lib/character-data"
 import type { RaceData } from "@/lib/database"
 import type { ClassData } from "@/lib/class-utils"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
@@ -36,6 +36,14 @@ interface CharacterCreationData {
   level: number
   classes?: Array<{name: string, subclass?: string, class_id?: string, level: number, selectedSkillProficiencies?: string[]}> // Multiclass support
   background: string
+  backgroundId?: string // New field for background ID
+  backgroundData?: {
+    defining_events?: Array<{ number: number; text: string }>
+    personality_traits?: Array<{ number: number; text: string }>
+    ideals?: Array<{ number: number; text: string }>
+    bonds?: Array<{ number: number; text: string }>
+    flaws?: Array<{ number: number; text: string }>
+  }
   race: string // Legacy field
   raceIds?: Array<{id: string, isMain: boolean}> // Array of up to 2 race objects with main status
   alignment: string
@@ -62,6 +70,27 @@ interface CharacterCreationData {
   imageUrl?: string
   feats?: Array<{name: string, description: string}>
   languages?: string
+  toolsProficiencies?: Array<{name: string, proficiency: 'none' | 'proficient' | 'expertise'}>
+  equipment?: string
+  money?: { gold: number; silver: number; copper: number }
+  equipmentProficiencies?: {
+    lightArmor: boolean
+    mediumArmor: boolean
+    heavyArmor: boolean
+    shields: boolean
+    simpleWeapons: boolean
+    martialWeapons: boolean
+    firearms: boolean
+    handCrossbows: boolean
+    longswords: boolean
+    rapiers: boolean
+    shortswords: boolean
+    scimitars: boolean
+    lightCrossbows: boolean
+    darts: boolean
+    slings: boolean
+    quarterstaffs: boolean
+  }
 }
 
 interface CharacterCreationModalProps {
@@ -88,7 +117,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   const { isSuperadmin } = useUser()
   
   // Step management
-  const [step, setStep] = useState<'basic_info' | 'race_selection' | 'class_selection' | 'class_features' | 'hp_roll' | 'summary'>('basic_info')
+  const [step, setStep] = useState<'basic_info' | 'race_selection' | 'background_selection' | 'class_selection' | 'class_features' | 'hp_roll' | 'summary'>('basic_info')
   
   // Point buy system constants (defined early so they're accessible throughout)
   const POINT_BUY_TOTAL = 27
@@ -126,6 +155,17 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   // Track tool proficiency choices for choice-based tool features
   const [toolProficiencyChoices, setToolProficiencyChoices] = useState<Map<string, string[]>>(new Map())
   const [background, setBackground] = useState("")
+  const [selectedBackgroundId, setSelectedBackgroundId] = useState<string | null>(null)
+  const [selectedBackgroundData, setSelectedBackgroundData] = useState<BackgroundData | null>(null)
+  const [backgroundSkillChoices, setBackgroundSkillChoices] = useState<string[]>([]) // Selected skills when background has choice
+  const [backgroundToolChoices, setBackgroundToolChoices] = useState<string[]>([]) // Selected tools when background has choice
+  const [backgroundLanguageChoices, setBackgroundLanguageChoices] = useState<string[]>([]) // Selected languages when background has choice
+  // Track selected/rolled items for numbered arrays
+  const [backgroundDefiningEvents, setBackgroundDefiningEvents] = useState<Array<{ number: number; text: string }>>([])
+  const [backgroundPersonalityTraits, setBackgroundPersonalityTraits] = useState<Array<{ number: number; text: string }>>([])
+  const [backgroundIdeals, setBackgroundIdeals] = useState<Array<{ number: number; text: string }>>([])
+  const [backgroundBonds, setBackgroundBonds] = useState<Array<{ number: number; text: string }>>([])
+  const [backgroundFlaws, setBackgroundFlaws] = useState<Array<{ number: number; text: string }>>([])
   const [alignment, setAlignment] = useState("True Neutral")
   const [isNPC, setIsNPC] = useState(false)
   const [imageUrl, setImageUrl] = useState("")
@@ -228,9 +268,11 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   const [classes, setClasses] = useState<ClassOption[]>([])
   const [classesData, setClassesData] = useState<Array<{id: string, name: string, subclass: string | null, subclass_selection_level?: number}>>([])
   const [races, setRaces] = useState<Array<{id: string, name: string}>>([])
+  const [backgrounds, setBackgrounds] = useState<Array<{id: string, name: string}>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingRaceDetails, setLoadingRaceDetails] = useState(false)
+  const [loadingBackgroundDetails, setLoadingBackgroundDetails] = useState(false)
 
   // Reset all state when modal opens/closes
   const resetAllState = () => {
@@ -245,6 +287,16 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     setHalfElfVersatilityChoice(null)
     setCustomLineageChoices(null)
     setBackground("")
+    setSelectedBackgroundId(null)
+    setSelectedBackgroundData(null)
+    setBackgroundSkillChoices([])
+    setBackgroundToolChoices([])
+    setBackgroundLanguageChoices([])
+    setBackgroundDefiningEvents([])
+    setBackgroundPersonalityTraits([])
+    setBackgroundIdeals([])
+    setBackgroundBonds([])
+    setBackgroundFlaws([])
     setAlignment("True Neutral")
     setIsNPC(false)
     setCharacterClasses([])
@@ -302,6 +354,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       resetAllState()
       loadClasses()
       loadRaces()
+      loadBackgrounds()
     }
   }, [isOpen])
 
@@ -583,13 +636,19 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       const allFeatures: any[] = []
       
       for (const charClass of characterClasses) {
-        if (charClass.class_id) {
-          console.log(`Loading features for ${charClass.name} level ${charClass.level} (class_id: ${charClass.class_id}, subclass: ${charClass.subclass || 'none'})`)
+        // Get the base class_id (where subclass IS NULL) - loadClassFeatures needs this
+        // It will handle loading subclass features when subclass name is provided
+        const { loadClassData } = await import('@/lib/database')
+        const { classData: baseClassData } = await loadClassData(charClass.name)
+        
+        if (baseClassData?.id) {
+          console.log(`Loading features for ${charClass.name} level ${charClass.level} (base_class_id: ${baseClassData.id}, subclass: ${charClass.subclass || 'none'})`)
           
           // CRITICAL: Always pass includeHidden=true to ensure ASI features are included
           // ASI features are marked as hidden in the database but must be available during character creation
+          // Pass base class_id - loadClassFeatures will handle loading subclass features if subclass is provided
           const { features, error: loadError } = await loadClassFeatures(
-            charClass.class_id, 
+            baseClassData.id, 
             charClass.level, 
             charClass.subclass,
             true // includeHidden = true to include ASI features during character creation
@@ -603,9 +662,75 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
             console.log(`Loaded ${features.length} features for ${charClass.name} level ${charClass.level}`)
             console.log('Feature titles:', features.map(f => `${f.title || f.name} (Level ${f.level}, Hidden: ${(f as any).is_hidden ?? 'unknown'})`))
             
+            // Filter features to only include those for the selected subclass (or base class features if no subclass)
+            // loadClassFeatures loads base class features and subclass features when subclass is provided
+            // We need to filter to only show:
+            // 1. Base class features (source === 'Class')
+            // 2. Features that belong to the selected subclass
+            const filteredFeatures = features.filter((feature: any) => {
+              const featureSource = (feature.source || '').toLowerCase().trim()
+              const featureType = (feature.feature_type || '').toLowerCase().trim()
+              
+              // Base class features: source is 'Class' or feature_type is not 'subclass'
+              const isBaseClassFeature = featureSource === 'class' || (featureType !== 'subclass' && featureSource !== 'subclass')
+              
+              // If no subclass is selected, only show base class features
+              if (!charClass.subclass) {
+                return isBaseClassFeature
+              }
+              
+              // If subclass is selected, show:
+              // 1. Base class features (always show these)
+              if (isBaseClassFeature) {
+                return true
+              }
+              
+              // 2. Features that belong to the selected subclass
+              // When loadClassFeatures is called with a subclass name, it loads subclass features
+              // where class_id = subclass's class_id. We need to get the subclass's class_id to match.
+              const isSubclassFeature = featureSource === 'subclass' || featureType === 'subclass'
+              if (isSubclassFeature) {
+                // Get the subclass's class_id to match against
+                // charClass.class_id should be the subclass's class_id when a subclass is selected
+                const selectedSubclassClassId = charClass.class_id
+                
+                // Check if this feature belongs to the selected subclass
+                // The feature's class_id should match the selected subclass's class_id
+                const matchesSubclass = feature.class_id === selectedSubclassClassId || 
+                                       feature.subclass_id === selectedSubclassClassId
+                
+                if (!matchesSubclass) {
+                  console.log(`Filtering out subclass feature: ${feature.title || feature.name}`, {
+                    feature_class_id: feature.class_id,
+                    feature_subclass_id: feature.subclass_id,
+                    selected_subclass_class_id: selectedSubclassClassId,
+                    selected_subclass_name: charClass.subclass
+                  })
+                }
+                
+                return matchesSubclass
+              }
+              
+              // Exclude everything else
+              return false
+            })
+            
+            // Debug: Log feature sources to help diagnose filtering issues
+            if (filteredFeatures.length === 0 && features.length > 0) {
+              console.warn(`⚠️ All features filtered out for ${charClass.name}${charClass.subclass ? ` (${charClass.subclass})` : ''}`)
+              console.log('Feature sources:', features.map((f: any) => ({
+                title: f.title || f.name,
+                source: f.source || '(no source)',
+                level: f.level
+              })))
+              console.log(`Looking for subclass: "${charClass.subclass}" (normalized: "${charClass.subclass ? (charClass.subclass || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/^(the|a|an)\s+/i, '') : 'N/A'}")`)
+            }
+            
+            console.log(`Filtered to ${filteredFeatures.length} features for ${charClass.name}${charClass.subclass ? ` (${charClass.subclass})` : ''} level ${charClass.level}`)
+            
             // loadClassFeatures with includeHidden=true already includes hidden features (like ASI)
-            // No additional filtering needed - all features returned are valid for character creation
-            allFeatures.push(...features)
+            // Filtered to only show features for the selected subclass
+            allFeatures.push(...filteredFeatures)
           } else {
             console.warn(`No features returned for ${charClass.name} level ${charClass.level}`)
           }
@@ -704,6 +829,40 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       }
     } catch (err) {
       console.error("Failed to load races:", err)
+    }
+  }
+
+  const loadBackgrounds = async () => {
+    try {
+      const { backgrounds: loadedBackgrounds, error: loadError } = await loadBackgroundsWithDetails()
+      if (loadError) {
+        console.error("Error loading backgrounds:", loadError)
+      } else {
+        setBackgrounds(loadedBackgrounds?.map(bg => ({ id: bg.id, name: bg.name })) || [])
+      }
+    } catch (err) {
+      console.error("Failed to load backgrounds:", err)
+    }
+  }
+
+  const loadSelectedBackgroundDetails = async (backgroundId: string) => {
+    setLoadingBackgroundDetails(true)
+    try {
+      const { background, error: loadError } = await loadBackgroundDetails(backgroundId)
+      if (loadError) {
+        console.error("Error loading background details:", loadError)
+        setSelectedBackgroundData(null)
+      } else if (background) {
+        setSelectedBackgroundData(background)
+        setBackground(background.name)
+        // Don't call applyBackgroundModifications here - let the useEffect handle it
+        // This prevents duplicate application of equipment, money, and languages
+      }
+    } catch (err) {
+      console.error("Failed to load background details:", err)
+      setSelectedBackgroundData(null)
+    } finally {
+      setLoadingBackgroundDetails(false)
     }
   }
 
@@ -1096,6 +1255,468 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       }
     })
   }
+
+  // Function to revert all modifications from a previous background
+  const revertBackgroundModifications = (previousBackground: BackgroundData | null, previousSkillChoices: string[] = [], previousToolChoices: string[] = [], previousLanguageChoices: string[] = []) => {
+    if (!previousBackground) return
+
+    // Track skills that came from classes and race (to preserve them)
+    const classSkillProficiencies = new Set<string>()
+    characterClasses.forEach(charClass => {
+      if (charClass.selectedSkillProficiencies) {
+        charClass.selectedSkillProficiencies.forEach(skill => {
+          classSkillProficiencies.add(skill.toLowerCase().replace(/\s+/g, '_'))
+        })
+      }
+      const classData = classDataMap.get(charClass.name)
+      if (classData?.skill_proficiencies) {
+        if (Array.isArray(classData.skill_proficiencies)) {
+          classData.skill_proficiencies.forEach((skill: any) => {
+            if (typeof skill === 'string') {
+              classSkillProficiencies.add(skill.toLowerCase().replace(/\s+/g, '_'))
+            } else if (skill.name) {
+              classSkillProficiencies.add(skill.name.toLowerCase().replace(/\s+/g, '_'))
+            }
+          })
+        }
+      }
+    })
+
+    // Collect race skills
+    const raceSkillSet = new Set<string>()
+    selectedProficiencies.skills.forEach(skill => raceSkillSet.add(skill))
+    raceChoiceSelections.forEach((selection) => {
+      if (selection.selectedSkills) {
+        selection.selectedSkills.forEach(skill => raceSkillSet.add(skill))
+      }
+    })
+    if (halfElfVersatilityChoice?.selectedSkills) {
+      halfElfVersatilityChoice.selectedSkills.forEach(skill => raceSkillSet.add(skill))
+    }
+    if (customLineageChoices?.variableTrait === 'skill_proficiency' && customLineageChoices.selectedSkill) {
+      raceSkillSet.add(customLineageChoices.selectedSkill.toLowerCase().replace(/\s+/g, '_'))
+    }
+
+    // Collect background skills from previous background
+    const previousBackgroundSkillSet = new Set<string>()
+    if (previousBackground.skill_proficiencies) {
+      if (Array.isArray(previousBackground.skill_proficiencies)) {
+        previousBackground.skill_proficiencies.forEach(skill => {
+          previousBackgroundSkillSet.add(skill.toLowerCase().replace(/\s+/g, '_'))
+        })
+      } else if (typeof previousBackground.skill_proficiencies === 'object' && !Array.isArray(previousBackground.skill_proficiencies)) {
+        const skillsObj = previousBackground.skill_proficiencies as any
+        if (skillsObj.fixed) {
+          skillsObj.fixed.forEach((skill: string) => {
+            previousBackgroundSkillSet.add(skill.toLowerCase().replace(/\s+/g, '_'))
+          })
+        }
+        // Don't include choice skills in the revert - they're handled separately
+      }
+    }
+    // Add selected background skill choices from previous background
+    previousSkillChoices.forEach(skill => {
+      previousBackgroundSkillSet.add(skill.toLowerCase().replace(/\s+/g, '_'))
+    })
+
+    // Revert all skills that came from the previous background (but preserve class and race skills)
+    const updatedSkills = editableCharacter.skills?.map(skill => {
+      const skillInDbFormat = skill.name.toLowerCase().replace(/\s+/g, '_')
+      const wasBackgroundSkill = previousBackgroundSkillSet.has(skillInDbFormat)
+      const isClassSkill = classSkillProficiencies.has(skillInDbFormat)
+      const isRaceSkill = raceSkillSet.has(skillInDbFormat)
+      
+      // Remove proficiency if it came from background and not from class or race
+      if (wasBackgroundSkill && !isClassSkill && !isRaceSkill) {
+        return { ...skill, proficiency: 'none' as const }
+      }
+      return skill
+    }) || createDefaultSkills()
+
+    // Collect background tools from previous background
+    const previousBackgroundToolSet = new Set<string>()
+    if (previousBackground.tool_proficiencies) {
+      if (Array.isArray(previousBackground.tool_proficiencies)) {
+        previousBackground.tool_proficiencies.forEach(tool => {
+          previousBackgroundToolSet.add(tool.toLowerCase().replace(/\s+/g, '_'))
+        })
+      } else if (typeof previousBackground.tool_proficiencies === 'object' && !Array.isArray(previousBackground.tool_proficiencies)) {
+        const toolsObj = previousBackground.tool_proficiencies as any
+        if (toolsObj.fixed) {
+          toolsObj.fixed.forEach((tool: string) => {
+            previousBackgroundToolSet.add(tool.toLowerCase().replace(/\s+/g, '_'))
+          })
+        }
+      }
+    }
+    previousToolChoices.forEach(tool => {
+      previousBackgroundToolSet.add(tool.toLowerCase().replace(/\s+/g, '_'))
+    })
+
+    // Revert all tool proficiencies from previous background
+    const updatedToolsProficiencies = (editableCharacter.toolsProficiencies || []).filter((tool: any) => {
+      if (typeof tool === 'string') {
+        return !previousBackgroundToolSet.has(tool.toLowerCase().replace(/\s+/g, '_'))
+      }
+      return !previousBackgroundToolSet.has(tool.name.toLowerCase().replace(/\s+/g, '_'))
+    })
+
+    // Collect background languages from previous background
+    const previousBackgroundLanguageSet = new Set<string>()
+    if (previousBackground.languages) {
+      if (Array.isArray(previousBackground.languages)) {
+        previousBackground.languages.forEach(lang => {
+          previousBackgroundLanguageSet.add(lang.toLowerCase())
+        })
+      } else if (typeof previousBackground.languages === 'object' && !Array.isArray(previousBackground.languages)) {
+        const langsObj = previousBackground.languages as any
+        if (langsObj.fixed) {
+          langsObj.fixed.forEach((lang: string) => {
+            previousBackgroundLanguageSet.add(lang.toLowerCase())
+          })
+        }
+      }
+    }
+    previousLanguageChoices.forEach(lang => {
+      previousBackgroundLanguageSet.add(lang.toLowerCase())
+    })
+
+    // Revert languages (remove background languages, keep race languages)
+    const currentLanguages = editableCharacter.languages || ""
+    const languagesArray = currentLanguages.split(',').map(l => l.trim()).filter(Boolean)
+    const updatedLanguages = languagesArray
+      .filter(lang => !previousBackgroundLanguageSet.has(lang.toLowerCase()))
+      .join(', ')
+
+    // Revert equipment and money
+    const previousEquipment = previousBackground.equipment || ""
+    const currentEquipment = editableCharacter.equipment || ""
+    // Simple approach: if equipment matches background equipment, clear it
+    const updatedEquipment = currentEquipment === previousEquipment ? "" : currentEquipment
+
+    const previousMoney = previousBackground.money || { gold: 0, silver: 0, copper: 0 }
+    const currentMoney = editableCharacter.money || { gold: 0, silver: 0, copper: 0 }
+    const updatedMoney = {
+      gold: Math.max(0, currentMoney.gold - (previousMoney.gold || 0)),
+      silver: Math.max(0, currentMoney.silver - (previousMoney.silver || 0)),
+      copper: Math.max(0, currentMoney.copper - (previousMoney.copper || 0))
+    }
+
+    // Revert all modifications
+    setEditableCharacter(prev => ({
+      ...prev,
+      skills: updatedSkills,
+      toolsProficiencies: updatedToolsProficiencies,
+      languages: updatedLanguages || "Common",
+      equipment: updatedEquipment,
+      money: updatedMoney
+    }))
+  }
+
+  const applyBackgroundModifications = (background: BackgroundData, skipEquipmentAndMoney: boolean = false) => {
+    // Use functional update to get the latest state for applying proficiencies
+    setEditableCharacter(prev => {
+      // Track skills that came from classes and race (to preserve them)
+      const classSkillProficiencies = new Set<string>()
+      characterClasses.forEach(charClass => {
+        if (charClass.selectedSkillProficiencies) {
+          charClass.selectedSkillProficiencies.forEach(skill => {
+            classSkillProficiencies.add(skill.toLowerCase().replace(/\s+/g, '_'))
+          })
+        }
+        const classData = classDataMap.get(charClass.name)
+        if (classData?.skill_proficiencies) {
+          if (Array.isArray(classData.skill_proficiencies)) {
+            classData.skill_proficiencies.forEach((skill: any) => {
+              if (typeof skill === 'string') {
+                classSkillProficiencies.add(skill.toLowerCase().replace(/\s+/g, '_'))
+              } else if (skill.name) {
+                classSkillProficiencies.add(skill.name.toLowerCase().replace(/\s+/g, '_'))
+              }
+            })
+          }
+        }
+      })
+
+      // Collect race skills
+      const raceSkillSet = new Set<string>()
+      selectedProficiencies.skills.forEach(skill => raceSkillSet.add(skill))
+      raceChoiceSelections.forEach((selection) => {
+        if (selection.selectedSkills) {
+          selection.selectedSkills.forEach(skill => raceSkillSet.add(skill))
+        }
+      })
+      if (halfElfVersatilityChoice?.selectedSkills) {
+        halfElfVersatilityChoice.selectedSkills.forEach(skill => raceSkillSet.add(skill))
+      }
+      if (customLineageChoices?.variableTrait === 'skill_proficiency' && customLineageChoices.selectedSkill) {
+        raceSkillSet.add(customLineageChoices.selectedSkill.toLowerCase().replace(/\s+/g, '_'))
+      }
+
+      // Start with current skills (already reverted if this is a background change)
+      const updatedSkills = prev.skills || createDefaultSkills()
+
+      // Start with current tool proficiencies (already reverted if this is a background change)
+      const updatedToolsProficiencies = prev.toolsProficiencies || []
+
+      // Apply skill proficiencies from background
+      const backgroundSkills: string[] = []
+      if (background.skill_proficiencies) {
+        if (Array.isArray(background.skill_proficiencies)) {
+          // Legacy format - simple array
+          background.skill_proficiencies.forEach(skill => {
+            backgroundSkills.push(skill.toLowerCase().replace(/\s+/g, '_'))
+          })
+        } else if (typeof background.skill_proficiencies === 'object' && !Array.isArray(background.skill_proficiencies)) {
+          const skillsObj = background.skill_proficiencies as any
+          const choice = skillsObj.choice || {}
+          const fromSelected = choice.from_selected || false
+          const availableSkills = skillsObj.available || []
+          
+          // If from_selected is true and there's no available array, 
+          // the fixed array contains the choice options (not actual fixed skills)
+          // Example: Haunted One - fixed: [4 skills], choice: {count: 2, from_selected: true}, no available
+          // In this case, don't add fixed as proficiencies - they're choice options
+          const fixedIsActuallyAvailable = fromSelected && availableSkills.length === 0
+          
+          // Add fixed skills ONLY if they're not being used as choice options
+          if (skillsObj.fixed && Array.isArray(skillsObj.fixed) && !fixedIsActuallyAvailable) {
+            skillsObj.fixed.forEach((skill: string) => {
+              // Only add if it's not in the available array (safeguard)
+              const skillInDbFormat = skill.toLowerCase().replace(/\s+/g, '_')
+              const isInAvailable = availableSkills.some((availSkill: string) => 
+                availSkill.toLowerCase().replace(/\s+/g, '_') === skillInDbFormat
+              )
+              // Only add fixed skills that are not in the available list
+              if (!isInAvailable) {
+                backgroundSkills.push(skillInDbFormat)
+              }
+            })
+          }
+          // Choice skills are handled separately via backgroundSkillChoices
+          // NOTE: available skills are NEVER added here - they are only options to choose from
+        }
+      }
+      // Add selected choice skills (only the ones the user actually selected)
+      backgroundSkillChoices.forEach(skill => {
+        const skillInDbFormat = skill.toLowerCase().replace(/\s+/g, '_')
+        if (!backgroundSkills.includes(skillInDbFormat)) {
+          backgroundSkills.push(skillInDbFormat)
+        }
+      })
+
+      // Update editable character skills - add new background proficiencies
+      const updatedSkillsWithBackground = updatedSkills.map((skill: any) => {
+        const skillInDbFormat = skill.name.toLowerCase().replace(/\s+/g, '_')
+        if (backgroundSkills.includes(skillInDbFormat)) {
+          // Only add proficiency if not already proficient from class or race
+          const isClassSkill = classSkillProficiencies.has(skillInDbFormat)
+          const isRaceSkill = raceSkillSet.has(skillInDbFormat)
+          if (!isClassSkill && !isRaceSkill) {
+            return { ...skill, proficiency: 'proficient' as const }
+          }
+        }
+        return skill
+      })
+
+      // Apply tool proficiencies from background
+      const backgroundTools: string[] = []
+      if (background.tool_proficiencies) {
+        if (Array.isArray(background.tool_proficiencies)) {
+          // Legacy format - simple array
+          background.tool_proficiencies.forEach(tool => {
+            backgroundTools.push(tool)
+          })
+        } else if (typeof background.tool_proficiencies === 'object' && !Array.isArray(background.tool_proficiencies)) {
+          const toolsObj = background.tool_proficiencies as any
+          const choice = toolsObj.choice || {}
+          const fromSelected = choice.from_selected || false
+          const availableTools = toolsObj.available || []
+          
+          // If from_selected is true and there's no available array, 
+          // the fixed array contains the choice options (not actual fixed tools)
+          const fixedIsActuallyAvailable = fromSelected && availableTools.length === 0
+          
+          // Add fixed tools ONLY if they're not being used as choice options
+          if (toolsObj.fixed && Array.isArray(toolsObj.fixed) && !fixedIsActuallyAvailable) {
+            toolsObj.fixed.forEach((tool: string) => {
+              // Only add if it's not in the available array (safeguard)
+              const isInAvailable = availableTools.some((availTool: string) => 
+                availTool === tool
+              )
+              // Only add fixed tools that are not in the available list
+              if (!isInAvailable) {
+                backgroundTools.push(tool)
+              }
+            })
+          }
+          // Choice tools are handled separately via backgroundToolChoices
+          // NOTE: available tools are NEVER added here - they are only options to choose from
+        }
+      }
+      // Add selected choice tools (only the ones the user actually selected)
+      backgroundToolChoices.forEach(tool => {
+        if (!backgroundTools.includes(tool)) {
+          backgroundTools.push(tool)
+        }
+      })
+
+      // Update tool proficiencies - add new background proficiencies
+      const newTools = backgroundTools
+        .filter(tool => !updatedToolsProficiencies.some((t: any) => 
+          (typeof t === 'string' ? t : t.name) === tool
+        ))
+        .map(tool => ({ name: tool, proficiency: 'proficient' as const }))
+      const updatedToolsProfs = [...updatedToolsProficiencies, ...newTools]
+
+      // Apply languages from background
+      const backgroundLanguages: string[] = []
+      if (background.languages) {
+        if (Array.isArray(background.languages)) {
+          // Legacy format - simple array
+          background.languages.forEach(lang => {
+            backgroundLanguages.push(lang)
+          })
+        } else if (typeof background.languages === 'object' && !Array.isArray(background.languages)) {
+          const langsObj = background.languages as any
+          // Add fixed languages
+          if (langsObj.fixed) {
+            langsObj.fixed.forEach((lang: string) => {
+              backgroundLanguages.push(lang)
+            })
+          }
+          // Choice languages are handled separately via backgroundLanguageChoices
+        }
+      }
+      // Add selected choice languages
+      backgroundLanguageChoices.forEach(lang => {
+        backgroundLanguages.push(lang)
+      })
+
+      // Update languages - add background languages
+      const currentLanguages = prev.languages || "Common"
+      const languagesArray = currentLanguages.split(',').map(l => l.trim()).filter(Boolean)
+      const newLanguages = backgroundLanguages.filter(lang => 
+        !languagesArray.some(l => l.toLowerCase() === lang.toLowerCase())
+      )
+      const updatedLanguages = newLanguages.length > 0
+        ? `${currentLanguages}${currentLanguages ? ', ' : ''}${newLanguages.join(', ')}`
+        : currentLanguages
+
+      // Apply equipment and money (only if not skipping - skip when re-applying due to choice changes)
+      const currentEquipment = prev.equipment || ""
+      const backgroundEquipment = background.equipment || ""
+      // Check if background equipment is already in the current equipment to prevent duplicates
+      const equipmentAlreadyApplied = backgroundEquipment && currentEquipment.includes(backgroundEquipment)
+      const updatedEquipment = !skipEquipmentAndMoney && backgroundEquipment && !equipmentAlreadyApplied
+        ? `${currentEquipment}${currentEquipment ? '\n\n' : ''}${backgroundEquipment}`
+        : currentEquipment
+
+      const currentMoney = prev.money || { gold: 0, silver: 0, copper: 0 }
+      const backgroundMoney = background.money || { gold: 0, silver: 0, copper: 0 }
+      // Check if background money has already been added by checking if current money contains the background money
+      // This is a simple heuristic - if current money is exactly the background money or more, it might have been added
+      // But we can't be 100% sure, so we use a ref to track if we've applied this background's money
+      const moneyAlreadyApplied = backgroundMoney.gold > 0 && currentMoney.gold >= backgroundMoney.gold &&
+                                   backgroundMoney.silver > 0 && currentMoney.silver >= backgroundMoney.silver &&
+                                   backgroundMoney.copper > 0 && currentMoney.copper >= backgroundMoney.copper &&
+                                   // Only consider it applied if all three match (to avoid false positives)
+                                   (currentMoney.gold === backgroundMoney.gold || currentMoney.silver === backgroundMoney.silver || currentMoney.copper === backgroundMoney.copper)
+      const updatedMoney = !skipEquipmentAndMoney && !moneyAlreadyApplied ? {
+        gold: currentMoney.gold + (backgroundMoney.gold || 0),
+        silver: currentMoney.silver + (backgroundMoney.silver || 0),
+        copper: currentMoney.copper + (backgroundMoney.copper || 0)
+      } : currentMoney
+
+      return {
+        ...prev,
+        skills: updatedSkillsWithBackground,
+        toolsProficiencies: updatedToolsProfs,
+        languages: updatedLanguages,
+        equipment: updatedEquipment,
+        money: updatedMoney
+      }
+    })
+  }
+
+  // Store previous background data to properly revert modifications
+  const previousBackgroundDataRef = useRef<BackgroundData | null>(null)
+  const previousBackgroundChoicesRef = useRef<{
+    skills: string[]
+    tools: string[]
+    languages: string[]
+  }>({ skills: [], tools: [], languages: [] })
+
+  // Handle background changes - revert previous and apply new
+  useEffect(() => {
+    if (selectedBackgroundId && selectedBackgroundData) {
+      // If background ID changed, revert previous and apply new
+      if (previousBackgroundDataRef.current && previousBackgroundDataRef.current.id !== selectedBackgroundData.id) {
+        // Revert using the previous background's choices (stored in ref)
+        revertBackgroundModifications(
+          previousBackgroundDataRef.current,
+          previousBackgroundChoicesRef.current.skills,
+          previousBackgroundChoicesRef.current.tools,
+          previousBackgroundChoicesRef.current.languages
+        )
+        // Clear previous background's choices (ensure they're cleared even if already cleared in onValueChange)
+        setBackgroundSkillChoices([])
+        setBackgroundToolChoices([])
+        setBackgroundLanguageChoices([])
+        setBackgroundDefiningEvents([])
+        setBackgroundPersonalityTraits([])
+        setBackgroundIdeals([])
+        setBackgroundBonds([])
+        setBackgroundFlaws([])
+        // Use setTimeout to ensure state updates complete before applying new background
+        setTimeout(() => {
+          applyBackgroundModifications(selectedBackgroundData)
+        }, 0)
+      } else if (!previousBackgroundDataRef.current) {
+        // First time selecting a background - just apply
+        applyBackgroundModifications(selectedBackgroundData)
+      }
+      
+      previousBackgroundDataRef.current = selectedBackgroundData
+      // Update choices ref with current choices (for next background change)
+      previousBackgroundChoicesRef.current = {
+        skills: backgroundSkillChoices,
+        tools: backgroundToolChoices,
+        languages: backgroundLanguageChoices
+      }
+    } else if (!selectedBackgroundId && previousBackgroundDataRef.current) {
+      // Background was cleared - revert
+      revertBackgroundModifications(
+        previousBackgroundDataRef.current,
+        previousBackgroundChoicesRef.current.skills,
+        previousBackgroundChoicesRef.current.tools,
+        previousBackgroundChoicesRef.current.languages
+      )
+      previousBackgroundDataRef.current = null
+      previousBackgroundChoicesRef.current = { skills: [], tools: [], languages: [] }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBackgroundId, selectedBackgroundData?.id])
+
+  // Update choices ref when they change
+  useEffect(() => {
+    if (selectedBackgroundData) {
+      previousBackgroundChoicesRef.current = {
+        skills: backgroundSkillChoices,
+        tools: backgroundToolChoices,
+        languages: backgroundLanguageChoices
+      }
+    }
+  }, [backgroundSkillChoices, backgroundToolChoices, backgroundLanguageChoices, selectedBackgroundData])
+
+  // Re-apply background modifications when skill/tool/language choices change
+  // Skip equipment and money since those should only be applied once when background is first selected
+  useEffect(() => {
+    if (selectedBackgroundData) {
+      applyBackgroundModifications(selectedBackgroundData, true) // Skip equipment and money
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backgroundSkillChoices, backgroundToolChoices, backgroundLanguageChoices])
 
   const handleAbilityScoreIncreases = (asi: any, baseScores: any = null) => {
     // Use provided baseScores, or fall back to POINT_BUY_BASE (never use editableCharacter as it might be stale)
@@ -1492,8 +2113,40 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   }
 
   const getSubclassSelectionLevel = (className: string): number => {
-    const baseClass = classesData.find(cls => cls.name === className && cls.subclass === null)
-    return baseClass?.subclass_selection_level || 3
+    // Helper to coerce values
+    const toNum = (val: any): number | null => {
+      if (typeof val === 'number' && Number.isFinite(val)) return val
+      if (typeof val === 'string' && val.trim() !== '' && !Number.isNaN(Number(val))) return Number(val)
+      return null
+    }
+    // Prefer detailed class data when available (often includes subclass_selection_level)
+    const baseFromDetails = classDataMap.get(className)
+    const detailedLevel = baseFromDetails ? toNum((baseFromDetails as any).subclass_selection_level) : null
+    if (detailedLevel !== null) return detailedLevel
+    // Try to find by selected class_id when available to avoid name mismatches
+    const selected = characterClasses.find(c => c.name === className)
+    if (selected?.class_id) {
+      const rowById = classesData.find(r => r.id === selected.class_id)
+      if (rowById) {
+        // If this row is a subclass row, try to find the base row for the same class name
+        if (rowById.subclass) {
+          const baseRow = classesData.find(r => r.name === rowById.name && (!r.subclass || r.subclass === null))
+          const baseLevel = toNum(baseRow?.subclass_selection_level)
+          if (baseLevel !== null) return baseLevel
+        } else {
+          const baseLevel = toNum(rowById.subclass_selection_level)
+          if (baseLevel !== null) return baseLevel
+        }
+      }
+    }
+    // Fallback: derive from all rows that share the class name
+    const rowsForClass = classesData.filter(cls => cls.name === className)
+    if (rowsForClass.length === 0) return 3
+    const numericLevels = rowsForClass
+      .map(r => toNum((r as any).subclass_selection_level))
+      .filter((v): v is number => v !== null)
+    if (numericLevels.length > 0) return Math.min(...numericLevels)
+    return 3
   }
 
   // Update saving throw proficiencies when main class (first class) changes
@@ -1557,6 +2210,13 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
 
   const rollHitDie = () => {
     if (characterClasses.length === 0) return
+
+    // Ensure point buy allocation is complete before rolling HP
+    const pointsSpent = getTotalPointsSpent()
+    if (pointsSpent !== POINT_BUY_TOTAL) {
+      setError(`Please finish point buy first: ${pointsSpent}/${POINT_BUY_TOTAL} points allocated.`)
+      return
+    }
 
     const hitDieTypes: Record<string, number> = {
       'barbarian': 12,
@@ -1640,6 +2300,61 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       currentHitPoints: totalHPWithBonus
     }))
   }
+
+  // Recalculate HP automatically when CON or race HP bonuses change after a roll (without causing loops)
+  useEffect(() => {
+    if (!hpRollResult) return
+
+    const conMod = calculateModifier(editableCharacter.constitution || 10)
+
+    // Compute total HP from stored rolls and current CON mod
+    let totalHP = 0
+    if (hpRollResult.classRolls && hpRollResult.classRolls.length > 0) {
+      totalHP = hpRollResult.classRolls.reduce((sum, cr) => {
+        const rollSum = cr.roll || 0
+        const levels = cr.level || 0
+        const hpFromCon = conMod * levels
+        const classHp = Math.max(levels, rollSum + hpFromCon)
+        return sum + classHp
+      }, 0)
+    } else {
+      // Fallback: use aggregate roll and total level (use overall level state)
+      const base = (hpRollResult.roll || 0) + (conMod * level)
+      totalHP = Math.max(level, base)
+    }
+
+    // Recompute level-based HP bonus from race features and selected options
+    let levelBasedHpBonus = 0
+    if (mainRaceData?.features && Array.isArray(mainRaceData.features)) {
+      mainRaceData.features.forEach((feature: any) => {
+        if (feature.hp_bonus_per_level) levelBasedHpBonus += level
+        if (feature.feature_type === 'choice' && feature.options && Array.isArray(feature.options)) {
+          const featureKey = feature.name || 'unknown-choice'
+          const selection = raceChoiceSelections.get(featureKey) || 
+            (feature.name === 'Half-Elf Versatility' ? halfElfVersatilityChoice : null)
+          feature.options.forEach((option: any) => {
+            if (option.hp_bonus_per_level && selection && selection.optionName === option.name) {
+              levelBasedHpBonus += level
+            }
+          })
+        }
+      })
+    }
+
+    const totalHPWithBonus = totalHP + levelBasedHpBonus
+
+    // Only update state if values actually changed to avoid effect loops
+    if (hpRollResult.constitutionModifier !== conMod || hpRollResult.total !== totalHP) {
+      setHpRollResult(prev => prev ? ({ ...prev, constitutionModifier: conMod, total: totalHP }) : prev)
+    }
+    if ((editableCharacter.maxHitPoints || 0) !== totalHPWithBonus || (editableCharacter.currentHitPoints || 0) !== totalHPWithBonus) {
+      setEditableCharacter(prev => ({
+        ...prev,
+        maxHitPoints: totalHPWithBonus,
+        currentHitPoints: totalHPWithBonus
+      }))
+    }
+  }, [editableCharacter.constitution, hpRollResult?.roll, hpRollResult?.classRolls, level, mainRaceData, raceChoiceSelections, halfElfVersatilityChoice])
   
   const handleASISelection = (featureId: string, type: 'ability_scores' | 'feat') => {
     const currentChoice = asiChoices.get(featureId)
@@ -2289,6 +3004,54 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       finalLanguages = `Common, ${customLineageChoices.selectedLanguage}`
     }
     
+    // Calculate equipment proficiencies from classes
+    const classEquipmentProficiencies = characterClasses.length > 0 
+      ? getMulticlassEquipmentProficiencies(characterClasses)
+      : {
+          lightArmor: false,
+          mediumArmor: false,
+          heavyArmor: false,
+          shields: false,
+          simpleWeapons: false,
+          martialWeapons: false,
+          firearms: false,
+          handCrossbows: false,
+          longswords: false,
+          rapiers: false,
+          shortswords: false,
+          scimitars: false,
+          lightCrossbows: false,
+          darts: false,
+          slings: false,
+          quarterstaffs: false,
+        }
+    
+    // Combine class equipment proficiencies with race equipment proficiencies
+    const raceEquipmentProficiencies = editableCharacter.equipmentProficiencies || {
+      lightArmor: false,
+      mediumArmor: false,
+      heavyArmor: false,
+      shields: false,
+      simpleWeapons: false,
+      martialWeapons: false,
+      firearms: false,
+      handCrossbows: false,
+      longswords: false,
+      rapiers: false,
+      shortswords: false,
+      scimitars: false,
+      lightCrossbows: false,
+      darts: false,
+      slings: false,
+      quarterstaffs: false,
+    }
+    
+    // Merge: class proficiencies take precedence, but race can add additional ones
+    const finalEquipmentProficiencies = {
+      ...raceEquipmentProficiencies,
+      ...classEquipmentProficiencies,
+    }
+    
     const firstClass = characterClasses[0]
     onCreateCharacter({
       name,
@@ -2297,7 +3060,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       classId: firstClass.class_id || "", // Legacy field
       level,
       classes: characterClasses, // Multiclass support (includes selectedSkillProficiencies)
-      background,
+      background: selectedBackgroundData?.name || background || "", // Use selected background name or fallback to legacy
+      backgroundId: selectedBackgroundId || undefined, // New field for background ID
+      backgroundData: selectedBackgroundId ? {
+        defining_events: backgroundDefiningEvents.length > 0 ? backgroundDefiningEvents : undefined,
+        personality_traits: backgroundPersonalityTraits.length > 0 ? backgroundPersonalityTraits : undefined,
+        ideals: backgroundIdeals.length > 0 ? backgroundIdeals : undefined,
+        bonds: backgroundBonds.length > 0 ? backgroundBonds : undefined,
+        flaws: backgroundFlaws.length > 0 ? backgroundFlaws : undefined,
+      } : undefined,
       race: raceIds.find(r => r.isMain)?.id || raceIds[0]?.id || "", // Legacy field - use main race
       raceIds: raceIds.length > 0 ? raceIds : undefined,
       alignment,
@@ -2324,6 +3095,10 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       imageUrl: imageUrl || undefined,
       feats: allFeats.length > 0 ? allFeats : undefined,
       languages: finalLanguages,
+      toolsProficiencies: updatedCharacter.toolsProficiencies || [],
+      equipment: editableCharacter.equipment || "",
+      money: editableCharacter.money || { gold: 0, silver: 0, copper: 0 },
+      equipmentProficiencies: finalEquipmentProficiencies,
     })
     onClose()
   }
@@ -2412,7 +3187,9 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     return abilities.reduce((total, ability) => {
       const score = editableCharacter[ability] || POINT_BUY_BASE
       // Get base score (before race/ASI bonuses)
-      let raceBonus = abilityScoreChoices.find(c => c.ability === ability)?.increase || 0
+      let raceBonus = abilityScoreChoices
+        .filter(c => c.ability === ability)
+        .reduce((sum, c) => sum + (c.increase || 0), 0)
       
       // Check for fixed ASI bonus in custom patterns (e.g., Half-Elf +2 CHA)
       if (mainRaceData?.ability_score_increases?.type === 'custom' && mainRaceData.ability_score_increases.fixed) {
@@ -2471,7 +3248,9 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
             const modifier = calculateModifier(value)
             
             // Calculate base score (before race/ASI bonuses)
-            let raceBonus = abilityScoreChoices.find(c => c.ability === key)?.increase || 0
+            let raceBonus = abilityScoreChoices
+              .filter(c => c.ability === key)
+              .reduce((sum, c) => sum + (c.increase || 0), 0)
             
             // Check for fixed ASI bonus in custom patterns (e.g., Half-Elf +2 CHA)
             if (mainRaceData?.ability_score_increases?.type === 'custom' && mainRaceData.ability_score_increases.fixed) {
@@ -2667,11 +3446,12 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
             Step {
               step === 'basic_info' ? '1' : 
               step === 'race_selection' ? '2' : 
-              step === 'class_selection' ? '3' : 
-              step === 'class_features' ? '4' : 
-              step === 'hp_roll' ? '5' : 
-              '6'
-            } of 6
+              step === 'background_selection' ? '3' : 
+              step === 'class_selection' ? '4' : 
+              step === 'class_features' ? '5' : 
+              step === 'hp_roll' ? '6' : 
+              '7'
+            } of 7
           </div>
         </DialogHeader>
 
@@ -2707,17 +3487,6 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Enter character name"
-                      />
-                    </div>
-
-                    {/* Background */}
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="background">Background *</Label>
-                      <Input
-                        id="background"
-                        value={background}
-                        onChange={(e) => setBackground(e.target.value)}
-                        placeholder="e.g., Folk Hero, Noble, Criminal"
                       />
                     </div>
 
@@ -2946,26 +3715,25 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                 })()
                               ) : hasChoiceASI ? (
                                 (() => {
-                                  // Check if options are pattern objects (like Kender)
-                                  const options = mainRaceData.ability_score_increases.options || []
-                                  const hasPatternOptions = Array.isArray(options) && options.length > 0 && typeof options[0] === 'object' && options[0].pattern
+                                  // Check if pattern is defined on choices object (e.g., three_ones, one_plus_two)
+                                  const choices = mainRaceData.ability_score_increases.choices || {}
+                                  const pattern = choices.pattern || (Array.isArray(mainRaceData.ability_score_increases.options) && mainRaceData.ability_score_increases.options.length > 0 && typeof mainRaceData.ability_score_increases.options[0] === 'object' ? mainRaceData.ability_score_increases.options[0].pattern : null)
                                   
-                                  if (hasPatternOptions) {
+                                  if (pattern) {
                                     // Handle pattern-based choice ASI (like Kender with one_plus_two or three_ones patterns)
-                                    // Detect pattern from current choices if not explicitly selected
-                                    const detectedPattern = selectedASIPattern || (abilityScoreChoices.length > 0 
-                                      ? (abilityScoreChoices.some(c => c.increase === 2) ? 'one_plus_two' : 'three_ones')
-                                      : null)
+                                    const requiredCount = choices.count || 3
+                                    const increaseAmount = choices.increase || 1
+                                    const description = choices.description || mainRaceData.ability_score_increases.description || `Choose ${requiredCount} ability score increases (an ability can be selected up to 2 times)`
                                     
                                     return (
                                       <div className="flex flex-col gap-2">
                                         <p className="text-sm text-muted-foreground">
-                                          {mainRaceData.ability_score_increases.description || "Choose 3 ability score increases (an ability can be selected up to 2 times)"}
+                                          {description}
                                         </p>
                                         <div className="flex flex-row gap-4 mt-1">
-                                          {[1, 2, 3].map((index) => {
-                                            // Get all choices with increase === 1 (for pattern-based selections)
-                                            const currentChoices = abilityScoreChoices.filter(c => c.increase === 1)
+                                          {Array.from({ length: requiredCount }, (_, i) => i + 1).map((index) => {
+                                            // Get all choices with increase matching the pattern's increase amount
+                                            const currentChoices = abilityScoreChoices.filter(c => c.increase === increaseAmount)
                                             
                                             // Get the choice for this specific slot (by position in array)
                                             // We maintain order: slot 1 = index 0, slot 2 = index 1, slot 3 = index 2
@@ -2980,7 +3748,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                             return (
                                               <div key={index} className="flex flex-col gap-2">
                                                 <Label className="text-sm font-medium">
-                                                  Ability #{index} *
+                                                  Ability #{index} (+{increaseAmount})
                                                 </Label>
                                                 <Select
                                                   value={currentChoice?.ability || ""}
@@ -2995,8 +3763,8 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                                       
                                                       // Remove current choice if exists (at this specific index)
                                                       setAbilityScoreChoices(prev => {
-                                                        const choicesToKeep = prev.filter(c => c.increase === 1)
-                                                        const otherChoices = prev.filter(c => c.increase !== 1)
+                                                        const choicesToKeep = prev.filter(c => c.increase === increaseAmount)
+                                                        const otherChoices = prev.filter(c => c.increase !== increaseAmount)
                                                         const updated = currentChoice
                                                           ? [
                                                               ...choicesToKeep.slice(0, index - 1),
@@ -3005,7 +3773,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                                           : choicesToKeep
                                                         
                                                         // Add new choice at the correct position
-                                                        updated.splice(index - 1, 0, { ability: value, increase: 1 })
+                                                        updated.splice(index - 1, 0, { ability: value, increase: increaseAmount })
                                                         
                                                         // Recalculate ability scores
                                                         // Reset all abilities to base before applying fixed and choice increases
@@ -3047,7 +3815,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                                   }}
                                                 >
                                                   <SelectTrigger className="w-[212px] h-8">
-                                                    <SelectValue placeholder={`Select ability #${index} *`} />
+                                                    <SelectValue placeholder={`Select ability #${index} (+${increaseAmount})`} />
                                                   </SelectTrigger>
                                                   <SelectContent>
                                                     {['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'].map((ability) => {
@@ -3078,8 +3846,106 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                     )
                                   }
                                   
-                                  // No fallback needed - all cases are handled by pattern-based selection or other specific handlers
-                                  return null
+                                  // Generic fallback for choice-based ASI without a pattern
+                                  // Supports: count, increase, options (abilities list) or defaults to any ability
+                                  const asiConfig = mainRaceData.ability_score_increases
+                                  const requiredCount = (typeof asiConfig?.choices?.count === 'number' && asiConfig.choices.count > 0)
+                                    ? asiConfig.choices.count
+                                    : (typeof asiConfig?.count === 'number' && asiConfig.count > 0 ? asiConfig.count : 1)
+                                  const increaseAmount = (typeof asiConfig?.choices?.increase === 'number' && asiConfig.choices.increase > 0)
+                                    ? asiConfig.choices.increase
+                                    : (typeof asiConfig?.increase === 'number' && asiConfig.increase > 0 ? asiConfig.increase : 1)
+                                  const availableAbilities: string[] = Array.isArray(asiConfig?.choices?.options) && asiConfig.choices.options.length > 0
+                                    ? asiConfig.choices.options.map((a: any) => String(a).toLowerCase())
+                                    : (Array.isArray(asiConfig?.options) && asiConfig.options.length > 0
+                                        ? asiConfig.options.map((a: any) => String(a).toLowerCase())
+                                        : ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'])
+                                  // Allow selecting the same ability up to twice for +1 patterns
+                                  const maxPerAbility = increaseAmount === 1 ? 2 : 1
+
+                                  // Current choices (exclude any fixed ability from custom patterns – not applicable here but safe)
+                                  const currentChoices = abilityScoreChoices
+                                  const selectedAbilities = currentChoices.map(c => c.ability)
+
+                                  return (
+                                    <div className="flex flex-row gap-4 justify-start p-0">
+                                      {Array.from({ length: requiredCount }, (_, i) => i).map((index) => {
+                                        const currentChoice = currentChoices[index]
+                                        const otherSelectedAbilities = currentChoices
+                                          .map(c => c?.ability)
+                                          .filter((a, idx) => idx !== index && !!a) as string[]
+                                        return (
+                                          <div key={index} className="flex flex-col gap-2">
+                                            <Label className="text-sm font-medium">
+                                              Ability #{index + 1} {increaseAmount ? `(+${increaseAmount})` : ''}
+                                            </Label>
+                                            <Select
+                                              value={currentChoice?.ability || ''}
+                                              onValueChange={(value) => {
+                                                // Replace the choice at this index with the new selection
+                                                setAbilityScoreChoices(prev => {
+                                                  // Build a copy of prev where slot index holds the selection
+                                                  const prevCopy = [...prev]
+                                                  // Remove any existing entry at this slot by rebuilding slots sequentially
+                                                  const withoutSlots = prevCopy.filter((_, idx) => idx >= requiredCount)
+                                                  const slots = prevCopy.slice(0, requiredCount)
+                                                  // Ensure slots array has proper length
+                                                  while (slots.length < requiredCount) slots.push({ ability: '', increase: increaseAmount })
+                                                  // Enforce max-per-ability across slots
+                                                  const usedCountElsewhere = slots.filter((c, sIdx) => sIdx !== index && c?.ability === value).length
+                                                  if (usedCountElsewhere >= maxPerAbility) {
+                                                    return prev // do not apply if this would exceed limit
+                                                  }
+                                                  const choice = { ability: value, increase: increaseAmount }
+                                                  slots[index] = choice
+                                                  // Recompute editableCharacter from base with these choices
+                                                  const baseScore = POINT_BUY_BASE
+                                                  let updatedCharacter: Partial<CharacterData> = {
+                                                    ...editableCharacter,
+                                                    strength: baseScore,
+                                                    dexterity: baseScore,
+                                                    constitution: baseScore,
+                                                    intelligence: baseScore,
+                                                    wisdom: baseScore,
+                                                    charisma: baseScore,
+                                                  }
+                                                  // Apply totals from slots
+                                                  const abilityTotals = slots
+                                                    .filter(c => c && c.ability)
+                                                    .reduce((acc: Record<string, number>, c) => {
+                                                      const key = c.ability.toLowerCase()
+                                                      acc[key] = (acc[key] || 0) + (c.increase || increaseAmount)
+                                                      return acc
+                                                    }, {})
+                                                  Object.entries(abilityTotals).forEach(([abilityKey, totalIncrease]) => {
+                                                    updatedCharacter[abilityKey as keyof CharacterData] = (baseScore + (totalIncrease as number)) as any
+                                                  })
+                                                  setEditableCharacter(updatedCharacter)
+                                                  // Return combined array: slots first (enforcing order), then any extra previous entries after requiredCount
+                                                  return [...slots, ...withoutSlots]
+                                                })
+                                              }}
+                                            >
+                                              <SelectTrigger className="w-[212px] h-8">
+                                                <SelectValue placeholder={`Select ability ${increaseAmount ? `(+${increaseAmount})` : ''}`} />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {availableAbilities.map((ability) => {
+                                                  const countWithoutCurrent = otherSelectedAbilities.filter(a => a === ability).length
+                                                  const disabled = countWithoutCurrent >= maxPerAbility && ability !== currentChoice?.ability
+                                                  return (
+                                                    <SelectItem key={ability} value={ability} disabled={disabled}>
+                                                      {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                                                    </SelectItem>
+                                                  )
+                                                })}
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  )
                                 })()
                               ) : mainRaceData.ability_score_increases.type === 'custom' ? (
                                 <div className="flex flex-row gap-4">
@@ -4135,7 +5001,701 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
             </div>
           )}
 
-            {/* Step 3: Class Selection */}
+            {/* Step 3: Background Selection */}
+            {step === 'background_selection' && (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-lg font-semibold">Background Selection</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Choose your character's background and configure background features
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="bg-[#ce6565] border-[#b04a4a] text-white px-4 py-3 rounded-lg text-sm font-medium flex-row flex gap-3">
+                    <Icon icon="lucide:alert-circle" className="w-4 h-4 my-0.5" />
+                    <span className="flex flex-col gap-0">
+                      <span className="text-sm font-semibold">Error:</span>
+                      <span className="text-sm font-normal">{error}</span>
+                    </span>
+                  </div>
+                )}
+
+                <Card>
+                  <CardContent className="flex flex-col gap-4">
+                    {/* Background Selection */}
+                    <div className="flex flex-col gap-2">
+                      <Label>Background *</Label>
+                      <Select
+                        value={selectedBackgroundId || ""}
+                        onValueChange={(value) => {
+                          if (value) {
+                            // Clear all previous background choices when changing background
+                            setBackgroundSkillChoices([])
+                            setBackgroundToolChoices([])
+                            setBackgroundLanguageChoices([])
+                            setBackgroundDefiningEvents([])
+                            setBackgroundPersonalityTraits([])
+                            setBackgroundIdeals([])
+                            setBackgroundBonds([])
+                            setBackgroundFlaws([])
+                            // Set new background
+                            setSelectedBackgroundId(value)
+                            loadSelectedBackgroundDetails(value)
+                          } else {
+                            setSelectedBackgroundId(null)
+                            setSelectedBackgroundData(null)
+                            setBackground("")
+                            setBackgroundSkillChoices([])
+                            setBackgroundToolChoices([])
+                            setBackgroundLanguageChoices([])
+                            setBackgroundDefiningEvents([])
+                            setBackgroundPersonalityTraits([])
+                            setBackgroundIdeals([])
+                            setBackgroundBonds([])
+                            setBackgroundFlaws([])
+                          }
+                        }}
+                        disabled={loading || loadingBackgroundDetails}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingBackgroundDetails ? "Loading background details..." : "Select a background"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {backgrounds.map((bg) => (
+                            <SelectItem key={bg.id} value={bg.id}>
+                              {bg.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Background Details */}
+                    {selectedBackgroundData && (
+                      <div className="flex flex-col gap-4 px-3 py-3 border rounded-lg bg-background">
+                        {/* Description */}
+                        {selectedBackgroundData.description && (
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-md font-medium">Description</Label>
+                            <div className="text-sm text-muted-foreground">
+                              <RichTextDisplay content={selectedBackgroundData.description} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Skill Proficiencies */}
+                        {selectedBackgroundData.skill_proficiencies && (() => {
+                          const skillsData = (() => {
+                            if (Array.isArray(selectedBackgroundData.skill_proficiencies)) {
+                              return { fixed: selectedBackgroundData.skill_proficiencies, choice: undefined, available: [] }
+                            }
+                            if (selectedBackgroundData.skill_proficiencies && typeof selectedBackgroundData.skill_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.skill_proficiencies)) {
+                              const skillsObj = selectedBackgroundData.skill_proficiencies as any
+                              const fixed = skillsObj.fixed || []
+                              const available = skillsObj.available || []
+                              const choice = skillsObj.choice || undefined
+                              const fromSelected = choice?.from_selected || false
+                              
+                              // If from_selected is true and there's no available array,
+                              // the fixed array contains the choice options (not actual fixed skills)
+                              // Example: Haunted One - fixed: [4 skills], choice: {count: 2, from_selected: true}, no available
+                              if (fromSelected && available.length === 0 && fixed.length > 0) {
+                                return {
+                                  fixed: [], // No actual fixed skills
+                                  available: fixed, // Fixed array is actually the available options
+                                  choice: choice
+                                }
+                              }
+                              
+                              return {
+                                fixed: fixed,
+                                available: available,
+                                choice: choice
+                              }
+                            }
+                            return { fixed: [], available: [], choice: undefined }
+                          })()
+
+                          const fixedSkills = skillsData.fixed || []
+                          const availableSkills = skillsData.available || []
+                          const hasChoice = !!skillsData.choice
+                          const choiceCount = skillsData.choice?.count || 1
+                          const fromSelected = skillsData.choice?.from_selected || false
+
+                          return (
+                            <div className="flex flex-col gap-2">
+                              <Label className="text-md font-medium">Skill Proficiencies</Label>
+                              {fixedSkills.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {fixedSkills.map((skill: string) => (
+                                    <Badge key={skill} variant="secondary">{SKILL_OPTIONS.find(s => s.value === skill)?.label || skill}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                              {hasChoice && (
+                                <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
+                                  <p className="text-sm text-muted-foreground">
+                                    Choose {choiceCount} skill{choiceCount > 1 ? 's' : ''} {fromSelected && availableSkills.length > 0 ? `from the ${availableSkills.length} skill${availableSkills.length > 1 ? 's' : ''} below` : 'from all available skills'}
+                                  </p>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {(fromSelected && availableSkills.length > 0 ? availableSkills : SKILL_OPTIONS.map(s => s.value))
+                                      .filter((skill: string) => !fixedSkills.includes(skill))
+                                      .map((skill: string) => {
+                                        const skillOption = SKILL_OPTIONS.find(s => s.value === skill)
+                                        if (!skillOption) return null
+                                        const isSelected = backgroundSkillChoices.includes(skill)
+                                        const canSelect = isSelected || backgroundSkillChoices.length < choiceCount
+                                        
+                                        return (
+                                          <div key={skill} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
+                                            <Checkbox
+                                              id={`bg-skill-${skill}`}
+                                              checked={isSelected}
+                                              disabled={!canSelect && !isSelected}
+                                              onCheckedChange={(checked) => {
+                                                if (checked) {
+                                                  if (backgroundSkillChoices.length < choiceCount) {
+                                                    setBackgroundSkillChoices([...backgroundSkillChoices, skill])
+                                                  }
+                                                } else {
+                                                  setBackgroundSkillChoices(backgroundSkillChoices.filter(s => s !== skill))
+                                                }
+                                              }}
+                                            />
+                                            <Label htmlFor={`bg-skill-${skill}`} className="text-sm cursor-pointer">
+                                              {skillOption.label}
+                                            </Label>
+                                          </div>
+                                        )
+                                      })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
+                        {/* Tool Proficiencies */}
+                        {selectedBackgroundData.tool_proficiencies && (() => {
+                          const toolsData = (() => {
+                            if (Array.isArray(selectedBackgroundData.tool_proficiencies)) {
+                              return { fixed: selectedBackgroundData.tool_proficiencies, choice: undefined, available: [] }
+                            }
+                            if (selectedBackgroundData.tool_proficiencies && typeof selectedBackgroundData.tool_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.tool_proficiencies)) {
+                              const toolsObj = selectedBackgroundData.tool_proficiencies as any
+                              const fixed = toolsObj.fixed || []
+                              const available = toolsObj.available || []
+                              const choice = toolsObj.choice || undefined
+                              const fromSelected = choice?.from_selected || false
+                              
+                              // If from_selected is true and there's no available array,
+                              // the fixed array contains the choice options (not actual fixed tools)
+                              if (fromSelected && available.length === 0 && fixed.length > 0) {
+                                return {
+                                  fixed: [], // No actual fixed tools
+                                  available: fixed, // Fixed array is actually the available options
+                                  choice: choice
+                                }
+                              }
+                              
+                              return {
+                                fixed: fixed,
+                                available: available,
+                                choice: choice
+                              }
+                            }
+                            return { fixed: [], available: [], choice: undefined }
+                          })()
+
+                          const fixedTools = toolsData.fixed || []
+                          const availableTools = toolsData.available || []
+                          const hasChoice = !!toolsData.choice
+                          const choiceCount = toolsData.choice?.count || 1
+                          const fromSelected = toolsData.choice?.from_selected || false
+
+                          const TOOL_OPTIONS = [
+                            { value: 'thieves_tools', label: 'Thieves\' Tools' },
+                            { value: 'artisans_tools', label: 'Artisan\'s Tools' },
+                            { value: 'tinkers_tools', label: 'Tinker\'s Tools' },
+                            { value: 'alchemists_supplies', label: 'Alchemist\'s Supplies' },
+                            { value: 'herbalism_kit', label: 'Herbalism Kit' },
+                            { value: 'poisoners_kit', label: 'Poisoner\'s Kit' },
+                            { value: 'disguise_kit', label: 'Disguise Kit' },
+                            { value: 'forgery_kit', label: 'Forgery Kit' },
+                            { value: 'navigators_tools', label: 'Navigator\'s Tools' },
+                            { value: 'musical_instruments', label: 'Musical Instruments' },
+                            { value: 'gaming_set', label: 'Gaming Set' },
+                            { value: 'vehicles_land', label: 'Vehicles (Land)' },
+                            { value: 'vehicles_water', label: 'Vehicles (Water)' }
+                          ]
+
+                          return (
+                            <div className="flex flex-col gap-2">
+                              <Label className="text-md font-medium">Tool Proficiencies</Label>
+                              {fixedTools.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {fixedTools.map((tool: string) => (
+                                    <Badge key={tool} variant="secondary">{TOOL_OPTIONS.find(t => t.value === tool)?.label || tool}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                              {hasChoice && (
+                                <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
+                                  <p className="text-sm text-muted-foreground">
+                                    Choose {choiceCount} tool{choiceCount > 1 ? 's' : ''} {fromSelected && availableTools.length > 0 ? `from the ${availableTools.length} tool${availableTools.length > 1 ? 's' : ''} below` : 'from all available tools'}
+                                  </p>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {(fromSelected && availableTools.length > 0 ? availableTools : TOOL_OPTIONS.map(t => t.value))
+                                      .filter((tool: string) => !fixedTools.includes(tool))
+                                      .map((tool: string) => {
+                                        const toolOption = TOOL_OPTIONS.find(t => t.value === tool)
+                                        if (!toolOption) return null
+                                        const isSelected = backgroundToolChoices.includes(tool)
+                                        const canSelect = isSelected || backgroundToolChoices.length < choiceCount
+                                        
+                                        return (
+                                          <div key={tool} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
+                                            <Checkbox
+                                              id={`bg-tool-${tool}`}
+                                              checked={isSelected}
+                                              disabled={!canSelect && !isSelected}
+                                              onCheckedChange={(checked) => {
+                                                if (checked) {
+                                                  if (backgroundToolChoices.length < choiceCount) {
+                                                    setBackgroundToolChoices([...backgroundToolChoices, tool])
+                                                  }
+                                                } else {
+                                                  setBackgroundToolChoices(backgroundToolChoices.filter(t => t !== tool))
+                                                }
+                                              }}
+                                            />
+                                            <Label htmlFor={`bg-tool-${tool}`} className="text-sm cursor-pointer">
+                                              {toolOption.label}
+                                            </Label>
+                                          </div>
+                                        )
+                                      })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
+                        {/* Languages */}
+                        {selectedBackgroundData.languages && (() => {
+                          const langsData = (() => {
+                            if (Array.isArray(selectedBackgroundData.languages)) {
+                              return { fixed: selectedBackgroundData.languages, choice: undefined }
+                            }
+                            if (selectedBackgroundData.languages && typeof selectedBackgroundData.languages === 'object' && !Array.isArray(selectedBackgroundData.languages)) {
+                              const langsObj = selectedBackgroundData.languages as any
+                              return {
+                                fixed: langsObj.fixed || [],
+                                choice: langsObj.choice || undefined
+                              }
+                            }
+                            return { fixed: [], choice: undefined }
+                          })()
+
+                          const fixedLangs = langsData.fixed || []
+                          const hasChoice = !!langsData.choice
+                          const choiceCount = langsData.choice?.count || 1
+
+                          return (
+                            <div className="flex flex-col gap-2">
+                              <Label className="text-md font-medium">Languages</Label>
+                              {fixedLangs.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {fixedLangs.map((lang: string) => (
+                                    <Badge key={lang} variant="secondary">{lang}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                              {hasChoice && (
+                                <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
+                                  <p className="text-sm text-muted-foreground">
+                                    Choose {choiceCount} additional language{choiceCount > 1 ? 's' : ''}
+                                  </p>
+                                  <div className="flex flex-col gap-2">
+                                    {Array.from({ length: choiceCount }, (_, i) => i).map((index) => (
+                                      <Input
+                                        key={index}
+                                        value={backgroundLanguageChoices[index] || ""}
+                                        onChange={(e) => {
+                                          const newChoices = [...backgroundLanguageChoices]
+                                          newChoices[index] = e.target.value
+                                          setBackgroundLanguageChoices(newChoices.filter(l => l.trim() !== ""))
+                                        }}
+                                        placeholder={`Language ${index + 1}`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
+                        {/* Equipment */}
+                        {selectedBackgroundData.equipment && (
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-md font-medium">Equipment</Label>
+                            <div className="text-sm text-muted-foreground">
+                              <RichTextDisplay content={selectedBackgroundData.equipment} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Money */}
+                        {selectedBackgroundData.money && (
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-md font-medium">Starting Money</Label>
+                            <div className="flex gap-4 text-sm">
+                              {selectedBackgroundData.money.gold > 0 && (
+                                <span>{selectedBackgroundData.money.gold} gp</span>
+                              )}
+                              {selectedBackgroundData.money.silver > 0 && (
+                                <span>{selectedBackgroundData.money.silver} sp</span>
+                              )}
+                              {selectedBackgroundData.money.copper > 0 && (
+                                <span>{selectedBackgroundData.money.copper} cp</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Numbered Items - Defining Events */}
+                        {selectedBackgroundData.defining_events && selectedBackgroundData.defining_events.length > 0 && (
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-md font-medium">
+                              {selectedBackgroundData.defining_events_title || 'Background Setup'}
+                            </Label>
+                            <p className="text-xs text-muted-foreground">Choose or roll for 1 defining event</p>
+                            <div className="flex flex-col gap-2">
+                              {(() => {
+                                const selectedEvent = backgroundDefiningEvents[0]
+                                return (
+                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
+                                    <Badge variant="outline">Event</Badge>
+                                    <div className="flex-1">
+                                      {selectedEvent ? (
+                                        <span className="text-sm">{selectedEvent.text}</span>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">Not selected</span>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={selectedEvent?.number.toString() || ""}
+                                        onValueChange={(value) => {
+                                          const event = selectedBackgroundData.defining_events?.find((e: any) => e.number === parseInt(value))
+                                          if (event) {
+                                            setBackgroundDefiningEvents([{ number: event.number, text: event.text }])
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-[200px]">
+                                          <SelectValue placeholder="Select event" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {(selectedBackgroundData.defining_events || []).map((event: any) => (
+                                            <SelectItem key={event.number} value={event.number.toString()}>
+                                              {event.number}: {event.text.substring(0, 50)}{event.text.length > 50 ? '...' : ''}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          const maxNumber = selectedBackgroundData.defining_events?.length || 0
+                                          if (maxNumber > 0) {
+                                            const roll = Math.floor(Math.random() * maxNumber) + 1
+                                            const rolledEvent = selectedBackgroundData.defining_events?.find((e: any) => e.number === roll)
+                                            if (rolledEvent) {
+                                              setBackgroundDefiningEvents([{ number: rolledEvent.number, text: rolledEvent.text }])
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                        Roll d{selectedBackgroundData.defining_events?.length || 0}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Numbered Items - Personality Traits */}
+                        {selectedBackgroundData.personality_traits && selectedBackgroundData.personality_traits.length > 0 && (
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-md font-medium">Personality Traits</Label>
+                            <p className="text-xs text-muted-foreground">Choose or roll for 1 personality trait</p>
+                            <div className="flex flex-col gap-2">
+                              {(() => {
+                                const selectedTrait = backgroundPersonalityTraits[0] || null
+                                return (
+                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
+                                    <Badge variant="outline">Personality Trait</Badge>
+                                    <div className="flex-1">
+                                      {selectedTrait ? (
+                                        <span className="text-sm">{selectedTrait.text}</span>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">Not selected</span>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={selectedTrait?.number.toString() || ""}
+                                        onValueChange={(value) => {
+                                          const trait = selectedBackgroundData.personality_traits?.find((t: any) => t.number === parseInt(value))
+                                          if (trait) {
+                                            setBackgroundPersonalityTraits([{ number: trait.number, text: trait.text }])
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-[200px]">
+                                          <SelectValue placeholder="Select trait" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {(selectedBackgroundData.personality_traits || []).map((trait: any) => (
+                                            <SelectItem key={trait.number} value={trait.number.toString()}>
+                                              {trait.number}: {trait.text.substring(0, 50)}{trait.text.length > 50 ? '...' : ''}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          const traits = selectedBackgroundData.personality_traits || []
+                                          if (traits.length > 0) {
+                                            // Roll based on array index (0 to length-1)
+                                            const rollIndex = Math.floor(Math.random() * traits.length)
+                                            const rolledTrait = traits[rollIndex]
+                                            if (rolledTrait) {
+                                              setBackgroundPersonalityTraits([{ number: rolledTrait.number, text: rolledTrait.text }])
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                        Roll d{selectedBackgroundData.personality_traits?.length || 0}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Numbered Items - Ideals */}
+                        {selectedBackgroundData.ideals && selectedBackgroundData.ideals.length > 0 && (
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-md font-medium">Ideals</Label>
+                            <p className="text-xs text-muted-foreground">Choose or roll for 1 ideal</p>
+                            <div className="flex flex-col gap-2">
+                              {(() => {
+                                const selectedIdeal = backgroundIdeals[0]
+                                return (
+                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
+                                    <Badge variant="outline">Ideal</Badge>
+                                    <div className="flex-1">
+                                      {selectedIdeal ? (
+                                        <span className="text-sm">{selectedIdeal.text}</span>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">Not selected</span>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={selectedIdeal?.number.toString() || ""}
+                                        onValueChange={(value) => {
+                                          const ideal = selectedBackgroundData.ideals?.find((i: any) => i.number === parseInt(value))
+                                          if (ideal) {
+                                            setBackgroundIdeals([{ number: ideal.number, text: ideal.text }])
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-[200px]">
+                                          <SelectValue placeholder="Select ideal" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {(selectedBackgroundData.ideals || []).map((ideal: any) => (
+                                            <SelectItem key={ideal.number} value={ideal.number.toString()}>
+                                              {ideal.number}: {ideal.text.substring(0, 50)}{ideal.text.length > 50 ? '...' : ''}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          const maxNumber = selectedBackgroundData.ideals?.length || 0
+                                          if (maxNumber > 0) {
+                                            const roll = Math.floor(Math.random() * maxNumber) + 1
+                                            const rolledIdeal = selectedBackgroundData.ideals?.find((i: any) => i.number === roll)
+                                            if (rolledIdeal) {
+                                              setBackgroundIdeals([{ number: rolledIdeal.number, text: rolledIdeal.text }])
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                        Roll d{selectedBackgroundData.ideals?.length || 0}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Numbered Items - Bonds */}
+                        {selectedBackgroundData.bonds && selectedBackgroundData.bonds.length > 0 && (
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-md font-medium">Bonds</Label>
+                            <p className="text-xs text-muted-foreground">Choose or roll for 1 bond</p>
+                            <div className="flex flex-col gap-2">
+                              {(() => {
+                                const selectedBond = backgroundBonds[0]
+                                return (
+                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
+                                    <Badge variant="outline">Bond</Badge>
+                                    <div className="flex-1">
+                                      {selectedBond ? (
+                                        <span className="text-sm">{selectedBond.text}</span>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">Not selected</span>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={selectedBond?.number.toString() || ""}
+                                        onValueChange={(value) => {
+                                          const bond = selectedBackgroundData.bonds?.find((b: any) => b.number === parseInt(value))
+                                          if (bond) {
+                                            setBackgroundBonds([{ number: bond.number, text: bond.text }])
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-[200px]">
+                                          <SelectValue placeholder="Select bond" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {(selectedBackgroundData.bonds || []).map((bond: any) => (
+                                            <SelectItem key={bond.number} value={bond.number.toString()}>
+                                              {bond.number}: {bond.text.substring(0, 50)}{bond.text.length > 50 ? '...' : ''}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          const maxNumber = selectedBackgroundData.bonds?.length || 0
+                                          if (maxNumber > 0) {
+                                            const roll = Math.floor(Math.random() * maxNumber) + 1
+                                            const rolledBond = selectedBackgroundData.bonds?.find((b: any) => b.number === roll)
+                                            if (rolledBond) {
+                                              setBackgroundBonds([{ number: rolledBond.number, text: rolledBond.text }])
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                        Roll d{selectedBackgroundData.bonds?.length || 0}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Numbered Items - Flaws */}
+                        {selectedBackgroundData.flaws && selectedBackgroundData.flaws.length > 0 && (
+                          <div className="flex flex-col gap-2">
+                            <Label className="text-md font-medium">Flaws</Label>
+                            <p className="text-xs text-muted-foreground">Choose or roll for 1 flaw</p>
+                            <div className="flex flex-col gap-2">
+                              {(() => {
+                                const selectedFlaw = backgroundFlaws[0]
+                                return (
+                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
+                                    <Badge variant="outline">Flaw</Badge>
+                                    <div className="flex-1">
+                                      {selectedFlaw ? (
+                                        <span className="text-sm">{selectedFlaw.text}</span>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">Not selected</span>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={selectedFlaw?.number.toString() || ""}
+                                        onValueChange={(value) => {
+                                          const flaw = selectedBackgroundData.flaws?.find((f: any) => f.number === parseInt(value))
+                                          if (flaw) {
+                                            setBackgroundFlaws([{ number: flaw.number, text: flaw.text }])
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-[200px]">
+                                          <SelectValue placeholder="Select flaw" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {(selectedBackgroundData.flaws || []).map((flaw: any) => (
+                                            <SelectItem key={flaw.number} value={flaw.number.toString()}>
+                                              {flaw.number}: {flaw.text.substring(0, 50)}{flaw.text.length > 50 ? '...' : ''}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          const maxNumber = selectedBackgroundData.flaws?.length || 0
+                                          if (maxNumber > 0) {
+                                            const roll = Math.floor(Math.random() * maxNumber) + 1
+                                            const rolledFlaw = selectedBackgroundData.flaws?.find((f: any) => f.number === roll)
+                                            if (rolledFlaw) {
+                                              setBackgroundFlaws([{ number: rolledFlaw.number, text: rolledFlaw.text }])
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                        Roll d{selectedBackgroundData.flaws?.length || 0}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Step 4: Class Selection */}
             {step === 'class_selection' && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
@@ -4268,40 +5828,47 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                     }}
                                   />
                                   </div>
-                                  {charClass.name && classSubclasses.length > 0 && (() => {
+                                  {charClass.name && (() => {
                                     const requiredLevel = getSubclassSelectionLevel(charClass.name)
+                                    const currentLevel = charClass.level || 1
                                     // Only show subclass select if level is at or above the threshold
-                                    if (charClass.level < requiredLevel) {
-                                      return null
+                                    if (currentLevel >= requiredLevel) {
+                                      return (
+                                        <div className="flex flex-col gap-2">
+                                          <Label htmlFor={`subclass-${index}`} className="text-xs">
+                                            Subclass *
+                                          </Label>
+                                          <Select
+                                          value={charClass.subclass || undefined}
+                                          onValueChange={(value) => {
+                                            const selectedClassOption = classes.find(c => c.name === charClass.name && c.subclass === value)
+                                            const updated = characterClasses.map((c, i) => 
+                                              i === index ? { ...c, subclass: value || undefined, class_id: selectedClassOption?.id || c.class_id } : c
+                                            )
+                                            setCharacterClasses(updated)
+                                          }}
+                                        >
+                                          <SelectTrigger className="h-8 w-[212px]">
+                                            <SelectValue placeholder="Select a subclass (required)" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {classSubclasses.length > 0 ? (
+                                              classSubclasses.map((subclass) => (
+                                                <SelectItem key={subclass} value={subclass}>
+                                                  {subclass}
+                                                </SelectItem>
+                                              ))
+                                            ) : (
+                                              <SelectItem value="__none__" disabled>
+                                                No subclasses available
+                                              </SelectItem>
+                                            )}
+                                          </SelectContent>
+                                        </Select>
+                                        </div>
+                                      )
                                     }
-                                    return (
-                                      <div className="flex flex-col gap-2">
-                                        <Label htmlFor={`subclass-${index}`} className="text-xs">
-                                          Subclass *
-                                        </Label>
-                                        <Select
-                                        value={charClass.subclass || undefined}
-                                        onValueChange={(value) => {
-                                          const selectedClassOption = classes.find(c => c.name === charClass.name && c.subclass === value)
-                                          const updated = characterClasses.map((c, i) => 
-                                            i === index ? { ...c, subclass: value || undefined, class_id: selectedClassOption?.id || c.class_id } : c
-                                          )
-                                          setCharacterClasses(updated)
-                                        }}
-                                      >
-                                        <SelectTrigger className="h-8 w-[212px]">
-                                          <SelectValue placeholder="Select a subclass (required)" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {classSubclasses.map((subclass) => (
-                                            <SelectItem key={subclass} value={subclass}>
-                                              {subclass}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      </div>
-                                    )
+                                    return null
                                   })()}
                                   {index > 0 && (
                                     <Button
@@ -4332,6 +5899,20 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                   // Most classes get 2 skill proficiencies
                                   const maxSkillChoices = 2
                                   
+                                  // Collect skills that are already proficient from race or background (but not from this class)
+                                  const alreadyProficientSkills = new Set<string>()
+                                  editableCharacter.skills?.forEach(skill => {
+                                    const skillInDbFormat = skill.name.toLowerCase().replace(/\s+/g, '_')
+                                    // Check if this skill is proficient but not from this class
+                                    if (skill.proficiency === 'proficient' || skill.proficiency === 'expertise') {
+                                      // Check if it's not from this class's selected skills
+                                      const isFromThisClass = (charClass.selectedSkillProficiencies || []).includes(skillInDbFormat)
+                                      if (!isFromThisClass) {
+                                        alreadyProficientSkills.add(skillInDbFormat)
+                                      }
+                                    }
+                                  })
+                                  
                                   if (availableSkills.length > 0) {
                                     const selectedSkills = charClass.selectedSkillProficiencies || []
                                     
@@ -4354,7 +5935,8 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                             })
                                           }).map((skill) => {
                                             const isSelected = selectedSkills.includes(skill.value)
-                                            const canSelect = isSelected || selectedSkills.length < maxSkillChoices
+                                            const isAlreadyProficient = alreadyProficientSkills.has(skill.value)
+                                            const canSelect = isSelected || (selectedSkills.length < maxSkillChoices && !isAlreadyProficient)
                                             
                                             return (
                                               <div key={skill.value} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
@@ -4386,8 +5968,11 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                                     setEditableCharacter(prev => ({ ...prev, skills: updatedSkills }))
                                                   }}
                                                 />
-                                                <Label htmlFor={`skill-${index}-${skill.value}`} className="text-sm font-normal cursor-pointer flex-1">
+                                                <Label htmlFor={`skill-${index}-${skill.value}`} className={`text-sm font-normal flex-1 ${isAlreadyProficient ? 'cursor-not-allowed text-muted-foreground' : 'cursor-pointer'}`}>
                                                   {skill.label}
+                                                  {isAlreadyProficient && (
+                                                    <span className="ml-2 text-xs text-muted-foreground">(already proficient)</span>
+                                                  )}
                                                 </Label>
                                               </div>
                                             )
@@ -4733,7 +6318,9 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                         const modifier = calculateModifier(value)
                         
                         // Calculate base score (before race/ASI bonuses)
-                        let raceBonus = abilityScoreChoices.find(c => c.ability === ability)?.increase || 0
+                        let raceBonus = abilityScoreChoices
+                          .filter(c => c.ability === ability)
+                          .reduce((sum, c) => sum + (c.increase || 0), 0)
                         
                         // Check for fixed ASI bonus in custom patterns (e.g., Half-Elf +2 CHA)
                         if (mainRaceData?.ability_score_increases?.type === 'custom' && mainRaceData.ability_score_increases.fixed) {
@@ -4898,9 +6485,10 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                       </div>
                       <Button
                         onClick={rollHitDie}
-                        disabled={hpRollResult !== null}
+                        disabled={hpRollResult !== null || getTotalPointsSpent() !== POINT_BUY_TOTAL}
                         className="min-w-[120px] absolute top-0 right-4"
                         size="lg"
+                        title={getTotalPointsSpent() !== POINT_BUY_TOTAL ? `Allocate all ${POINT_BUY_TOTAL} points to enable rolling HP` : undefined}
                       >
                         <Icon icon="lucide:dice-6" className="w-4 h-4" />
                         Roll Hit Dice
@@ -5073,7 +6661,9 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                           const modifier = calculateModifier(score)
                           
                           // Calculate race bonuses (including fixed ASI for custom patterns like Half-Elf)
-                          let raceBonus = abilityScoreChoices.find(c => c.ability === ability)?.increase || 0
+                          let raceBonus = abilityScoreChoices
+                            .filter(c => c.ability === ability)
+                            .reduce((sum, c) => sum + (c.increase || 0), 0)
                           
                           // Check for fixed ASI bonus in custom patterns (e.g., Half-Elf +2 CHA)
                           if (mainRaceData?.ability_score_increases?.type === 'custom' && mainRaceData.ability_score_increases.fixed) {
@@ -5278,8 +6868,10 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                   onClick={() => {
                     if (step === 'race_selection') {
                       setStep('basic_info')
-                    } else if (step === 'class_selection') {
+                    } else if (step === 'background_selection') {
                       setStep('race_selection')
+                    } else if (step === 'class_selection') {
+                      setStep('background_selection')
                     } else if (step === 'class_features') {
                       setStep('class_selection')
                     } else if (step === 'hp_roll') {
@@ -5303,10 +6895,6 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                       setError("Character name is required")
                       return
                     }
-                    if (!background.trim()) {
-                      setError("Background is required")
-                      return
-                    }
                     setError(null)
                     setStep('race_selection')
                   }}
@@ -5326,6 +6914,75 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                     if (!raceIds.some(r => r.isMain)) {
                       setError("Please mark one race as main")
                       return
+                    }
+                    setError(null)
+                    setStep('background_selection')
+                  }}
+                >
+                  Continue to Background Selection
+                  <Icon icon="lucide:arrow-right" className="w-4 h-4" />
+                </Button>
+              )}
+              
+              {step === 'background_selection' && (
+                <Button
+                  onClick={() => {
+                    if (!selectedBackgroundId) {
+                      setError("Please select a background")
+                      return
+                    }
+                    // Validate skill/tool/language choices if background has choice options
+                    if (selectedBackgroundData) {
+                      const skillsData = (() => {
+                        if (Array.isArray(selectedBackgroundData.skill_proficiencies)) {
+                          return { fixed: selectedBackgroundData.skill_proficiencies, choice: undefined }
+                        }
+                        if (selectedBackgroundData.skill_proficiencies && typeof selectedBackgroundData.skill_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.skill_proficiencies)) {
+                          return {
+                            fixed: (selectedBackgroundData.skill_proficiencies as any).fixed || [],
+                            choice: (selectedBackgroundData.skill_proficiencies as any).choice || undefined
+                          }
+                        }
+                        return { fixed: [], choice: undefined }
+                      })()
+                      if (skillsData.choice && backgroundSkillChoices.length < (skillsData.choice.count || 1)) {
+                        setError(`Please select ${skillsData.choice.count || 1} skill${(skillsData.choice.count || 1) > 1 ? 's' : ''} for your background`)
+                        return
+                      }
+
+                      const toolsData = (() => {
+                        if (Array.isArray(selectedBackgroundData.tool_proficiencies)) {
+                          return { fixed: selectedBackgroundData.tool_proficiencies, choice: undefined }
+                        }
+                        if (selectedBackgroundData.tool_proficiencies && typeof selectedBackgroundData.tool_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.tool_proficiencies)) {
+                          return {
+                            fixed: (selectedBackgroundData.tool_proficiencies as any).fixed || [],
+                            choice: (selectedBackgroundData.tool_proficiencies as any).choice || undefined
+                          }
+                        }
+                        return { fixed: [], choice: undefined }
+                      })()
+                      if (toolsData.choice && backgroundToolChoices.length < (toolsData.choice.count || 1)) {
+                        setError(`Please select ${toolsData.choice.count || 1} tool${(toolsData.choice.count || 1) > 1 ? 's' : ''} for your background`)
+                        return
+                      }
+
+                      const langsData = (() => {
+                        if (Array.isArray(selectedBackgroundData.languages)) {
+                          return { fixed: selectedBackgroundData.languages, choice: undefined }
+                        }
+                        if (selectedBackgroundData.languages && typeof selectedBackgroundData.languages === 'object' && !Array.isArray(selectedBackgroundData.languages)) {
+                          return {
+                            fixed: (selectedBackgroundData.languages as any).fixed || [],
+                            choice: (selectedBackgroundData.languages as any).choice || undefined
+                          }
+                        }
+                        return { fixed: [], choice: undefined }
+                      })()
+                      if (langsData.choice && backgroundLanguageChoices.length < (langsData.choice.count || 1)) {
+                        setError(`Please enter ${langsData.choice.count || 1} language${(langsData.choice.count || 1) > 1 ? 's' : ''} for your background`)
+                        return
+                      }
                     }
                     setError(null)
                     setStep('class_selection')

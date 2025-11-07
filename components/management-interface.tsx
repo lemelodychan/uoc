@@ -9,8 +9,8 @@ import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
 import type { UserProfile, PermissionLevel } from "@/lib/user-profiles"
 import { useUser } from "@/lib/user-context"
-import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin, loadRacesWithDetails, upsertRace as dbUpsertRace, deleteRace as dbDeleteRace, loadRaceDetails } from "@/lib/database"
-import type { RaceData } from "@/lib/database"
+import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin, loadRacesWithDetails, upsertRace as dbUpsertRace, deleteRace as dbDeleteRace, loadRaceDetails, loadBackgroundsWithDetails, upsertBackground as dbUpsertBackground, deleteBackground as dbDeleteBackground, loadBackgroundDetails } from "@/lib/database"
+import type { RaceData, BackgroundData } from "@/lib/database"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
@@ -20,6 +20,7 @@ import { ClassFeatureSkillModal } from "./edit-modals/class-feature-skill-modal"
 import { CampaignCreationModal } from "./edit-modals/campaign-creation-modal"
 import { ClassEditorPage } from "./class-editor-page"
 import { RaceEditorPage } from "./race-editor-page"
+import { BackgroundEditorPage } from "./background-editor-page"
 import { SubclassManagementModal } from "@/components/edit-modals/subclass-management-modal"
 import { FeatureManagementModal } from "@/components/edit-modals/feature-management-modal"
 import { ProficiencyCheckboxes, SAVING_THROW_OPTIONS, SKILL_OPTIONS, EQUIPMENT_OPTIONS } from "@/components/ui/proficiency-checkboxes"
@@ -73,6 +74,12 @@ export function ManagementInterface({
   const [raceEditorView, setRaceEditorView] = useState<'list' | 'editor'>('list')
   const [lastEditedRaceId, setLastEditedRaceId] = useState<string | null>(null)
   
+  // Background management state
+  const [backgrounds, setBackgrounds] = useState<BackgroundData[]>([])
+  const [editingBackground, setEditingBackground] = useState<BackgroundData | null>(null)
+  const [backgroundEditorView, setBackgroundEditorView] = useState<'list' | 'editor'>('list')
+  const [lastEditedBackgroundId, setLastEditedBackgroundId] = useState<string | null>(null)
+  
   // Refs for scroll management
   const classListTopRef = useRef<HTMLDivElement>(null)
   const classCardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -87,10 +94,23 @@ export function ManagementInterface({
     loadRaces()
   }, [])
 
+  // Load backgrounds on mount
+  useEffect(() => {
+    loadBackgrounds()
+  }, [])
+
   // Reload races when switching to races tab (if in list view)
   useEffect(() => {
     if (activeTab === 'races' && raceEditorView === 'list') {
       loadRaces()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  // Reload backgrounds when switching to backgrounds tab (if in list view)
+  useEffect(() => {
+    if (activeTab === 'backgrounds' && backgroundEditorView === 'list') {
+      loadBackgrounds()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
@@ -286,6 +306,28 @@ export function ManagementInterface({
     }
   }
 
+  const loadBackgrounds = async () => {
+    try {
+      const result = await loadBackgroundsWithDetails()
+      if (result.backgrounds) {
+        setBackgrounds(result.backgrounds)
+      } else if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error loading backgrounds:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load backgrounds",
+        variant: "destructive"
+      })
+    }
+  }
+
   return (
     <div className="relative flex flex-row gap-6 h-full !overflow-auto">
 
@@ -328,6 +370,22 @@ export function ManagementInterface({
           >
             <Icon icon="lucide:users-round" className="w-4 h-4" />
             Races
+            <Badge 
+              variant="secondary" 
+              className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto"
+            >
+              Beta
+            </Badge>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('backgrounds')}
+            className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
+              activeTab === 'backgrounds' ? 'text-primary' : ''
+            }`}
+          >
+            <Icon icon="lucide:scroll-text" className="w-4 h-4" />
+            Backgrounds
             <Badge 
               variant="secondary" 
               className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto"
@@ -659,6 +717,121 @@ export function ManagementInterface({
                   toast({
                     title: "Error",
                     description: "Failed to delete race",
+                      variant: "destructive"
+                    })
+                  }
+                }}
+              />
+            )
+          )}
+          </div>
+        )}
+
+        {activeTab === 'backgrounds' && (
+          <div className="flex-1 min-h-0 flex flex-col gap-0">
+            {backgroundEditorView === 'list' ? (
+              <BackgroundManagement 
+                backgrounds={backgrounds}
+                canEdit={canEdit}
+                onEditBackground={async (backgroundData) => {
+              const result = await loadBackgroundDetails(backgroundData.id)
+              if (result.background) {
+                setEditingBackground(result.background)
+                setBackgroundEditorView('editor')
+              } else {
+                  toast({
+                    title: "Error",
+                    description: result.error || "Failed to load background data",
+                    variant: "destructive"
+                  })
+                }
+              }}
+              onCreateBackground={() => {
+              setEditingBackground({
+                id: '',
+                name: '',
+                skill_proficiencies: null,
+                tool_proficiencies: null,
+                equipment_proficiencies: null,
+                languages: null,
+                equipment: null,
+                money: { gold: 0, silver: 0, copper: 0 },
+                description: null,
+                defining_events: null,
+                defining_events_title: null,
+                personality_traits: null,
+                ideals: null,
+                bonds: null,
+                flaws: null
+                })
+                setBackgroundEditorView('editor')
+              }}
+              onDeleteBackground={async (backgroundId) => {
+              try {
+                await dbDeleteBackground(backgroundId)
+                await loadBackgrounds()
+                toast({
+                  title: "Success",
+                  description: "Background deleted successfully"
+                })
+              } catch (error) {
+                toast({
+                  title: "Error",
+                  description: "Failed to delete background",
+                  variant: "destructive"
+                })
+              }
+            }}
+                onReloadBackgrounds={loadBackgrounds}
+              />
+            ) : (
+              editingBackground && (
+                <BackgroundEditorPage
+                  backgroundData={editingBackground}
+                  canEdit={canEdit}
+                  onSave={async (backgroundData) => {
+                try {
+                  const result = await dbUpsertBackground(backgroundData)
+                  if (!result.success) {
+                    throw new Error(result.error || 'Failed to save background')
+                  }
+                  const savedBackgroundId = result.id || backgroundData.id
+                  if (savedBackgroundId) {
+                    setLastEditedBackgroundId(savedBackgroundId)
+                  }
+                  // Reload backgrounds to refresh the list
+                  await loadBackgrounds()
+                  // Switch to list view after backgrounds are loaded
+                  setBackgroundEditorView('list')
+                  setEditingBackground(null)
+                  toast({
+                    title: "Success",
+                    description: `Background "${backgroundData.name}" saved successfully`,
+                  })
+                } catch (error) {
+                    console.error('Error saving background:', error)
+                    throw error
+                  }
+                }}
+                onCancel={() => {
+                  setBackgroundEditorView('list')
+                  setEditingBackground(null)
+                }}
+                onDelete={async (backgroundId) => {
+                try {
+                  await dbDeleteBackground(backgroundId)
+                  await loadBackgrounds()
+                  setBackgroundEditorView('list')
+                  setEditingBackground(null)
+                  toast({
+                    title: "Success",
+                    description: "Background deleted successfully",
+                  })
+                } catch (error) {
+                  console.error('Error deleting background:', error)
+                  toast({
+                    title: "Error",
+                    description: "Failed to delete background",
                       variant: "destructive"
                     })
                   }
@@ -1361,6 +1534,264 @@ function RaceManagement({
         {races.length === 0 && (
           <div className="text-center text-muted-foreground py-8">
             No races found. Create your first race to get started.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Background Management Component
+function BackgroundManagement({ 
+  backgrounds,
+  canEdit = true,
+  onEditBackground,
+  onCreateBackground,
+  onDeleteBackground,
+  onReloadBackgrounds
+}: {
+  backgrounds: BackgroundData[]
+  canEdit?: boolean
+  onEditBackground: (backgroundData: BackgroundData) => void
+  onCreateBackground: () => void
+  onDeleteBackground: (backgroundId: string) => void
+  onReloadBackgrounds: () => Promise<void>
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-row gap-4 items-start justify-between">
+        <h2 className="text-3xl font-display font-bold">Background Management</h2>
+        {canEdit && (
+          <Button onClick={onCreateBackground}>
+            <Icon icon="lucide:plus" className="w-4 h-4" />
+            Create Background
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {backgrounds.map((background) => (
+          <Card key={background.id}>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">{background.name}</span>
+                </div>
+                <div className="flex gap-2">
+                  {canEdit && (
+                    <Button size="sm" variant="outline" onClick={() => onEditBackground(background)} className="h-8 font-body">
+                      <Icon icon="lucide:edit" className="w-4 h-4" />
+                      Edit
+                    </Button>
+                  )}
+                  {canEdit && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"
+                      onClick={async () => {
+                        if (confirm(`Are you sure you want to delete "${background.name}"? This action cannot be undone.`)) {
+                          await onDeleteBackground(background.id)
+                          await onReloadBackgrounds()
+                        }
+                      }}
+                    >
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Description */}
+              {background.description && (
+                <p className="text-muted-foreground mb-4 line-clamp-2 text-sm">
+                  {background.description.replace(/<[^>]*>/g, '').substring(0, 400)}
+                  {background.description.length > 400 ? '...' : ''}
+                </p>
+              )}
+              
+              <div className="flex flex-col gap-2">
+                {/* Background Stats */}
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                  {/* Skill Proficiencies Count */}
+                  {background.skill_proficiencies && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:brain" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Skills:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(() => {
+                          if (Array.isArray(background.skill_proficiencies)) {
+                            return background.skill_proficiencies.length
+                          }
+                          if (typeof background.skill_proficiencies === 'object' && !Array.isArray(background.skill_proficiencies)) {
+                            const skillsObj = background.skill_proficiencies as any
+                            const fixed = skillsObj.fixed || []
+                            const available = skillsObj.available || []
+                            const choice = skillsObj.choice
+                            
+                            // Check if there are fixed skills AND choice
+                            if (fixed.length > 0 && choice) {
+                              // Has both fixed skills and choice
+                              if (choice.from_selected) {
+                                // Choice from selected skills
+                                const optionCount = available.length > 0 ? available.length : 0
+                                if (optionCount > 0) {
+                                  return `${fixed.length} + Choose ${choice.count || 1} from ${optionCount}`
+                                } else {
+                                  // Legacy data - fixed array might contain available options
+                                  // But we have fixed.length > 0, so assume they're actual fixed skills
+                                  return `${fixed.length} + Choose ${choice.count || 1} from selected`
+                                }
+                              } else {
+                                // Choice from all skills
+                                return `${fixed.length} + Choose ${choice.count || 1}`
+                              }
+                            } else if (choice && choice.from_selected) {
+                              // Only choice from selected (no fixed skills)
+                              const optionCount = available.length > 0 ? available.length : fixed.length
+                              if (optionCount > 0) {
+                                return `Choose ${choice.count || 1} from ${optionCount}`
+                              } else {
+                                return `Choose ${choice.count || 1} from selected`
+                              }
+                            } else if (fixed.length > 0) {
+                              // Only fixed skills
+                              return fixed.length
+                            } else if (choice) {
+                              // Only choice from all skills
+                              return `Choose ${choice.count || 1}`
+                            }
+                          }
+                          return '0'
+                        })()}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Tool Proficiencies Count */}
+                  {background.tool_proficiencies && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:wrench" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Tools:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(() => {
+                          if (Array.isArray(background.tool_proficiencies)) {
+                            return background.tool_proficiencies.length
+                          }
+                          if (typeof background.tool_proficiencies === 'object' && !Array.isArray(background.tool_proficiencies)) {
+                            const toolsObj = background.tool_proficiencies as any
+                            const fixed = toolsObj.fixed || []
+                            const available = toolsObj.available || []
+                            const choice = toolsObj.choice
+                            
+                            // Check if there are fixed tools AND choice
+                            if (fixed.length > 0 && choice) {
+                              // Has both fixed tools and choice
+                              if (choice.from_selected) {
+                                // Choice from selected tools
+                                const optionCount = available.length > 0 ? available.length : 0
+                                if (optionCount > 0) {
+                                  return `${fixed.length} + Choose ${choice.count || 1} from ${optionCount}`
+                                } else {
+                                  return `${fixed.length} + Choose ${choice.count || 1} from selected`
+                                }
+                              } else {
+                                // Choice from all tools
+                                return `${fixed.length} + Choose ${choice.count || 1}`
+                              }
+                            } else if (choice && choice.from_selected) {
+                              // Only choice from selected (no fixed tools)
+                              const optionCount = available.length > 0 ? available.length : fixed.length
+                              if (optionCount > 0) {
+                                return `Choose ${choice.count || 1} from ${optionCount}`
+                              } else {
+                                return `Choose ${choice.count || 1} from selected`
+                              }
+                            } else if (fixed.length > 0) {
+                              // Only fixed tools
+                              return fixed.length
+                            } else if (choice) {
+                              // Only choice from all tools
+                              return `Choose ${choice.count || 1}`
+                            }
+                          }
+                          return '0'
+                        })()}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Languages Count */}
+                  {background.languages && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:languages" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Languages:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(() => {
+                          if (Array.isArray(background.languages)) {
+                            return background.languages.length
+                          }
+                          if (typeof background.languages === 'object' && !Array.isArray(background.languages)) {
+                            const langsObj = background.languages as any
+                            const fixed = langsObj.fixed || []
+                            const choice = langsObj.choice
+                            if (fixed.length > 0 && choice) {
+                              return `${fixed.length} + Choose ${choice.count || 1}`
+                            } else if (fixed.length > 0) {
+                              return fixed.length
+                            } else if (choice) {
+                              return `Choose ${choice.count || 1}`
+                            }
+                          }
+                          return '0'
+                        })()}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Money */}
+                  {background.money && (background.money.gold > 0 || background.money.silver > 0 || background.money.copper > 0) && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:coins" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Money:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {background.money.gold > 0 && `${background.money.gold}gp`}
+                        {background.money.gold > 0 && (background.money.silver > 0 || background.money.copper > 0) && ' '}
+                        {background.money.silver > 0 && `${background.money.silver}sp`}
+                        {background.money.silver > 0 && background.money.copper > 0 && ' '}
+                        {background.money.copper > 0 && `${background.money.copper}cp`}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between mt-1 border-t pt-3">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Icon icon="lucide:calendar" className="w-3 h-3" />
+                    <span>Updated {(() => {
+                      try {
+                        if (background.updated_at) {
+                          const date = new Date(background.updated_at)
+                          if (!isNaN(date.getTime())) {
+                            return date.toLocaleDateString()
+                          }
+                        }
+                        return 'Recently'
+                      } catch (error) {
+                        return 'Unknown'
+                      }
+                    })()}</span>
+                  </div>
+                </div>
+              </div>
+                
+            </CardContent>
+          </Card>
+        ))}
+        {backgrounds.length === 0 && (
+          <div className="text-center text-muted-foreground py-8">
+            No backgrounds found. Create your first background to get started.
           </div>
         )}
       </div>

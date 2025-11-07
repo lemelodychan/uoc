@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +13,7 @@ interface ProficiencyCheckboxesProps {
   description?: string
   readonly?: boolean
   maxSelections?: number
+  disabledValues?: string[]
 }
 
 export function ProficiencyCheckboxes({
@@ -22,10 +23,19 @@ export function ProficiencyCheckboxes({
   title,
   description,
   readonly = false,
-  maxSelections
+  maxSelections,
+  disabledValues = []
 }: ProficiencyCheckboxesProps) {
   const [selectedValues, setSelectedValues] = useState<string[]>(value)
   const [unmatchedValues, setUnmatchedValues] = useState<string[]>([])
+  const prevValueRef = useRef<string>(JSON.stringify(value))
+  const prevDisabledValuesRef = useRef<string>(JSON.stringify(disabledValues))
+  const selectedValuesRef = useRef<string[]>(value)
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedValuesRef.current = selectedValues
+  }, [selectedValues])
 
   // Debug logging
   useEffect(() => {
@@ -35,6 +45,18 @@ export function ProficiencyCheckboxes({
   }, [title, options])
 
   useEffect(() => {
+    // Check if value or disabledValues actually changed
+    const currentValueStr = JSON.stringify(value)
+    const currentDisabledStr = JSON.stringify(disabledValues)
+    
+    // Only process if value or disabledValues changed
+    if (currentValueStr === prevValueRef.current && currentDisabledStr === prevDisabledValuesRef.current) {
+      return
+    }
+    
+    prevValueRef.current = currentValueStr
+    prevDisabledValuesRef.current = currentDisabledStr
+    
     // Normalize the incoming value to match our options
     const unmatched: string[] = []
     const normalizedValue = value.map(val => {
@@ -70,12 +92,25 @@ export function ProficiencyCheckboxes({
       return null
     }).filter(Boolean) as string[]
     
-    setSelectedValues(normalizedValue)
+    // Filter out disabled values from the normalized value
+    const filteredValue = normalizedValue.filter(val => !disabledValues.includes(val))
+    
+    // Only update if the filtered value is different from current state (using ref to avoid dependency)
+    const currentSelectedStr = JSON.stringify([...selectedValuesRef.current].sort())
+    const filteredValueStr = JSON.stringify([...filteredValue].sort())
+    if (currentSelectedStr !== filteredValueStr) {
+      setSelectedValues(filteredValue)
+    }
     setUnmatchedValues(unmatched)
-  }, [value, options, title])
+  }, [value, options, title, disabledValues])
 
   const handleToggle = (optionValue: string) => {
     if (readonly) return
+    
+    // Don't allow toggling disabled values
+    if (disabledValues && disabledValues.includes(optionValue)) {
+      return
+    }
 
     let newSelection: string[]
     if (selectedValues.includes(optionValue)) {
@@ -89,8 +124,13 @@ export function ProficiencyCheckboxes({
       newSelection = [...selectedValues, optionValue]
     }
 
-    setSelectedValues(newSelection)
-    onChange(newSelection)
+    // Filter out disabled values before calling onChange
+    const filteredSelection = disabledValues 
+      ? newSelection.filter(v => !disabledValues.includes(v))
+      : newSelection
+
+    setSelectedValues(filteredSelection)
+    onChange(filteredSelection)
   }
 
   const isAtMax = maxSelections ? selectedValues.length >= maxSelections : false
@@ -114,7 +154,9 @@ export function ProficiencyCheckboxes({
         <div className="flex flex-row flex-wrap gap-4">
           {options.map((option) => {
             const isSelected = selectedValues.includes(option.value)
-            const isDisabled = readonly || (!isSelected && isAtMax)
+            const isDisabledByMax = readonly || (!isSelected && isAtMax)
+            const isDisabledByFixed = disabledValues.includes(option.value)
+            const isDisabled = isDisabledByMax || isDisabledByFixed
             
             return (
               <div key={option.value} className="flex items-start w-[calc(33.33%-0.75rem)] gap-3">
@@ -187,15 +229,5 @@ export const EQUIPMENT_OPTIONS = [
   { value: 'shields', label: 'Shields', description: 'All shields except tower shields' },
   { value: 'simple_weapons', label: 'Simple Weapons', description: 'Clubs, daggers, darts, etc.' },
   { value: 'martial_weapons', label: 'Martial Weapons', description: 'Swords, axes, bows, etc.' },
-  { value: 'firearms', label: 'Firearms', description: 'Pistols, rifles, etc.' },
-  { value: 'thieves_tools', label: 'Thieves\' Tools', description: 'Lockpicks, trap disarming' },
-  { value: 'artisans_tools', label: 'Artisan\'s Tools', description: 'Smith\'s tools, brewer\'s supplies' },
-  { value: 'tinkers_tools', label: 'Tinker\'s Tools', description: 'Clockwork, mechanical devices' },
-  { value: 'alchemists_supplies', label: 'Alchemist\'s Supplies', description: 'Potions, chemical compounds' },
-  { value: 'herbalism_kit', label: 'Herbalism Kit', description: 'Healing herbs, natural remedies' },
-  { value: 'poisoners_kit', label: 'Poisoner\'s Kit', description: 'Poisons, toxins' },
-  { value: 'disguise_kit', label: 'Disguise Kit', description: 'Costumes, makeup, false identities' },
-  { value: 'forgery_kit', label: 'Forgery Kit', description: 'Fake documents, signatures' },
-  { value: 'navigators_tools', label: 'Navigator\'s Tools', description: 'Maps, compasses, sextants' },
-  { value: 'musical_instruments', label: 'Musical Instruments', description: 'Lute, flute, drums, etc.' }
+  { value: 'firearms', label: 'Firearms', description: 'Pistols, rifles, etc.' }
 ]

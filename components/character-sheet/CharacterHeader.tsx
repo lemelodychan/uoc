@@ -8,6 +8,7 @@ import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel } from "@/lib/character-data"
 import { racesCache } from "@/lib/races-cache"
+import { loadBackgroundDetails } from "@/lib/database"
 
 interface CharacterHeaderProps {
   character: CharacterData
@@ -39,6 +40,7 @@ export function CharacterHeader({
   const showLevelUpButton = canEdit && levelUpEnabled
   const levelUpCompleted = character.levelUpCompleted || false
   const [racesById, setRacesById] = useState<Record<string, string> | null>(racesCache.get())
+  const [backgroundName, setBackgroundName] = useState<string>(character.background || "")
 
   // Load races cache on mount and subscribe to updates
   useEffect(() => {
@@ -47,6 +49,23 @@ export function CharacterHeader({
     unsub = racesCache.subscribe((map) => setRacesById(map))
     return () => { if (unsub) unsub() }
   }, [])
+
+  // Reset background name immediately when character changes to prevent showing stale data
+  useEffect(() => {
+    // Reset immediately to prevent showing previous character's background
+    if (character.backgroundId) {
+      // Set to empty first, then load
+      setBackgroundName("")
+      loadBackgroundDetails(character.backgroundId).then(({ background, error }) => {
+        if (background && !error) {
+          setBackgroundName(background.name)
+        }
+      })
+    } else {
+      // Fallback to legacy background field
+      setBackgroundName(character.background || "")
+    }
+  }, [character.id, character.backgroundId, character.background])
 
   // Format race display based on raceIds
   const formatRaceDisplay = (): string => {
@@ -116,7 +135,7 @@ export function CharacterHeader({
                 </Badge>
               </div>
               <span className="text-sm text-muted-foreground px-1">
-                {formatRaceDisplay()}・{character.background}・{character.alignment}
+                {formatRaceDisplay()}・{backgroundName}・{character.alignment}
               </span>
             </div>
           </div>

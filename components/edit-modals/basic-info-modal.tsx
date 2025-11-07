@@ -12,9 +12,11 @@ import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel, getPrimaryClass } from "@/lib/character-data"
 import { MulticlassModal } from "./multiclass-modal"
-import { getCurrentUser, getAllUsers, loadAllRaces } from "@/lib/database"
+import { BackgroundTraitSelectionModal } from "./background-trait-selection-modal"
+import { getCurrentUser, getAllUsers, loadAllRaces, loadBackgroundsWithDetails, loadBackgroundDetails } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
 import { useUser } from "@/lib/user-context"
+import type { BackgroundData } from "@/lib/database"
 
 interface BasicInfoModalProps {
   isOpen: boolean
@@ -41,7 +43,6 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
       class: primaryClass?.name || character.class,
       subclass: primaryClass?.subclass || character.subclass || "",
       level: calculateTotalLevel(character.classes),
-      background: character.background,
       race: character.race,
       alignment: character.alignment,
       partyStatus: character.partyStatus || 'active',
@@ -55,7 +56,12 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     character.raceIds?.map(r => typeof r === 'string' ? {id: r, isMain: true} : r) || []
   )
   const [races, setRaces] = useState<Array<{id: string, name: string}>>([])
+  const [backgrounds, setBackgrounds] = useState<Array<{id: string, name: string}>>([])
+  const [backgroundName, setBackgroundName] = useState<string>("")
+  const [selectedBackgroundId, setSelectedBackgroundId] = useState<string | undefined>(character.backgroundId)
+  const [selectedBackgroundIdForModal, setSelectedBackgroundIdForModal] = useState<string | null>(null)
   const [multiclassModalOpen, setMulticlassModalOpen] = useState(false)
+  const [backgroundTraitModalOpen, setBackgroundTraitModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [users, setUsers] = useState<UserProfile[]>([])
@@ -75,7 +81,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
     getUser()
   }, [character.userId])
 
-  // Load users and races when modal opens
+  // Load users, races, and backgrounds when modal opens
   useEffect(() => {
     if (isOpen) {
       getAllUsers().then(({ users, error }) => {
@@ -86,8 +92,22 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
         }
       })
       loadRaces()
+      loadBackgrounds()
+      
+      // Load background name if backgroundId exists
+      if (character.backgroundId) {
+        setSelectedBackgroundId(character.backgroundId)
+        loadBackgroundDetails(character.backgroundId).then(({ background, error }) => {
+          if (background && !error) {
+            setBackgroundName(background.name)
+          }
+        })
+      } else {
+        setSelectedBackgroundId(undefined)
+        setBackgroundName("")
+      }
     }
-  }, [isOpen])
+  }, [isOpen, character.backgroundId])
 
   // Set main race to first race when 2 races are selected and no main is set
   useEffect(() => {
@@ -109,6 +129,19 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
       }
     } catch (err) {
       console.error("Failed to load races:", err)
+    }
+  }
+
+  const loadBackgrounds = async () => {
+    try {
+      const { backgrounds: loadedBackgrounds, error: loadError } = await loadBackgroundsWithDetails()
+      if (loadError) {
+        console.error("Error loading backgrounds:", loadError)
+      } else {
+        setBackgrounds(loadedBackgrounds || [])
+      }
+    } catch (err) {
+      console.error("Failed to load backgrounds:", err)
     }
   }
 
@@ -139,7 +172,6 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
         class: primaryClass?.name || character.class,
         subclass: primaryClass?.subclass || character.subclass || "",
         level: calculateTotalLevel(character.classes),
-      background: character.background,
       race: character.race,
       alignment: character.alignment,
       partyStatus: character.partyStatus || 'active',
@@ -152,7 +184,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
       character.raceIds?.map(r => typeof r === 'string' ? {id: r, isMain: true} : r) || []
     )
     }
-  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.background, character.race, character.raceIds, character.alignment, character.partyStatus, character.imageUrl, character.visibility, character.isNPC, character.aestheticImages])
+  }, [isOpen, character.id, character.name, character.class, character.subclass, character.classes, character.race, character.raceIds, character.alignment, character.partyStatus, character.imageUrl, character.visibility, character.isNPC, character.aestheticImages])
 
 
   const handleImageUpload = async (file: File, isAesthetic: boolean = false, aestheticIndex?: number) => {
@@ -382,17 +414,6 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-[112px_auto] items-center gap-3">
-            <Label htmlFor="background" className="text-right">
-              Background
-            </Label>
-            <Input
-              id="background"
-              value={formData.background}
-              onChange={(e) => setFormData({ ...formData, background: e.target.value })}
-              className="w-full"
-            />
-          </div>
           <div className="grid grid-cols-[112px_auto] items-start gap-3">
             <Label htmlFor="race" className="text-right min-h-9">
               Race
@@ -513,6 +534,68 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
               )}
             </div>
           </div>
+          
+          <div className="grid grid-cols-[112px_auto] items-center gap-3">
+            <Label htmlFor="background" className="text-right">
+              Background
+            </Label>
+            <div className="flex gap-2">
+              <Select
+                value={selectedBackgroundId || "__none__"}
+                onValueChange={(value) => {
+                  if (value && value !== "__none__") {
+                    // Find the background to get its name
+                    const selectedBackground = backgrounds.find(b => b.id === value)
+                    if (selectedBackground) {
+                      setBackgroundName(selectedBackground.name)
+                      setSelectedBackgroundId(value)
+                      setSelectedBackgroundIdForModal(value)
+                      // Save the backgroundId first, then open trait selection modal
+                      onSave({ backgroundId: value })
+                      // Open trait selection modal after a brief delay to ensure backgroundId is saved
+                      setTimeout(() => {
+                        setBackgroundTraitModalOpen(true)
+                      }, 100)
+                    }
+                  } else if (value === "__none__") {
+                    // Clear background
+                    setBackgroundName("")
+                    setSelectedBackgroundId(undefined)
+                    setSelectedBackgroundIdForModal(null)
+                    onSave({ 
+                      backgroundId: undefined,
+                      backgroundData: null
+                    })
+                  }
+                }}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder={selectedBackgroundId ? backgroundName || "Select background" : "No background selected"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {backgrounds.map((background) => (
+                    <SelectItem key={background.id} value={background.id}>
+                      {background.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedBackgroundId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBackgroundTraitModalOpen(true)}
+                  title="Edit background traits"
+                  className="h-[38px]"
+                >
+                  <Icon icon="lucide:edit" className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+          
           <div className="grid grid-cols-[112px_auto] items-center gap-3">
             <Label htmlFor="alignment" className="text-right">
               Alignment
@@ -736,6 +819,29 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
           onSave(updates)
         }}
       />
+      
+      {(selectedBackgroundId || selectedBackgroundIdForModal) && (
+        <BackgroundTraitSelectionModal
+          isOpen={backgroundTraitModalOpen}
+          onClose={() => {
+            setBackgroundTraitModalOpen(false)
+            setSelectedBackgroundIdForModal(null)
+          }}
+          backgroundId={selectedBackgroundIdForModal || selectedBackgroundId || ""}
+          existingBackgroundData={character.backgroundData || null}
+          onSave={(backgroundData) => {
+            // Update both backgroundData and preserve backgroundId
+            const backgroundIdToSave = selectedBackgroundIdForModal || selectedBackgroundId
+            if (backgroundIdToSave) {
+              onSave({ 
+                backgroundId: backgroundIdToSave,
+                backgroundData 
+              })
+            }
+            setSelectedBackgroundIdForModal(null)
+          }}
+        />
+      )}
     </Dialog>
   )
 }

@@ -482,7 +482,17 @@ function CharacterSheetContent() {
   const updateCharacter = (updates: Partial<CharacterData>, options?: { autosave?: boolean }) => {
     setCharacters((prev) => prev.map((char) => {
       if (char.id === activeCharacterId) {
-        const updatedChar = { ...char, ...updates }
+        // Preserve backgroundData and backgroundId only if they're not being explicitly updated
+        // This allows intentional updates while preventing accidental overwrites from other fields
+        const preservedFields: Partial<CharacterData> = {}
+        if (!('backgroundId' in updates)) {
+          preservedFields.backgroundId = char.backgroundId
+        }
+        if (!('backgroundData' in updates)) {
+          preservedFields.backgroundData = char.backgroundData
+        }
+        
+        const updatedChar = { ...char, ...updates, ...preservedFields }
         
         // If level changed, update feature max uses that depend on proficiency bonus
         if (updates.level && updates.level !== char.level) {
@@ -2374,6 +2384,28 @@ function CharacterSheetContent() {
     features?: Array<{name: string, description: string, usesPerLongRest?: number | string, currentUses?: number, refuelingDie?: string}>
     feats?: Array<{name: string, description: string}>
     languages?: string
+    imageUrl?: string
+    toolsProficiencies?: Array<{name: string, proficiency: 'none' | 'proficient' | 'expertise'}>
+    equipment?: string
+    money?: { gold: number; silver: number; copper: number }
+    equipmentProficiencies?: {
+      lightArmor: boolean
+      mediumArmor: boolean
+      heavyArmor: boolean
+      shields: boolean
+      simpleWeapons: boolean
+      martialWeapons: boolean
+      firearms: boolean
+      handCrossbows: boolean
+      longswords: boolean
+      rapiers: boolean
+      shortswords: boolean
+      scimitars: boolean
+      lightCrossbows: boolean
+      darts: boolean
+      slings: boolean
+      quarterstaffs: boolean
+    }
   }) => {
     const newId = (characters.length + 1).toString()
     
@@ -2492,6 +2524,8 @@ function CharacterSheetContent() {
       level: characterData.level,
       classes: classesToUse, // Multiclass support
       background: characterData.background,
+      backgroundId: characterData.backgroundId,
+      backgroundData: characterData.backgroundData,
       race: characterData.raceIds && characterData.raceIds.length > 0
         ? (characterData.raceIds.find(r => r.isMain)?.id || characterData.raceIds[0]?.id || characterData.race)
         : characterData.race, // Legacy field
@@ -2548,16 +2582,34 @@ function CharacterSheetContent() {
         source: feature.source,
         className: characterData.class
       })),
-      toolsProficiencies: [] as any,
+      toolsProficiencies: characterData.toolsProficiencies || [],
       feats: characterData.feats || [],
-      equipment: "",
+      equipment: characterData.equipment || "",
       magicItems: [],
       languages: characterData.languages || "",
       otherTools: "",
-      money: {
+      money: characterData.money || {
         gold: 0,
         silver: 0,
         copper: 0,
+      },
+      equipmentProficiencies: characterData.equipmentProficiencies || {
+        lightArmor: false,
+        mediumArmor: false,
+        heavyArmor: false,
+        shields: false,
+        simpleWeapons: false,
+        martialWeapons: false,
+        firearms: false,
+        handCrossbows: false,
+        longswords: false,
+        rapiers: false,
+        shortswords: false,
+        scimitars: false,
+        lightCrossbows: false,
+        darts: false,
+        slings: false,
+        quarterstaffs: false,
       },
       personalityTraits: "",
       ideals: "",
@@ -2666,9 +2718,13 @@ function CharacterSheetContent() {
     try {
       const { success, error, characterId } = await saveCharacter(newCharacter)
       if (success) {
+        const finalCharacterId = characterId || newId
+        
+        // Reload character from database to ensure we have the latest data including backgroundData
+        await reloadCharacterFromDatabase(finalCharacterId)
+        
         // If a new UUID was generated, update the character's ID in local state
         if (characterId && characterId !== newId) {
-          setCharacters(prev => prev.map(char => char.id === newId ? { ...char, id: characterId } : char))
           setActiveCharacterId(characterId)
           saveActiveCharacterToLocalStorage(characterId)
         } else {

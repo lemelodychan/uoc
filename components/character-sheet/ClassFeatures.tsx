@@ -94,6 +94,11 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
   // Map of class name -> selected subclass class_id (to filter subclass features)
   const [subclassIdByClass, setSubclassIdByClass] = useState<Record<string, string | null>>({})
 
+  // Reset subclass IDs immediately when character changes to prevent showing stale data
+  useEffect(() => {
+    setSubclassIdByClass({})
+  }, [character.id])
+
   useEffect(() => {
     let isCancelled = false
 
@@ -184,32 +189,111 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
             // Filter out hidden features before displaying
             const visibleFeatures = allFeatures.filter(feature => !feature.is_hidden)
 
-            // Further filter subclass features to only the selected subclass (if any)
+            // Filter subclass features to only show the selected subclass
+            // Base class features should always be shown
+            // Subclass features should only be shown if they belong to the selected subclass
             const filteredFeatures = visibleFeatures.filter((feature: any) => {
-              const className = feature.className || character.class
+              // Use className from feature - it should always be set by loadClassFeatures
+              let className = feature.className
+              
+              // If className is not set, try to find it from character.classes
+              if (!className && character.classes && character.classes.length > 0) {
+                // Try to find the class by matching class name first (most reliable)
+                let matchingClass = character.classes.find(c => c.name === feature.className)
+                
+                // If no match by name, try class_id (though this might not work if feature has base class_id)
+                if (!matchingClass) {
+                  matchingClass = character.classes.find(c => c.class_id === feature.class_id)
+                }
+                
+                if (matchingClass) {
+                  className = matchingClass.name
+                } else {
+                  // Last resort: use primary class
+                  className = character.class
+                }
+              } else if (!className) {
+                className = character.class
+              }
+              
               const isSubclassFeature = (feature.source?.toLowerCase() === 'subclass') || feature.enabledBySubclass || feature.feature_type === 'subclass'
 
-              if (!isSubclassFeature) return true
-
-              // Require a selected subclass for this class to show subclass features
-              const selectedSubclass = getClassSubclass(character.classes || [], className)
-              if (!selectedSubclass) return false
-
-              // If feature has a specific subclass_id, ensure it matches the selected subclass's class_id
-              const selectedSubclassId = subclassIdByClass[className]
-              if (feature.subclass_id && selectedSubclassId) {
-                return feature.subclass_id === selectedSubclassId
+              // Base class features are always shown
+              if (!isSubclassFeature) {
+                return true
               }
-              // If no subclass_id on feature, allow it (legacy data)
-              return true
+
+              // For subclass features, check if this class has a selected subclass
+              const selectedSubclass = getClassSubclass(character.classes || [], className)
+              
+              if (!selectedSubclass) {
+                // No subclass selected for this class, filter out subclass features
+                return false
+              }
+
+              // Get the selected subclass's class_id
+              const selectedSubclassId = subclassIdByClass[className]
+              
+              if (!selectedSubclassId) {
+                // SubclassIdByClass not loaded yet, allow it (will be filtered on next render)
+                return true
+              }
+
+              // For subclass features, check if the feature's class_id matches the selected subclass's class_id
+              // This is the key check - subclass features are stored with class_id = subclass's class_id
+              if (feature.class_id === selectedSubclassId) {
+                return true
+              }
+              
+              // Also check if subclass_id matches (for legacy data or different storage patterns)
+              if (feature.subclass_id === selectedSubclassId) {
+                return true
+              }
+              
+              // Feature doesn't match the selected subclass, filter it out
+              return false
             })
+            
+            // Deduplicate features by id to avoid showing the same feature twice
+            const featureMap = new Map<string, any>()
+            filteredFeatures.forEach(feature => {
+              if (feature.id && !featureMap.has(feature.id)) {
+                featureMap.set(feature.id, feature)
+              } else if (!feature.id) {
+                // If no id, use a combination of name and class_id as key
+                const key = `${feature.name || feature.title}-${feature.class_id}-${feature.level}`
+                if (!featureMap.has(key)) {
+                  featureMap.set(key, feature)
+                }
+              }
+            })
+            const deduplicatedFeatures = Array.from(featureMap.values())
 
             // Group features by class
             const featuresByClass = new Map<string, any[]>()
 
-            filteredFeatures.forEach(feature => {
-              // Use the className from the feature, or fallback to the character's primary class
-              const className = feature.className || character.class
+            deduplicatedFeatures.forEach(feature => {
+              // Use className from feature - it should always be set by loadClassFeatures
+              // If not set, fallback to matching by class name from character.classes
+              let className = feature.className
+              
+              if (!className && character.classes && character.classes.length > 0) {
+                // Try to find the class by matching class name (more reliable than class_id)
+                // since feature.class_id might be base class_id while character.classes[].class_id might be subclass_id
+                const matchingClass = character.classes.find(c => {
+                  // Match by name if available, or try class_id as fallback
+                  return c.name === feature.className || c.class_id === feature.class_id
+                })
+                
+                if (matchingClass) {
+                  className = matchingClass.name
+                } else {
+                  // Fallback to primary class only if no match found
+                  className = character.class
+                }
+              } else if (!className) {
+                className = character.class
+              }
               
               if (!featuresByClass.has(className)) {
                 featuresByClass.set(className, [])

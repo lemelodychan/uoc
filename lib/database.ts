@@ -557,6 +557,22 @@ export const saveCharacter = async (
 
     // Legacy classFeatures column has been dropped - using unified class_features_skills_usage system
 
+    // Preserve existing background_data from database if character.backgroundData is undefined/null
+    // This prevents overwriting background_data when doing partial updates (e.g., editing personality traits)
+    let backgroundDataToSave = character.backgroundData
+    if (!backgroundDataToSave && characterId) {
+      // Try to load existing background_data from database to preserve it
+      const { data: existingData } = await supabase
+        .from("characters")
+        .select("background_data")
+        .eq("id", characterId)
+        .maybeSingle()
+      
+      if (existingData?.background_data) {
+        backgroundDataToSave = existingData.background_data
+      }
+    }
+
     const saveData: any = {
       id: characterId, // Use the UUID instead of character.id
       name: character.name,
@@ -567,6 +583,8 @@ export const saveCharacter = async (
       classes: character.classes || null,
       hit_dice_by_class: character.hitDiceByClass || null,
       background: character.background,
+      background_id: character.backgroundId || null, // New field for background ID reference
+      background_data: backgroundDataToSave || null, // Preserve existing data if character object doesn't have it
       race: character.raceIds && character.raceIds.length > 0 ? character.raceIds : [], // JSONB array of race objects [{id: string, isMain: boolean}]
       alignment: character.alignment,
       image_url: character.imageUrl || null,
@@ -705,7 +723,16 @@ export const saveCharacter = async (
 
 export const loadCharacter = async (characterId: string): Promise<{ character?: CharacterData; error?: string }> => {
   try {
-    const { data, error } = await supabase.from("characters").select("*").eq("id", characterId).maybeSingle()
+    const { data, error } = await supabase
+      .from("characters")
+      .select(`
+        *,
+        backgrounds:background_id (
+          id,
+          name
+        )
+      `)
+      .eq("id", characterId).maybeSingle()
 
     if (error) {
       console.error("Error loading character:", error)
@@ -749,7 +776,7 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         class_id: data.class_id,
         level: data.level
       }],
-      background: data.background,
+      background: (data.backgrounds as any)?.name || data.background || "",
       race: Array.isArray(data.race) && data.race.length > 0 
         ? (typeof data.race[0] === 'string' ? data.race[0] : data.race[0]?.id || "")
         : (data.race_legacy || ""), // Legacy compatibility
@@ -829,9 +856,11 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       equipmentProficiencies: data.equipment_proficiencies || undefined,
       featureNotes: data.feature_custom_descriptions || undefined,
       personalityTraits: data.personality_traits || "",
-      ideals: "",
-      bonds: "",
-      flaws: "",
+      ideals: data.ideals || "",
+      bonds: data.bonds || "",
+      flaws: data.flaws || "",
+      backgroundId: data.background_id || undefined,
+      backgroundData: data.background_data || undefined,
       backstory: data.backstory || "",
       notes: data.notes || "",
       feats: data.feats,
@@ -1030,7 +1059,11 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
       .from("characters")
       .select(`
         *,
-        party_status!left(status)
+        party_status!left(status),
+        backgrounds:background_id (
+          id,
+          name
+        )
       `)
       .order("updated_at", { ascending: false })
 
@@ -1160,7 +1193,7 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             class_id: row.class_id,
             level: row.level
           }],
-          background: row.background,
+          background: (row.backgrounds as any)?.name || row.background || "",
           race: Array.isArray(row.race) && row.race.length > 0 
             ? (typeof row.race[0] === 'string' ? row.race[0] : row.race[0]?.id || "")
             : (row.race_legacy || ""), // Legacy compatibility
@@ -1242,6 +1275,8 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           ideals: "",
           bonds: "",
           flaws: "",
+          backgroundId: row.background_id || undefined,
+          backgroundData: row.background_data || undefined,
           backstory: row.backstory || "",
           notes: row.notes || "",
           feats: row.feats,
@@ -2128,6 +2163,166 @@ export const deleteRace = async (raceId: string): Promise<{ success: boolean; er
   } catch (error) {
     console.error("Error deleting race:", error)
     return { success: false, error: "Failed to delete race" }
+  }
+}
+
+// Background Data Interface
+export interface BackgroundData {
+  id: string
+  name: string
+  skill_proficiencies?: string[] | { fixed?: string[]; available?: string[]; choice?: { count: number; from_selected?: boolean } } | null
+  tool_proficiencies?: string[] | { fixed?: string[]; available?: string[]; choice?: { count: number; from_selected?: boolean } } | null
+  equipment_proficiencies?: string[] | null
+  languages?: string[] | { fixed?: string[]; choice?: { count: number } } | null
+  equipment?: string | null
+  money?: { gold: number; silver: number; copper: number } | null
+  description?: string | null
+  defining_events?: Array<{ number: number; text: string }> | null
+  defining_events_title?: string | null
+  personality_traits?: Array<{ number: number; text: string }> | null
+  ideals?: Array<{ number: number; text: string }> | null
+  bonds?: Array<{ number: number; text: string }> | null
+  flaws?: Array<{ number: number; text: string }> | null
+  created_at?: string
+  updated_at?: string
+}
+
+export const loadBackgroundDetails = async (backgroundId: string): Promise<{
+  background?: BackgroundData
+  error?: string
+}> => {
+  try {
+    const { data, error } = await supabase
+      .from("backgrounds")
+      .select("*")
+      .eq("id", backgroundId)
+      .single()
+
+    if (error) {
+      console.error("Error loading background details:", error)
+      return { error: error.message }
+    }
+
+    return { background: data || undefined }
+  } catch (error) {
+    console.error("Error loading background details:", error)
+    return { error: "Failed to load background details" }
+  }
+}
+
+export const loadBackgroundsWithDetails = async (): Promise<{
+  backgrounds?: BackgroundData[]
+  error?: string
+}> => {
+  try {
+    const { data, error } = await supabase
+      .from("backgrounds")
+      .select("*")
+      .order("name", { ascending: true })
+
+    if (error) {
+      console.error("Error loading backgrounds with details:", error)
+      return { error: error.message }
+    }
+
+    return { backgrounds: data || [] }
+  } catch (error) {
+    console.error("Error loading backgrounds with details:", error)
+    return { error: "Failed to load backgrounds with details" }
+  }
+}
+
+export const upsertBackground = async (background: Partial<BackgroundData> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const isSuperadminUser = await isSuperadmin(user.id)
+    if (!isSuperadminUser) {
+      return { success: false, error: "Only superadmins can edit backgrounds" }
+    }
+
+    const payload: any = {
+      name: background.name,
+      skill_proficiencies: background.skill_proficiencies || null,
+      tool_proficiencies: background.tool_proficiencies || null,
+      equipment_proficiencies: background.equipment_proficiencies || null,
+      languages: background.languages || null,
+      equipment: background.equipment || null,
+      money: background.money || { gold: 0, silver: 0, copper: 0 },
+      description: background.description || null,
+      defining_events: background.defining_events || null,
+      defining_events_title: background.defining_events_title || null,
+      personality_traits: background.personality_traits || null,
+      ideals: background.ideals || null,
+      bonds: background.bonds || null,
+      flaws: background.flaws || null,
+    }
+
+    if (background.id) {
+      // Update existing background
+      const { error: updateError } = await supabase
+        .from("backgrounds")
+        .update(payload)
+        .eq("id", background.id)
+
+      if (updateError) {
+        console.error("Error updating background:", updateError)
+        return { success: false, error: updateError.message }
+      }
+
+      return { success: true, id: background.id }
+    } else {
+      // Create new background
+      const id = globalThis.crypto.randomUUID()
+      payload.id = id
+      payload.created_at = new Date().toISOString()
+
+      const { error: insertError } = await supabase
+        .from("backgrounds")
+        .insert([payload])
+
+      if (insertError) {
+        console.error("Error creating background:", insertError)
+        return { success: false, error: insertError.message }
+      }
+
+      return { success: true, id }
+    }
+  } catch (error) {
+    console.error("Error upserting background:", error)
+    return { success: false, error: "Failed to upsert background" }
+  }
+}
+
+export const deleteBackground = async (backgroundId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const isSuperadminUser = await isSuperadmin(user.id)
+    if (!isSuperadminUser) {
+      return { success: false, error: "Only superadmins can delete backgrounds" }
+    }
+
+    const { error } = await supabase
+      .from("backgrounds")
+      .delete()
+      .eq("id", backgroundId)
+
+    if (error) {
+      console.error("Error deleting background:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting background:", error)
+    return { success: false, error: "Failed to delete background" }
   }
 }
 

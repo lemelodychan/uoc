@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { CharacterData } from '@/lib/character-data'
 import { classFeaturesCache } from '@/lib/class-features-cache'
 
@@ -15,14 +15,41 @@ export function useClassFeatures(character: CharacterData | undefined): UseClass
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fromCache, setFromCache] = useState(false)
+  const [currentCharacterId, setCurrentCharacterId] = useState<string | undefined>(character?.id)
+  const loadAbortRef = useRef<AbortController | null>(null)
+
+  // Immediately clear features when character ID changes to prevent showing stale data
+  useEffect(() => {
+    if (character?.id !== currentCharacterId) {
+      // Abort any in-flight requests for the previous character
+      if (loadAbortRef.current) {
+        loadAbortRef.current.abort()
+      }
+      setCurrentCharacterId(character?.id)
+      setFeatures([])
+      setError(null)
+      setFromCache(false)
+      setLoading(true) // Set loading to true immediately when character changes
+    }
+  }, [character?.id, currentCharacterId])
 
   const loadFeatures = useCallback(async (forceRefresh = false) => {
     if (!character?.id) {
       setFeatures([])
       setError(null)
       setFromCache(false)
+      setLoading(false)
       return
     }
+
+    // Abort any previous request
+    if (loadAbortRef.current) {
+      loadAbortRef.current.abort()
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController()
+    loadAbortRef.current = abortController
 
     setLoading(true)
     setError(null)
@@ -34,16 +61,21 @@ export function useClassFeatures(character: CharacterData | undefined): UseClass
       // Handle multiclassing - load features for each class
       if (character.classes && character.classes.length > 0) {
         for (const charClass of character.classes) {
-          // Get class_id for this class
+          // Get base class_id for this class (where subclass IS NULL)
+          // loadClassFeatures will handle loading subclass features if subclass is provided
           const { loadClassData } = await import('@/lib/database')
-          const { classData } = await loadClassData(charClass.name, charClass.subclass)
+          const { classData: baseClassData } = await loadClassData(charClass.name)
           
-          if (classData?.id) {
-            // Check cache first
-            const cachedFeatures = classFeaturesCache.get(classData.id, charClass.level, charClass.subclass)
+          if (baseClassData?.id) {
+            // Check cache first - use base class_id for caching
+            const cachedFeatures = classFeaturesCache.get(baseClassData.id, charClass.level, charClass.subclass)
             
             if (cachedFeatures && !forceRefresh) {
-              allFeatures.push(...cachedFeatures)
+              const featuresWithClassName = cachedFeatures.map(f => ({
+                ...f,
+                className: f.className || charClass.name
+              }))
+              allFeatures.push(...featuresWithClassName)
               setFromCache(true)
             } else {
               // Load from database
@@ -52,8 +84,9 @@ export function useClassFeatures(character: CharacterData | undefined): UseClass
               }
               
               const { loadClassFeatures } = await import('@/lib/database')
+              // Pass base class_id - loadClassFeatures will handle loading subclass features
               const { features, error } = await loadClassFeatures(
-                classData.id, 
+                baseClassData.id, 
                 charClass.level, 
                 charClass.subclass
               )
@@ -62,7 +95,12 @@ export function useClassFeatures(character: CharacterData | undefined): UseClass
                 console.error(`Error loading features for ${charClass.name}:`, error)
                 setError(error)
               } else if (features) {
-                allFeatures.push(...features)
+                // Ensure all features have the correct className set
+                const featuresWithClassName = features.map(f => ({
+                  ...f,
+                  className: f.className || charClass.name
+                }))
+                allFeatures.push(...featuresWithClassName)
               }
             }
           }
@@ -70,11 +108,12 @@ export function useClassFeatures(character: CharacterData | undefined): UseClass
       } else {
         // Single class character
         const { loadClassData } = await import('@/lib/database')
-        const { classData } = await loadClassData(character.class, character.subclass)
+        // Get base class_id (where subclass IS NULL)
+        const { classData: baseClassData } = await loadClassData(character.class)
         
-        if (classData?.id) {
-          // Check cache first
-          const cachedFeatures = classFeaturesCache.get(classData.id, character.level, character.subclass)
+        if (baseClassData?.id) {
+          // Check cache first - use base class_id for caching
+          const cachedFeatures = classFeaturesCache.get(baseClassData.id, character.level, character.subclass)
           
           if (cachedFeatures && !forceRefresh) {
             allFeatures.push(...cachedFeatures)
@@ -86,8 +125,9 @@ export function useClassFeatures(character: CharacterData | undefined): UseClass
             }
             
             const { loadClassFeatures } = await import('@/lib/database')
+            // Pass base class_id - loadClassFeatures will handle loading subclass features
             const { features, error } = await loadClassFeatures(
-              classData.id, 
+              baseClassData.id, 
               character.level, 
               character.subclass
             )
@@ -96,20 +136,38 @@ export function useClassFeatures(character: CharacterData | undefined): UseClass
               console.error(`Error loading features for ${character.class}:`, error)
               setError(error)
             } else if (features) {
-              allFeatures.push(...features)
+              // Ensure all features have the correct className set
+              const featuresWithClassName = features.map(f => ({
+                ...f,
+                className: f.className || character.class
+              }))
+              allFeatures.push(...featuresWithClassName)
             }
           }
         }
       }
 
-      setFeatures(allFeatures)
+      // Only update state if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setFeatures(allFeatures)
+      }
     } catch (err) {
-      console.error('Error loading class features:', err)
-      setError('Failed to load class features')
-      setFeatures([])
-      setFromCache(false)
+      // Ignore abort errors
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
+      // Only update state if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        console.error('Error loading class features:', err)
+        setError('Failed to load class features')
+        setFeatures([])
+        setFromCache(false)
+      }
     } finally {
-      setLoading(false)
+      // Only update loading state if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setLoading(false)
+      }
     }
   }, [
     character?.id,
