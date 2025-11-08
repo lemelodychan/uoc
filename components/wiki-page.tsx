@@ -598,7 +598,7 @@ export function WikiPage() {
                     </h1>
                   </div>
                   <div className="flex flex-col gap-0 p-0 !overflow-hiddem h-[calc(100vh-64px)]">
-                      <Tabs value={classDetailTab} onValueChange={setClassDetailTab} className="w-full flex flex-col gap-0 p-0 h-[calc(100vh-64px)]">
+                      <Tabs value={classDetailTab} onValueChange={setClassDetailTab} className="w-full flex flex-col gap-0 p-0 h-[calc(100vh-64px-126px)]">
                         <TabsList className="flex items-center gap-2 w-full h-fit p-6 pt-0 pb-2 bg-card border-b rounded-none">
                           <TabsTrigger value="info" className="flex items-center gap-2 h-8 rounded-lg">Class Information</TabsTrigger>
                           <TabsTrigger value="base-features" className="flex items-center gap-2 h-8 rounded-lg">Base Features</TabsTrigger>
@@ -607,7 +607,7 @@ export function WikiPage() {
                           </TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="info" className="flex flex-col gap-6 p-6 !overflow-auto !h-[calc(100vh-128px-41px-64px)]">
+                        <TabsContent value="info" className="flex flex-col gap-6 p-6 !overflow-auto !h-[calc(100vh-126px-41px-64px)]">
                           <Card>
                             <CardContent>
                               <div className="flex flex-col gap-4">
@@ -722,7 +722,7 @@ export function WikiPage() {
                           </Card>
                         </TabsContent>
 
-                        <TabsContent value="base-features" className="flex flex-col gap-6 p-6 !overflow-auto h-[calc(100vh-173px-64px)]">
+                        <TabsContent value="base-features" className="flex flex-col gap-6 p-6 !overflow-auto h-[calc(100vh-126px-64px)]">
                           <div className="flex flex-col gap-4">
                             {baseFeatures.length > 0 ? (
                               baseFeatures.map((feature, idx) => (
@@ -750,7 +750,7 @@ export function WikiPage() {
                           </div>
                         </TabsContent>
 
-                        <TabsContent value="subclass-features" className="flex flex-col gap-6 p-6 !overflow-auto h-[calc(100vh-173px-64px)]">
+                        <TabsContent value="subclass-features" className="flex flex-col gap-6 p-6 !overflow-auto h-[calc(100vh-126px-64px)]">
                           <div className="flex flex-col gap-4">
                             {subclasses.length > 0 ? (
                               <Accordion type="single" collapsible className="w-full flex flex-col gap-4">
