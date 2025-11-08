@@ -2104,6 +2104,8 @@ export const upsertRace = async (race: Partial<RaceData> & { id?: string }): Pro
         const { racesCache } = await import('./races-cache')
         if (race.id && race.name) racesCache.upsert(race.id, race.name)
       } catch {}
+      // Invalidate wiki cache
+      await invalidateWikiRacesCache()
       return { success: true, id: race.id }
     } else {
       // Create new race
@@ -2125,6 +2127,8 @@ export const upsertRace = async (race: Partial<RaceData> & { id?: string }): Pro
         const { racesCache } = await import('./races-cache')
         if (id && race.name) racesCache.upsert(id, race.name)
       } catch {}
+      // Invalidate wiki cache
+      await invalidateWikiRacesCache()
       return { success: true, id }
     }
   } catch (error) {
@@ -2159,6 +2163,8 @@ export const deleteRace = async (raceId: string): Promise<{ success: boolean; er
       const { racesCache } = await import('./races-cache')
       racesCache.remove(raceId)
     } catch {}
+    // Invalidate wiki cache
+    await invalidateWikiRacesCache()
     return { success: true }
   } catch (error) {
     console.error("Error deleting race:", error)
@@ -2273,6 +2279,8 @@ export const upsertBackground = async (background: Partial<BackgroundData> & { i
         return { success: false, error: updateError.message }
       }
 
+      // Invalidate wiki cache
+      await invalidateWikiBackgroundsCache()
       return { success: true, id: background.id }
     } else {
       // Create new background
@@ -2289,6 +2297,8 @@ export const upsertBackground = async (background: Partial<BackgroundData> & { i
         return { success: false, error: insertError.message }
       }
 
+      // Invalidate wiki cache
+      await invalidateWikiBackgroundsCache()
       return { success: true, id }
     }
   } catch (error) {
@@ -2319,6 +2329,8 @@ export const deleteBackground = async (backgroundId: string): Promise<{ success:
       return { success: false, error: error.message }
     }
 
+    // Invalidate wiki cache
+    await invalidateWikiBackgroundsCache()
     return { success: true }
   } catch (error) {
     console.error("Error deleting background:", error)
@@ -2707,6 +2719,8 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
     } else {
     }
 
+    // Invalidate wiki cache
+    await invalidateWikiClassesCache()
     return { success: true, id }
   } catch (error) {
     console.error("Error upserting class:", error)
@@ -2826,6 +2840,9 @@ export const deleteClass = async (classId: string): Promise<{ success: boolean; 
       return { success: false, error: error.message }
     }
 
+    // Invalidate caches
+    await invalidateClassFeaturesCache(classId)
+    await invalidateWikiClassesCache()
     return { success: true }
   } catch (error) {
     console.error("Error deleting class:", error)
@@ -2932,8 +2949,52 @@ export const invalidateClassFeaturesCache = async (classId: string, className?: 
     
     if (removedCount > 0) {
     }
+
+    // Also invalidate wiki cache for classes
+    try {
+      const { wikiCache } = await import('./wiki-cache')
+      wikiCache.invalidateClasses()
+    } catch (error) {
+      // Ignore if wiki cache not available
+    }
   } catch (error) {
     console.error('Error invalidating class features cache:', error)
+  }
+}
+
+/**
+ * Invalidate wiki cache for classes
+ */
+export const invalidateWikiClassesCache = async (): Promise<void> => {
+  try {
+    const { wikiCache } = await import('./wiki-cache')
+    wikiCache.invalidateClasses()
+  } catch (error) {
+    console.error('Error invalidating wiki classes cache:', error)
+  }
+}
+
+/**
+ * Invalidate wiki cache for races
+ */
+export const invalidateWikiRacesCache = async (): Promise<void> => {
+  try {
+    const { wikiCache } = await import('./wiki-cache')
+    wikiCache.invalidateRaces()
+  } catch (error) {
+    console.error('Error invalidating wiki races cache:', error)
+  }
+}
+
+/**
+ * Invalidate wiki cache for backgrounds
+ */
+export const invalidateWikiBackgroundsCache = async (): Promise<void> => {
+  try {
+    const { wikiCache } = await import('./wiki-cache')
+    wikiCache.invalidateBackgrounds()
+  } catch (error) {
+    console.error('Error invalidating wiki backgrounds cache:', error)
   }
 }
 

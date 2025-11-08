@@ -19,6 +19,7 @@ import type { RaceData, BackgroundData } from "@/lib/database"
 import type { Spell, CharacterData } from "@/lib/character-data"
 import { SPELL_SCHOOL_COLORS, getCastingTimeColor } from "@/lib/color-mapping"
 import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
+import { wikiCache } from "@/lib/wiki-cache"
 
 interface LibrarySpell {
   id: string
@@ -140,22 +141,77 @@ export function WikiPage() {
   const loadClasses = async () => {
     setLoading(true)
     try {
-      const result = await loadClassesWithDetails()
-      if (result.classes) {
-        setClasses(result.classes as unknown as ClassData[])
-        // Load features for each base class
-        const baseClasses = result.classes.filter(c => c.subclass === null)
+      // Check cache first
+      const cachedClasses = wikiCache.getClasses()
+      const cachedFeatures: Record<string, any[]> = {}
+      let allFeaturesCached = true
+
+      if (cachedClasses) {
+        // Check if we have all features cached
+        const baseClasses = cachedClasses.filter((c: any) => c.subclass === null)
         for (const baseClass of baseClasses) {
-          const subclasses = result.classes.filter(c => c.name === baseClass.name && c.subclass !== null)
-          const subclassIds = subclasses.map(s => s.id)
-          const featuresResult = await loadFeaturesForBaseWithSubclasses(baseClass.id, subclassIds)
-          if (featuresResult.features) {
-            setClassFeatures(prev => ({
-              ...prev,
-              [baseClass.id]: featuresResult.features || []
-            }))
+          const cached = wikiCache.getClassFeatures(baseClass.id)
+          if (cached) {
+            cachedFeatures[baseClass.id] = cached
+          } else {
+            allFeaturesCached = false
+            break
           }
         }
+
+        if (allFeaturesCached) {
+          // Use cached data
+          setClasses(cachedClasses as unknown as ClassData[])
+          setClassFeatures(cachedFeatures)
+          setLoading(false)
+          return
+        }
+      }
+
+      // Load from database
+      const result = await loadClassesWithDetails()
+      if (result.classes) {
+        const classesList = result.classes
+        setClasses(classesList as unknown as ClassData[])
+        // Cache classes
+        wikiCache.setClasses(classesList)
+
+        // Load features for each base class in parallel
+        const baseClasses = classesList.filter(c => c.subclass === null)
+        const featurePromises = baseClasses.map(async (baseClass) => {
+          // Check cache for this specific class
+          const cached = wikiCache.getClassFeatures(baseClass.id)
+          if (cached) {
+            return {
+              baseClassId: baseClass.id,
+              features: cached
+            }
+          }
+
+          // Load from database
+          const subclasses = classesList.filter(c => c.name === baseClass.name && c.subclass !== null)
+          const subclassIds = subclasses.map(s => s.id)
+          const featuresResult = await loadFeaturesForBaseWithSubclasses(baseClass.id, subclassIds)
+          const features = featuresResult.features || []
+          
+          // Cache features
+          wikiCache.setClassFeatures(baseClass.id, features)
+          
+          return {
+            baseClassId: baseClass.id,
+            features
+          }
+        })
+        
+        // Wait for all feature loads to complete in parallel
+        const featureResults = await Promise.all(featurePromises)
+        
+        // Update state once with all features
+        const featuresMap: Record<string, any[]> = {}
+        featureResults.forEach(({ baseClassId, features }) => {
+          featuresMap[baseClassId] = features
+        })
+        setClassFeatures(featuresMap)
       }
     } catch (error) {
       console.error('Error loading classes:', error)
@@ -166,9 +222,19 @@ export function WikiPage() {
 
   const loadRaces = async () => {
     try {
+      // Check cache first
+      const cached = wikiCache.getRaces()
+      if (cached) {
+        setRaces(cached)
+        return
+      }
+
+      // Load from database
       const result = await loadRacesWithDetails()
       if (result.races) {
         setRaces(result.races)
+        // Cache races
+        wikiCache.setRaces(result.races)
       }
     } catch (error) {
       console.error('Error loading races:', error)
@@ -177,9 +243,19 @@ export function WikiPage() {
 
   const loadBackgrounds = async () => {
     try {
+      // Check cache first
+      const cached = wikiCache.getBackgrounds()
+      if (cached) {
+        setBackgrounds(cached)
+        return
+      }
+
+      // Load from database
       const result = await loadBackgroundsWithDetails()
       if (result.backgrounds) {
         setBackgrounds(result.backgrounds)
+        // Cache backgrounds
+        wikiCache.setBackgrounds(result.backgrounds)
       }
     } catch (error) {
       console.error('Error loading backgrounds:', error)
@@ -468,33 +544,9 @@ export function WikiPage() {
       {/* Content Area */}
       <div className="flex-1 w-full ml-72 h-100vh !overflow-hidden">
         {activeTab === 'classes' && (
-          <>
-          <div className="flex flex-col gap-3 p-6 bg-card border-b w-full">
-            <h1 className="text-3xl font-display font-semibold">Classes</h1>
-            <p className="text-sm text-muted-foreground">Explore the diverse classes that shape your character's story.</p>
-            <div className="flex items-center gap-4 relative mt-2">
-              <Icon icon="lucide:search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
-              <Input
-                placeholder="Search classes by name..."
-                value={classSearchTerm}
-                onChange={(e) => setClassSearchTerm(e.target.value)}
-                className="pl-10 pr-10"
-              />
-              {classSearchTerm && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setClassSearchTerm("")}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-transparent"
-                >
-                  <Icon icon="lucide:x" className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-col gap-6 p-6 !overflow-auto h-[calc(100vh-173px-64px)]">
+          <div className="flex flex-col p-0">
             {loading ? (
-              <div className="flex items-center justify-center h-32">
+              <div className="flex items-center justify-center p-6">
                 <div className="text-muted-foreground">Loading classes...</div>
               </div>
             ) : selectedClassId ? (
@@ -519,8 +571,9 @@ export function WikiPage() {
                 })
 
                 return (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-4">
+                  <>
+                  <div className="flex flex-col gap-3 p-6 bg-card w-full">
+                    <div className="flex flex-row items-center justify-start gap-1 text-sm text-muted-foreground">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -528,26 +581,25 @@ export function WikiPage() {
                           setSelectedClassId(null)
                           setClassDetailTab("info")
                         }}
-                        className="flex items-center gap-2"
+                        className="flex items-center !p-0 w-fit h-fit hover:bg-transparent hover:text-primary"
                       >
-                        <Icon icon="lucide:arrow-left" className="w-4 h-4" />
+                        <Icon icon="lucide:chevron-left" className="w-4 h-4" />
                         Back to Classes
                       </Button>
                     </div>
-
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-center gap-3">
-                        <h1 className="text-3xl font-display font-bold">{baseClass.name}</h1>
-                        {baseClass.is_custom && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Icon icon="lucide:user-plus" className="w-3 h-3 mr-1" />
-                            Custom
-                          </Badge>
-                        )}
-                      </div>
-
-                      <Tabs value={classDetailTab} onValueChange={setClassDetailTab} className="w-full flex flex-col gap-4">
-                        <TabsList className="flex items-center gap-2 w-full h-fit p-2 rounded-xl">
+                    <h1 className="text-3xl font-display font-semibold flex flex-col gap-2 mt-2">
+                      {baseClass.name}
+                      {baseClass.is_custom && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Icon icon="lucide:user-plus" className="w-3 h-3 mr-1" />
+                          Custom
+                        </Badge>
+                      )}
+                    </h1>
+                  </div>
+                  <div className="flex flex-col gap-0 p-0 !overflow-hiddem h-[calc(100vh-64px)]">
+                      <Tabs value={classDetailTab} onValueChange={setClassDetailTab} className="w-full flex flex-col gap-0 p-0 h-[calc(100vh-64px)]">
+                        <TabsList className="flex items-center gap-2 w-full h-fit p-6 pt-0 pb-2 bg-card border-b rounded-none">
                           <TabsTrigger value="info" className="flex items-center gap-2 h-8 rounded-lg">Class Information</TabsTrigger>
                           <TabsTrigger value="base-features" className="flex items-center gap-2 h-8 rounded-lg">Base Features</TabsTrigger>
                           <TabsTrigger value="subclass-features" className="flex items-center gap-2 h-8 rounded-lg">
@@ -555,7 +607,7 @@ export function WikiPage() {
                           </TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="info">
+                        <TabsContent value="info" className="flex flex-col gap-6 p-6 !overflow-auto !h-[calc(100vh-128px-41px-64px)]">
                           <Card>
                             <CardContent>
                               <div className="flex flex-col gap-4">
@@ -670,7 +722,7 @@ export function WikiPage() {
                           </Card>
                         </TabsContent>
 
-                        <TabsContent value="base-features">
+                        <TabsContent value="base-features" className="flex flex-col gap-6 p-6 !overflow-auto h-[calc(100vh-173px-64px)]">
                           <div className="flex flex-col gap-4">
                             {baseFeatures.length > 0 ? (
                               baseFeatures.map((feature, idx) => (
@@ -698,7 +750,7 @@ export function WikiPage() {
                           </div>
                         </TabsContent>
 
-                        <TabsContent value="subclass-features">
+                        <TabsContent value="subclass-features" className="flex flex-col gap-6 p-6 !overflow-auto h-[calc(100vh-173px-64px)]">
                           <div className="flex flex-col gap-4">
                             {subclasses.length > 0 ? (
                               <Accordion type="single" collapsible className="w-full flex flex-col gap-4">
@@ -751,13 +803,37 @@ export function WikiPage() {
                           </div>
                         </TabsContent>
                       </Tabs>
-                    </div>
                   </div>
+                  </>
                 )
               })()
             ) : (
               // Class List View
-              <div className="flex flex-col gap-4">
+              <>
+              <div className="flex flex-col gap-3 p-6 bg-card border-b w-full">
+                <h1 className="text-3xl font-display font-semibold">Classes</h1>
+                <p className="text-sm text-muted-foreground">Explore the diverse classes that shape your character's story.</p>
+                <div className="flex items-center gap-4 relative mt-2">
+                  <Icon icon="lucide:search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+                  <Input
+                    placeholder="Search classes by name..."
+                    value={classSearchTerm}
+                    onChange={(e) => setClassSearchTerm(e.target.value)}
+                    className="pl-10 pr-10"
+                  />
+                  {classSearchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setClassSearchTerm("")}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-transparent"
+                    >
+                      <Icon icon="lucide:x" className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col gap-4 p-6 !overflow-auto h-[calc(100vh-173px-64px)]">
                 {classGroups
                   .filter(({ baseClass }) => 
                     !classSearchTerm || 
@@ -791,9 +867,9 @@ export function WikiPage() {
                   </Card>
                 ))}
               </div>
+              </>
             )}
           </div>
-          </>
         )}
 
         {activeTab === 'races' && (
