@@ -74,6 +74,7 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { useToast } from "@/hooks/use-toast"
 import { AppHeader } from "@/components/app-header"
 import { AccessDeniedOverlay } from "@/components/access-denied-overlay"
+import { WikiPage } from "@/components/wiki-page"
 import { useUser } from "@/lib/user-context"
 import {
   sampleCharacters,
@@ -111,7 +112,7 @@ function CharacterSheetContent() {
   const [activeCharacterId, setActiveCharacterId] = useState<string>("")
   const [superadminOverride, setSuperadminOverride] = useState(false)
   const [currentView, setCurrentView] = useState<'character' | 'campaign' | 'management'>('campaign')
-  const [appView, setAppView] = useState<'campaign' | 'management'>('campaign')
+  const [appView, setAppView] = useState<'campaign' | 'wiki' | 'management'>('campaign')
   
   // Ref for the main scrollable container
   const mainRef = useRef<HTMLElement>(null)
@@ -3125,6 +3126,8 @@ function CharacterSheetContent() {
           setAppView(view)
           if (view === 'campaign') {
             setCurrentView('campaign')
+          } else if (view === 'wiki') {
+            // Wiki view doesn't need to set currentView
           } else {
             setCurrentView('management')
           }
@@ -3165,8 +3168,10 @@ function CharacterSheetContent() {
           />
         )}
 
-        <main ref={mainRef} className={`flex-1 ${appView !== 'management' ? 'p-6' : ''} relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
-          {appView === 'management' ? (
+        <main ref={mainRef} className={`flex-1 ${appView !== 'management' && appView !== 'wiki' ? 'p-6' : ''} relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
+          {appView === 'wiki' ? (
+            <WikiPage />
+          ) : appView === 'management' ? (
             <ManagementInterface
               campaigns={campaigns}
               characters={characters}

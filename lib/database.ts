@@ -2326,6 +2326,162 @@ export const deleteBackground = async (backgroundId: string): Promise<{ success:
   }
 }
 
+// Feat Data Interface
+export interface FeatData {
+  id: string
+  name: string
+  description?: string | null
+  ability_modifiers?: any | null
+  skill_proficiencies?: string[] | { fixed?: string[]; available?: string[]; choice?: { count: number; from_selected?: boolean } } | null
+  tool_proficiencies?: string[] | { fixed?: string[]; available?: string[]; choice?: { count: number; from_selected?: boolean } } | null
+  equipment_proficiencies?: string[] | null
+  weapon_proficiencies?: string[] | null
+  languages?: string[] | { fixed?: string[]; choice?: { count: number } } | null
+  special_features?: any[] | null
+  created_at?: string
+  updated_at?: string
+  created_by?: string | null
+  is_custom?: boolean
+  source?: string
+}
+
+export const loadFeatDetails = async (featId: string): Promise<{
+  feat?: FeatData
+  error?: string
+}> => {
+  try {
+    const { data, error } = await supabase
+      .from("feats")
+      .select("*")
+      .eq("id", featId)
+      .single()
+
+    if (error) {
+      console.error("Error loading feat details:", error)
+      return { error: error.message }
+    }
+
+    return { feat: data || undefined }
+  } catch (error) {
+    console.error("Error loading feat details:", error)
+    return { error: "Failed to load feat details" }
+  }
+}
+
+export const loadFeatsWithDetails = async (): Promise<{
+  feats?: FeatData[]
+  error?: string
+}> => {
+  try {
+    const { data, error } = await supabase
+      .from("feats")
+      .select("*")
+      .order("name", { ascending: true })
+
+    if (error) {
+      console.error("Error loading feats with details:", error)
+      return { error: error.message }
+    }
+
+    return { feats: data || [] }
+  } catch (error) {
+    console.error("Error loading feats with details:", error)
+    return { error: "Failed to load feats with details" }
+  }
+}
+
+export const upsertFeat = async (feat: Partial<FeatData> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const isSuperadminUser = await isSuperadmin(user.id)
+    if (!isSuperadminUser) {
+      return { success: false, error: "Only superadmins can edit feats" }
+    }
+
+    const payload: any = {
+      name: feat.name,
+      description: feat.description || null,
+      ability_modifiers: feat.ability_modifiers || null,
+      skill_proficiencies: feat.skill_proficiencies || null,
+      tool_proficiencies: feat.tool_proficiencies || null,
+      equipment_proficiencies: feat.equipment_proficiencies || null,
+      weapon_proficiencies: feat.weapon_proficiencies || null,
+      languages: feat.languages || null,
+      special_features: feat.special_features || null,
+    }
+
+    if (feat.id) {
+      // Update existing feat
+      const { error: updateError } = await supabase
+        .from("feats")
+        .update(payload)
+        .eq("id", feat.id)
+
+      if (updateError) {
+        console.error("Error updating feat:", updateError)
+        return { success: false, error: updateError.message }
+      }
+
+      return { success: true, id: feat.id }
+    } else {
+      // Create new feat
+      const id = globalThis.crypto.randomUUID()
+      payload.id = id
+      payload.created_at = new Date().toISOString()
+      payload.created_by = user.id
+      payload.is_custom = true
+      payload.source = 'custom'
+
+      const { error: insertError } = await supabase
+        .from("feats")
+        .insert([payload])
+
+      if (insertError) {
+        console.error("Error creating feat:", insertError)
+        return { success: false, error: insertError.message }
+      }
+
+      return { success: true, id }
+    }
+  } catch (error) {
+    console.error("Error upserting feat:", error)
+    return { success: false, error: "Failed to upsert feat" }
+  }
+}
+
+export const deleteFeat = async (featId: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+
+    const isSuperadminUser = await isSuperadmin(user.id)
+    if (!isSuperadminUser) {
+      return { success: false, error: "Only superadmins can delete feats" }
+    }
+
+    const { error } = await supabase
+      .from("feats")
+      .delete()
+      .eq("id", featId)
+
+    if (error) {
+      console.error("Error deleting feat:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting feat:", error)
+    return { success: false, error: "Failed to delete feat" }
+  }
+}
+
 // Admin: Classes, Subclasses, and Features Management
 export const loadClassesWithDetails = async (): Promise<{
   classes?: Array<{

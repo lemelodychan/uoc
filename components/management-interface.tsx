@@ -9,8 +9,8 @@ import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
 import type { UserProfile, PermissionLevel } from "@/lib/user-profiles"
 import { useUser } from "@/lib/user-context"
-import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin, loadRacesWithDetails, upsertRace as dbUpsertRace, deleteRace as dbDeleteRace, loadRaceDetails, loadBackgroundsWithDetails, upsertBackground as dbUpsertBackground, deleteBackground as dbDeleteBackground, loadBackgroundDetails } from "@/lib/database"
-import type { RaceData, BackgroundData } from "@/lib/database"
+import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin, loadRacesWithDetails, upsertRace as dbUpsertRace, deleteRace as dbDeleteRace, loadRaceDetails, loadBackgroundsWithDetails, upsertBackground as dbUpsertBackground, deleteBackground as dbDeleteBackground, loadBackgroundDetails, loadFeatsWithDetails, upsertFeat as dbUpsertFeat, deleteFeat as dbDeleteFeat, loadFeatDetails } from "@/lib/database"
+import type { RaceData, BackgroundData, FeatData } from "@/lib/database"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
@@ -21,6 +21,7 @@ import { CampaignCreationModal } from "./edit-modals/campaign-creation-modal"
 import { ClassEditorPage } from "./class-editor-page"
 import { RaceEditorPage } from "./race-editor-page"
 import { BackgroundEditorPage } from "./background-editor-page"
+import { FeatEditorPage } from "./feat-editor-page"
 import { SubclassManagementModal } from "@/components/edit-modals/subclass-management-modal"
 import { FeatureManagementModal } from "@/components/edit-modals/feature-management-modal"
 import { ProficiencyCheckboxes, SAVING_THROW_OPTIONS, SKILL_OPTIONS, EQUIPMENT_OPTIONS } from "@/components/ui/proficiency-checkboxes"
@@ -80,6 +81,12 @@ export function ManagementInterface({
   const [backgroundEditorView, setBackgroundEditorView] = useState<'list' | 'editor'>('list')
   const [lastEditedBackgroundId, setLastEditedBackgroundId] = useState<string | null>(null)
   
+  // Feat management state
+  const [feats, setFeats] = useState<FeatData[]>([])
+  const [editingFeat, setEditingFeat] = useState<FeatData | null>(null)
+  const [featEditorView, setFeatEditorView] = useState<'list' | 'editor'>('list')
+  const [lastEditedFeatId, setLastEditedFeatId] = useState<string | null>(null)
+  
   // Refs for scroll management
   const classListTopRef = useRef<HTMLDivElement>(null)
   const classCardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -99,6 +106,11 @@ export function ManagementInterface({
     loadBackgrounds()
   }, [])
 
+  // Load feats on mount
+  useEffect(() => {
+    loadFeats()
+  }, [])
+
   // Reload races when switching to races tab (if in list view)
   useEffect(() => {
     if (activeTab === 'races' && raceEditorView === 'list') {
@@ -111,6 +123,14 @@ export function ManagementInterface({
   useEffect(() => {
     if (activeTab === 'backgrounds' && backgroundEditorView === 'list') {
       loadBackgrounds()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  // Reload feats when switching to feats tab (if in list view)
+  useEffect(() => {
+    if (activeTab === 'feats' && featEditorView === 'list') {
+      loadFeats()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
@@ -328,6 +348,28 @@ export function ManagementInterface({
     }
   }
 
+  const loadFeats = async () => {
+    try {
+      const result = await loadFeatsWithDetails()
+      if (result.feats) {
+        setFeats(result.feats)
+      } else if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error loading feats:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load feats",
+        variant: "destructive"
+      })
+    }
+  }
+
   return (
     <div className="relative flex flex-row gap-6 h-full !overflow-auto">
 
@@ -352,7 +394,7 @@ export function ManagementInterface({
               activeTab === 'classes' ? 'text-primary' : ''
             }`}
           >
-            <Icon icon="lucide:book-open" className="w-4 h-4" />
+            <Icon icon="lucide:sword" className="w-4 h-4" />
             Classes
             <Badge 
               variant="secondary" 
@@ -386,6 +428,22 @@ export function ManagementInterface({
           >
             <Icon icon="lucide:scroll-text" className="w-4 h-4" />
             Backgrounds
+            <Badge 
+              variant="secondary" 
+              className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto"
+            >
+              Beta
+            </Badge>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('feats')}
+            className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
+              activeTab === 'feats' ? 'text-primary' : ''
+            }`}
+          >
+            <Icon icon="lucide:sparkles" className="w-4 h-4" />
+            Feats
             <Badge 
               variant="secondary" 
               className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto"
@@ -832,6 +890,116 @@ export function ManagementInterface({
                   toast({
                     title: "Error",
                     description: "Failed to delete background",
+                      variant: "destructive"
+                    })
+                  }
+                }}
+              />
+            )
+          )}
+          </div>
+        )}
+
+        {activeTab === 'feats' && (
+          <div className="flex-1 min-h-0 flex flex-col gap-0">
+            {featEditorView === 'list' ? (
+              <FeatManagement 
+                feats={feats}
+                canEdit={canEdit}
+                onEditFeat={async (featData) => {
+              const result = await loadFeatDetails(featData.id)
+              if (result.feat) {
+                setEditingFeat(result.feat)
+                setFeatEditorView('editor')
+              } else {
+                  toast({
+                    title: "Error",
+                    description: result.error || "Failed to load feat data",
+                    variant: "destructive"
+                  })
+                }
+              }}
+              onCreateFeat={() => {
+              setEditingFeat({
+                id: '',
+                name: '',
+                description: null,
+                ability_modifiers: null,
+                skill_proficiencies: null,
+                tool_proficiencies: null,
+                equipment_proficiencies: null,
+                weapon_proficiencies: null,
+                languages: null,
+                special_features: null
+                })
+                setFeatEditorView('editor')
+              }}
+              onDeleteFeat={async (featId) => {
+              try {
+                await dbDeleteFeat(featId)
+                await loadFeats()
+                toast({
+                  title: "Success",
+                  description: "Feat deleted successfully"
+                })
+              } catch (error) {
+                toast({
+                  title: "Error",
+                  description: "Failed to delete feat",
+                  variant: "destructive"
+                })
+              }
+            }}
+                onReloadFeats={loadFeats}
+              />
+            ) : (
+              editingFeat && (
+                <FeatEditorPage
+                  featData={editingFeat}
+                  canEdit={canEdit}
+                  onSave={async (featData) => {
+                try {
+                  const result = await dbUpsertFeat(featData)
+                  if (!result.success) {
+                    throw new Error(result.error || 'Failed to save feat')
+                  }
+                  const savedFeatId = result.id || featData.id
+                  if (savedFeatId) {
+                    setLastEditedFeatId(savedFeatId)
+                  }
+                  // Reload feats to refresh the list
+                  await loadFeats()
+                  // Switch to list view after feats are loaded
+                  setFeatEditorView('list')
+                  setEditingFeat(null)
+                  toast({
+                    title: "Success",
+                    description: `Feat "${featData.name}" saved successfully`,
+                  })
+                } catch (error) {
+                    console.error('Error saving feat:', error)
+                    throw error
+                  }
+                }}
+                onCancel={() => {
+                  setFeatEditorView('list')
+                  setEditingFeat(null)
+                }}
+                onDelete={async (featId) => {
+                try {
+                  await dbDeleteFeat(featId)
+                  await loadFeats()
+                  setFeatEditorView('list')
+                  setEditingFeat(null)
+                  toast({
+                    title: "Success",
+                    description: "Feat deleted successfully",
+                  })
+                } catch (error) {
+                  console.error('Error deleting feat:', error)
+                  toast({
+                    title: "Error",
+                    description: "Failed to delete feat",
                       variant: "destructive"
                     })
                   }
@@ -1792,6 +1960,278 @@ function BackgroundManagement({
         {backgrounds.length === 0 && (
           <div className="text-center text-muted-foreground py-8">
             No backgrounds found. Create your first background to get started.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Feat Management Component
+function FeatManagement({ 
+  feats,
+  canEdit = true,
+  onEditFeat,
+  onCreateFeat,
+  onDeleteFeat,
+  onReloadFeats
+}: {
+  feats: FeatData[]
+  canEdit?: boolean
+  onEditFeat: (featData: FeatData) => void
+  onCreateFeat: () => void
+  onDeleteFeat: (featId: string) => void
+  onReloadFeats: () => Promise<void>
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-row gap-4 items-start justify-between">
+        <h2 className="text-3xl font-display font-bold">Feat Management</h2>
+        {canEdit && (
+          <Button onClick={onCreateFeat}>
+            <Icon icon="lucide:plus" className="w-4 h-4" />
+            Create Feat
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {feats.map((feat) => (
+          <Card key={feat.id}>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">{feat.name}</span>
+                </div>
+                <div className="flex gap-2">
+                  {canEdit && (
+                    <Button size="sm" variant="outline" onClick={() => onEditFeat(feat)} className="h-8 font-body">
+                      <Icon icon="lucide:edit" className="w-4 h-4" />
+                      Edit
+                    </Button>
+                  )}
+                  {canEdit && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"
+                      onClick={async () => {
+                        if (confirm(`Are you sure you want to delete "${feat.name}"? This action cannot be undone.`)) {
+                          await onDeleteFeat(feat.id)
+                          await onReloadFeats()
+                        }
+                      }}
+                    >
+                      <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Description */}
+              {feat.description && (
+                <p className="text-muted-foreground mb-4 line-clamp-2 text-sm">
+                  {feat.description.replace(/<[^>]*>/g, '').substring(0, 400)}
+                  {feat.description.length > 400 ? '...' : ''}
+                </p>
+              )}
+              
+              <div className="flex flex-col gap-2">
+                {/* Feat Stats */}
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                  {/* Ability Modifiers */}
+                  {feat.ability_modifiers && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:trending-up" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Ability Modifiers:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(() => {
+                          if (Array.isArray(feat.ability_modifiers)) {
+                            return `${feat.ability_modifiers.length} modifier(s)`
+                          }
+                          if (feat.ability_modifiers.type === 'choice') {
+                            return `Choose ${(feat.ability_modifiers as any).choices?.count || 2}`
+                          }
+                          if (feat.ability_modifiers.type === 'custom') {
+                            return 'Custom'
+                          }
+                          if (feat.ability_modifiers.type === 'fixed_multi') {
+                            const abilities = (feat.ability_modifiers as any).abilities || {}
+                            const count = Object.values(abilities).filter((v: any) => v > 0).length
+                            return `${count} fixed`
+                          }
+                          return 'Yes'
+                        })()}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Skill Proficiencies Count */}
+                  {feat.skill_proficiencies && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:brain" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Skills:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(() => {
+                          if (Array.isArray(feat.skill_proficiencies)) {
+                            return feat.skill_proficiencies.length
+                          }
+                          if (typeof feat.skill_proficiencies === 'object' && !Array.isArray(feat.skill_proficiencies)) {
+                            const skillsObj = feat.skill_proficiencies as any
+                            const fixed = skillsObj.fixed || []
+                            const available = skillsObj.available || []
+                            const choice = skillsObj.choice
+                            
+                            if (fixed.length > 0 && choice) {
+                              if (choice.from_selected) {
+                                const optionCount = available.length > 0 ? available.length : 0
+                                if (optionCount > 0) {
+                                  return `${fixed.length} + Choose ${choice.count || 1} from ${optionCount}`
+                                } else {
+                                  return `${fixed.length} + Choose ${choice.count || 1} from selected`
+                                }
+                              } else {
+                                return `${fixed.length} + Choose ${choice.count || 1}`
+                              }
+                            } else if (choice && choice.from_selected) {
+                              const optionCount = available.length > 0 ? available.length : fixed.length
+                              if (optionCount > 0) {
+                                return `Choose ${choice.count || 1} from ${optionCount}`
+                              } else {
+                                return `Choose ${choice.count || 1} from selected`
+                              }
+                            } else if (fixed.length > 0) {
+                              return fixed.length
+                            } else if (choice) {
+                              return `Choose ${choice.count || 1}`
+                            }
+                          }
+                          return '0'
+                        })()}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Tool Proficiencies Count */}
+                  {feat.tool_proficiencies && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:wrench" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Tools:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(() => {
+                          if (Array.isArray(feat.tool_proficiencies)) {
+                            return feat.tool_proficiencies.length
+                          }
+                          if (typeof feat.tool_proficiencies === 'object' && !Array.isArray(feat.tool_proficiencies)) {
+                            const toolsObj = feat.tool_proficiencies as any
+                            const fixed = toolsObj.fixed || []
+                            const available = toolsObj.available || []
+                            const choice = toolsObj.choice
+                            
+                            if (fixed.length > 0 && choice) {
+                              if (choice.from_selected) {
+                                const optionCount = available.length > 0 ? available.length : 0
+                                if (optionCount > 0) {
+                                  return `${fixed.length} + Choose ${choice.count || 1} from ${optionCount}`
+                                } else {
+                                  return `${fixed.length} + Choose ${choice.count || 1} from selected`
+                                }
+                              } else {
+                                return `${fixed.length} + Choose ${choice.count || 1}`
+                              }
+                            } else if (choice && choice.from_selected) {
+                              const optionCount = available.length > 0 ? available.length : fixed.length
+                              if (optionCount > 0) {
+                                return `Choose ${choice.count || 1} from ${optionCount}`
+                              } else {
+                                return `Choose ${choice.count || 1} from selected`
+                              }
+                            } else if (fixed.length > 0) {
+                              return fixed.length
+                            } else if (choice) {
+                              return `Choose ${choice.count || 1}`
+                            }
+                          }
+                          return '0'
+                        })()}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Languages Count */}
+                  {feat.languages && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:languages" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Languages:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(() => {
+                          if (Array.isArray(feat.languages)) {
+                            return feat.languages.length
+                          }
+                          if (typeof feat.languages === 'object' && !Array.isArray(feat.languages)) {
+                            const langsObj = feat.languages as any
+                            const fixed = langsObj.fixed || []
+                            const choice = langsObj.choice
+                            if (fixed.length > 0 && choice) {
+                              return `${fixed.length} + Choose ${choice.count || 1}`
+                            } else if (fixed.length > 0) {
+                              return fixed.length
+                            } else if (choice) {
+                              return `Choose ${choice.count || 1}`
+                            }
+                          }
+                          return '0'
+                        })()}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Special Features Count */}
+                  {feat.special_features && Array.isArray(feat.special_features) && feat.special_features.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Icon icon="lucide:star" className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Features:</span>
+                      <Badge variant="outline" className="text-xs">
+                        {feat.special_features.length}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between mt-1 border-t pt-3">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Icon icon="lucide:book" className="w-3 h-3" />
+                    <span className="text-muted-foreground">Source:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {feat.source && feat.source !== 'custom' ? feat.source : 'Custom'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Icon icon="lucide:calendar" className="w-3 h-3" />
+                    <span>Updated {(() => {
+                      try {
+                        if (feat.updated_at) {
+                          const date = new Date(feat.updated_at)
+                          if (!isNaN(date.getTime())) {
+                            return date.toLocaleDateString()
+                          }
+                        }
+                        return 'Recently'
+                      } catch (error) {
+                        return 'Unknown'
+                      }
+                    })()}</span>
+                  </div>
+                </div>
+              </div>
+                
+            </CardContent>
+          </Card>
+        ))}
+        {feats.length === 0 && (
+          <div className="text-center text-muted-foreground py-8">
+            No feats found. Create your first feat to get started.
           </div>
         )}
       </div>

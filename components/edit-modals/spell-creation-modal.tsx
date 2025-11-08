@@ -29,6 +29,7 @@ interface SpellCreationModalProps {
   initialSpellData?: Partial<Spell>
   initialClasses?: string[]
   editingSpellId?: string
+  libraryOnly?: boolean // When true, only show "Save to Library Only" button
 }
 
 const SPELL_SCHOOLS = [
@@ -101,7 +102,8 @@ export function SpellCreationModal({
   onUpdateLibrarySpell, 
   initialSpellData, 
   initialClasses, 
-  editingSpellId 
+  editingSpellId,
+  libraryOnly = false
 }: SpellCreationModalProps) {
   const [spellData, setSpellData] = useState({
     name: initialSpellData?.name || "",
@@ -584,11 +586,11 @@ export function SpellCreationModal({
           </Button>
           <div className="flex gap-2">
             {onSaveToLibraryOnly && !editingSpellId && (
-              <Button variant="outline" onClick={handleSaveToLibraryOnly}>
-                Save to Library Only
+              <Button variant={libraryOnly ? "default" : "outline"} onClick={handleSaveToLibraryOnly}>
+                {libraryOnly ? "Save to Library" : "Save to Library Only"}
               </Button>
             )}
-            {!editingSpellId ? (
+            {!libraryOnly && !editingSpellId ? (
               availableCharacters.length === 1 ? (
                 <Button onClick={() => handleSave(availableCharacters[0].id)}>
                   Save and Add to Character
@@ -620,11 +622,11 @@ export function SpellCreationModal({
                   )}
                 </div>
               )
-            ) : (
+            ) : editingSpellId ? (
               <Button onClick={() => handleSave(character.id)}>
                 Update
               </Button>
-            )}
+            ) : null}
           </div>
         </DialogFooter>
       </DialogContent>

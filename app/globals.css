@@ -361,3 +361,40 @@
   list-style-type: decimal;
   padding-left: 1rem;
 }
+
+/* Prose font size modifiers for RichTextDisplay */
+.prose-xs { font-size: 0.75rem; }
+.prose-xs p { font-size: 0.75rem; }
+.prose-xs h1 { font-size: 1.5rem; }
+.prose-xs h2 { font-size: 1.25rem; }
+.prose-xs h3 { font-size: 1.125rem; }
+
+.prose-sm { font-size: 0.875rem; }
+.prose-sm p { font-size: 0.875rem; }
+.prose-sm h1 { font-size: 1.5rem; }
+.prose-sm h2 { font-size: 1.25rem; }
+.prose-sm h3 { font-size: 1.125rem; }
+
+.prose-base { font-size: 1rem; }
+.prose-base p { font-size: 1rem; }
+.prose-base h1 { font-size: 2rem; }
+.prose-base h2 { font-size: 1.5rem; }
+.prose-base h3 { font-size: 1.25rem; }
+
+.prose-lg { font-size: 1.125rem; }
+.prose-lg p { font-size: 1.125rem; }
+.prose-lg h1 { font-size: 2.25rem; }
+.prose-lg h2 { font-size: 1.875rem; }
+.prose-lg h3 { font-size: 1.5rem; }
+
+.prose-xl { font-size: 1.25rem; }
+.prose-xl p { font-size: 1.25rem; }
+.prose-xl h1 { font-size: 2.5rem; }
+.prose-xl h2 { font-size: 2rem; }
+.prose-xl h3 { font-size: 1.75rem; }
+
+.prose-2xl { font-size: 1.5rem; }
+.prose-2xl p { font-size: 1.5rem; }
+.prose-2xl h1 { font-size: 3rem; }
+.prose-2xl h2 { font-size: 2.5rem; }
+.prose-2xl h3 { font-size: 2rem; }

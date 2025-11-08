@@ -321,6 +321,21 @@ export function Spellcasting({
   // Create feature skill configuration from feature ID
   // This ensures feature configuration comes from the system, not character data
   const createFeatureSkillFromId = (featureId: string, usageData: any): ClassFeatureSkill | null => {
+    // Handle feat features - they have isFeatFeature flag and full config stored
+    if (usageData?.isFeatFeature) {
+      return {
+        id: featureId,
+        version: 1,
+        title: usageData.featureName || 'Unknown Feature',
+        subtitle: usageData.description || '',
+        featureType: usageData.featureType || 'trait',
+        enabledAtLevel: 1,
+        enabledBySubclass: null,
+        className: 'Feats', // Group feat features under "Feats"
+        config: usageData.config || {}
+      }
+    }
+
     // Determine which class this feature belongs to based on the feature ID and character's classes
     const getFeatureClassName = (featureId: string): string => {
       // Warlock features

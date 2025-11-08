@@ -145,6 +145,13 @@ export interface CharacterData {
   feats: Array<{
     name: string
     description: string
+    featId?: string // ID of the feat from the library (if selected from library)
+    choices?: {
+      abilityChoices?: string[]
+      skillChoices?: string[]
+      toolChoices?: string[]
+      languageChoices?: string[]
+    }
   }>
   // Temporary field to store used spell slot counts from database
   spellSlotsUsed?: {

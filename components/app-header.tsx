@@ -10,11 +10,13 @@ import { useToast } from "@/hooks/use-toast"
 import { Icon } from "@iconify/react"
 import { ThemeToggleSimple } from "@/components/theme-toggle-simple"
 import { LogoSVG } from "@/components/logo"
+import { useUser } from "@/lib/user-context"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
+import { Badge } from "./ui/badge"
 
 interface AppHeaderProps {
-  currentView?: 'campaign' | 'management'
-  onViewChange?: (view: 'campaign' | 'management') => void
+  currentView?: 'campaign' | 'wiki' | 'management'
+  onViewChange?: (view: 'campaign' | 'wiki' | 'management') => void
 }
 
 export function AppHeader({ currentView = 'campaign', onViewChange }: AppHeaderProps) {
@@ -29,6 +31,7 @@ export function AppHeader({ currentView = 'campaign', onViewChange }: AppHeaderP
     confirmPassword: ""
   })
   const { toast } = useToast()
+  const { isSuperadmin } = useUser()
   const supabase = createClient()
 
   useEffect(() => {
@@ -191,18 +194,32 @@ export function AppHeader({ currentView = 'campaign', onViewChange }: AppHeaderP
               onClick={() => onViewChange?.('campaign')}
               className="flex items-center gap-2"
             >
-              <Icon icon="lucide:dice-6" className="w-4 h-4" />
+              <Icon icon="iconoir:hexagon-dice" className="w-4 h-4" />
               Campaigns
             </Button>
             <Button
-              variant={currentView === 'management' ? 'default' : 'ghost'}
+              variant={currentView === 'wiki' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => onViewChange?.('management')}
+              onClick={() => onViewChange?.('wiki')}
               className="flex items-center gap-2"
             >
-              <Icon icon="lucide:settings" className="w-4 h-4" />
-              Settings
+              <Icon icon="lucide:book-open-text" className="w-4 h-4" />
+              Wiki
+              <Badge variant="secondary" className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto">
+                Beta
+              </Badge>
             </Button>
+            {isSuperadmin && (
+              <Button
+                variant={currentView === 'management' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => onViewChange?.('management')}
+                className="flex items-center gap-2"
+              >
+                <Icon icon="lucide:settings" className="w-4 h-4" />
+                Settings
+              </Button>
+            )}
           </nav>
         </div>
         
