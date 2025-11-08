@@ -388,7 +388,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                 size="sm"
                 onClick={() => setMulticlassModalOpen(true)}
                 title="Configure multiclassing"
-                className="h-[38px]"
+                className="h-[38px] w-9"
               >
                 <Icon icon="lucide:edit" className="w-4 h-4" />
               </Button>
@@ -407,7 +407,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                 max="20"
                 value={formData.level}
                 readOnly
-                className="w-full bg-muted"
+                className="w-16 h-9 bg-muted"
               />
               <span className="text-xs text-muted-foreground">
                 (calculated from classes)
@@ -459,7 +459,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                   </SelectContent>
                 </Select>
                 {raceIds.length === 2 && raceIds[0] && (
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center gap-2">
                     <Checkbox
                       id="main-race-1"
                       checked={raceIds[0]?.isMain || false}
@@ -512,7 +512,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                     </SelectContent>
                   </Select>
                   {raceIds.length === 2 && raceIds[1] && (
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center gap-2">
                       <Checkbox
                         id="main-race-2"
                         checked={raceIds[1]?.isMain || false}
@@ -564,7 +564,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                     setSelectedBackgroundIdForModal(null)
                     onSave({ 
                       backgroundId: undefined,
-                      backgroundData: null
+                      backgroundData: undefined
                     })
                   }
                 }}
@@ -588,7 +588,7 @@ export function BasicInfoModal({ isOpen, onClose, character, onSave, onPartyStat
                   size="sm"
                   onClick={() => setBackgroundTraitModalOpen(true)}
                   title="Edit background traits"
-                  className="h-[38px]"
+                  className="h-9 w-9"
                 >
                   <Icon icon="lucide:edit" className="w-4 h-4" />
                 </Button>

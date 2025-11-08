@@ -160,6 +160,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   const [backgroundSkillChoices, setBackgroundSkillChoices] = useState<string[]>([]) // Selected skills when background has choice
   const [backgroundToolChoices, setBackgroundToolChoices] = useState<string[]>([]) // Selected tools when background has choice
   const [backgroundLanguageChoices, setBackgroundLanguageChoices] = useState<string[]>([]) // Selected languages when background has choice
+  const [backgroundLanguageInputs, setBackgroundLanguageInputs] = useState<string[]>([]) // Temporary input values for languages (not saved until blur/next)
   // Track selected/rolled items for numbered arrays
   const [backgroundDefiningEvents, setBackgroundDefiningEvents] = useState<Array<{ number: number; text: string }>>([])
   const [backgroundPersonalityTraits, setBackgroundPersonalityTraits] = useState<Array<{ number: number; text: string }>>([])
@@ -1650,6 +1651,27 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   // Handle background changes - revert previous and apply new
   useEffect(() => {
     if (selectedBackgroundId && selectedBackgroundData) {
+      // Initialize language inputs array if background has language choices
+      if (selectedBackgroundData.languages) {
+        const langsData = (() => {
+          if (Array.isArray(selectedBackgroundData.languages)) {
+            return { fixed: selectedBackgroundData.languages, choice: undefined }
+          }
+          if (selectedBackgroundData.languages && typeof selectedBackgroundData.languages === 'object' && !Array.isArray(selectedBackgroundData.languages)) {
+            const langsObj = selectedBackgroundData.languages as any
+            return {
+              fixed: langsObj.fixed || [],
+              choice: langsObj.choice || undefined
+            }
+          }
+          return { fixed: [], choice: undefined }
+        })()
+        if (langsData.choice && backgroundLanguageInputs.length !== (langsData.choice.count || 1)) {
+          // Initialize inputs array to match the number of choices needed
+          setBackgroundLanguageInputs(Array((langsData.choice.count || 1)).fill(""))
+        }
+      }
+      
       // If background ID changed, revert previous and apply new
       if (previousBackgroundDataRef.current && previousBackgroundDataRef.current.id !== selectedBackgroundData.id) {
         // Revert using the previous background's choices (stored in ref)
@@ -1663,6 +1685,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         setBackgroundSkillChoices([])
         setBackgroundToolChoices([])
         setBackgroundLanguageChoices([])
+        setBackgroundLanguageInputs([])
         setBackgroundDefiningEvents([])
         setBackgroundPersonalityTraits([])
         setBackgroundIdeals([])
@@ -1694,6 +1717,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       )
       previousBackgroundDataRef.current = null
       previousBackgroundChoicesRef.current = { skills: [], tools: [], languages: [] }
+      setBackgroundLanguageInputs([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBackgroundId, selectedBackgroundData?.id])
@@ -3748,7 +3772,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                             return (
                                               <div key={index} className="flex flex-col gap-2">
                                                 <Label className="text-sm font-medium">
-                                                  Ability #{index} (+{increaseAmount})
+                                                  Ability #{index}
                                                 </Label>
                                                 <Select
                                                   value={currentChoice?.ability || ""}
@@ -3815,7 +3839,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                                   }}
                                                 >
                                                   <SelectTrigger className="w-[212px] h-8">
-                                                    <SelectValue placeholder={`Select ability #${index} (+${increaseAmount})`} />
+                                                    <SelectValue placeholder={`Select ability to add +${increaseAmount}`} />
                                                   </SelectTrigger>
                                                   <SelectContent>
                                                     {['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'].map((ability) => {
@@ -4319,7 +4343,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                         return (
                           <div className="flex flex-col gap-2">
                             <Label className="text-md font-medium">Race Features & Proficiencies</Label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 gap-2">
                               {/* Other Features (traits, spells, etc.) */}
                               {otherFeatures.map((feature: any, index: number) => (
                                 <div key={`feature-${index}`} className="py-3 px-4 border rounded-lg bg-card flex flex-col gap-2 order-2">
@@ -4330,7 +4354,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                     )}
                                   </div>
                                   {feature.description && (
-                                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                    <RichTextDisplay content={feature.description} className="text-muted-foreground" />
                                   )}
                                 </div>
                               ))}
@@ -4342,7 +4366,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                     <span className="text-sm font-medium">Weapon Proficiency</span>
                                   </div>
                                   {feature.description && (
-                                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                    <RichTextDisplay content={feature.description} className="text-muted-foreground" />
                                   )}
                                   <div className="flex flex-wrap gap-2 mt-1">
                                     {feature.weapons.map((weapon: string, weaponIndex: number) => (
@@ -4365,11 +4389,11 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                 if (isChoiceType) {
                                   const selectedCount = toolProficiencyChoices.get(featureKey)?.length || 0
                                   return (
-                                    <div key={`tool-choice-${index}`} className="col-span-2 py-3 px-4 border rounded-lg bg-card flex flex-col gap-2 !order-1">
+                                    <div key={`tool-choice-${index}`} className="py-3 px-4 border rounded-lg bg-card flex flex-col gap-2 !order-1">
                                       <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium">Tool Proficiency</span>
                                       </div>
-                                      <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                      <RichTextDisplay content={feature.description} className="text-muted-foreground" />
                                       {maxSelections > 1 && (
                                         <p className="text-sm text-muted-foreground">
                                           Select {maxSelections} tool{maxSelections > 1 ? 's' : ''} ({selectedCount}/{maxSelections})
@@ -4407,7 +4431,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                     <span className="text-sm font-medium">Tool Proficiency</span>
                                   </div>
                                   {feature.description && (
-                                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                    <RichTextDisplay content={feature.description} className="text-muted-foreground" />
                                   )}
                                   <div className="flex flex-wrap gap-2 mt-1">
                                     {feature.tools.map((tool: string, toolIndex: number) => (
@@ -4426,35 +4450,46 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                     feature.skill_options.some((opt: string) => opt.toLowerCase().replace(/\s+/g, '_') === s)
                                   ).length
                                   
+                                  // Deduplicate skill options by normalizing to database format
+                                  const normalizedSkillOptions = new Map<string, string>()
+                                  feature.skill_options.forEach((skill: string) => {
+                                    const skillInDbFormat = skill.toLowerCase().replace(/\s+/g, '_')
+                                    if (!normalizedSkillOptions.has(skillInDbFormat)) {
+                                      // Try to find the proper label from SKILL_OPTIONS, otherwise use the original
+                                      const skillOption = SKILL_OPTIONS.find(s => s.value === skillInDbFormat)
+                                      normalizedSkillOptions.set(skillInDbFormat, skillOption?.label || skill)
+                                    }
+                                  })
+                                  const uniqueSkillOptions = Array.from(normalizedSkillOptions.entries())
+                                  
                                   return (
-                                    <div key={`skill-choice-${index}`} className="col-span-2 py-3 px-4 border rounded-lg bg-card flex flex-col gap-2 !order-1">
+                                    <div key={`skill-choice-${index}`} className="py-3 px-4 border rounded-lg bg-card flex flex-col gap-2 !order-1">
                                       <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium">Skill Proficiency</span>
                                       </div>
-                                      <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                      <RichTextDisplay content={feature.description} className="text-muted-foreground" />
                                       {maxSelections > 1 && (
                                         <p className="text-sm text-muted-foreground">
                                           Select {maxSelections} skill{maxSelections > 1 ? 's' : ''} ({selectedCount}/{maxSelections})
                                         </p>
                                       )}
                                       <div className="grid grid-cols-3 gap-2 mt-1">
-                                        {feature.skill_options.map((skill: string) => {
-                                          const skillInDbFormat = skill.toLowerCase().replace(/\s+/g, '_')
-                                          const isSelected = selectedProficiencies.skills.includes(skillInDbFormat)
+                                        {uniqueSkillOptions.map(([skillValue, skillLabel]) => {
+                                          const isSelected = selectedProficiencies.skills.includes(skillValue)
                                           const canSelect = isSelected || selectedCount < maxSelections
                                           
                                           return (
-                                            <div key={skill} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
+                                            <div key={skillValue} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
                                               <Checkbox
-                                                id={`skill-${skill}`}
+                                                id={`skill-${skillValue}`}
                                                 checked={isSelected}
                                                 disabled={!canSelect && !isSelected}
                                                 onCheckedChange={(checked) => 
-                                                  handleSkillProficiencySelection(skill, checked as boolean, maxSelections, feature.skill_options)
+                                                  handleSkillProficiencySelection(skillLabel, checked as boolean, maxSelections, feature.skill_options)
                                                 }
                                               />
-                                              <Label htmlFor={`skill-${skill}`} className="text-sm cursor-pointer">
-                                                {skill}
+                                              <Label htmlFor={`skill-${skillValue}`} className="text-sm cursor-pointer">
+                                                {skillLabel}
                                               </Label>
                                             </div>
                                           )
@@ -4469,7 +4504,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                         <span className="text-sm font-medium">Skill Proficiency</span>
                                       </div>
                                       {feature.description && (
-                                        <p className="text-sm text-muted-foreground mb-1">{feature.description}</p>
+                                        <RichTextDisplay content={feature.description} className="text-muted-foreground mb-1" />
                                       )}
                                       <div className="flex flex-wrap gap-2 mt-1">
                                         {feature.skill_options.map((skill: string, sIdx: number) => (
@@ -4485,7 +4520,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                         <span className="text-sm font-medium">Skill Proficiency</span>
                                       </div>
                                       {feature.description && (
-                                        <p className="text-sm text-muted-foreground mb-1">{feature.description}</p>
+                                        <RichTextDisplay content={feature.description} className="text-muted-foreground mb-1" />
                                       )}
                                       <Badge variant="secondary">{feature.feature_skill_type}</Badge>
                                     </div>
@@ -4524,9 +4559,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                             <Label className="text-md font-medium">
                               {choiceFeature.name}
                             </Label>
-                            <p className="text-xs text-muted-foreground">
-                              {choiceFeature.description}
-                            </p>
+                            <RichTextDisplay content={choiceFeature.description} className="text-xs text-muted-foreground" />
                             <Select
                               value={currentSelection?.optionName || ""}
                               onValueChange={(value) => {
@@ -4647,7 +4680,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                             {currentSelection && (
                               <div className="text-sm py-3 px-4 flex flex-col gap-2 border rounded-lg bg-card">
                                 <div className="font-medium">{currentSelection.option.name}</div>
-                                <p className="text-sm text-muted-foreground">{currentSelection.option.description}</p>
+                                <RichTextDisplay content={currentSelection.option.description} className="text-muted-foreground" />
                                 {/* Skill Selection for Skill Versatility option */}
                                 {currentSelection?.option.type === 'skill_proficiency' && 
                                 currentSelection.option.skill_choice === 'any' && (
@@ -5073,7 +5106,8 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
 
                     {/* Background Details */}
                     {selectedBackgroundData && (
-                      <div className="flex flex-col gap-4 px-3 py-3 border rounded-lg bg-background">
+                      <div className="flex flex-col gap-4 p-4 border rounded-lg bg-background">
+                        <Label className="text-lg font-medium">{selectedBackgroundData.name}</Label>
                         {/* Description */}
                         {selectedBackgroundData.description && (
                           <div className="flex flex-col gap-2">
@@ -5084,610 +5118,637 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                           </div>
                         )}
 
-                        {/* Skill Proficiencies */}
-                        {selectedBackgroundData.skill_proficiencies && (() => {
-                          const skillsData = (() => {
-                            if (Array.isArray(selectedBackgroundData.skill_proficiencies)) {
-                              return { fixed: selectedBackgroundData.skill_proficiencies, choice: undefined, available: [] }
-                            }
-                            if (selectedBackgroundData.skill_proficiencies && typeof selectedBackgroundData.skill_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.skill_proficiencies)) {
-                              const skillsObj = selectedBackgroundData.skill_proficiencies as any
-                              const fixed = skillsObj.fixed || []
-                              const available = skillsObj.available || []
-                              const choice = skillsObj.choice || undefined
-                              const fromSelected = choice?.from_selected || false
-                              
-                              // If from_selected is true and there's no available array,
-                              // the fixed array contains the choice options (not actual fixed skills)
-                              // Example: Haunted One - fixed: [4 skills], choice: {count: 2, from_selected: true}, no available
-                              if (fromSelected && available.length === 0 && fixed.length > 0) {
-                                return {
-                                  fixed: [], // No actual fixed skills
-                                  available: fixed, // Fixed array is actually the available options
-                                  choice: choice
+                        <div className="flex flex-col gap-4 border-t pt-4">
+                            <Label className="text-lg font-medium">Proficiencies & Equipment</Label>
+                            {/* Skill Proficiencies */}
+                            {selectedBackgroundData.skill_proficiencies && (() => {
+                              const skillsData = (() => {
+                                if (Array.isArray(selectedBackgroundData.skill_proficiencies)) {
+                                  return { fixed: selectedBackgroundData.skill_proficiencies, choice: undefined, available: [] }
                                 }
-                              }
-                              
-                              return {
-                                fixed: fixed,
-                                available: available,
-                                choice: choice
-                              }
-                            }
-                            return { fixed: [], available: [], choice: undefined }
-                          })()
-
-                          const fixedSkills = skillsData.fixed || []
-                          const availableSkills = skillsData.available || []
-                          const hasChoice = !!skillsData.choice
-                          const choiceCount = skillsData.choice?.count || 1
-                          const fromSelected = skillsData.choice?.from_selected || false
-
-                          return (
-                            <div className="flex flex-col gap-2">
-                              <Label className="text-md font-medium">Skill Proficiencies</Label>
-                              {fixedSkills.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {fixedSkills.map((skill: string) => (
-                                    <Badge key={skill} variant="secondary">{SKILL_OPTIONS.find(s => s.value === skill)?.label || skill}</Badge>
-                                  ))}
-                                </div>
-                              )}
-                              {hasChoice && (
-                                <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
-                                  <p className="text-sm text-muted-foreground">
-                                    Choose {choiceCount} skill{choiceCount > 1 ? 's' : ''} {fromSelected && availableSkills.length > 0 ? `from the ${availableSkills.length} skill${availableSkills.length > 1 ? 's' : ''} below` : 'from all available skills'}
-                                  </p>
-                                  <div className="grid grid-cols-3 gap-2">
-                                    {(fromSelected && availableSkills.length > 0 ? availableSkills : SKILL_OPTIONS.map(s => s.value))
-                                      .filter((skill: string) => !fixedSkills.includes(skill))
-                                      .map((skill: string) => {
-                                        const skillOption = SKILL_OPTIONS.find(s => s.value === skill)
-                                        if (!skillOption) return null
-                                        const isSelected = backgroundSkillChoices.includes(skill)
-                                        const canSelect = isSelected || backgroundSkillChoices.length < choiceCount
-                                        
-                                        return (
-                                          <div key={skill} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
-                                            <Checkbox
-                                              id={`bg-skill-${skill}`}
-                                              checked={isSelected}
-                                              disabled={!canSelect && !isSelected}
-                                              onCheckedChange={(checked) => {
-                                                if (checked) {
-                                                  if (backgroundSkillChoices.length < choiceCount) {
-                                                    setBackgroundSkillChoices([...backgroundSkillChoices, skill])
-                                                  }
-                                                } else {
-                                                  setBackgroundSkillChoices(backgroundSkillChoices.filter(s => s !== skill))
-                                                }
-                                              }}
-                                            />
-                                            <Label htmlFor={`bg-skill-${skill}`} className="text-sm cursor-pointer">
-                                              {skillOption.label}
-                                            </Label>
-                                          </div>
-                                        )
-                                      })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })()}
-
-                        {/* Tool Proficiencies */}
-                        {selectedBackgroundData.tool_proficiencies && (() => {
-                          const toolsData = (() => {
-                            if (Array.isArray(selectedBackgroundData.tool_proficiencies)) {
-                              return { fixed: selectedBackgroundData.tool_proficiencies, choice: undefined, available: [] }
-                            }
-                            if (selectedBackgroundData.tool_proficiencies && typeof selectedBackgroundData.tool_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.tool_proficiencies)) {
-                              const toolsObj = selectedBackgroundData.tool_proficiencies as any
-                              const fixed = toolsObj.fixed || []
-                              const available = toolsObj.available || []
-                              const choice = toolsObj.choice || undefined
-                              const fromSelected = choice?.from_selected || false
-                              
-                              // If from_selected is true and there's no available array,
-                              // the fixed array contains the choice options (not actual fixed tools)
-                              if (fromSelected && available.length === 0 && fixed.length > 0) {
-                                return {
-                                  fixed: [], // No actual fixed tools
-                                  available: fixed, // Fixed array is actually the available options
-                                  choice: choice
+                                if (selectedBackgroundData.skill_proficiencies && typeof selectedBackgroundData.skill_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.skill_proficiencies)) {
+                                  const skillsObj = selectedBackgroundData.skill_proficiencies as any
+                                  const fixed = skillsObj.fixed || []
+                                  const available = skillsObj.available || []
+                                  const choice = skillsObj.choice || undefined
+                                  const fromSelected = choice?.from_selected || false
+                                  
+                                  // If from_selected is true and there's no available array,
+                                  // the fixed array contains the choice options (not actual fixed skills)
+                                  // Example: Haunted One - fixed: [4 skills], choice: {count: 2, from_selected: true}, no available
+                                  if (fromSelected && available.length === 0 && fixed.length > 0) {
+                                    return {
+                                      fixed: [], // No actual fixed skills
+                                      available: fixed, // Fixed array is actually the available options
+                                      choice: choice
+                                    }
+                                  }
+                                  
+                                  return {
+                                    fixed: fixed,
+                                    available: available,
+                                    choice: choice
+                                  }
                                 }
-                              }
-                              
-                              return {
-                                fixed: fixed,
-                                available: available,
-                                choice: choice
-                              }
-                            }
-                            return { fixed: [], available: [], choice: undefined }
-                          })()
+                                return { fixed: [], available: [], choice: undefined }
+                              })()
 
-                          const fixedTools = toolsData.fixed || []
-                          const availableTools = toolsData.available || []
-                          const hasChoice = !!toolsData.choice
-                          const choiceCount = toolsData.choice?.count || 1
-                          const fromSelected = toolsData.choice?.from_selected || false
+                              const fixedSkills = skillsData.fixed || []
+                              const availableSkills = skillsData.available || []
+                              const hasChoice = !!skillsData.choice
+                              const choiceCount = skillsData.choice?.count || 1
+                              const fromSelected = skillsData.choice?.from_selected || false
 
-                          const TOOL_OPTIONS = [
-                            { value: 'thieves_tools', label: 'Thieves\' Tools' },
-                            { value: 'artisans_tools', label: 'Artisan\'s Tools' },
-                            { value: 'tinkers_tools', label: 'Tinker\'s Tools' },
-                            { value: 'alchemists_supplies', label: 'Alchemist\'s Supplies' },
-                            { value: 'herbalism_kit', label: 'Herbalism Kit' },
-                            { value: 'poisoners_kit', label: 'Poisoner\'s Kit' },
-                            { value: 'disguise_kit', label: 'Disguise Kit' },
-                            { value: 'forgery_kit', label: 'Forgery Kit' },
-                            { value: 'navigators_tools', label: 'Navigator\'s Tools' },
-                            { value: 'musical_instruments', label: 'Musical Instruments' },
-                            { value: 'gaming_set', label: 'Gaming Set' },
-                            { value: 'vehicles_land', label: 'Vehicles (Land)' },
-                            { value: 'vehicles_water', label: 'Vehicles (Water)' }
-                          ]
+                              return (
+                                <div className="flex flex-col gap-2">
+                                  <Label className="text-md font-medium">Skill Proficiencies</Label>
+                                  {fixedSkills.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {fixedSkills.map((skill: string) => (
+                                        <Badge key={skill} variant="secondary">{SKILL_OPTIONS.find(s => s.value === skill)?.label || skill}</Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {hasChoice && (
+                                    <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
+                                      <p className="text-sm text-muted-foreground">
+                                        Choose {choiceCount} skill{choiceCount > 1 ? 's' : ''} {fromSelected && availableSkills.length > 0 ? `from the ${availableSkills.length} skill${availableSkills.length > 1 ? 's' : ''} below` : 'from all available skills'}
+                                      </p>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {(fromSelected && availableSkills.length > 0 ? availableSkills : SKILL_OPTIONS.map(s => s.value))
+                                          .filter((skill: string) => !fixedSkills.includes(skill))
+                                          .map((skill: string) => {
+                                            const skillOption = SKILL_OPTIONS.find(s => s.value === skill)
+                                            if (!skillOption) return null
+                                            const isSelected = backgroundSkillChoices.includes(skill)
+                                            const canSelect = isSelected || backgroundSkillChoices.length < choiceCount
+                                            
+                                            return (
+                                              <div key={skill} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
+                                                <Checkbox
+                                                  id={`bg-skill-${skill}`}
+                                                  checked={isSelected}
+                                                  disabled={!canSelect && !isSelected}
+                                                  onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                      if (backgroundSkillChoices.length < choiceCount) {
+                                                        setBackgroundSkillChoices([...backgroundSkillChoices, skill])
+                                                      }
+                                                    } else {
+                                                      setBackgroundSkillChoices(backgroundSkillChoices.filter(s => s !== skill))
+                                                    }
+                                                  }}
+                                                />
+                                                <Label htmlFor={`bg-skill-${skill}`} className="text-sm cursor-pointer">
+                                                  {skillOption.label}
+                                                </Label>
+                                              </div>
+                                            )
+                                          })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
 
-                          return (
-                            <div className="flex flex-col gap-2">
-                              <Label className="text-md font-medium">Tool Proficiencies</Label>
-                              {fixedTools.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {fixedTools.map((tool: string) => (
-                                    <Badge key={tool} variant="secondary">{TOOL_OPTIONS.find(t => t.value === tool)?.label || tool}</Badge>
-                                  ))}
+                            {/* Tool Proficiencies */}
+                            {selectedBackgroundData.tool_proficiencies && (() => {
+                              const toolsData = (() => {
+                                if (Array.isArray(selectedBackgroundData.tool_proficiencies)) {
+                                  return { fixed: selectedBackgroundData.tool_proficiencies, choice: undefined, available: [] }
+                                }
+                                if (selectedBackgroundData.tool_proficiencies && typeof selectedBackgroundData.tool_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.tool_proficiencies)) {
+                                  const toolsObj = selectedBackgroundData.tool_proficiencies as any
+                                  const fixed = toolsObj.fixed || []
+                                  const available = toolsObj.available || []
+                                  const choice = toolsObj.choice || undefined
+                                  const fromSelected = choice?.from_selected || false
+                                  
+                                  // If from_selected is true and there's no available array,
+                                  // the fixed array contains the choice options (not actual fixed tools)
+                                  if (fromSelected && available.length === 0 && fixed.length > 0) {
+                                    return {
+                                      fixed: [], // No actual fixed tools
+                                      available: fixed, // Fixed array is actually the available options
+                                      choice: choice
+                                    }
+                                  }
+                                  
+                                  return {
+                                    fixed: fixed,
+                                    available: available,
+                                    choice: choice
+                                  }
+                                }
+                                return { fixed: [], available: [], choice: undefined }
+                              })()
+
+                              const fixedTools = toolsData.fixed || []
+                              const availableTools = toolsData.available || []
+                              const hasChoice = !!toolsData.choice
+                              const choiceCount = toolsData.choice?.count || 1
+                              const fromSelected = toolsData.choice?.from_selected || false
+
+                              const TOOL_OPTIONS = [
+                                { value: 'thieves_tools', label: 'Thieves\' Tools' },
+                                { value: 'artisans_tools', label: 'Artisan\'s Tools' },
+                                { value: 'tinkers_tools', label: 'Tinker\'s Tools' },
+                                { value: 'alchemists_supplies', label: 'Alchemist\'s Supplies' },
+                                { value: 'herbalism_kit', label: 'Herbalism Kit' },
+                                { value: 'poisoners_kit', label: 'Poisoner\'s Kit' },
+                                { value: 'disguise_kit', label: 'Disguise Kit' },
+                                { value: 'forgery_kit', label: 'Forgery Kit' },
+                                { value: 'navigators_tools', label: 'Navigator\'s Tools' },
+                                { value: 'musical_instruments', label: 'Musical Instruments' },
+                                { value: 'gaming_set', label: 'Gaming Set' },
+                                { value: 'vehicles_land', label: 'Vehicles (Land)' },
+                                { value: 'vehicles_water', label: 'Vehicles (Water)' }
+                              ]
+
+                              return (
+                                <div className="flex flex-col gap-2">
+                                  <Label className="text-md font-medium">Tool Proficiencies</Label>
+                                  {fixedTools.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {fixedTools.map((tool: string) => (
+                                        <Badge key={tool} variant="secondary">{TOOL_OPTIONS.find(t => t.value === tool)?.label || tool}</Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {hasChoice && (
+                                    <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
+                                      <p className="text-sm text-muted-foreground">
+                                        Choose {choiceCount} tool{choiceCount > 1 ? 's' : ''} {fromSelected && availableTools.length > 0 ? `from the ${availableTools.length} tool${availableTools.length > 1 ? 's' : ''} below` : 'from all available tools'}
+                                      </p>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {(fromSelected && availableTools.length > 0 ? availableTools : TOOL_OPTIONS.map(t => t.value))
+                                          .filter((tool: string) => !fixedTools.includes(tool))
+                                          .map((tool: string) => {
+                                            const toolOption = TOOL_OPTIONS.find(t => t.value === tool)
+                                            if (!toolOption) return null
+                                            const isSelected = backgroundToolChoices.includes(tool)
+                                            const canSelect = isSelected || backgroundToolChoices.length < choiceCount
+                                            
+                                            return (
+                                              <div key={tool} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
+                                                <Checkbox
+                                                  id={`bg-tool-${tool}`}
+                                                  checked={isSelected}
+                                                  disabled={!canSelect && !isSelected}
+                                                  onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                      if (backgroundToolChoices.length < choiceCount) {
+                                                        setBackgroundToolChoices([...backgroundToolChoices, tool])
+                                                      }
+                                                    } else {
+                                                      setBackgroundToolChoices(backgroundToolChoices.filter(t => t !== tool))
+                                                    }
+                                                  }}
+                                                />
+                                                <Label htmlFor={`bg-tool-${tool}`} className="text-sm cursor-pointer">
+                                                  {toolOption.label}
+                                                </Label>
+                                              </div>
+                                            )
+                                          })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
+
+                            {/* Languages */}
+                            {selectedBackgroundData.languages && (() => {
+                              const langsData = (() => {
+                                if (Array.isArray(selectedBackgroundData.languages)) {
+                                  return { fixed: selectedBackgroundData.languages, choice: undefined }
+                                }
+                                if (selectedBackgroundData.languages && typeof selectedBackgroundData.languages === 'object' && !Array.isArray(selectedBackgroundData.languages)) {
+                                  const langsObj = selectedBackgroundData.languages as any
+                                  return {
+                                    fixed: langsObj.fixed || [],
+                                    choice: langsObj.choice || undefined
+                                  }
+                                }
+                                return { fixed: [], choice: undefined }
+                              })()
+
+                              const fixedLangs = langsData.fixed || []
+                              const hasChoice = !!langsData.choice
+                              const choiceCount = langsData.choice?.count || 1
+
+                              return (
+                                <div className="flex flex-col gap-2">
+                                  <Label className="text-md font-medium">Languages</Label>
+                                  {fixedLangs.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {fixedLangs.map((lang: string) => (
+                                        <Badge key={lang} variant="secondary">{lang}</Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {hasChoice && (
+                                    <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
+                                      <p className="text-sm text-muted-foreground">
+                                        Choose {choiceCount} additional language{choiceCount > 1 ? 's' : ''}:
+                                      </p>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {Array.from({ length: choiceCount }, (_, i) => i).map((index) => (
+                                          <Input
+                                            key={index}
+                                            value={backgroundLanguageInputs[index] || ""}
+                                            onChange={(e) => {
+                                              const newInputs = [...backgroundLanguageInputs]
+                                              newInputs[index] = e.target.value
+                                              setBackgroundLanguageInputs(newInputs)
+                                            }}
+                                            onBlur={() => {
+                                              // Save to backgroundLanguageChoices when input loses focus
+                                              const newInputs = [...backgroundLanguageInputs]
+                                              newInputs[index] = (newInputs[index] || "").trim()
+                                              setBackgroundLanguageInputs(newInputs)
+                                              // Update the saved choices (filter out empty strings)
+                                              setBackgroundLanguageChoices(newInputs.filter(l => l.trim() !== ""))
+                                            }}
+                                            placeholder={`Language ${index + 1}`}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
+
+                            <div className="grid grid-cols-2 gap-4">
+                              {/* Equipment */}
+                              {selectedBackgroundData.equipment && (
+                                <div className="flex flex-col gap-0">
+                                  <Label className="text-md font-medium">Equipment</Label>
+                                  <div className="text-sm text-muted-foreground">
+                                    <RichTextDisplay content={selectedBackgroundData.equipment} />
+                                  </div>
                                 </div>
                               )}
-                              {hasChoice && (
-                                <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
-                                  <p className="text-sm text-muted-foreground">
-                                    Choose {choiceCount} tool{choiceCount > 1 ? 's' : ''} {fromSelected && availableTools.length > 0 ? `from the ${availableTools.length} tool${availableTools.length > 1 ? 's' : ''} below` : 'from all available tools'}
-                                  </p>
-                                  <div className="grid grid-cols-3 gap-2">
-                                    {(fromSelected && availableTools.length > 0 ? availableTools : TOOL_OPTIONS.map(t => t.value))
-                                      .filter((tool: string) => !fixedTools.includes(tool))
-                                      .map((tool: string) => {
-                                        const toolOption = TOOL_OPTIONS.find(t => t.value === tool)
-                                        if (!toolOption) return null
-                                        const isSelected = backgroundToolChoices.includes(tool)
-                                        const canSelect = isSelected || backgroundToolChoices.length < choiceCount
-                                        
-                                        return (
-                                          <div key={tool} className={`flex items-center space-x-2 ${!canSelect ? 'opacity-50' : ''}`}>
-                                            <Checkbox
-                                              id={`bg-tool-${tool}`}
-                                              checked={isSelected}
-                                              disabled={!canSelect && !isSelected}
-                                              onCheckedChange={(checked) => {
-                                                if (checked) {
-                                                  if (backgroundToolChoices.length < choiceCount) {
-                                                    setBackgroundToolChoices([...backgroundToolChoices, tool])
-                                                  }
-                                                } else {
-                                                  setBackgroundToolChoices(backgroundToolChoices.filter(t => t !== tool))
-                                                }
-                                              }}
-                                            />
-                                            <Label htmlFor={`bg-tool-${tool}`} className="text-sm cursor-pointer">
-                                              {toolOption.label}
-                                            </Label>
-                                          </div>
-                                        )
-                                      })}
+
+                              {/* Money */}
+                              {selectedBackgroundData.money && (
+                                <div className="flex flex-col gap-2">
+                                  <Label className="text-md font-medium">Starting Money</Label>
+                                  <div className="flex gap-4 text-sm text-muted-foreground">
+                                    {selectedBackgroundData.money.gold > 0 && (
+                                      <span>{selectedBackgroundData.money.gold} gp</span>
+                                    )}
+                                    {selectedBackgroundData.money.silver > 0 && (
+                                      <span>{selectedBackgroundData.money.silver} sp</span>
+                                    )}
+                                    {selectedBackgroundData.money.copper > 0 && (
+                                      <span>{selectedBackgroundData.money.copper} cp</span>
+                                    )}
                                   </div>
                                 </div>
                               )}
                             </div>
-                          )
-                        })()}
+                        </div>
 
-                        {/* Languages */}
-                        {selectedBackgroundData.languages && (() => {
-                          const langsData = (() => {
-                            if (Array.isArray(selectedBackgroundData.languages)) {
-                              return { fixed: selectedBackgroundData.languages, choice: undefined }
-                            }
-                            if (selectedBackgroundData.languages && typeof selectedBackgroundData.languages === 'object' && !Array.isArray(selectedBackgroundData.languages)) {
-                              const langsObj = selectedBackgroundData.languages as any
-                              return {
-                                fixed: langsObj.fixed || [],
-                                choice: langsObj.choice || undefined
-                              }
-                            }
-                            return { fixed: [], choice: undefined }
-                          })()
+                        <div className="flex flex-col gap-4 border-t pt-4">
+                          <h3 className="text-lg font-medium">Backstory & Personality Traits</h3>
 
-                          const fixedLangs = langsData.fixed || []
-                          const hasChoice = !!langsData.choice
-                          const choiceCount = langsData.choice?.count || 1
-
-                          return (
+                          {/* Numbered Items - Defining Events */}
+                          {selectedBackgroundData.defining_events && selectedBackgroundData.defining_events.length > 0 && (
                             <div className="flex flex-col gap-2">
-                              <Label className="text-md font-medium">Languages</Label>
-                              {fixedLangs.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {fixedLangs.map((lang: string) => (
-                                    <Badge key={lang} variant="secondary">{lang}</Badge>
-                                  ))}
-                                </div>
-                              )}
-                              {hasChoice && (
-                                <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
-                                  <p className="text-sm text-muted-foreground">
-                                    Choose {choiceCount} additional language{choiceCount > 1 ? 's' : ''}
-                                  </p>
-                                  <div className="flex flex-col gap-2">
-                                    {Array.from({ length: choiceCount }, (_, i) => i).map((index) => (
-                                      <Input
-                                        key={index}
-                                        value={backgroundLanguageChoices[index] || ""}
-                                        onChange={(e) => {
-                                          const newChoices = [...backgroundLanguageChoices]
-                                          newChoices[index] = e.target.value
-                                          setBackgroundLanguageChoices(newChoices.filter(l => l.trim() !== ""))
-                                        }}
-                                        placeholder={`Language ${index + 1}`}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })()}
-
-                        {/* Equipment */}
-                        {selectedBackgroundData.equipment && (
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-md font-medium">Equipment</Label>
-                            <div className="text-sm text-muted-foreground">
-                              <RichTextDisplay content={selectedBackgroundData.equipment} />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Money */}
-                        {selectedBackgroundData.money && (
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-md font-medium">Starting Money</Label>
-                            <div className="flex gap-4 text-sm">
-                              {selectedBackgroundData.money.gold > 0 && (
-                                <span>{selectedBackgroundData.money.gold} gp</span>
-                              )}
-                              {selectedBackgroundData.money.silver > 0 && (
-                                <span>{selectedBackgroundData.money.silver} sp</span>
-                              )}
-                              {selectedBackgroundData.money.copper > 0 && (
-                                <span>{selectedBackgroundData.money.copper} cp</span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Numbered Items - Defining Events */}
-                        {selectedBackgroundData.defining_events && selectedBackgroundData.defining_events.length > 0 && (
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-md font-medium">
-                              {selectedBackgroundData.defining_events_title || 'Background Setup'}
-                            </Label>
-                            <p className="text-xs text-muted-foreground">Choose or roll for 1 defining event</p>
-                            <div className="flex flex-col gap-2">
-                              {(() => {
-                                const selectedEvent = backgroundDefiningEvents[0]
-                                return (
-                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
-                                    <Badge variant="outline">Event</Badge>
-                                    <div className="flex-1">
-                                      {selectedEvent ? (
-                                        <span className="text-sm">{selectedEvent.text}</span>
-                                      ) : (
-                                        <span className="text-sm text-muted-foreground">Not selected</span>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Select
-                                        value={selectedEvent?.number.toString() || ""}
-                                        onValueChange={(value) => {
-                                          const event = selectedBackgroundData.defining_events?.find((e: any) => e.number === parseInt(value))
-                                          if (event) {
-                                            setBackgroundDefiningEvents([{ number: event.number, text: event.text }])
-                                          }
-                                        }}
-                                      >
-                                        <SelectTrigger className="w-[200px]">
-                                          <SelectValue placeholder="Select event" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {(selectedBackgroundData.defining_events || []).map((event: any) => (
-                                            <SelectItem key={event.number} value={event.number.toString()}>
-                                              {event.number}: {event.text.substring(0, 50)}{event.text.length > 50 ? '...' : ''}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          const maxNumber = selectedBackgroundData.defining_events?.length || 0
-                                          if (maxNumber > 0) {
-                                            const roll = Math.floor(Math.random() * maxNumber) + 1
-                                            const rolledEvent = selectedBackgroundData.defining_events?.find((e: any) => e.number === roll)
-                                            if (rolledEvent) {
-                                              setBackgroundDefiningEvents([{ number: rolledEvent.number, text: rolledEvent.text }])
+                              <Label className="text-md font-medium">
+                                {selectedBackgroundData.defining_events_title || 'Background Setup'}
+                              </Label>
+                              <div className="flex flex-col gap-2">
+                                {(() => {
+                                  const selectedEvent = backgroundDefiningEvents[0]
+                                  return (
+                                    <div className="flex flex-col gap-3 items-center gap-2 p-2 border rounded-lg bg-background">
+                                      <div className="flex w-full gap-2">
+                                        <Select
+                                          value={selectedEvent?.number.toString() || ""}
+                                          onValueChange={(value) => {
+                                            const event = selectedBackgroundData.defining_events?.find((e: any) => e.number === parseInt(value))
+                                            if (event) {
+                                              setBackgroundDefiningEvents([{ number: event.number, text: event.text }])
                                             }
-                                          }
-                                        }}
-                                      >
-                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
-                                        Roll d{selectedBackgroundData.defining_events?.length || 0}
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )
-                              })()}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Numbered Items - Personality Traits */}
-                        {selectedBackgroundData.personality_traits && selectedBackgroundData.personality_traits.length > 0 && (
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-md font-medium">Personality Traits</Label>
-                            <p className="text-xs text-muted-foreground">Choose or roll for 1 personality trait</p>
-                            <div className="flex flex-col gap-2">
-                              {(() => {
-                                const selectedTrait = backgroundPersonalityTraits[0] || null
-                                return (
-                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
-                                    <Badge variant="outline">Personality Trait</Badge>
-                                    <div className="flex-1">
-                                      {selectedTrait ? (
-                                        <span className="text-sm">{selectedTrait.text}</span>
-                                      ) : (
-                                        <span className="text-sm text-muted-foreground">Not selected</span>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Select
-                                        value={selectedTrait?.number.toString() || ""}
-                                        onValueChange={(value) => {
-                                          const trait = selectedBackgroundData.personality_traits?.find((t: any) => t.number === parseInt(value))
-                                          if (trait) {
-                                            setBackgroundPersonalityTraits([{ number: trait.number, text: trait.text }])
-                                          }
-                                        }}
-                                      >
-                                        <SelectTrigger className="w-[200px]">
-                                          <SelectValue placeholder="Select trait" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {(selectedBackgroundData.personality_traits || []).map((trait: any) => (
-                                            <SelectItem key={trait.number} value={trait.number.toString()}>
-                                              {trait.number}: {trait.text.substring(0, 50)}{trait.text.length > 50 ? '...' : ''}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          const traits = selectedBackgroundData.personality_traits || []
-                                          if (traits.length > 0) {
-                                            // Roll based on array index (0 to length-1)
-                                            const rollIndex = Math.floor(Math.random() * traits.length)
-                                            const rolledTrait = traits[rollIndex]
-                                            if (rolledTrait) {
-                                              setBackgroundPersonalityTraits([{ number: rolledTrait.number, text: rolledTrait.text }])
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select event" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {(selectedBackgroundData.defining_events || []).map((event: any) => (
+                                              <SelectItem key={event.number} value={event.number.toString()}>
+                                                {event.number}: {event.text.substring(0, 80)}{event.text.length > 80 ? '...' : ''}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          className="h-9"
+                                          onClick={() => {
+                                            const maxNumber = selectedBackgroundData.defining_events?.length || 0
+                                            if (maxNumber > 0) {
+                                              const roll = Math.floor(Math.random() * maxNumber) + 1
+                                              const rolledEvent = selectedBackgroundData.defining_events?.find((e: any) => e.number === roll)
+                                              if (rolledEvent) {
+                                                setBackgroundDefiningEvents([{ number: rolledEvent.number, text: rolledEvent.text }])
+                                              }
                                             }
-                                          }
-                                        }}
-                                      >
-                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
-                                        Roll d{selectedBackgroundData.personality_traits?.length || 0}
-                                      </Button>
+                                          }}
+                                        >
+                                          <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                          Roll d{selectedBackgroundData.defining_events?.length || 0}
+                                        </Button>
+                                      </div>
+                                      <div className="flex flex-col gap-2 border rounded-md p-3">
+                                        <Badge variant="outline">Event</Badge>
+                                        <div className="flex-1">
+                                          {selectedEvent ? (
+                                            <span className="text-sm">{selectedEvent.text}</span>
+                                          ) : (
+                                            <span className="text-sm text-muted-foreground">Not selected</span>
+                                          )}
+                                        </div>
+                                        </div>
                                     </div>
-                                  </div>
-                                )
-                              })()}
+                                  )
+                                })()}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Numbered Items - Ideals */}
-                        {selectedBackgroundData.ideals && selectedBackgroundData.ideals.length > 0 && (
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-md font-medium">Ideals</Label>
-                            <p className="text-xs text-muted-foreground">Choose or roll for 1 ideal</p>
+                          {/* Numbered Items - Personality Traits */}
+                          {selectedBackgroundData.personality_traits && selectedBackgroundData.personality_traits.length > 0 && (
                             <div className="flex flex-col gap-2">
-                              {(() => {
-                                const selectedIdeal = backgroundIdeals[0]
-                                return (
-                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
-                                    <Badge variant="outline">Ideal</Badge>
-                                    <div className="flex-1">
-                                      {selectedIdeal ? (
-                                        <span className="text-sm">{selectedIdeal.text}</span>
-                                      ) : (
-                                        <span className="text-sm text-muted-foreground">Not selected</span>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Select
-                                        value={selectedIdeal?.number.toString() || ""}
-                                        onValueChange={(value) => {
-                                          const ideal = selectedBackgroundData.ideals?.find((i: any) => i.number === parseInt(value))
-                                          if (ideal) {
-                                            setBackgroundIdeals([{ number: ideal.number, text: ideal.text }])
-                                          }
-                                        }}
-                                      >
-                                        <SelectTrigger className="w-[200px]">
-                                          <SelectValue placeholder="Select ideal" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {(selectedBackgroundData.ideals || []).map((ideal: any) => (
-                                            <SelectItem key={ideal.number} value={ideal.number.toString()}>
-                                              {ideal.number}: {ideal.text.substring(0, 50)}{ideal.text.length > 50 ? '...' : ''}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          const maxNumber = selectedBackgroundData.ideals?.length || 0
-                                          if (maxNumber > 0) {
-                                            const roll = Math.floor(Math.random() * maxNumber) + 1
-                                            const rolledIdeal = selectedBackgroundData.ideals?.find((i: any) => i.number === roll)
-                                            if (rolledIdeal) {
-                                              setBackgroundIdeals([{ number: rolledIdeal.number, text: rolledIdeal.text }])
+                              <Label className="text-md font-medium">Personality Trait</Label>
+                              <div className="flex flex-col gap-2">
+                                {(() => {
+                                  const selectedTrait = backgroundPersonalityTraits[0] || null
+                                  return (
+                                    <div className="flex items-center gap-2 p-2 border rounded-lg flex-col gap-3 bg-background">
+                                      <div className="flex gap-2 w-full">
+                                        <Select
+                                          value={selectedTrait?.number.toString() || ""}
+                                          onValueChange={(value) => {
+                                            const trait = selectedBackgroundData.personality_traits?.find((t: any) => t.number === parseInt(value))
+                                            if (trait) {
+                                              setBackgroundPersonalityTraits([{ number: trait.number, text: trait.text }])
                                             }
-                                          }
-                                        }}
-                                      >
-                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
-                                        Roll d{selectedBackgroundData.ideals?.length || 0}
-                                      </Button>
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select trait" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {(selectedBackgroundData.personality_traits || []).map((trait: any) => (
+                                              <SelectItem key={trait.number} value={trait.number.toString()}>
+                                                {trait.number}: {trait.text.substring(0, 80)}{trait.text.length > 80 ? '...' : ''}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          className="h-9"
+                                          onClick={() => {
+                                            const traits = selectedBackgroundData.personality_traits || []
+                                            if (traits.length > 0) {
+                                              // Roll based on array index (0 to length-1)
+                                              const rollIndex = Math.floor(Math.random() * traits.length)
+                                              const rolledTrait = traits[rollIndex]
+                                              if (rolledTrait) {
+                                                setBackgroundPersonalityTraits([{ number: rolledTrait.number, text: rolledTrait.text }])
+                                              }
+                                            }
+                                          }}
+                                        >
+                                          <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                          Roll d{selectedBackgroundData.personality_traits?.length || 0}
+                                        </Button>
+                                      </div>
+                                      <div className="flex flex-col gap-2 border rounded-md p-3 w-full">
+                                        <Badge variant="outline">Personality Trait</Badge>
+                                        <div className="flex-1">
+                                          {selectedTrait ? (
+                                            <span className="text-sm">{selectedTrait.text}</span>
+                                          ) : (
+                                            <span className="text-sm text-muted-foreground">Not selected</span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                )
-                              })()}
+                                  )
+                                })()}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Numbered Items - Bonds */}
-                        {selectedBackgroundData.bonds && selectedBackgroundData.bonds.length > 0 && (
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-md font-medium">Bonds</Label>
-                            <p className="text-xs text-muted-foreground">Choose or roll for 1 bond</p>
+                          {/* Numbered Items - Ideals */}
+                          {selectedBackgroundData.ideals && selectedBackgroundData.ideals.length > 0 && (
                             <div className="flex flex-col gap-2">
-                              {(() => {
-                                const selectedBond = backgroundBonds[0]
-                                return (
-                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
-                                    <Badge variant="outline">Bond</Badge>
-                                    <div className="flex-1">
-                                      {selectedBond ? (
-                                        <span className="text-sm">{selectedBond.text}</span>
-                                      ) : (
-                                        <span className="text-sm text-muted-foreground">Not selected</span>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Select
-                                        value={selectedBond?.number.toString() || ""}
-                                        onValueChange={(value) => {
-                                          const bond = selectedBackgroundData.bonds?.find((b: any) => b.number === parseInt(value))
-                                          if (bond) {
-                                            setBackgroundBonds([{ number: bond.number, text: bond.text }])
-                                          }
-                                        }}
-                                      >
-                                        <SelectTrigger className="w-[200px]">
-                                          <SelectValue placeholder="Select bond" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {(selectedBackgroundData.bonds || []).map((bond: any) => (
-                                            <SelectItem key={bond.number} value={bond.number.toString()}>
-                                              {bond.number}: {bond.text.substring(0, 50)}{bond.text.length > 50 ? '...' : ''}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          const maxNumber = selectedBackgroundData.bonds?.length || 0
-                                          if (maxNumber > 0) {
-                                            const roll = Math.floor(Math.random() * maxNumber) + 1
-                                            const rolledBond = selectedBackgroundData.bonds?.find((b: any) => b.number === roll)
-                                            if (rolledBond) {
-                                              setBackgroundBonds([{ number: rolledBond.number, text: rolledBond.text }])
+                              <Label className="text-md font-medium">Ideals</Label>
+                              <div className="flex flex-col gap-2">
+                                {(() => {
+                                  const selectedIdeal = backgroundIdeals[0]
+                                  return (
+                                    <div className="flex items-center gap-2 p-2 border rounded-lg flex-col gap-3 bg-background">
+                                      <div className="flex w-full gap-2">
+                                        <Select
+                                          value={selectedIdeal?.number.toString() || ""}
+                                          onValueChange={(value) => {
+                                            const ideal = selectedBackgroundData.ideals?.find((i: any) => i.number === parseInt(value))
+                                            if (ideal) {
+                                              setBackgroundIdeals([{ number: ideal.number, text: ideal.text }])
                                             }
-                                          }
-                                        }}
-                                      >
-                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
-                                        Roll d{selectedBackgroundData.bonds?.length || 0}
-                                      </Button>
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select ideal" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {(selectedBackgroundData.ideals || []).map((ideal: any) => (
+                                              <SelectItem key={ideal.number} value={ideal.number.toString()}>
+                                                {ideal.number}: {ideal.text.substring(0, 80)}{ideal.text.length > 80 ? '...' : ''}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          className="h-9"
+                                          onClick={() => {
+                                            const maxNumber = selectedBackgroundData.ideals?.length || 0
+                                            if (maxNumber > 0) {
+                                              const roll = Math.floor(Math.random() * maxNumber) + 1
+                                              const rolledIdeal = selectedBackgroundData.ideals?.find((i: any) => i.number === roll)
+                                              if (rolledIdeal) {
+                                                setBackgroundIdeals([{ number: rolledIdeal.number, text: rolledIdeal.text }])
+                                              }
+                                            }
+                                          }}
+                                        >
+                                          <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                          Roll d{selectedBackgroundData.ideals?.length || 0}
+                                        </Button>
+                                      </div>
+                                      <div className="flex flex-col gap-2 border rounded-md p-3 w-full">
+                                        <Badge variant="outline">Ideal</Badge>
+                                        <div className="flex-1">
+                                          {selectedIdeal ? (
+                                            <span className="text-sm">{selectedIdeal.text}</span>
+                                          ) : (
+                                            <span className="text-sm text-muted-foreground">Not selected</span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                )
-                              })()}
+                                  )
+                                })()}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Numbered Items - Flaws */}
-                        {selectedBackgroundData.flaws && selectedBackgroundData.flaws.length > 0 && (
-                          <div className="flex flex-col gap-2">
-                            <Label className="text-md font-medium">Flaws</Label>
-                            <p className="text-xs text-muted-foreground">Choose or roll for 1 flaw</p>
+                          {/* Numbered Items - Bonds */}
+                          {selectedBackgroundData.bonds && selectedBackgroundData.bonds.length > 0 && (
                             <div className="flex flex-col gap-2">
-                              {(() => {
-                                const selectedFlaw = backgroundFlaws[0]
-                                return (
-                                  <div className="flex items-center gap-2 p-2 border rounded-lg">
-                                    <Badge variant="outline">Flaw</Badge>
-                                    <div className="flex-1">
-                                      {selectedFlaw ? (
-                                        <span className="text-sm">{selectedFlaw.text}</span>
-                                      ) : (
-                                        <span className="text-sm text-muted-foreground">Not selected</span>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Select
-                                        value={selectedFlaw?.number.toString() || ""}
-                                        onValueChange={(value) => {
-                                          const flaw = selectedBackgroundData.flaws?.find((f: any) => f.number === parseInt(value))
-                                          if (flaw) {
-                                            setBackgroundFlaws([{ number: flaw.number, text: flaw.text }])
-                                          }
-                                        }}
-                                      >
-                                        <SelectTrigger className="w-[200px]">
-                                          <SelectValue placeholder="Select flaw" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {(selectedBackgroundData.flaws || []).map((flaw: any) => (
-                                            <SelectItem key={flaw.number} value={flaw.number.toString()}>
-                                              {flaw.number}: {flaw.text.substring(0, 50)}{flaw.text.length > 50 ? '...' : ''}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          const maxNumber = selectedBackgroundData.flaws?.length || 0
-                                          if (maxNumber > 0) {
-                                            const roll = Math.floor(Math.random() * maxNumber) + 1
-                                            const rolledFlaw = selectedBackgroundData.flaws?.find((f: any) => f.number === roll)
-                                            if (rolledFlaw) {
-                                              setBackgroundFlaws([{ number: rolledFlaw.number, text: rolledFlaw.text }])
+                              <Label className="text-md font-medium">Bonds</Label>
+                              <div className="flex flex-col gap-2">
+                                {(() => {
+                                  const selectedBond = backgroundBonds[0]
+                                  return (
+                                    <div className="flex items-center gap-2 p-2 border rounded-lg flex-col gap-3 bg-background">
+                                      <div className="flex w-full gap-2">
+                                        <Select
+                                          value={selectedBond?.number.toString() || ""}
+                                          onValueChange={(value) => {
+                                            const bond = selectedBackgroundData.bonds?.find((b: any) => b.number === parseInt(value))
+                                            if (bond) {
+                                              setBackgroundBonds([{ number: bond.number, text: bond.text }])
                                             }
-                                          }
-                                        }}
-                                      >
-                                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
-                                        Roll d{selectedBackgroundData.flaws?.length || 0}
-                                      </Button>
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select bond" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {(selectedBackgroundData.bonds || []).map((bond: any) => (
+                                              <SelectItem key={bond.number} value={bond.number.toString()}>
+                                                {bond.number}: {bond.text.substring(0, 80)}{bond.text.length > 80 ? '...' : ''}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <Button
+                                          variant="default"
+                                          className="h-9"
+                                          size="sm"
+                                          onClick={() => {
+                                            const maxNumber = selectedBackgroundData.bonds?.length || 0
+                                            if (maxNumber > 0) {
+                                              const roll = Math.floor(Math.random() * maxNumber) + 1
+                                              const rolledBond = selectedBackgroundData.bonds?.find((b: any) => b.number === roll)
+                                              if (rolledBond) {
+                                                setBackgroundBonds([{ number: rolledBond.number, text: rolledBond.text }])
+                                              }
+                                            }
+                                          }}
+                                        >
+                                          <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                          Roll d{selectedBackgroundData.bonds?.length || 0}
+                                        </Button>
+                                      </div>
+                                      <div className="flex flex-col w-full gap-2 p-3 border rounded-md">
+                                        <Badge variant="outline">Bond</Badge>
+                                        <div className="flex-1">
+                                          {selectedBond ? (
+                                            <span className="text-sm">{selectedBond.text}</span>
+                                          ) : (
+                                            <span className="text-sm text-muted-foreground">Not selected</span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                )
-                              })()}
+                                  )
+                                })()}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+
+                          {/* Numbered Items - Flaws */}
+                          {selectedBackgroundData.flaws && selectedBackgroundData.flaws.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              <Label className="text-md font-medium">Flaws</Label>
+                              <div className="flex flex-col gap-2">
+                                {(() => {
+                                  const selectedFlaw = backgroundFlaws[0]
+                                  return (
+                                    <div className="flex items-center gap-2 p-2 border rounded-lg flex-col gap-3 bg-background">
+                                      <div className="flex w-full gap-2">
+                                        <Select
+                                          value={selectedFlaw?.number.toString() || ""}
+                                          onValueChange={(value) => {
+                                            const flaw = selectedBackgroundData.flaws?.find((f: any) => f.number === parseInt(value))
+                                            if (flaw) {
+                                              setBackgroundFlaws([{ number: flaw.number, text: flaw.text }])
+                                            }
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select flaw" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {(selectedBackgroundData.flaws || []).map((flaw: any) => (
+                                              <SelectItem key={flaw.number} value={flaw.number.toString()}>
+                                                {flaw.number}: {flaw.text.substring(0, 80)}{flaw.text.length > 80 ? '...' : ''}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        <Button
+                                          variant="default"
+                                          className="h-9"
+                                          size="sm"
+                                          onClick={() => {
+                                            const maxNumber = selectedBackgroundData.flaws?.length || 0
+                                            if (maxNumber > 0) {
+                                              const roll = Math.floor(Math.random() * maxNumber) + 1
+                                              const rolledFlaw = selectedBackgroundData.flaws?.find((f: any) => f.number === roll)
+                                              if (rolledFlaw) {
+                                                setBackgroundFlaws([{ number: rolledFlaw.number, text: rolledFlaw.text }])
+                                              }
+                                            }
+                                          }}
+                                        >
+                                          <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                                          Roll d{selectedBackgroundData.flaws?.length || 0}
+                                        </Button>
+                                      </div>
+                                      <div className="flex w-full gap-2 flex-col border rounded-md p-3">
+                                        <Badge variant="outline">Flaw</Badge>
+                                        <div className="flex-1">
+                                          {selectedFlaw ? (
+                                            <span className="text-sm">{selectedFlaw.text}</span>
+                                          ) : (
+                                            <span className="text-sm text-muted-foreground">Not selected</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -6979,7 +7040,14 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                         }
                         return { fixed: [], choice: undefined }
                       })()
-                      if (langsData.choice && backgroundLanguageChoices.length < (langsData.choice.count || 1)) {
+                      // Save any pending language inputs before validation
+                      const trimmedInputs = backgroundLanguageInputs.map(input => input.trim()).filter(l => l !== "")
+                      if (trimmedInputs.length > 0) {
+                        setBackgroundLanguageChoices(trimmedInputs)
+                      }
+                      // Use the saved choices or the trimmed inputs for validation
+                      const languagesToCheck = trimmedInputs.length > 0 ? trimmedInputs : backgroundLanguageChoices
+                      if (langsData.choice && languagesToCheck.length < (langsData.choice.count || 1)) {
                         setError(`Please enter ${langsData.choice.count || 1} language${(langsData.choice.count || 1) > 1 ? 's' : ''} for your background`)
                         return
                       }

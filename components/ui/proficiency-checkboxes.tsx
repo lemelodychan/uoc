@@ -14,6 +14,7 @@ interface ProficiencyCheckboxesProps {
   readonly?: boolean
   maxSelections?: number
   disabledValues?: string[]
+  variant?: 'default' | 'simple'
 }
 
 export function ProficiencyCheckboxes({
@@ -24,7 +25,8 @@ export function ProficiencyCheckboxes({
   description,
   readonly = false,
   maxSelections,
-  disabledValues = []
+  disabledValues = [],
+  variant = 'default'
 }: ProficiencyCheckboxesProps) {
   const [selectedValues, setSelectedValues] = useState<string[]>(value)
   const [unmatchedValues, setUnmatchedValues] = useState<string[]>([])
@@ -39,10 +41,10 @@ export function ProficiencyCheckboxes({
 
   // Debug logging
   useEffect(() => {
-    if (!title) {
+    if (!title && variant === 'default') {
       console.warn('ProficiencyCheckboxes: title prop is missing or empty', { title, options: options?.length })
     }
-  }, [title, options])
+  }, [title, options, variant])
 
   useEffect(() => {
     // Check if value or disabledValues actually changed
@@ -135,6 +137,48 @@ export function ProficiencyCheckboxes({
 
   const isAtMax = maxSelections ? selectedValues.length >= maxSelections : false
 
+  const content = (
+    <div className="flex flex-row flex-wrap gap-4">
+      {options.map((option) => {
+        const isSelected = selectedValues.includes(option.value)
+        const isDisabledByMax = readonly || (!isSelected && isAtMax)
+        const isDisabledByFixed = disabledValues.includes(option.value)
+        const isDisabled = isDisabledByMax || isDisabledByFixed
+        
+        return (
+          <div key={option.value} className="flex items-start w-[calc(33.33%-0.75rem)] gap-3">
+            <Checkbox
+              id={option.value}
+              checked={isSelected}
+              onCheckedChange={() => handleToggle(option.value)}
+              disabled={isDisabled}
+              className="mt-0.5"
+            />
+            <div className="grid gap-1.5 leading-none">
+              <Label
+                htmlFor={option.value}
+                className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
+                  isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
+                }`}
+              >
+                {option.label}
+              </Label>
+              {option.description && (
+                <p className="text-xs text-muted-foreground">
+                  {option.description}
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  if (variant === 'simple') {
+    return content
+  }
+
   return (
     <Card className="!bg-background !shadow-none flex flex-col gap-6">
       <CardHeader className="flex flex-col gap-1">
@@ -151,41 +195,7 @@ export function ProficiencyCheckboxes({
         )}
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="flex flex-row flex-wrap gap-4">
-          {options.map((option) => {
-            const isSelected = selectedValues.includes(option.value)
-            const isDisabledByMax = readonly || (!isSelected && isAtMax)
-            const isDisabledByFixed = disabledValues.includes(option.value)
-            const isDisabled = isDisabledByMax || isDisabledByFixed
-            
-            return (
-              <div key={option.value} className="flex items-start w-[calc(33.33%-0.75rem)] gap-3">
-                <Checkbox
-                  id={option.value}
-                  checked={isSelected}
-                  onCheckedChange={() => handleToggle(option.value)}
-                  disabled={isDisabled}
-                  className="mt-0.5"
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <Label
-                    htmlFor={option.value}
-                    className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
-                      isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
-                    }`}
-                  >
-                    {option.label}
-                  </Label>
-                  {option.description && (
-                    <p className="text-xs text-muted-foreground">
-                      {option.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        {content}
       </CardContent>
     </Card>
   )

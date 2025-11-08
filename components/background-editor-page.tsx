@@ -211,7 +211,7 @@ export function BackgroundEditorPage({
   }
 
   const removeLanguage = (index: number) => {
-    const updated = languages.filter((_, i) => i !== index)
+    const updated = languages.filter((_: string, i: number) => i !== index)
     
     setEditingBackground(prev => ({
       ...prev,
@@ -636,7 +636,7 @@ export function BackgroundEditorPage({
           {canEdit && (
             <Button variant="outline" size="sm" onClick={() => addNumberedItem(field)} className="w-fit">
               <Icon icon="lucide:plus" className="w-4 h-4" />
-              Add {displayTitle.slice(0, -1)}
+              Add item
             </Button>
           )}
         </CardContent>
@@ -736,15 +736,15 @@ export function BackgroundEditorPage({
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <ProficiencyCheckboxes
-            title={hasSkillsChoice ? "Fixed Skill Proficiencies" : "Skill Proficiencies"}
-            description={hasSkillsChoice ? "Select fixed skill proficiencies granted by this background" : "Select skill proficiencies granted by this background"}
+            title={hasSkillsChoice ? "Fixed Skill Proficiencies" : "Fixed Skill Proficiencies"}
+            description={hasSkillsChoice ? "Select fixed skill proficiencies granted by this background" : "Select fixed skill proficiencies granted by this background"}
             value={skills}
             onChange={updateSkillsFixed}
             options={SKILL_OPTIONS}
             readonly={!canEdit}
           />
 
-          <div className="flex items-center space-x-2 p-3 border rounded-lg bg-background">
+          <div className="flex items-start p-4 gap-4 border rounded-lg bg-background">
             <Checkbox
               id="skills-choice"
               checked={hasSkillsChoice}
@@ -756,7 +756,7 @@ export function BackgroundEditorPage({
                 Allow player to choose skill proficiencies
               </Label>
               {hasSkillsChoice && (
-                <div className="flex flex-col gap-3 pl-6">
+                <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-2">
                     <Label className="text-sm text-muted-foreground">Number to choose:</Label>
                     <Input
@@ -769,9 +769,9 @@ export function BackgroundEditorPage({
                     />
                   </div>
                   
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium">Available Skills (Optional):</Label>
-                    <p className="text-xs text-muted-foreground">
+                  <div className="flex flex-col gap-2 pt-4 pb-2 mt-2 border-t">
+                    <Label className="text-sm font-medium">Available Skills:</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
                       {availableSkills.length > 0 
                         ? `Players can choose ${skillsData.choice?.count || 1} skill(s) from the ${availableSkills.length} skill(s) selected below. Leave empty to allow choosing from all skills.`
                         : `Players can choose ${skillsData.choice?.count || 1} skill(s) from all available skills. Select specific skills below to limit the choice.`}
@@ -784,6 +784,7 @@ export function BackgroundEditorPage({
                       options={SKILL_OPTIONS}
                       readonly={!canEdit}
                       disabledValues={skills}
+                      variant="simple"
                     />
                   </div>
                 </div>
@@ -800,15 +801,15 @@ export function BackgroundEditorPage({
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <ProficiencyCheckboxes
-            title={hasToolsChoice ? "Fixed Tool Proficiencies" : "Tool Proficiencies"}
-            description={hasToolsChoice ? "Select fixed tool proficiencies granted by this background" : "Select tool proficiencies granted by this background"}
+            title={hasToolsChoice ? "Fixed Tool Proficiencies" : "Fixed Tool Proficiencies"}
+            description={hasToolsChoice ? "Select fixed tool proficiencies granted by this background" : "Select fixed tool proficiencies granted by this background"}
             value={tools}
             onChange={updateToolsFixed}
             options={TOOL_OPTIONS}
             readonly={!canEdit}
           />
 
-          <div className="flex items-center space-x-2 p-3 border rounded-lg bg-background">
+          <div className="flex items-start p-4 gap-4 border rounded-lg bg-background">
             <Checkbox
               id="tools-choice"
               checked={hasToolsChoice}
@@ -820,7 +821,7 @@ export function BackgroundEditorPage({
                 Allow player to choose tool proficiencies
               </Label>
               {hasToolsChoice && (
-                <div className="flex flex-col gap-3 pl-6">
+                <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-2">
                     <Label className="text-sm text-muted-foreground">Number to choose:</Label>
                     <Input
@@ -833,9 +834,9 @@ export function BackgroundEditorPage({
                     />
                   </div>
                   
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 pt-4 pb-2 mt-2 border-t">
                     <Label className="text-sm font-medium">Available Tools (Optional):</Label>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground mb-4">
                       {availableTools.length > 0 
                         ? `Players can choose ${toolsData.choice?.count || 1} tool(s) from the ${availableTools.length} tool(s) selected below. Leave empty to allow choosing from all tools.`
                         : `Players can choose ${toolsData.choice?.count || 1} tool(s) from all available tools. Select specific tools below to limit the choice.`}
@@ -848,6 +849,7 @@ export function BackgroundEditorPage({
                       options={TOOL_OPTIONS}
                       readonly={!canEdit}
                       disabledValues={tools}
+                      variant="simple"
                     />
                   </div>
                 </div>
@@ -878,6 +880,7 @@ export function BackgroundEditorPage({
                   <Button
                     variant="outline"
                     size="sm"
+                    className="w-9 h-9 text-destructive hover:bg-destructive hover:text-white"
                     onClick={() => removeLanguage(index)}
                   >
                     <Icon icon="lucide:trash-2" className="w-4 h-4" />
@@ -893,19 +896,19 @@ export function BackgroundEditorPage({
             )}
           </div>
 
-          <div className="flex items-center space-x-2 p-3 border rounded-lg bg-background">
+          <div className="flex items-start p-4 gap-4 border rounded-lg bg-background">
             <Checkbox
               id="languages-choice"
               checked={hasLanguagesChoice}
               onCheckedChange={(checked) => handleLanguagesChoiceToggle(checked as boolean)}
               disabled={!canEdit}
             />
-            <div className="flex-1 flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="languages-choice" className="cursor-pointer font-medium">
                 Allow player to choose additional languages
               </Label>
               {hasLanguagesChoice && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-2">
                   <Label className="text-sm text-muted-foreground">Number to choose:</Label>
                   <Input
                     type="number"
@@ -915,8 +918,8 @@ export function BackgroundEditorPage({
                     min="1"
                     disabled={!canEdit}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Players can add {languagesData.choice?.count || 1} additional language(s) of their choice.
+                  <p className="text-xs text-muted-foreground ml-2">
+                    Players will be able to add {languagesData.choice?.count || 1} additional language(s) of their choice.
                   </p>
                 </div>
               )}
@@ -925,67 +928,67 @@ export function BackgroundEditorPage({
         </CardContent>
       </Card>
 
-      {/* Equipment */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Equipment</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <RichTextEditor
-            value={editingBackground.equipment || ""}
-            onChange={(value) => setEditingBackground(prev => ({ ...prev, equipment: value }))}
-            placeholder="Enter equipment description (supports rich text and lists)"
-            rows={6}
-          />
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-[auto_212px] gap-4">
+        {/* Equipment */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Equipment</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <RichTextEditor
+              value={editingBackground.equipment || ""}
+              onChange={(value) => setEditingBackground(prev => ({ ...prev, equipment: value }))}
+              placeholder="Enter equipment description (supports rich text and lists)"
+              rows={6}
+            />
+          </CardContent>
+        </Card>
 
-      {/* Money */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Starting Money</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex gap-4 items-center">
-            <div className="flex flex-col gap-2">
+        {/* Money */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Starting Money</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 w-full">
               <Label htmlFor="money-gold">Gold</Label>
               <Input
                 id="money-gold"
                 type="number"
                 value={editingBackground.money?.gold || 0}
                 onChange={(e) => updateMoney('gold', parseInt(e.target.value) || 0)}
-                className="bg-background w-[100px]"
+                className="bg-background w-full"
                 disabled={!canEdit}
                 min="0"
               />
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 w-full">
               <Label htmlFor="money-silver">Silver</Label>
               <Input
                 id="money-silver"
                 type="number"
                 value={editingBackground.money?.silver || 0}
                 onChange={(e) => updateMoney('silver', parseInt(e.target.value) || 0)}
-                className="bg-background w-[100px]"
+                className="bg-background w-full"
                 disabled={!canEdit}
                 min="0"
               />
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 w-full">
               <Label htmlFor="money-copper">Copper</Label>
               <Input
                 id="money-copper"
                 type="number"
                 value={editingBackground.money?.copper || 0}
                 onChange={(e) => updateMoney('copper', parseInt(e.target.value) || 0)}
-                className="bg-background w-[100px]"
+                className="bg-background w-full"
                 disabled={!canEdit}
                 min="0"
               />
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Defining Events */}
       {renderNumberedItems(

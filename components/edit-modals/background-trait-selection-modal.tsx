@@ -182,16 +182,8 @@ export function BackgroundTraitSelectionModal({
                 {(() => {
                   const selectedEvent = backgroundDefiningEvents[0]
                   return (
-                    <div className="flex items-center gap-2 p-2 border rounded-lg">
-                      <Badge variant="outline">Event</Badge>
-                      <div className="flex-1">
-                        {selectedEvent ? (
-                          <span className="text-sm">{selectedEvent.text}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Not selected</span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
+                    <div className="flex flex-col items-center gap-2 p-2 border rounded-lg bg-background">
+                      <div className="flex w-full gap-2">
                         <Select
                           value={selectedEvent?.number.toString() || ""}
                           onValueChange={(value) => {
@@ -201,19 +193,20 @@ export function BackgroundTraitSelectionModal({
                             }
                           }}
                         >
-                          <SelectTrigger className="w-[200px]">
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select event" />
                           </SelectTrigger>
                           <SelectContent>
                             {(backgroundData.defining_events || []).map((event: any) => (
                               <SelectItem key={event.number} value={event.number.toString()}>
-                                {event.number}: {event.text.substring(0, 50)}{event.text.length > 50 ? '...' : ''}
+                                {event.number}: {event.text.substring(0, 68)}{event.text.length > 68 ? '...' : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <Button
-                          variant="outline"
+                          variant="default"
+                          className="h-9"
                           size="sm"
                           onClick={() => {
                             const maxNumber = backgroundData.defining_events?.length || 0
@@ -229,6 +222,16 @@ export function BackgroundTraitSelectionModal({
                           <Icon icon="lucide:dice-6" className="w-4 h-4" />
                           Roll d{backgroundData.defining_events?.length || 0}
                         </Button>
+                      </div>
+                      <div className="flex w-full flex-col gap-2 p-3 border rounded-lg bg-background">
+                        <Badge variant="outline">Event</Badge>
+                        <div className="flex-1">
+                          {selectedEvent ? (
+                            <span className="text-sm">{selectedEvent.text}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not selected</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
@@ -246,16 +249,8 @@ export function BackgroundTraitSelectionModal({
                 {(() => {
                   const selectedTrait = backgroundPersonalityTraits[0] || null
                   return (
-                    <div className="flex items-center gap-2 p-2 border rounded-lg">
-                      <Badge variant="outline">Personality Trait</Badge>
-                      <div className="flex-1">
-                        {selectedTrait ? (
-                          <span className="text-sm">{selectedTrait.text}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Not selected</span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
+                    <div className="flex flex-col items-center gap-2 p-2 border rounded-lg bg-background">
+                      <div className="flex w-full gap-2">
                         <Select
                           value={selectedTrait?.number.toString() || ""}
                           onValueChange={(value) => {
@@ -265,19 +260,20 @@ export function BackgroundTraitSelectionModal({
                             }
                           }}
                         >
-                          <SelectTrigger className="w-[200px]">
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select trait" />
                           </SelectTrigger>
                           <SelectContent>
                             {(backgroundData.personality_traits || []).map((trait: any) => (
                               <SelectItem key={trait.number} value={trait.number.toString()}>
-                                {trait.number}: {trait.text.substring(0, 50)}{trait.text.length > 50 ? '...' : ''}
+                                {trait.number}: {trait.text.substring(0, 68)}{trait.text.length > 68 ? '...' : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <Button
-                          variant="outline"
+                          variant="default"
+                          className="h-9"
                           size="sm"
                           onClick={() => {
                             const traits = backgroundData.personality_traits || []
@@ -293,6 +289,16 @@ export function BackgroundTraitSelectionModal({
                           <Icon icon="lucide:dice-6" className="w-4 h-4" />
                           Roll d{backgroundData.personality_traits?.length || 0}
                         </Button>
+                      </div>
+                      <div className="flex w-full flex-col gap-2 p-3 border rounded-lg bg-background">
+                        <Badge variant="outline">Personality Trait</Badge>
+                        <div className="flex-1">
+                          {selectedTrait ? (
+                            <span className="text-sm">{selectedTrait.text}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not selected</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
@@ -310,16 +316,8 @@ export function BackgroundTraitSelectionModal({
                 {(() => {
                   const selectedIdeal = backgroundIdeals[0]
                   return (
-                    <div className="flex items-center gap-2 p-2 border rounded-lg">
-                      <Badge variant="outline">Ideal</Badge>
-                      <div className="flex-1">
-                        {selectedIdeal ? (
-                          <span className="text-sm">{selectedIdeal.text}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Not selected</span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
+                    <div className="flex flex-col items-center gap-2 p-2 border rounded-lg bg-background">
+                      <div className="flex w-full gap-2">
                         <Select
                           value={selectedIdeal?.number.toString() || ""}
                           onValueChange={(value) => {
@@ -329,19 +327,20 @@ export function BackgroundTraitSelectionModal({
                             }
                           }}
                         >
-                          <SelectTrigger className="w-[200px]">
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select ideal" />
                           </SelectTrigger>
                           <SelectContent>
                             {(backgroundData.ideals || []).map((ideal: any) => (
                               <SelectItem key={ideal.number} value={ideal.number.toString()}>
-                                {ideal.number}: {ideal.text.substring(0, 50)}{ideal.text.length > 50 ? '...' : ''}
+                                {ideal.number}: {ideal.text.substring(0, 68)}{ideal.text.length > 68 ? '...' : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <Button
-                          variant="outline"
+                          variant="default"
+                          className="h-9"
                           size="sm"
                           onClick={() => {
                             const maxNumber = backgroundData.ideals?.length || 0
@@ -357,6 +356,16 @@ export function BackgroundTraitSelectionModal({
                           <Icon icon="lucide:dice-6" className="w-4 h-4" />
                           Roll d{backgroundData.ideals?.length || 0}
                         </Button>
+                      </div>
+                      <div className="flex flex-col w-full gap-2 p-3 border rounded-lg bg-background">
+                        <Badge variant="outline">Ideal</Badge>
+                        <div className="flex-1">
+                          {selectedIdeal ? (
+                            <span className="text-sm">{selectedIdeal.text}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not selected</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
@@ -374,16 +383,8 @@ export function BackgroundTraitSelectionModal({
                 {(() => {
                   const selectedBond = backgroundBonds[0]
                   return (
-                    <div className="flex items-center gap-2 p-2 border rounded-lg">
-                      <Badge variant="outline">Bond</Badge>
-                      <div className="flex-1">
-                        {selectedBond ? (
-                          <span className="text-sm">{selectedBond.text}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Not selected</span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
+                    <div className="flex items-center gap-2 p-2 border rounded-lg bg-background flex-col">
+                      <div className="flex gap-2 w-full">
                         <Select
                           value={selectedBond?.number.toString() || ""}
                           onValueChange={(value) => {
@@ -393,19 +394,20 @@ export function BackgroundTraitSelectionModal({
                             }
                           }}
                         >
-                          <SelectTrigger className="w-[200px]">
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select bond" />
                           </SelectTrigger>
                           <SelectContent>
                             {(backgroundData.bonds || []).map((bond: any) => (
                               <SelectItem key={bond.number} value={bond.number.toString()}>
-                                {bond.number}: {bond.text.substring(0, 50)}{bond.text.length > 50 ? '...' : ''}
+                                {bond.number}: {bond.text.substring(0, 68)}{bond.text.length > 68 ? '...' : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <Button
-                          variant="outline"
+                          variant="default"
+                          className="h-9"
                           size="sm"
                           onClick={() => {
                             const maxNumber = backgroundData.bonds?.length || 0
@@ -422,6 +424,16 @@ export function BackgroundTraitSelectionModal({
                           Roll d{backgroundData.bonds?.length || 0}
                         </Button>
                       </div>
+                      <div className="flex w-full gap-2 border p-3 flex-col rounded-lg bg-background">
+                        <Badge variant="outline">Bond</Badge>
+                        <div className="flex-1">
+                          {selectedBond ? (
+                            <span className="text-sm">{selectedBond.text}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not selected</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )
                 })()}
@@ -433,21 +445,12 @@ export function BackgroundTraitSelectionModal({
           {backgroundData.flaws && backgroundData.flaws.length > 0 && (
             <div className="flex flex-col gap-2">
               <Label className="text-md font-medium">Flaws</Label>
-              <p className="text-xs text-muted-foreground">Choose or roll for 1 flaw</p>
               <div className="flex flex-col gap-2">
                 {(() => {
                   const selectedFlaw = backgroundFlaws[0]
                   return (
-                    <div className="flex items-center gap-2 p-2 border rounded-lg">
-                      <Badge variant="outline">Flaw</Badge>
-                      <div className="flex-1">
-                        {selectedFlaw ? (
-                          <span className="text-sm">{selectedFlaw.text}</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Not selected</span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
+                    <div className="flex items-center gap-2 p-2 border rounded-lg bg-background flex-col">
+                      <div className="flex w-full gap-2">
                         <Select
                           value={selectedFlaw?.number.toString() || ""}
                           onValueChange={(value) => {
@@ -457,19 +460,20 @@ export function BackgroundTraitSelectionModal({
                             }
                           }}
                         >
-                          <SelectTrigger className="w-[200px]">
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select flaw" />
                           </SelectTrigger>
                           <SelectContent>
                             {(backgroundData.flaws || []).map((flaw: any) => (
                               <SelectItem key={flaw.number} value={flaw.number.toString()}>
-                                {flaw.number}: {flaw.text.substring(0, 50)}{flaw.text.length > 50 ? '...' : ''}
+                                {flaw.number}: {flaw.text.substring(0, 68)}{flaw.text.length > 68 ? '...' : ''}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <Button
-                          variant="outline"
+                          variant="default"
+                          className="h-9"
                           size="sm"
                           onClick={() => {
                             const maxNumber = backgroundData.flaws?.length || 0
@@ -485,6 +489,16 @@ export function BackgroundTraitSelectionModal({
                           <Icon icon="lucide:dice-6" className="w-4 h-4" />
                           Roll d{backgroundData.flaws?.length || 0}
                         </Button>
+                      </div>
+                      <div className="flex flex-col w-full gap-2 p-3 border rounded-lg bg-background">
+                        <Badge variant="outline">Flaw</Badge>
+                        <div className="flex-1">
+                          {selectedFlaw ? (
+                            <span className="text-sm">{selectedFlaw.text}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not selected</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
