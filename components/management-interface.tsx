@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -1139,20 +1139,26 @@ function CampaignManagement({
   const { userProfile } = useUser()
   const canEdit = userProfile?.permissionLevel !== 'viewer'
   
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-row gap-4 items-start justify-between">
-        <h2 className="text-3xl font-display font-bold">Campaigns</h2>
-        {canEdit && (
-          <Button onClick={onCreateCampaign}>
-            <Icon icon="lucide:plus" className="w-4 h-4" />
-            Create Campaign
-          </Button>
-        )}
-      </div>
-
-      <div className="grid gap-4">
-        {campaigns.map((campaign) => (
+  // Split campaigns into active and inactive groups, prioritizing default campaign
+  const { activeCampaigns, inactiveCampaigns } = useMemo(() => {
+    const active = campaigns.filter(c => c.isActive).sort((a, b) => {
+      // Default campaign always comes first
+      if (a.isDefault && !b.isDefault) return -1
+      if (!a.isDefault && b.isDefault) return 1
+      // Then sort alphabetically
+      return a.name.localeCompare(b.name)
+    })
+    const inactive = campaigns.filter(c => !c.isActive).sort((a, b) => {
+      // Default campaign always comes first (even if inactive)
+      if (a.isDefault && !b.isDefault) return -1
+      if (!a.isDefault && b.isDefault) return 1
+      // Then sort alphabetically
+      return a.name.localeCompare(b.name)
+    })
+    return { activeCampaigns: active, inactiveCampaigns: inactive }
+  }, [campaigns])
+  
+  const renderCampaignCard = (campaign: Campaign) => (
           <Card key={campaign.id}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -1235,7 +1241,46 @@ function CampaignManagement({
               )}
             </CardContent>
           </Card>
-        ))}
+  )
+  
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-row gap-4 items-start justify-between">
+        <h2 className="text-3xl font-display font-bold">Campaigns</h2>
+        {canEdit && (
+          <Button onClick={onCreateCampaign}>
+            <Icon icon="lucide:plus" className="w-4 h-4" />
+            Create Campaign
+          </Button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-6">
+        {/* Active Campaigns Section */}
+        {activeCampaigns.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <Icon icon="lucide:circle" className="w-2 h-2 fill-current text-primary" />
+              Active Campaigns
+            </h3>
+            <div className="grid gap-4">
+              {activeCampaigns.map(renderCampaignCard)}
+            </div>
+          </div>
+        )}
+
+        {/* Inactive Campaigns Section */}
+        {inactiveCampaigns.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <Icon icon="lucide:circle" className="w-2 h-2 fill-none text-muted-foreground" />
+              Inactive Campaigns
+            </h3>
+            <div className="grid gap-4">
+              {inactiveCampaigns.map(renderCampaignCard)}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

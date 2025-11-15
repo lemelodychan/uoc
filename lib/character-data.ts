@@ -23,6 +23,11 @@ export interface Campaign {
   discordWebhookUrl?: string
   discordNotificationsEnabled?: boolean
   discordReminderSent?: boolean
+  // Campaign logos
+  logoLightUrl?: string // Logo for light mode (SVG supported)
+  logoDarkUrl?: string // Logo for dark mode (SVG supported)
+  // Default campaign setting (superadmin only)
+  isDefault?: boolean // Whether this is the default campaign to show on app load
 }
 
 export interface CharacterData {

@@ -692,8 +692,9 @@ function CharacterSheetContent() {
             // Failed to preload class features - non-critical
           })
 
-          // Set active campaign by default
-          const activeCampaign = (dbCampaigns || []).find(c => c.isActive)
+          // Set campaign by default - prioritize default campaign, then first active campaign
+          const defaultCampaign = (dbCampaigns || []).find(c => c.isDefault)
+          const activeCampaign = defaultCampaign || (dbCampaigns || []).find(c => c.isActive)
           let selectedCampaignId = "all"
           if (activeCampaign) {
             selectedCampaignId = activeCampaign.id
@@ -3130,6 +3131,17 @@ function CharacterSheetContent() {
             // Wiki view doesn't need to set currentView
           } else {
             setCurrentView('management')
+          }
+        }}
+        campaigns={campaigns}
+        selectedCampaignId={selectedCampaignId}
+        onCampaignSelect={(campaignId) => {
+          setSelectedCampaignId(campaignId)
+          if (campaignId !== "all" && campaignId !== "no-campaign") {
+            setCurrentView('campaign')
+          } else {
+            setCurrentView('character')
+            scrollToTop()
           }
         }}
       />

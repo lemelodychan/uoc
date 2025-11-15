@@ -3131,6 +3131,18 @@ export const deleteClassFeature = async (featureId: string): Promise<{ success: 
 // Campaign management functions
 export const createCampaign = async (campaign: Campaign): Promise<{ success: boolean; error?: string }> => {
   try {
+    // If setting this campaign as default, unset all other campaigns as default
+    if (campaign.isDefault) {
+      const { error: unsetError } = await supabase
+        .from("campaigns")
+        .update({ is_default: false })
+      
+      if (unsetError) {
+        console.error("Error unsetting other default campaigns:", unsetError)
+        return { success: false, error: unsetError.message }
+      }
+    }
+
     const { error } = await supabase
       .from("campaigns")
       .insert([{
@@ -3149,7 +3161,10 @@ export const createCampaign = async (campaign: Campaign): Promise<{ success: boo
         next_session_number: campaign.nextSessionNumber || null,
         discord_webhook_url: campaign.discordWebhookUrl || null,
         discord_notifications_enabled: campaign.discordNotificationsEnabled || false,
-        discord_reminder_sent: campaign.discordReminderSent || false
+        discord_reminder_sent: campaign.discordReminderSent || false,
+        logo_light_url: campaign.logoLightUrl || null,
+        logo_dark_url: campaign.logoDarkUrl || null,
+        is_default: campaign.isDefault || false
       }])
 
     if (error) {
@@ -3201,7 +3216,10 @@ export const loadAllCampaigns = async (useServiceRole = false): Promise<{ campai
       nextSessionNumber: row.next_session_number || undefined,
       discordWebhookUrl: row.discord_webhook_url || undefined,
       discordNotificationsEnabled: row.discord_notifications_enabled || false,
-      discordReminderSent: row.discord_reminder_sent || false
+      discordReminderSent: row.discord_reminder_sent || false,
+      logoLightUrl: row.logo_light_url || undefined,
+      logoDarkUrl: row.logo_dark_url || undefined,
+      isDefault: row.is_default || false
     }))
 
     return { campaigns }
@@ -3213,6 +3231,19 @@ export const loadAllCampaigns = async (useServiceRole = false): Promise<{ campai
 
 export const updateCampaign = async (campaign: Campaign): Promise<{ success: boolean; error?: string }> => {
   try {
+    // If setting this campaign as default, unset all other campaigns as default
+    if (campaign.isDefault) {
+      const { error: unsetError } = await supabase
+        .from("campaigns")
+        .update({ is_default: false })
+        .neq("id", campaign.id)
+      
+      if (unsetError) {
+        console.error("Error unsetting other default campaigns:", unsetError)
+        return { success: false, error: unsetError.message }
+      }
+    }
+
     const { error } = await supabase
       .from("campaigns")
       .update({
@@ -3229,7 +3260,10 @@ export const updateCampaign = async (campaign: Campaign): Promise<{ success: boo
         next_session_number: campaign.nextSessionNumber || null,
         discord_webhook_url: campaign.discordWebhookUrl || null,
         discord_notifications_enabled: campaign.discordNotificationsEnabled || false,
-        discord_reminder_sent: campaign.discordReminderSent || false
+        discord_reminder_sent: campaign.discordReminderSent || false,
+        logo_light_url: campaign.logoLightUrl || null,
+        logo_dark_url: campaign.logoDarkUrl || null,
+        is_default: campaign.isDefault || false
       })
       .eq("id", campaign.id)
 

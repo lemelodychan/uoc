@@ -9,10 +9,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Icon } from "@iconify/react"
 import { useToast } from "@/components/ui/use-toast"
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { UserProfile } from "@/lib/user-profiles"
+import { useUser } from "@/lib/user-context"
 
 interface CampaignCreationModalProps {
   isOpen: boolean
@@ -43,7 +45,16 @@ export function CampaignCreationModal({
   const [description, setDescription] = useState(editingCampaign?.description || "")
   const [dungeonMasterId, setDungeonMasterId] = useState(editingCampaign?.dungeonMasterId || "")
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState(editingCampaign?.discordWebhookUrl || "")
+  const [isActive, setIsActive] = useState(editingCampaign?.isActive || false)
+  const [isDefault, setIsDefault] = useState(editingCampaign?.isDefault || false)
+  const [logoLightUrl, setLogoLightUrl] = useState(editingCampaign?.logoLightUrl || "")
+  const [logoDarkUrl, setLogoDarkUrl] = useState(editingCampaign?.logoDarkUrl || "")
+  const [uploadingLightLogo, setUploadingLightLogo] = useState(false)
+  const [uploadingDarkLogo, setUploadingDarkLogo] = useState(false)
+  const lightLogoInputRef = useRef<HTMLInputElement>(null)
+  const darkLogoInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const { isSuperadmin } = useUser()
   const [testStatus, setTestStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
   const testTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -54,11 +65,19 @@ export function CampaignCreationModal({
       setDescription(editingCampaign.description || "")
       setDungeonMasterId(editingCampaign.dungeonMasterId || "")
       setDiscordWebhookUrl(editingCampaign.discordWebhookUrl || "")
+      setIsActive(editingCampaign.isActive || false)
+      setIsDefault(editingCampaign.isDefault || false)
+      setLogoLightUrl(editingCampaign.logoLightUrl || "")
+      setLogoDarkUrl(editingCampaign.logoDarkUrl || "")
     } else {
       setName("")
       setDescription("")
       setDungeonMasterId("")
       setDiscordWebhookUrl("")
+      setIsActive(false)
+      setIsDefault(false)
+      setLogoLightUrl("")
+      setLogoDarkUrl("")
     }
   }, [editingCampaign])
 
@@ -96,7 +115,7 @@ export function CampaignCreationModal({
               created_at: editingCampaign?.created_at || new Date().toISOString(),
               updated_at: new Date().toISOString(),
               characters: editingCampaign?.characters || [],
-              isActive: editingCampaign?.isActive || false, // Preserve the isActive status
+              isActive: isActive,
               dungeonMasterId: dungeonMasterId || undefined,
               // Discord integration
               discordWebhookUrl: discordWebhookUrl.trim() || undefined,
@@ -107,7 +126,12 @@ export function CampaignCreationModal({
               nextSessionTime: editingCampaign?.nextSessionTime,
               nextSessionTimezone: editingCampaign?.nextSessionTimezone,
               nextSessionNumber: editingCampaign?.nextSessionNumber,
-              discordReminderSent: editingCampaign?.discordReminderSent || false
+              discordReminderSent: editingCampaign?.discordReminderSent || false,
+              // Campaign logos
+              logoLightUrl: logoLightUrl || undefined,
+              logoDarkUrl: logoDarkUrl || undefined,
+              // Default campaign (superadmin only)
+              isDefault: isSuperadmin ? isDefault : false
             }
 
     onSave(campaign)
@@ -119,7 +143,79 @@ export function CampaignCreationModal({
     setDescription("")
     setDungeonMasterId("")
     setDiscordWebhookUrl("")
+    setIsActive(false)
+    setLogoLightUrl("")
+    setLogoDarkUrl("")
     onClose()
+  }
+
+  const handleLogoUpload = async (file: File, mode: 'light' | 'dark') => {
+    try {
+      if (mode === 'light') {
+        setUploadingLightLogo(true)
+      } else {
+        setUploadingDarkLogo(true)
+      }
+
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('folder', 'campaign-logos')
+
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: uploadFormData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        const errorMessage = result.details 
+          ? `${result.error}: ${result.details}` 
+          : result.error || 'Failed to upload logo'
+        throw new Error(errorMessage)
+      }
+
+      if (mode === 'light') {
+        setLogoLightUrl(result.url)
+      } else {
+        setLogoDarkUrl(result.url)
+      }
+
+      toast({
+        title: "Logo Uploaded",
+        description: `${mode === 'light' ? 'Light' : 'Dark'} mode logo uploaded successfully.`,
+      })
+    } catch (error) {
+      console.error('Error uploading logo:', error)
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : 'Failed to upload logo',
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingLightLogo(false)
+      setUploadingDarkLogo(false)
+      if (mode === 'light' && lightLogoInputRef.current) {
+        lightLogoInputRef.current.value = ''
+      }
+      if (mode === 'dark' && darkLogoInputRef.current) {
+        darkLogoInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>, mode: 'light' | 'dark') => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleLogoUpload(file, mode)
+    }
+    // Reset input so same file can be selected again
+    if (mode === 'light' && lightLogoInputRef.current) {
+      lightLogoInputRef.current.value = ''
+    }
+    if (mode === 'dark' && darkLogoInputRef.current) {
+      darkLogoInputRef.current.value = ''
+    }
   }
 
   const handleSendTestDiscord = async () => {
@@ -174,32 +270,23 @@ export function CampaignCreationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-0 max-h-[70vh]">
+        <div className="flex flex-col gap-0 max-h-[75vh]">
           <div className="flex-shrink-0 flex flex-col gap-4 p-4 bg-background">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="campaign-name">Campaign Name *</Label>
-              <Input
-                id="campaign-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter campaign name..."
-                maxLength={100}
-              />
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="campaign-description">Description</Label>
-              <RichTextEditor
-                value={description}
-                onChange={setDescription}
-                placeholder="Enter campaign description, setting details, or notes..."
-                height={80}
-              />
-            </div>
-
-            <div className="flex flex-row gap-4 w-full">
+            <div className="flex flex-row gap-4">
+              <div className="flex flex-col gap-2 w-full">
+                <Label htmlFor="campaign-name">Campaign Name *</Label>
+                <Input
+                  id="campaign-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter campaign name..."
+                  maxLength={100}
+                />
+              </div>
+              {/* Dungeon Master */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="dungeon-master">Dungeon Master</Label>
+                <Label htmlFor="dungeon-master">Dungeon Master *</Label>
                 <Select value={dungeonMasterId || "none"} onValueChange={(value) => setDungeonMasterId(value === "none" ? "" : value)}>
                   <SelectTrigger className="w-[144px]">
                     <SelectValue placeholder="Select a Dungeon Master (optional)" />
@@ -219,6 +306,117 @@ export function CampaignCreationModal({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="campaign-description">Description</Label>
+              <RichTextEditor
+                value={description}
+                onChange={setDescription}
+                placeholder="Enter campaign description, setting details, or notes..."
+                height={80}
+              />
+            </div>
+
+            {/* Campaign Logos */}
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Light Mode Logo */}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="logo-light" className="text-xs text-muted-foreground">
+                    Light Mode Logo
+                  </Label>
+                  <div className="flex flex-col gap-2">
+                    {(logoLightUrl || logoDarkUrl) && (
+                      <div className="relative w-full h-20 border rounded-lg bg-background flex items-center justify-center overflow-hidden">
+                        <img 
+                          src={logoLightUrl || logoDarkUrl || ""} 
+                          alt="Light mode logo" 
+                          className="max-w-full max-h-full object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setLogoLightUrl("")}
+                          className="absolute top-1 right-1 h-6 w-6 p-0"
+                        >
+                          <Icon icon="lucide:x" className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                    <Input
+                      id="logo-light"
+                      type="file"
+                      accept="image/*,.svg"
+                      ref={lightLogoInputRef}
+                      onChange={(e) => handleLogoFileChange(e, 'light')}
+                      disabled={uploadingLightLogo}
+                      className="cursor-pointer"
+                    />
+                    {uploadingLightLogo && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Icon icon="lucide:loader-2" className="w-3 h-3 animate-spin" />
+                        Uploading...
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dark Mode Logo */}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="logo-dark" className="text-xs text-muted-foreground">
+                    Dark Mode Logo
+                  </Label>
+                  <div className="flex flex-col gap-2">
+                    {(logoDarkUrl || logoLightUrl) && (
+                      <div className="relative w-full h-20 border rounded-lg bg-background flex items-center justify-center overflow-hidden">
+                        <img 
+                          src={logoDarkUrl || logoLightUrl || ""} 
+                          alt="Dark mode logo" 
+                          className="max-w-full max-h-full object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setLogoDarkUrl("")}
+                          className="absolute top-1 right-1 h-6 w-6 p-0"
+                        >
+                          <Icon icon="lucide:x" className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                    <Input
+                      id="logo-dark"
+                      type="file"
+                      accept="image/*,.svg"
+                      ref={darkLogoInputRef}
+                      onChange={(e) => handleLogoFileChange(e, 'dark')}
+                      disabled={uploadingDarkLogo}
+                      className="cursor-pointer"
+                    />
+                    {uploadingDarkLogo && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Icon icon="lucide:loader-2" className="w-3 h-3 animate-spin" />
+                        Uploading...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-row gap-4 w-full">
+              {/* Discord Webhook URL */}
               <div className="flex flex-col gap-2 w-full">
                 <Label htmlFor="discord-webhook-url">Discord Webhook URL</Label>
                 <div className="flex gap-2 items-center w-full">
@@ -243,6 +441,50 @@ export function CampaignCreationModal({
                   </Button>
                 </div>
               </div>
+            </div>
+
+            {/* Campaign Settings */}
+            <div className="flex flex-col gap-2">
+              {/* Active Campaign */}
+              <div className="flex gap-4 items-start justify-start p-3 border rounded-lg bg-card">
+                <div className="h-[20px] w-fit">
+                  <Switch
+                    id="campaign-default"
+                    checked={isDefault}
+                    onCheckedChange={setIsDefault}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="campaign-active" className="text-sm font-medium h-[20px]">
+                    Active Campaign
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Mark this campaign as active. Multiple campaigns can be active at the same time.
+                  </p>
+                </div>
+              </div>
+
+              {/* Default Campaign (Superadmin Only) */}
+              {isSuperadmin && (
+                <div className="flex items-start gap-4 justify-start p-3 border rounded-lg bg-card border-primary/20">
+                  <div className="h-[20px] w-fit">
+                    <Switch
+                      id="campaign-default"
+                      checked={isDefault}
+                      onCheckedChange={setIsDefault}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="campaign-default" className="text-sm font-medium h-[20px]">
+                      Make Default Campaign
+                      <Badge variant="secondary" className="text-xs py-0.5 px-1.5">Admin Only</Badge>
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Set this campaign as the default to show on app load. Only one campaign can be the default.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -290,8 +532,8 @@ export function CampaignCreationModal({
                               className="h-8"
                               onClick={() => onConvertFromNPC?.(character.id)}
                             >
-                              <Icon icon="lucide:user" className="w-3 h-3 mr-1" />
-                              To PC
+                              <Icon icon="lucide:user" className="w-3 h-3" />
+                              Turn into PC
                             </Button>
                           ) : (
                             <Button
@@ -300,8 +542,8 @@ export function CampaignCreationModal({
                               className="h-8"
                               onClick={() => onConvertToNPC?.(character.id)}
                             >
-                              <Icon icon="lucide:users" className="w-3 h-3 mr-1" />
-                              To NPC
+                              <Icon icon="lucide:users" className="w-3 h-3" />
+                              Turn into NPC
                             </Button>
                           )}
                           <Button

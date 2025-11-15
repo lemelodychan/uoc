@@ -20,10 +20,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Validate file type
-    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-    if (!validImageTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Invalid file type. Only images are allowed.' }, { status: 400 })
+    // Validate file type (including SVG)
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+    const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || ''
+    
+    if (!validImageTypes.includes(file.type) && !(fileExt && validExtensions.includes(fileExt))) {
+      return NextResponse.json({ error: 'Invalid file type. Only images (including SVG) are allowed.' }, { status: 400 })
     }
 
     // Validate file size (max 5MB)
@@ -32,8 +35,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size exceeds 5MB limit' }, { status: 400 })
     }
 
+    // Determine content type (SVG might not have proper MIME type)
+    const contentType = file.type || (fileExt === 'svg' ? 'image/svg+xml' : file.type)
+
     // Generate unique filename
-    const fileExt = file.name.split('.').pop()
     const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
     const filePath = `${folder}/${fileName}`
 
@@ -44,7 +49,7 @@ export async function POST(request: NextRequest) {
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
-        contentType: file.type
+        contentType: contentType
       })
 
     if (error) {
