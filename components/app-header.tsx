@@ -557,7 +557,7 @@ export function AppHeader({
                                     icon="lucide:check-circle" 
                                     className="w-3 h-3" 
                                   />
-                                  Active
+                                  Selected
                                   </Badge>
                                 )}
                                 <div className="w-full h-20 p-2 flex items-center justify-center overflow-hidden">
@@ -580,7 +580,7 @@ export function AppHeader({
                                     icon="lucide:check-circle" 
                                     className="w-3 h-3" 
                                   />
-                                  Active
+                                  Selected
                                   </Badge>
                                 )}
                                 <div className="flex items-center gap-2 flex-1 min-w-0">

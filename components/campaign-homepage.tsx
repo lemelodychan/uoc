@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
+import { useTheme } from 'next-themes'
 import { fromZonedTime, toZonedTime, format, formatInTimeZone } from 'date-fns-tz'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Icon } from "@iconify/react"
 import type { CharacterData, Campaign } from "@/lib/character-data"
 import type { CampaignNote, CampaignResource, CampaignLink } from "@/lib/database"
+import { getCampaignLogoUrl } from "@/lib/utils"
 import { CampaignNoteModal } from "./edit-modals/campaign-note-modal"
 import { CampaignNoteReadModal } from "./edit-modals/campaign-note-read-modal"
 import { CampaignResourceModal } from "./edit-modals/campaign-resource-modal"
@@ -96,6 +98,12 @@ export function CampaignHomepage({
   const { isSuperadmin, userProfile } = useUser()
   const { toast } = useToast()
   const canEdit = userProfile?.permissionLevel !== 'viewer'
+  const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   
   // Use campaign notes hook with caching
   const { 
@@ -309,19 +317,12 @@ export function CampaignHomepage({
 
   const handleSaveNote = async (note: Omit<CampaignNote, 'id' | 'created_at' | 'updated_at'>) => {
     if (editingNote && editingNote.id) {
-      const result = await onUpdateNote?.(editingNote.id, { 
+      await onUpdateNote?.(editingNote.id, { 
         title: note.title, 
         content: note.content,
         session_date: note.session_date,
         members_attending: note.members_attending
       })
-      
-      // If update fails with "Note not found", it might have been deleted
-      // In that case, we should refresh the notes list
-      if (result?.error && result.error.includes("Note not found")) {
-        console.warn("Note not found during update, refreshing notes list")
-        refreshNotes()
-      }
     } else {
       await onCreateNote?.(note)
     }
@@ -664,18 +665,53 @@ export function CampaignHomepage({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex flex-col gap-2">
-              <h1 className="text-3xl font-bold font-display flex items-center gap-3">
-                {campaign?.name || 'Campaign'}
-                {campaign?.isActive && (
-                  <Badge variant="secondary" className="text-sm">
-                    Active
-                  </Badge>
-                )}
-              </h1>
+              {(() => {
+                if (!mounted) {
+                  // Prevent hydration mismatch
+                  return (
+                    <div className="flex items-center gap-3">
+                      <div className="h-12 w-48 bg-muted animate-pulse rounded" />
+                    </div>
+                  )
+                }
+                
+                const theme = resolvedTheme === 'dark' ? 'dark' : 'light'
+                const logoUrl = campaign ? getCampaignLogoUrl(campaign, theme) : undefined
+                
+                if (logoUrl) {
+                  return (
+                    <div className="flex items-center gap-3">
+                      <div className="h-20 flex items-center justify-center overflow-hidden">
+                        <img 
+                          src={logoUrl} 
+                          alt={campaign?.name || 'Campaign'}
+                          className="max-h-full max-w-full object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )
+                }
+                
+                return (
+                  <h1 className="text-3xl font-bold font-display flex items-center gap-3">
+                    {campaign?.name || 'Campaign'}
+                  </h1>
+                )
+              })()}
               {campaign?.description && (
                 <p className="text-muted-foreground mb-2">{campaign.description}</p>
               )}
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                {campaign?.isActive && (
+                  <Badge variant="default" className="text-xs pl-1 pr-1.5">
+                    <Icon icon="lucide:play" className="w-4 h-4" />
+                    Active
+                  </Badge>
+                )}
                 <Badge variant="outline" className="flex items-center gap-2">
                   <Icon icon="lucide:calendar" className="w-4 h-4" /> 
                   Started {formatDate(campaign?.created_at)}

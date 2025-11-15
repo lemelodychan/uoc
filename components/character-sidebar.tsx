@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useTheme } from 'next-themes'
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -12,7 +11,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { CharacterData, Campaign } from "@/lib/character-data"
 import { calculateTotalLevel } from "@/lib/character-data"
 import { canViewCharacter } from "@/lib/database"
-import { getCampaignLogoUrl } from "@/lib/utils"
 
 interface CharacterSidebarProps {
   characters: CharacterData[]
@@ -50,12 +48,6 @@ export function CharacterSidebar({
   canEdit = true,
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const { resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Show all characters in sidebar except NPCs, but we'll handle access control in the main view
   const visibleCharacters = characters.filter(character => !character.isNPC)
@@ -171,46 +163,14 @@ export function CharacterSidebar({
       </div> */}
 
       <div className={`flex flex-col gap-0 flex-1 min-h-0 w-full ${isCollapsed ? "p-2" : "p-0"}`}>
-
         {(() => {
           const selectedCampaign = selectedCampaignId && selectedCampaignId !== "all" && selectedCampaignId !== "no-campaign"
             ? campaigns?.find(c => c.id === selectedCampaignId)
             : null
-          
-          if (!mounted) {
-            // Prevent hydration mismatch
-            return selectedCampaign ? (
-              <div className="px-4 pt-4">
-                <div className="w-full h-20 my-3 p-2 bg-muted animate-pulse rounded-lg" />
-              </div>
-            ) : (
-              <h1 className="text-xl font-display font-bold px-4 pt-4">All Campaigns</h1>
-            )
-          }
-          
-          const theme = resolvedTheme === 'dark' ? 'dark' : 'light'
-          const logoUrl = selectedCampaign ? getCampaignLogoUrl(selectedCampaign, theme) : undefined
-          
           return selectedCampaign ? (
-            <div className="px-4 pt-6">
-              {logoUrl ? (
-                <div className="px-2 w-full h-16 flex items-center justify-center overflow-hidden">
-                  <img 
-                    src={logoUrl} 
-                    alt={selectedCampaign.name}
-                    className="max-w-full max-h-full object-contain"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                    }}
-                  />
-                </div>
-              ) : (
-                <h1 className="text-xl font-display font-bold">{selectedCampaign.name}</h1>
-              )}
-            </div>
+            <h1 className="text-xs uppercase font-base text-muted-foreground tracking-wide font-bold px-4 pt-4">{selectedCampaign.name}</h1>
           ) : (
-            <h1 className="text-xl font-display font-bold px-4 pt-4">All Campaigns</h1>
+            <h1 className="text-xs uppercase font-base text-muted-foreground tracking-wide font-bold px-4 pt-4">All Campaigns</h1>
           )
         })()}
 
