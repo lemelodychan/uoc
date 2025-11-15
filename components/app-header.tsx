@@ -300,6 +300,7 @@ export function AppHeader({
             >
               <Icon icon="iconoir:hexagon-dice" className="w-4 h-4" />
               Campaigns
+              <Icon icon="lucide:chevron-down" className="w-4 h-4" />
             </Button>
             <Button
               variant={currentView === 'wiki' ? 'default' : 'ghost'}
