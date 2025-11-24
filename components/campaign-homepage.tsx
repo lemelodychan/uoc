@@ -771,7 +771,7 @@ export function CampaignHomepage({
       </div>
 
       {/* Dungeon Master Controls */}
-      {isDungeonMaster && (
+      {(isDungeonMaster || isSuperadmin) && (
         <Card className="bg-card border-primary/50 border-1 gap-2">
           <CardHeader className="w-full flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
