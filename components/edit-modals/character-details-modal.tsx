@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { WysiwygEditor } from "@/components/ui/wysiwyg-editor"
 import { Separator } from "@/components/ui/separator"
 import type { CharacterData } from "@/lib/character-data"
 import { loadBackgroundDetails } from "@/lib/database"
@@ -157,8 +157,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
           
           <div className="space-y-2">
             <Label htmlFor="personalityTraits">Personality Traits</Label>
-            <RichTextEditor
-              content={formData.personalityTraits}
+            <WysiwygEditor
+              value={formData.personalityTraits}
               onChange={(content) => canEdit && setFormData({ ...formData, personalityTraits: content })}
               placeholder="Describe your character's personality traits..."
             />
@@ -166,8 +166,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
 
           <div className="space-y-2">
             <Label htmlFor="ideals">Ideals</Label>
-            <RichTextEditor
-              content={formData.ideals}
+            <WysiwygEditor
+              value={formData.ideals}
               onChange={(content) => canEdit && setFormData({ ...formData, ideals: content })}
               placeholder="What drives your character? What principles do they believe in?"
             />
@@ -175,8 +175,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
 
           <div className="space-y-2">
             <Label htmlFor="bonds">Bonds</Label>
-            <RichTextEditor
-              content={formData.bonds}
+            <WysiwygEditor
+              value={formData.bonds}
               onChange={(content) => canEdit && setFormData({ ...formData, bonds: content })}
               placeholder="What connects your character to the world? People, places, or things they care about..."
             />
@@ -184,8 +184,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
 
           <div className="space-y-2">
             <Label htmlFor="flaws">Flaws</Label>
-            <RichTextEditor
-              content={formData.flaws}
+            <WysiwygEditor
+              value={formData.flaws}
               onChange={(content) => canEdit && setFormData({ ...formData, flaws: content })}
               placeholder="What are your character's weaknesses or vices?"
             />
@@ -193,8 +193,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
 
           <div className="space-y-2">
             <Label htmlFor="backstory">Backstory</Label>
-            <RichTextEditor
-              content={formData.backstory}
+            <WysiwygEditor
+              value={formData.backstory}
               onChange={(content) => canEdit && setFormData({ ...formData, backstory: content })}
               placeholder="Tell your character's story. Where did they come from? What shaped them?"
             />
@@ -202,8 +202,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
-            <RichTextEditor
-              content={formData.notes}
+            <WysiwygEditor
+              value={formData.notes}
               onChange={(content) => canEdit && setFormData({ ...formData, notes: content })}
               placeholder="Any additional notes, reminders, or information about your character..."
             />

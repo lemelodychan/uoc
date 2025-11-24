@@ -351,6 +351,34 @@
   margin: 0.75rem 0;
 }
 
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: hsl(var(--foreground));
+}
+
+.prose h1:first-child,
+.prose h2:first-child,
+.prose h3:first-child {
+  margin-top: 0;
+}
+
+.prose h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 0.25rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
 .prose ul {
   list-style-type: disc;
   padding-left: 1rem;
@@ -366,35 +394,67 @@
 .prose-xs { font-size: 0.75rem; }
 .prose-xs p { font-size: 0.75rem; }
 .prose-xs h1 { font-size: 1.5rem; }
-.prose-xs h2 { font-size: 1.25rem; }
+.prose-xs h2 { font-size: 1.25rem !important; }
 .prose-xs h3 { font-size: 1.125rem; }
 
 .prose-sm { font-size: 0.875rem; }
 .prose-sm p { font-size: 0.875rem; }
 .prose-sm h1 { font-size: 1.5rem; }
-.prose-sm h2 { font-size: 1.25rem; }
+.prose-sm h2 { font-size: 1.25rem !important; }
 .prose-sm h3 { font-size: 1.125rem; }
 
 .prose-base { font-size: 1rem; }
 .prose-base p { font-size: 1rem; }
 .prose-base h1 { font-size: 2rem; }
-.prose-base h2 { font-size: 1.5rem; }
+.prose-base h2 { font-size: 1.5rem !important; }
 .prose-base h3 { font-size: 1.25rem; }
 
 .prose-lg { font-size: 1.125rem; }
 .prose-lg p { font-size: 1.125rem; }
 .prose-lg h1 { font-size: 2.25rem; }
-.prose-lg h2 { font-size: 1.875rem; }
+.prose-lg h2 { font-size: 1.875rem !important; }
 .prose-lg h3 { font-size: 1.5rem; }
 
 .prose-xl { font-size: 1.25rem; }
 .prose-xl p { font-size: 1.25rem; }
 .prose-xl h1 { font-size: 2.5rem; }
-.prose-xl h2 { font-size: 2rem; }
+.prose-xl h2 { font-size: 2rem !important; }
 .prose-xl h3 { font-size: 1.75rem; }
 
 .prose-2xl { font-size: 1.5rem; }
 .prose-2xl p { font-size: 1.5rem; }
 .prose-2xl h1 { font-size: 3rem; }
-.prose-2xl h2 { font-size: 2.5rem; }
+.prose-2xl h2 { font-size: 2.5rem !important; }
 .prose-2xl h3 { font-size: 2rem; }
+
+/* Spoiler styling for rendered content */
+.prose spoiler,
+spoiler {
+  background-color: var(--background);
+  color: var(--background);
+  border-radius: 4px;
+  display: inline;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.3s ease;
+  position: relative;
+}
+.prose spoiler *,
+spoiler * {
+  color: var(--background);
+  transition: all 0.3s ease;
+}
+
+.prose spoiler:hover,
+spoiler:hover, .prose spoiler:hover *, spoiler:hover * {
+  color: var(--muted-foreground);
+}
+
+.prose spoiler.revealed,
+spoiler.revealed {
+  background-color: transparent;
+  color: inherit;
+  cursor: default;
+  text-shadow: none;
+  filter: none;
+}

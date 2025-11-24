@@ -1,15 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
-import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { loadBackgroundDetails } from "@/lib/database"
+import { CharacterDetailsFieldEditModal } from "./character-details-field-edit-modal"
 
 interface CharacterDetailsContentModalProps {
   isOpen: boolean
@@ -20,7 +20,7 @@ interface CharacterDetailsContentModalProps {
 }
 
 export function CharacterDetailsContentModal({ isOpen, onClose, character, onSave, canEdit = true }: CharacterDetailsContentModalProps) {
-  const [editingSection, setEditingSection] = useState<string | null>(null)
+  const [editingField, setEditingField] = useState<"personalityTraits" | "backstory" | "notes" | null>(null)
   const [formData, setFormData] = useState({
     personalityTraits: character.personalityTraits || "",
     backstory: character.backstory || "",
@@ -74,69 +74,32 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
     }
   }, [character.backgroundId, character.backgroundData])
 
-  const handleSave = () => {
-    onSave(formData)
-    setEditingSection(null)
-  }
-
-  const handleCancel = () => {
-    setFormData({
-      personalityTraits: character.personalityTraits || "",
-      backstory: character.backstory || "",
-      notes: character.notes || "",
-    })
-    setEditingSection(null)
-  }
-
-  const startEditing = (section: string) => {
-    setEditingSection(section)
-  }
-
-  const updateField = (field: string, value: string) => {
+  const handleFieldSave = (field: "personalityTraits" | "backstory" | "notes", value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+    onSave({ [field]: value })
+    setEditingField(null)
   }
 
-  const renderSection = (title: string, field: keyof typeof formData, content: string) => {
-    const isEditing = editingSection === field
-    
+  const renderSection = (title: string, field: "personalityTraits" | "backstory" | "notes", content: string) => {
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h4 className="font-medium text-md">{title}</h4>
-          {canEdit && !isEditing && (
-            <Button variant="outline" size="sm" onClick={() => startEditing(field)}>
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={() => setEditingField(field)}>
               <Icon icon="lucide:edit" className="w-4 h-4 mr-2" />
               Edit
             </Button>
           )}
         </div>
         
-        {isEditing && canEdit ? (
-          <div className="flex flex-col gap-4">
-            <RichTextEditor
-              value={formData[field]}
-              onChange={(value) => updateField(field, value)}
-              placeholder={`Enter ${title.toLowerCase()}...`}
-              rows={4}
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSave}>
-                Save
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleCancel}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="p-3 border rounded-lg bg-card">
-            {content ? (
-              <RichTextDisplay content={content} />
-            ) : (
-              <p className="text-muted-foreground">No {title.toLowerCase()} added yet.</p>
-            )}
-          </div>
-        )}
+        <div className="p-3 border rounded-lg bg-card">
+          {content ? (
+            <RichTextDisplay content={content} />
+          ) : (
+            <p className="text-muted-foreground">No {title.toLowerCase()} added yet.</p>
+          )}
+        </div>
       </div>
     )
   }
@@ -240,6 +203,32 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
           {renderSection("Notes", "notes", formData.notes)}
         </div>
       </DialogContent>
+
+      {/* Field Editing Modal */}
+      {editingField && (
+        <CharacterDetailsFieldEditModal
+          isOpen={true}
+          onClose={() => setEditingField(null)}
+          field={editingField}
+          title={
+            editingField === "personalityTraits" ? "Personality Traits" :
+            editingField === "backstory" ? "Backstory" :
+            "Notes"
+          }
+          value={
+            editingField === "personalityTraits" ? formData.personalityTraits :
+            editingField === "backstory" ? formData.backstory :
+            formData.notes
+          }
+          onSave={(value) => handleFieldSave(editingField, value)}
+          placeholder={
+            editingField === "personalityTraits" ? "Describe your character's personality traits..." :
+            editingField === "backstory" ? "Tell your character's story. Where did they come from? What shaped them?" :
+            "Any additional notes, reminders, or information about your character..."
+          }
+          canEdit={canEdit}
+        />
+      )}
     </Dialog>
   )
 }

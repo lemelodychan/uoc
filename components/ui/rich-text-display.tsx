@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect, useRef } from "react"
+
 interface RichTextDisplayProps {
   content: string
   className?: string
@@ -59,11 +61,36 @@ export function RichTextDisplay({ content, className = "", fontSize }: RichTextD
 
   // If content appears to be HTML (from TipTap), render as-is inside prose container
   const looksLikeHtml = /<\w+[^>]*>/.test(content)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Add click handler for spoiler reveals
+  useEffect(() => {
+    if (!containerRef.current || !looksLikeHtml) return
+
+    const handleSpoilerClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'SPOILER' || target.closest('spoiler')) {
+        const spoiler = target.tagName === 'SPOILER' ? target : target.closest('spoiler')
+        if (spoiler && !spoiler.classList.contains('revealed')) {
+          spoiler.classList.add('revealed')
+        }
+      }
+    }
+
+    const container = containerRef.current
+    container.addEventListener('click', handleSpoilerClick)
+
+    return () => {
+      container.removeEventListener('click', handleSpoilerClick)
+    }
+  }, [content, looksLikeHtml])
+
   if (looksLikeHtml) {
     // Use prose modifier if fontSize is specified, otherwise use default prose
     const proseClass = fontSize ? `prose ${proseModifier}` : 'prose'
     return (
       <div 
+        ref={containerRef}
         className={`${proseClass} ${fontSizeClasses} ${cleanedClassName}`}
         style={fontSize ? { fontSize: 'inherit' } : undefined}
         dangerouslySetInnerHTML={{ __html: content }} 

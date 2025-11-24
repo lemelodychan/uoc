@@ -151,6 +151,16 @@ export function CampaignHomepage({
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showSessionMenu])
+
+  // Update reading note when notes refresh (to show latest version in read modal)
+  useEffect(() => {
+    if (readingNote && readModalOpen) {
+      const updatedNote = notes.find(n => n.id === readingNote.id)
+      if (updatedNote && updatedNote.updated_at !== readingNote.updated_at) {
+        setReadingNote(updatedNote)
+      }
+    }
+  }, [notes, readingNote, readModalOpen])
   
   // Sort notes by session date (fallback to created_at) with configurable order
   const sortedNotes = useMemo(() => {
@@ -296,7 +306,10 @@ export function CampaignHomepage({
   const handleOpenAddLink = () => setLinkModalOpen(true)
 
   const handleReadNote = (note: CampaignNote) => {
-    setReadingNote(note)
+    // Find the latest version of the note from the notes array
+    // This ensures we always show the most up-to-date version
+    const latestNote = notes.find(n => n.id === note.id) || note
+    setReadingNote(latestNote)
     setReadModalOpen(true)
   }
 
@@ -323,10 +336,13 @@ export function CampaignHomepage({
         session_date: note.session_date,
         members_attending: note.members_attending
       })
+      // Refresh notes to get the updated version
+      await refreshNotes()
     } else {
       await onCreateNote?.(note)
+      // Refresh notes to get the new note
+      await refreshNotes()
     }
-    // Cache will be updated automatically by the database functions
   }
 
   const handleDeleteNote = async (noteId: string) => {
@@ -1502,9 +1518,11 @@ export function CampaignHomepage({
       {/* Campaign Note Modal */}
       <CampaignNoteModal
         isOpen={noteModalOpen}
-        onClose={() => {
+        onClose={async () => {
           setNoteModalOpen(false)
           setEditingNote(null)
+          // Refresh notes when closing to ensure we have the latest data
+          await refreshNotes()
         }}
         onSave={handleSaveNote}
         editingNote={editingNote}
@@ -1519,7 +1537,7 @@ export function CampaignHomepage({
           setReadModalOpen(false)
           setReadingNote(null)
         }}
-        note={readingNote}
+        note={readingNote ? notes.find(n => n.id === readingNote.id) || readingNote : null}
         onEdit={handleEditFromRead}
         onDelete={handleDeleteFromRead}
         authorName={readingNote ? getAuthorName(readingNote.author_id) : ''}

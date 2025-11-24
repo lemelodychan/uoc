@@ -8,6 +8,7 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CustomImage } from '@/lib/tiptap-image-extension'
+import { Spoiler } from '@/lib/tiptap-spoiler-extension'
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { useEffect, useState, useRef } from "react"
@@ -69,6 +70,7 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
       TableHeader,
       TableCellExtended,
       CustomImage,
+      Spoiler,
       Placeholder.configure({
         placeholder: placeholder || 'Start writing...',
       }),
@@ -500,6 +502,18 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
           title="Clear Formatting"
         >
           <Icon icon="lucide:remove-formatting" className="w-4 h-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        {/* Spoiler button */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleSpoiler().run()}
+          className={`h-8 w-8 p-0 ${editor.isActive('spoiler') ? 'bg-accent' : ''}`}
+          title="Toggle Spoiler"
+        >
+          <Icon icon="lucide:eye-off" className="w-4 h-4" />
         </Button>
         <div className="w-px h-6 bg-border mx-1" />
         {/* Image controls */}
@@ -987,6 +1001,26 @@ export function WysiwygEditor({ value, onChange, placeholder, className }: Wysiw
 
         .dark .ProseMirror::-webkit-scrollbar-thumb:hover {
           background: #6b7280;
+        }
+
+        /* Spoiler styling in editor - visible with background color */
+        .ProseMirror spoiler {
+          background-color: rgba(201 168 112 / 0.15);
+          border: 1px solid rgba(201 168 112 / 0.2);
+          color: var(--foreground);
+          border-radius: 4px;
+          display: inline;
+          cursor: text;
+          user-select: text;
+          -webkit-user-select: text;
+          -moz-user-select: text;
+          -ms-user-select: text;
+          pointer-events: auto;
+          position: relative;
+        }
+        
+        .ProseMirror spoiler * {
+          color: var(--foreground);
         }
 
         /* View Mode Styles (for campaign notes display) */
