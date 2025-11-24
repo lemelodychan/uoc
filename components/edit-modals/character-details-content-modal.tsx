@@ -126,7 +126,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
             (Array.isArray(backgroundData.bonds) && backgroundData.bonds.length > 0) ||
             (Array.isArray(backgroundData.flaws) && backgroundData.flaws.length > 0)
           ) && (
-            <div className="flex flex-col gap-2 p-3 border rounded-lg bg-muted/50">
+            <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
               {backgroundData.defining_events && backgroundData.defining_events.length > 0 && (
                 <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
                   <Label className="text-sm font-semibold font-display">{definingEventsTitle}</Label>
