@@ -7,6 +7,7 @@
 .line-clamp-3 {
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -235,6 +236,7 @@
 
 }
 
+/* Tailwind CSS v4 directive - valid but not recognized by standard CSS linters */
 @theme inline {
   /* Font configuration */
   --font-sans: var(--font-public-sans), 'Public Sans', sans-serif;
@@ -287,10 +289,12 @@
 
 @layer base {
   * {
+    /* Tailwind CSS directive - valid but not recognized by standard CSS linters */
     @apply border-border outline-ring/50;
   }
   
   body {
+    /* Tailwind CSS directive - valid but not recognized by standard CSS linters */
     @apply bg-background text-foreground overflow-hidden;
     font-family: var(--font-body);
     line-height: var(--leading-relaxed);
@@ -457,4 +461,28 @@ spoiler.revealed {
   cursor: default;
   text-shadow: none;
   filter: none;
+}
+
+/* Character Details Content Modal - Custom text color for rendered content */
+.character-details-content .prose,
+.character-details-content .prose p,
+.character-details-content .prose div,
+.character-details-content .prose li,
+.character-details-content .prose ul,
+.character-details-content .prose ol {
+  color: var(--muted-foreground);
+}
+
+.character-details-content .prose strong,
+.character-details-content .prose h1,
+.character-details-content .prose h2,
+.character-details-content .prose h3,
+.character-details-content .prose h4,
+.character-details-content .prose h5,
+.character-details-content .prose h6 {
+  color: var(--foreground);
+}
+
+.character-details-content .prose spoiler strong {
+  color: inherit;
 }

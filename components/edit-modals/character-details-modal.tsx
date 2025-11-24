@@ -81,73 +81,60 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
           {/* Background Data Section */}
           {backgroundData && (backgroundData.defining_events || backgroundData.personality_traits || backgroundData.ideals || backgroundData.bonds || backgroundData.flaws) && (
             <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-              <div className="space-y-1">
-                <Label className="text-base font-semibold">Background: {backgroundName}</Label>
-                <p className="text-sm text-muted-foreground">Selected/rolled background features</p>
-              </div>
+              <Label className="text-base font-semibold">Background: {backgroundName}</Label>
               
               {backgroundData.defining_events && backgroundData.defining_events.length > 0 && (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">{definingEventsTitle}</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.defining_events.map((event, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{event.number}.</span> {event.text}
-                      </div>
-                    ))}
-                  </div>
+                  {backgroundData.defining_events.map((event, idx) => (
+                    <div key={idx} className="text-sm">
+                      {event.text}
+                    </div>
+                  ))}
                 </div>
               )}
               
               {backgroundData.personality_traits && backgroundData.personality_traits.length > 0 && (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">Personality Traits</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.personality_traits.map((trait, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{trait.number}.</span> {trait.text}
-                      </div>
-                    ))}
-                  </div>
+                  {backgroundData.personality_traits.map((trait, idx) => (
+                    <div key={idx} className="text-sm">
+                      {trait.text}
+                    </div>
+                  ))}
                 </div>
               )}
               
               {backgroundData.ideals && backgroundData.ideals.length > 0 && (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">Ideals</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.ideals.map((ideal, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{ideal.number}.</span> {ideal.text}
-                      </div>
-                    ))}
-                  </div>
+                  {backgroundData.ideals.map((ideal, idx) => (
+                    <div key={idx} className="text-sm">
+                      {ideal.text}
+                    </div>
+                  ))}
                 </div>
               )}
               
               {backgroundData.bonds && backgroundData.bonds.length > 0 && (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">Bonds</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.bonds.map((bond, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{bond.number}.</span> {bond.text}
-                      </div>
-                    ))}
-                  </div>
+                  {backgroundData.bonds.map((bond, idx) => (
+                    <div key={idx} className="text-sm">
+                      {bond.text}
+                    </div>
+                  ))}
                 </div>
               )}
               
               {backgroundData.flaws && backgroundData.flaws.length > 0 && (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">Flaws</Label>
-                  <div className="space-y-1 pl-4">
                     {backgroundData.flaws.map((flaw, idx) => (
                       <div key={idx} className="text-sm">
-                        <span className="font-medium">{flaw.number}.</span> {flaw.text}
+                        {flaw.text}
                       </div>
                     ))}
-                  </div>
                 </div>
               )}
             </div>
@@ -161,33 +148,6 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
               value={formData.personalityTraits}
               onChange={(content) => canEdit && setFormData({ ...formData, personalityTraits: content })}
               placeholder="Describe your character's personality traits..."
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ideals">Ideals</Label>
-            <WysiwygEditor
-              value={formData.ideals}
-              onChange={(content) => canEdit && setFormData({ ...formData, ideals: content })}
-              placeholder="What drives your character? What principles do they believe in?"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="bonds">Bonds</Label>
-            <WysiwygEditor
-              value={formData.bonds}
-              onChange={(content) => canEdit && setFormData({ ...formData, bonds: content })}
-              placeholder="What connects your character to the world? People, places, or things they care about..."
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="flaws">Flaws</Label>
-            <WysiwygEditor
-              value={formData.flaws}
-              onChange={(content) => canEdit && setFormData({ ...formData, flaws: content })}
-              placeholder="What are your character's weaknesses or vices?"
             />
           </div>
 

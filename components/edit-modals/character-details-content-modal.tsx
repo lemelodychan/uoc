@@ -93,7 +93,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
           )}
         </div>
         
-        <div className="p-3 border rounded-lg bg-card">
+        <div className="p-3 border rounded-lg bg-card character-details-content">
           {content ? (
             <RichTextDisplay content={content} />
           ) : (
@@ -115,6 +115,9 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
         </DialogHeader>
         
         <div className="space-y-6 p-4 max-h-[70vh] overflow-y-auto">
+          <Label className="text-base font-semibold mb-3">
+            <span className="font-normal text-muted-foreground">Background Details:</span> {backgroundName}
+          </Label>
           {/* Background Data Section */}
           {backgroundData && (
             (Array.isArray(backgroundData.defining_events) && backgroundData.defining_events.length > 0) ||
@@ -123,76 +126,63 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
             (Array.isArray(backgroundData.bonds) && backgroundData.bonds.length > 0) ||
             (Array.isArray(backgroundData.flaws) && backgroundData.flaws.length > 0)
           ) && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-              <div className="space-y-1">
-                <Label className="text-base font-semibold">Background: {backgroundName}</Label>
-                <p className="text-sm text-muted-foreground">Selected/rolled background features</p>
-              </div>
-              
+            <div className="flex flex-col gap-2 p-3 border rounded-lg bg-muted/50">
               {backgroundData.defining_events && backgroundData.defining_events.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">{definingEventsTitle}</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.defining_events.map((event, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{event.number}.</span> {event.text}
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                  <Label className="text-sm font-semibold font-display">{definingEventsTitle}</Label>
+                  {backgroundData.defining_events.map((event, idx) => (
+                    <div key={idx} className="text-sm text-muted-foreground">
+                      {event.text}
+                    </div>
+                  ))}
                 </div>
               )}
               
+              <div className="grid grid-cols-2 gap-2">
               {backgroundData.personality_traits && backgroundData.personality_traits.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Personality Traits</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.personality_traits.map((trait, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{trait.number}.</span> {trait.text}
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                  <Label className="text-sm font-semibold font-display">Personality Traits</Label>
+                  {backgroundData.personality_traits.map((trait, idx) => (
+                    <div key={idx} className="text-sm text-muted-foreground">
+                      {trait.text}
+                    </div>
+                  ))}
                 </div>
               )}
               
               {backgroundData.ideals && backgroundData.ideals.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Ideals</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.ideals.map((ideal, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{ideal.number}.</span> {ideal.text}
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                  <Label className="text-sm font-semibold font-display">Ideals</Label>
+                  {backgroundData.ideals.map((ideal, idx) => (
+                    <div key={idx} className="text-sm text-muted-foreground">
+                      {ideal.text}
+                    </div>
+                  ))}
                 </div>
               )}
               
               {backgroundData.bonds && backgroundData.bonds.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Bonds</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.bonds.map((bond, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{bond.number}.</span> {bond.text}
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                  <Label className="text-sm font-semibold font-display">Bonds</Label>
+                  {backgroundData.bonds.map((bond, idx) => (
+                    <div key={idx} className="text-sm text-muted-foreground">
+                      {bond.text}
+                    </div>
+                  ))}
                 </div>
               )}
               
               {backgroundData.flaws && backgroundData.flaws.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Flaws</Label>
-                  <div className="space-y-1 pl-4">
-                    {backgroundData.flaws.map((flaw, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-medium">{flaw.number}.</span> {flaw.text}
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                  <Label className="text-sm font-semibold font-display">Flaws</Label>
+                  {backgroundData.flaws.map((flaw, idx) => (
+                    <div key={idx} className="text-sm text-muted-foreground">
+                      {flaw.text}
+                    </div>
+                  ))}
                 </div>
               )}
+              </div>
             </div>
           )}
           
