@@ -128,7 +128,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
           ) && (
             <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
               {backgroundData.defining_events && backgroundData.defining_events.length > 0 && (
-                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                <div className="flex flex-col gap-1 border rounded-md p-2">
                   <Label className="text-sm font-semibold font-display">{definingEventsTitle}</Label>
                   {backgroundData.defining_events.map((event, idx) => (
                     <div key={idx} className="text-sm text-muted-foreground">
@@ -140,7 +140,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
               
               <div className="grid grid-cols-2 gap-2">
               {backgroundData.personality_traits && backgroundData.personality_traits.length > 0 && (
-                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                <div className="flex flex-col gap-1 border rounded-md p-2">
                   <Label className="text-sm font-semibold font-display">Personality Traits</Label>
                   {backgroundData.personality_traits.map((trait, idx) => (
                     <div key={idx} className="text-sm text-muted-foreground">
@@ -151,7 +151,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
               )}
               
               {backgroundData.ideals && backgroundData.ideals.length > 0 && (
-                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                <div className="flex flex-col gap-1 border rounded-md p-2">
                   <Label className="text-sm font-semibold font-display">Ideals</Label>
                   {backgroundData.ideals.map((ideal, idx) => (
                     <div key={idx} className="text-sm text-muted-foreground">
@@ -162,7 +162,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
               )}
               
               {backgroundData.bonds && backgroundData.bonds.length > 0 && (
-                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                <div className="flex flex-col gap-1 border rounded-md p-2">
                   <Label className="text-sm font-semibold font-display">Bonds</Label>
                   {backgroundData.bonds.map((bond, idx) => (
                     <div key={idx} className="text-sm text-muted-foreground">
@@ -173,7 +173,7 @@ export function CharacterDetailsContentModal({ isOpen, onClose, character, onSav
               )}
               
               {backgroundData.flaws && backgroundData.flaws.length > 0 && (
-                <div className="flex flex-col gap-1 border bg-background rounded-lg p-2">
+                <div className="flex flex-col gap-1 border rounded-md p-2">
                   <Label className="text-sm font-semibold font-display">Flaws</Label>
                   {backgroundData.flaws.map((flaw, idx) => (
                     <div key={idx} className="text-sm text-muted-foreground">
