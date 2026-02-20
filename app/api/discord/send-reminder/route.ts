@@ -19,13 +19,27 @@ export async function POST(req: Request) {
     }
 
     // Check if campaign has required fields for Discord notification
-    if (!campaign.discordWebhookUrl || !campaign.nextSessionDate || !campaign.nextSessionNumber) {
+    if (!campaign.discordWebhookUrl || !campaign.discordNotificationsEnabled || !campaign.nextSessionDate || !campaign.nextSessionNumber) {
       return NextResponse.json({ 
-        error: 'Campaign missing required fields for Discord notification' 
+        error: 'Campaign missing required fields for Discord notification. Ensure Discord notifications are enabled and all session details are set.' 
       }, { status: 400 })
     }
 
-    const sessionUtc = new Date(campaign.nextSessionDate)
+    // Parse session date and time correctly (matching cron job logic)
+    let sessionUtc: Date
+    if (campaign.nextSessionDate && campaign.nextSessionTime && campaign.nextSessionTimezone) {
+      // Combine date and time in the specified timezone
+      const dateTimeString = `${campaign.nextSessionDate}T${campaign.nextSessionTime}`
+      const localDate = new Date(dateTimeString)
+      
+      // Convert from the session timezone to UTC
+      const { fromZonedTime } = await import('date-fns-tz')
+      sessionUtc = fromZonedTime(localDate, campaign.nextSessionTimezone)
+    } else {
+      // Fallback to old method
+      sessionUtc = new Date(campaign.nextSessionDate)
+    }
+    
     if (isNaN(sessionUtc.getTime())) {
       return NextResponse.json({ error: 'Invalid session date' }, { status: 400 })
     }
