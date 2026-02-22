@@ -68,7 +68,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
   const [editingSpellClasses, setEditingSpellClasses] = useState<string[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [editIndex, setEditIndex] = useState<number | null>(null)
-  const [activeTab, setActiveTab] = useState<string>("basic")
+  const [activeTab, setActiveTab] = useState<string>("all")
   
   const getSchoolColor = (school: string) => {
     return SPELL_SCHOOL_COLORS[school as keyof typeof SPELL_SCHOOL_COLORS] || "bg-muted text-muted-foreground"
@@ -398,6 +398,13 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
     })
   }
 
+  // All spells grouped by level (for the "All" tab)
+  const allSpellsByLevel = spells.reduce<{ [key: number]: Spell[] }>((acc, spell) => {
+    if (!acc[spell.level]) acc[spell.level] = []
+    acc[spell.level].push(spell)
+    return acc
+  }, {})
+
   // Base (untagged) spells grouped by level
   const baseSpells = spells.filter((s) => !s.tag)
   const spellsByLevel = baseSpells.reduce<{ [key: number]: Spell[] }>((acc, spell) => {
@@ -421,6 +428,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
   // Build tabs metadata
   const baseCount = baseSpells.length
   const tabs = [
+    { id: "all", label: "All", count: spells.length },
     { id: "basic", label: "Basic Spells", count: baseCount },
     ...tagKeys
       .slice()
@@ -452,6 +460,83 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
                 ))}
               </TabsList>
             </div>
+
+            <TabsContent value="all" className="flex-1 min-h-0 overflow-y-auto bg-background">
+              <div className="p-4">
+                {Object.entries(allSpellsByLevel)
+                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                  .map(([level, levelSpells]) => (
+                    <div key={level} className="space-y-2 flex flex-col gap-0 mb-10 last:mb-0">
+                      <h3 className="text-lg font-semibold flex items-center gap-3">
+                        <span>{level === "0" ? "Cantrips" : `Level ${level}`}</span>
+                        <Badge variant="outline" className="px-2 py-0.5 text-xs">{levelSpells.length}</Badge>
+                      </h3>
+                      <div className="grid grid-cols-1 gap-3">
+                        {levelSpells
+                          .slice()
+                          .sort((a,b)=> ( (b.isPrepared?1:0) - (a.isPrepared?1:0) ) || a.name.localeCompare(b.name))
+                          .map((spell, index) => {
+                            const key = `all-${spell.level}-${spell.name}-${index}`
+                            const isOpen = !!expanded[key]
+                            const globalIndex = spells.findIndex((s) => s === spell)
+                            return (
+                              <div key={key} className={`p-3 bg-card border rounded-lg ${!spell.isPrepared && spell.level > 0 ? 'opacity-60' : ''}`}>
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      {(spell.description || spell.higherLevel) && (
+                                        <button type="button" className={`w-5 h-5 flex items-center justify-center rounded border hover:bg-muted`} onClick={() => toggleExpanded(key)} aria-label="Toggle details">
+                                          {isOpen ? (
+                                            <Icon icon="lucide:chevron-down" className="w-4 h-4" />
+                                          ) : (
+                                            <Icon icon="lucide:chevron-right" className="w-4 h-4" />
+                                          )}
+                                        </button>
+                                      )}
+                                      <div className="text-base font-semibold flex items-center gap-2">
+                                        {spell.name}
+                                        {spell.tag && <Badge variant="default">{spell.tag}</Badge>}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {spell.level > 0 && (
+                                        <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => canEdit && togglePrepared(spell)} variant="outline" size="sm" disabled={!canEdit}>{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
+                                      )}
+                                      {canEdit && (
+                                        <>
+                                          <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
+                                          <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-wrap text-xs">
+                                    {renderCastingBadge(spell.castingTime)}
+                                    {spell.duration && <Badge variant="secondary">{spell.duration.includes('Concentration') ? `Concentration, ${spell.duration.replace('Concentration, ', '')}` : spell.duration}</Badge>}
+                                    {spell.saveThrow && <Badge variant="outline">{spell.saveThrow} saving throw</Badge>}
+                                    {spell.damage && <Badge variant="outline">{spell.damage} damage</Badge>}
+                                  </div>
+                                  {(spell.description || spell.higherLevel) && isOpen && (
+                                    <div className="mt-2 flex flex-col gap-3 border-t pt-3">
+                                      <div className="flex flex-row gap-6 items-center flex-wrap">
+                                        {spell.range && (<div className="text-xs flex items-center gap-2"><span className="font-medium">Range:</span><Badge variant="outline">{spell.range}</Badge></div>)}
+                                        {spell.duration && (<div className="text-xs flex items-center gap-2"><span className="font-medium">Duration:</span><Badge variant="outline">{spell.duration}</Badge></div>)}
+                                        {spell.components && (<div className="text-xs font-medium flex items-center gap-2">Components: <Badge variant="outline">{`${spell.components.v ? "V, " : ""}${spell.components.s ? "S, " : ""}${spell.components.m ? "M" : ""}`.replace(/, $/, "")}</Badge></div>)}
+                                      </div>
+                                      {spell.description && (<RichTextDisplay content={spell.description} className="text-sm text-muted-foreground" />)}
+                                      {spell.higherLevel && (<div className="text-xs text-muted-foreground italic mt-2">Using a Higher-Level Spell Slot: {spell.higherLevel}</div>)}
+                                      <Badge className={getSchoolColor(spell.school)}>School of {spell.school}</Badge>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </TabsContent>
 
             <TabsContent value="basic" className="flex-1 min-h-0 overflow-y-auto bg-background">
               <div className="p-4">
