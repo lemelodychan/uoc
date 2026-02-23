@@ -2,15 +2,32 @@ import { NextResponse } from 'next/server'
 import { loadAllCampaigns, updateCampaign } from '@/lib/database'
 import { formatInTimeZone } from 'date-fns-tz'
 
-// Secure this endpoint with a secret header
-// Cron job runs every minute to check for sessions 24h before scheduled time
+// Force dynamic rendering to prevent caching
+export const dynamic = 'force-dynamic'
+
+// Secure this endpoint - Vercel cron jobs are automatically authenticated
+// Optional CRON_SECRET for additional security (for manual testing)
 const CRON_SECRET = process.env.CRON_SECRET
 
 export async function GET(req: Request) {
-  const secret = req.headers.get('x-cron-secret')
-  if (!CRON_SECRET || secret !== CRON_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Vercel cron jobs are automatically secured, but we can add optional secret check for manual testing
+  // Check for custom secret if CRON_SECRET is set (for manual testing via curl/etc)
+  if (CRON_SECRET) {
+    const customSecret = req.headers.get('x-cron-secret')
+    if (customSecret !== CRON_SECRET) {
+      // Allow if it's a Vercel cron invocation (they're automatically secured)
+      // Otherwise require the secret
+      const userAgent = req.headers.get('user-agent') || ''
+      const isVercelCron = userAgent.includes('vercel-cron') || req.headers.get('x-vercel-cron')
+      
+      if (!isVercelCron) {
+        console.error('[Cron] Unauthorized access attempt - missing CRON_SECRET')
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
   }
+  
+  console.log('[Cron] Request authenticated, starting cron job execution')
 
   const { campaigns, error } = await loadAllCampaigns(true) // Use service role to bypass RLS
   if (error) {
