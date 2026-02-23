@@ -2363,6 +2363,14 @@ function CharacterSheetContent() {
     level: number
     classes?: Array<{name: string, subclass?: string, class_id?: string, level: number, selectedSkillProficiencies?: string[]}>
     background: string
+    backgroundId?: string
+    backgroundData?: {
+      defining_events?: Array<{ number: number; text: string }>
+      personality_traits?: Array<{ number: number; text: string }>
+      ideals?: Array<{ number: number; text: string }>
+      bonds?: Array<{ number: number; text: string }>
+      flaws?: Array<{ number: number; text: string }>
+    }
     race: string
     raceIds?: Array<{id: string, isMain: boolean}>
     alignment: string
