@@ -813,13 +813,16 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
     
     // Create temporary character for calculations
     // Calculate saving throw proficiencies
+    // Always prefer saved data from database to preserve user modifications
     let savingThrowProficiencies
-    // TEMPORARY FIX: Force recalculation for multiclass characters to fix the missing saving throws
-    if (data.classes && data.classes.length > 1) {
-      savingThrowProficiencies = (await import('./character-data')).getMulticlassSavingThrowProficiencies(data.classes)
-    } else if (data.saving_throw_proficiencies && data.saving_throw_proficiencies.length > 0) {
+    if (data.saving_throw_proficiencies && data.saving_throw_proficiencies.length > 0) {
+      // Use saved data from database (preserves user modifications)
       savingThrowProficiencies = data.saving_throw_proficiencies
+    } else if (data.classes && data.classes.length > 1) {
+      // Only recalculate for multiclass if no saved data exists
+      savingThrowProficiencies = (await import('./character-data')).getMulticlassSavingThrowProficiencies(data.classes)
     } else {
+      // Only recalculate for single class if no saved data exists
       savingThrowProficiencies = (await import('./character-data')).createClassBasedSavingThrowProficiencies(data.class_name)
     }
 
@@ -1250,13 +1253,16 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
         const proficiencyBonus = calculateProficiencyBonus(row.level)
         
         // Calculate saving throw proficiencies
+        // Always prefer saved data from database to preserve user modifications
         let savingThrowProficiencies
-        // TEMPORARY FIX: Force recalculation for multiclass characters to fix the missing saving throws
-        if (row.classes && row.classes.length > 1) {
-          savingThrowProficiencies = (await import('./character-data')).getMulticlassSavingThrowProficiencies(row.classes)
-        } else if (row.saving_throw_proficiencies && row.saving_throw_proficiencies.length > 0) {
+        if (row.saving_throw_proficiencies && row.saving_throw_proficiencies.length > 0) {
+          // Use saved data from database (preserves user modifications)
           savingThrowProficiencies = row.saving_throw_proficiencies
+        } else if (row.classes && row.classes.length > 1) {
+          // Only recalculate for multiclass if no saved data exists
+          savingThrowProficiencies = (await import('./character-data')).getMulticlassSavingThrowProficiencies(row.classes)
         } else {
+          // Only recalculate for single class if no saved data exists
           savingThrowProficiencies = (await import('./character-data')).createClassBasedSavingThrowProficiencies(row.class_name)
         }
 
