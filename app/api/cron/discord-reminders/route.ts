@@ -3,6 +3,7 @@ import { loadAllCampaigns, updateCampaign } from '@/lib/database'
 import { formatInTimeZone } from 'date-fns-tz'
 
 // Secure this endpoint with a secret header
+// Cron job runs every minute to check for sessions 24h before scheduled time
 const CRON_SECRET = process.env.CRON_SECRET
 
 export async function GET(req: Request) {
