@@ -112,42 +112,30 @@ export async function GET(req: Request) {
     const diff = sessionUtc.getTime() - nowUtc.getTime()
     const hoursUntilSession = diff / (1000 * 60 * 60)
     const twentyFiveHMs = 25 * 60 * 60 * 1000 // 25 hours in milliseconds
-    
-    // If reminder was sent but session is more than 25 hours away, reset the flag
-    // This handles cases where the session was rescheduled
-    if (c.discordReminderSent && diff > twentyFiveHMs) {
-      console.log(`[Cron] Campaign "${c.name}": Resetting reminder flag (session is ${hoursUntilSession.toFixed(2)} hours away)`)
-      await updateCampaign({ ...c, updated_at: new Date().toISOString(), discordReminderSent: false })
-      c.discordReminderSent = false
-    }
 
     // Send reminder if:
     // - Session is 25 hours away or less AND
-    // - Reminder hasn't been sent yet AND
     // - Session hasn't passed yet
+    // Note: We ignore the discordReminderSent flag - reminders can be sent multiple times
     const isWithin25Hours = diff <= twentyFiveHMs
     const isFuture = diff > 0
-    const reminderNotSent = !c.discordReminderSent
-    const shouldSendReminder = reminderNotSent && isWithin25Hours && isFuture
+    const shouldSendReminder = isWithin25Hours && isFuture
     
-    console.log(`[Cron] Campaign "${c.name}":`)
-    console.log(`  - Session UTC: ${sessionUtc.toISOString()}`)
-    console.log(`  - Now UTC: ${nowUtc.toISOString()}`)
-    console.log(`  - Hours until session: ${hoursUntilSession.toFixed(2)}`)
-    console.log(`  - Diff in ms: ${diff}`)
-    console.log(`  - 25 hours in ms: ${twentyFiveHMs}`)
-    console.log(`  - Reminder already sent: ${c.discordReminderSent}`)
-    console.log(`  - Is within 25h: ${isWithin25Hours} (diff <= ${twentyFiveHMs})`)
-    console.log(`  - Is future: ${isFuture} (diff > 0)`)
-    console.log(`  - Reminder not sent: ${reminderNotSent}`)
-    console.log(`  - Should send reminder: ${shouldSendReminder}`)
+    console.error(`[Cron] Campaign "${c.name}":`)
+    console.error(`  - Session UTC: ${sessionUtc.toISOString()}`)
+    console.error(`  - Now UTC: ${nowUtc.toISOString()}`)
+    console.error(`  - Hours until session: ${hoursUntilSession.toFixed(2)}`)
+    console.error(`  - Diff in ms: ${diff}`)
+    console.error(`  - 25 hours in ms: ${twentyFiveHMs}`)
+    console.error(`  - Is within 25h: ${isWithin25Hours} (diff <= ${twentyFiveHMs})`)
+    console.error(`  - Is future: ${isFuture} (diff > 0)`)
+    console.error(`  - Should send reminder: ${shouldSendReminder}`)
     
     if (!shouldSendReminder) {
       const reasons = []
-      if (c.discordReminderSent) reasons.push('Reminder already sent')
       if (!isWithin25Hours) reasons.push(`Not within 25h (${hoursUntilSession.toFixed(2)} hours away)`)
       if (!isFuture) reasons.push('Session has already passed')
-      console.log(`[Cron] Campaign "${c.name}": NOT sending - Reasons: ${reasons.join(', ')}`)
+      console.error(`[Cron] Campaign "${c.name}": NOT sending - Reasons: ${reasons.join(', ')}`)
     }
     
     if (shouldSendReminder) {
@@ -168,8 +156,8 @@ export async function GET(req: Request) {
           const errorText = await response.text().catch(() => 'Unknown error')
           console.error(`[Cron] Campaign "${c.name}": Webhook failed with status ${response.status}: ${errorText}`)
         } else {
-          console.log(`[Cron] Campaign "${c.name}": Reminder sent successfully`)
-          await updateCampaign({ ...c, updated_at: new Date().toISOString(), discordReminderSent: true })
+          console.error(`[Cron] Campaign "${c.name}": Reminder sent successfully`)
+          // Note: We're not setting discordReminderSent anymore since we allow multiple reminders
           sent++
         }
       } catch (e) {
