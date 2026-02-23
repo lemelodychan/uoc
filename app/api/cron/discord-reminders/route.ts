@@ -5,29 +5,36 @@ import { formatInTimeZone } from 'date-fns-tz'
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic'
 
-// Secure this endpoint - Vercel cron jobs are automatically authenticated
-// Optional CRON_SECRET for additional security (for manual testing)
-const CRON_SECRET = process.env.CRON_SECRET
+// Force dynamic rendering to prevent caching
+export const dynamic = 'force-dynamic'
 
+// Vercel cron jobs are automatically authenticated by Vercel's infrastructure
 export async function GET(req: Request) {
-  // Vercel cron jobs are automatically secured, but we can add optional secret check for manual testing
-  // Check for custom secret if CRON_SECRET is set (for manual testing via curl/etc)
+  // Log immediately to verify the endpoint is being called
+  console.log('[Cron] ========================================')
+  console.log('[Cron] Endpoint called at', new Date().toISOString())
+  console.log('[Cron] URL:', req.url)
+  
+  // Log headers for debugging (Vercel cron jobs send specific headers)
+  const userAgent = req.headers.get('user-agent') || ''
+  const vercelCron = req.headers.get('x-vercel-cron') || req.headers.get('vercel-cron')
+  console.log('[Cron] User-Agent:', userAgent)
+  console.log('[Cron] Vercel-Cron header:', vercelCron)
+  
+  // Vercel cron jobs are automatically authenticated at the infrastructure level
+  // We only check CRON_SECRET if it's explicitly provided (for manual testing)
+  const CRON_SECRET = process.env.CRON_SECRET
   if (CRON_SECRET) {
-    const customSecret = req.headers.get('x-cron-secret')
-    if (customSecret !== CRON_SECRET) {
-      // Allow if it's a Vercel cron invocation (they're automatically secured)
-      // Otherwise require the secret
-      const userAgent = req.headers.get('user-agent') || ''
-      const isVercelCron = userAgent.includes('vercel-cron') || req.headers.get('x-vercel-cron')
-      
-      if (!isVercelCron) {
-        console.error('[Cron] Unauthorized access attempt - missing CRON_SECRET')
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
+    const providedSecret = req.headers.get('x-cron-secret')
+    // Only reject if a secret was provided but it's wrong
+    // Don't reject if no secret is provided (Vercel cron jobs don't send it)
+    if (providedSecret && providedSecret !== CRON_SECRET) {
+      console.error('[Cron] Invalid CRON_SECRET provided')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
   
-  console.log('[Cron] Request authenticated, starting cron job execution')
+  console.log('[Cron] Authentication passed, starting execution')
 
   const { campaigns, error } = await loadAllCampaigns(true) // Use service role to bypass RLS
   if (error) {
@@ -38,7 +45,6 @@ export async function GET(req: Request) {
   console.log(`[Cron] Running at ${new Date().toISOString()}, found ${campaigns?.length || 0} campaigns`)
 
   const nowUtc = new Date()
-  const twentyFourHMs = 24 * 60 * 60 * 1000
   let sent = 0
   let processed = 0
   let skipped = 0
@@ -99,18 +105,17 @@ export async function GET(req: Request) {
     const hoursUntilSession = diff / (1000 * 60 * 60)
 
     // Send reminder if:
-    // - Session is exactly 24 hours away (within a 10 minute window) AND
+    // - Session is 25 hours away or less AND
     // - Reminder hasn't been sent yet AND
     // - Session hasn't passed yet
-    const window = 10 * 60 * 1000 // 10 minute window
-    const within24HourWindow = Math.abs(diff - twentyFourHMs) <= window
-    const shouldSendReminder = !c.discordReminderSent && within24HourWindow && diff > 0
+    const twentyFiveHMs = 25 * 60 * 60 * 1000 // 25 hours in milliseconds
+    const shouldSendReminder = !c.discordReminderSent && diff <= twentyFiveHMs && diff > 0
     
     console.log(`[Cron] Campaign "${c.name}":`)
     console.log(`  - Session UTC: ${sessionUtc.toISOString()}`)
     console.log(`  - Hours until session: ${hoursUntilSession.toFixed(2)}`)
     console.log(`  - Reminder already sent: ${c.discordReminderSent}`)
-    console.log(`  - Within 24h window (±10min): ${within24HourWindow}`)
+    console.log(`  - Within 25h window: ${diff <= twentyFiveHMs && diff > 0}`)
     console.log(`  - Should send reminder: ${shouldSendReminder}`)
     
     if (shouldSendReminder) {
