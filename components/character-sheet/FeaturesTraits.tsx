@@ -70,7 +70,7 @@ export function FeaturesTraits({
       <CardContent>
         <div className="flex flex-col gap-2">
           {character.features.map((feature, index) => (
-            <div key={index} className="p-2 border rounded flex flex-col gap-0.5 bg-background">
+            <div key={index} className="p-2 pr-3 border rounded flex flex-col gap-0.5 bg-background">
               <div className="font-medium flex items-start justify-between">
                 <span className="text-sm">{feature.name}</span>
                 {getFeatureUsesPerLongRest(feature, character) > 0 && (
@@ -97,7 +97,7 @@ export function FeaturesTraits({
                         />
                       )
                     })}
-                    <span className="text-xs text-muted-foreground ml-1 w-5 text-right">
+                    <span className="text-xs text-muted-foreground ml-1 w-5 text-right font-mono">
                       {Math.min(getFeatureUsesPerLongRest(feature, character), Math.max(0, feature.currentUses ?? getFeatureUsesPerLongRest(feature, character)))}/{getFeatureUsesPerLongRest(feature, character)}
                     </span>
                   </div>

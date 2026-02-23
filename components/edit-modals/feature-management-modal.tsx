@@ -215,6 +215,7 @@ interface ClassFeature {
     componentId?: string
     config?: any
     customDescription?: string
+    displayLocation?: ('spellcasting' | 'combat')[]  // Where to display this feature
   }
 }
 
@@ -382,6 +383,9 @@ export function FeatureManagementModal({
 
     setIsSaving(true)
     try {
+      // Ensure class_features_skills is always an object (not undefined) when saving
+      const classFeaturesSkills = editingFeature.class_features_skills || {}
+      
       // For base class features (feature_type is 'class'), subclass_id should be null
       if (editingFeature.feature_type === 'class') {
         const result = await upsertClassFeature({
@@ -394,7 +398,7 @@ export function FeatureManagementModal({
           feature_skill_type: editingFeature.feature_skill_type as "slots" | "points_pool" | "options_list" | "special_ux" | "skill_modifier" | "availability_toggle" | undefined,
           subclass_id: null, // Base class features have null subclass_id
           is_hidden: editingFeature.is_hidden,
-          class_features_skills: editingFeature.class_features_skills
+          class_features_skills: classFeaturesSkills
         })
 
         if (result.success) {
@@ -407,6 +411,9 @@ export function FeatureManagementModal({
         }
       } else {
         // For subclass-specific features, subclass_id should be set to the specific subclass
+        // Ensure class_features_skills is always an object (not undefined) when saving
+        const classFeaturesSkills = editingFeature.class_features_skills || {}
+        
         const result = await upsertClassFeature({
           id: editingFeature.id || undefined,
           class_id: editingFeature.class_id,
@@ -417,7 +424,7 @@ export function FeatureManagementModal({
           feature_skill_type: editingFeature.feature_skill_type as "slots" | "points_pool" | "options_list" | "special_ux" | "skill_modifier" | "availability_toggle" | undefined,
           subclass_id: editingFeature.subclass_id,
           is_hidden: editingFeature.is_hidden,
-          class_features_skills: editingFeature.class_features_skills
+          class_features_skills: classFeaturesSkills
         })
 
         if (result.success) {
@@ -855,6 +862,71 @@ export function FeatureManagementModal({
                   placeholder="Describe this feature and its effects..."
                 />
               </div>
+
+              {/* Display Location - Where to show this feature */}
+              {editingFeature.feature_skill_type && editingFeature.feature_skill_type !== 'none' && (
+                <div className="grid gap-2">
+                  <Label htmlFor="display-location">Display Location</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="display-spellcasting"
+                        checked={editingFeature.class_features_skills?.displayLocation?.includes('spellcasting') || false}
+                        onChange={(e) => {
+                          const currentLocations = editingFeature.class_features_skills?.displayLocation || []
+                          const newLocations = e.target.checked
+                            ? [...currentLocations.filter(loc => loc !== 'spellcasting'), 'spellcasting']
+                            : currentLocations.filter(loc => loc !== 'spellcasting')
+                          setEditingFeature(prev => 
+                            prev ? { 
+                              ...prev, 
+                              class_features_skills: {
+                                ...prev.class_features_skills,
+                                displayLocation: newLocations
+                              }
+                            } : null
+                          )
+                        }}
+                        disabled={!canEdit}
+                      />
+                      <Label htmlFor="display-spellcasting" className="text-sm font-normal cursor-pointer">
+                        Show in Spellcasting section
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="display-combat"
+                        checked={editingFeature.class_features_skills?.displayLocation?.includes('combat') || false}
+                        onChange={(e) => {
+                          const currentLocations = editingFeature.class_features_skills?.displayLocation || []
+                          const newLocations = e.target.checked
+                            ? [...currentLocations.filter(loc => loc !== 'combat'), 'combat']
+                            : currentLocations.filter(loc => loc !== 'combat')
+                          setEditingFeature(prev => 
+                            prev ? { 
+                              ...prev, 
+                              class_features_skills: {
+                                ...prev.class_features_skills,
+                                displayLocation: newLocations
+                              }
+                            } : null
+                          )
+                        }}
+                        disabled={!canEdit}
+                      />
+                      <Label htmlFor="display-combat" className="text-sm font-normal cursor-pointer">
+                        Show in Combat Stats section
+                      </Label>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    If neither is selected, the feature will only appear in the Class Features column. 
+                    You can select both to show in multiple locations.
+                  </p>
+                </div>
+              )}
 
               {/* Custom Description for Spellcasting Section */}
               {(editingFeature.feature_skill_type === 'slots' || 

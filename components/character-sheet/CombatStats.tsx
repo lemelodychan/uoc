@@ -7,14 +7,21 @@ import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
 import { getClassLevel } from "@/lib/character-data"
-import { getFeatureUsage } from "@/lib/feature-usage-tracker"
-import { getCombatColor } from "@/lib/color-mapping"
+import { getFeatureUsage, getFeatureCustomDescription } from "@/lib/feature-usage-tracker"
+import { getCombatColor, getClassFeatureColors } from "@/lib/color-mapping"
+import { loadClassFeatureSkills } from "@/lib/database"
+import { calculateUsesFromFormula, resolveDescriptionSegments } from "@/lib/class-feature-templates"
+import type { DescriptionSegment } from "@/lib/class-feature-templates"
+import { getFeatureMaxUses } from "@/lib/feature-usage-tracker"
+import type { ClassFeatureSkill } from "@/lib/class-feature-types"
+import { useState, useEffect } from "react"
 
 interface CombatStatsProps {
   character: CharacterData
   onEdit: () => void
   onToggleHitDie: (classIndex: number, dieIndex: number) => void
   onToggleDeathSave?: (type: 'successes' | 'failures', index: number) => void
+  onUpdateFeatureUsage?: (featureId: string, updates: any) => void
   canEdit?: boolean
 }
 
@@ -22,7 +29,295 @@ const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
-export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSave, canEdit = true }: CombatStatsProps) {
+export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSave, onUpdateFeatureUsage, canEdit = true }: CombatStatsProps) {
+  const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
+  const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
+
+  // Load class feature skills
+  useEffect(() => {
+    const loadFeatures = async () => {
+      setIsLoadingFeatures(true)
+      try {
+        const { featureSkills } = await loadClassFeatureSkills(character)
+        setClassFeatureSkills(featureSkills || [])
+      } catch (error) {
+        setClassFeatureSkills([])
+      } finally {
+        setIsLoadingFeatures(false)
+      }
+    }
+
+    loadFeatures()
+  }, [character.id, character.level, character.classes])
+
+  // Filter features for combat display
+  const combatFeatures = classFeatureSkills.filter(skill => {
+    // Only show features that have 'combat' in their displayLocation
+    if (skill.displayLocation !== undefined && skill.displayLocation !== null) {
+      return skill.displayLocation.includes('combat')
+    }
+    // If displayLocation is not set, don't show in combat (backward compatibility)
+    return false
+  })
+
+  // Group combat features by class
+  const featuresByClass = new Map<string, ClassFeatureSkill[]>()
+  combatFeatures.forEach(skill => {
+    const className = skill.className || character.class
+    if (!featuresByClass.has(className)) {
+      featuresByClass.set(className, [])
+    }
+    featuresByClass.get(className)!.push(skill)
+  })
+
+  // Render individual feature skill (similar to Spellcasting component)
+  const renderFeatureSkill = (skill: ClassFeatureSkill, className?: string) => {
+    if (!skill.id) return null
+    
+    const usage = getFeatureUsage(character, skill.id)
+    const customDescription = getFeatureCustomDescription(character, skill.id) || ''
+
+    switch (skill.featureType) {
+      case 'slots':
+        return renderSlotsFeature(skill, usage, customDescription, className)
+      case 'points_pool':
+        return renderPointsPoolFeature(skill, usage, customDescription)
+      case 'availability_toggle':
+        return renderAvailabilityToggleFeature(skill, usage, customDescription)
+      default:
+        return null
+    }
+  }
+
+  // Render a description with resolved variables styled as badges
+  const renderDescription = (segments: DescriptionSegment[]) => {
+    if (segments.length === 0) return null
+    if (segments.every(s => s.type === 'text')) {
+      const text = segments.map(s => s.value).join('')
+      return text || null
+    }
+    return (
+      <>
+        {segments.map((seg, i) =>
+          seg.type === 'variable' ? (
+            <Badge key={i} variant="secondary" className="text-[11px] leading-none h-[18px] px-1.5 py-0 font-mono font-semibold align-middle">
+              {seg.value}
+            </Badge>
+          ) : (
+            <span key={i}>{seg.value}</span>
+          )
+        )}
+      </>
+    )
+  }
+
+  // Render slots-based features
+  const renderSlotsFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string, className?: string) => {
+    if (!skill.id) return null
+    
+    // Get effective config with level-based scaling applied
+    const slotConfig = skill.config as any
+    const classLevel = className ? getClassLevel(character.classes || [], className) || character.level : character.level
+    
+    // Apply level-based scaling if override.levelScaling exists
+    let effectiveConfig = { ...slotConfig }
+    if (slotConfig.override && slotConfig.override.levelScaling) {
+      const levelScaling = slotConfig.override.levelScaling
+      const levels = Object.keys(levelScaling)
+        .map(Number)
+        .sort((a, b) => b - a) // Sort descending to find highest applicable level
+      
+      // Find the highest level that applies
+      for (const level of levels) {
+        if (classLevel >= level) {
+          const scalingConfig = levelScaling[level.toString()]
+          // Merge scaling config into effective config
+          effectiveConfig = { ...effectiveConfig, ...scalingConfig }
+          break
+        }
+      }
+    }
+    
+    // Calculate maxUses: ALWAYS use formula if available (formulas are dynamic based on stats)
+    let maxUses = 0
+    if (effectiveConfig?.usesFormula) {
+      maxUses = calculateUsesFromFormula(effectiveConfig.usesFormula, character, skill.className)
+    } else if (usage?.maxUses !== undefined) {
+      maxUses = usage.maxUses
+    } else {
+      maxUses = getFeatureMaxUses(character, skill.id) || 0
+    }
+    const currentUses = usage?.currentUses !== undefined ? Math.min(usage.currentUses, maxUses) : maxUses
+
+    if (maxUses === 0) return null
+
+    const classColors = className ? getClassFeatureColors(className) : {
+      available: getCombatColor('spellSlotAvailable'),
+      used: getCombatColor('spellSlotUsed')
+    }
+
+    return (
+      <div className="flex items-center justify-between p-2 border rounded gap-1 bg-background">
+        <div className="flex gap-1 flex-col">
+          <span className="text-sm font-medium">{skill.title}</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
+            {renderDescription(resolveDescriptionSegments(
+              customDescription || skill.subtitle || skill.customDescription || '',
+              character,
+              effectiveConfig,
+              skill.className,
+              { maxUses }
+            ))}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          {Array.from({ length: maxUses }, (_, i) => {
+            const isAvailable = i < currentUses
+            return (
+              <button
+                key={i}
+                onClick={() => {
+                  if (!canEdit || !onUpdateFeatureUsage) return
+                  onUpdateFeatureUsage(skill.id, { 
+                    type: isAvailable ? 'use_slot' : 'restore_slot', 
+                    amount: 1 
+                  })
+                }}
+                disabled={!canEdit}
+                className={`w-4 h-4 rounded border-2 transition-colors ${
+                  isAvailable
+                    ? `${classColors.available} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                    : `${classColors.used} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                }`}
+                title={isAvailable ? "Available" : "Used"}
+              />
+            )
+          })}
+          <span className="text-xs text-muted-foreground ml-2 w-5 text-right">
+            {currentUses}/{maxUses}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // Render points pool features
+  const renderPointsPoolFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string) => {
+    if (!skill.id) return null
+    
+    // Get effective config with level-based scaling applied
+    const pointsConfig = skill.config as any
+    const classLevel = skill.className ? getClassLevel(character.classes || [], skill.className) || character.level : character.level
+    
+    // Apply level-based scaling if override.levelScaling exists
+    let effectiveConfig = { ...pointsConfig }
+    if (pointsConfig.override && pointsConfig.override.levelScaling) {
+      const levelScaling = pointsConfig.override.levelScaling
+      const levels = Object.keys(levelScaling)
+        .map(Number)
+        .sort((a, b) => b - a) // Sort descending to find highest applicable level
+      
+      // Find the highest level that applies
+      for (const level of levels) {
+        if (classLevel >= level) {
+          const scalingConfig = levelScaling[level.toString()]
+          // Merge scaling config into effective config
+          effectiveConfig = { ...effectiveConfig, ...scalingConfig }
+          break
+        }
+      }
+    }
+    
+    // Calculate maxPoints: ALWAYS use formula if available (formulas are dynamic based on stats)
+    let maxPoints = 0
+    if (effectiveConfig?.totalFormula) {
+      maxPoints = calculateUsesFromFormula(effectiveConfig.totalFormula, character, skill.className)
+    } else if (usage?.maxPoints !== undefined) {
+      maxPoints = usage.maxPoints
+    }
+    const currentPoints = usage?.currentPoints !== undefined ? Math.min(usage.currentPoints, maxPoints) : maxPoints
+
+    if (maxPoints === 0) return null
+
+    return (
+      <div className="flex items-center justify-between p-2 border rounded bg-background">
+        <div className="flex gap-1 flex-col">
+          <span className="text-sm font-medium">{skill.title}</span>
+          <span className="text-xs font-medium text-muted-foreground flex items-center gap-1 flex-wrap">
+            {renderDescription(resolveDescriptionSegments(
+              customDescription || skill.subtitle || skill.customDescription || '',
+              character,
+              effectiveConfig,
+              skill.className,
+              { maxPoints }
+            ))}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min="0"
+            max={maxPoints}
+            value={currentPoints}
+            onChange={(e) => {
+              if (!canEdit || !onUpdateFeatureUsage) return
+              const newValue = Math.max(0, Math.min(maxPoints, parseInt(e.target.value) || 0))
+              onUpdateFeatureUsage(skill.id, { 
+                type: 'direct_update',
+                updates: {
+                  currentPoints: newValue,
+                  maxPoints: maxPoints
+                }
+              })
+            }}
+            disabled={!canEdit}
+            className="w-16 px-2 py-1 text-sm border rounded text-center bg-card"
+            title={`Remaining ${skill.title} points`}
+          />
+          <span className="text-sm text-muted-foreground">
+            / {maxPoints}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // Render availability toggle features
+  const renderAvailabilityToggleFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string) => {
+    if (!skill.id) return null
+    
+    const available = (usage?.isAvailable ?? (usage?.customState?.available as boolean | undefined)) ?? true
+
+    return (
+      <div 
+        className={`p-2 border rounded transition-colors bg-background ${canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed opacity-50'}`}
+        onClick={() => {
+          if (!canEdit || !onUpdateFeatureUsage) return
+          onUpdateFeatureUsage(skill.id, { 
+            type: 'toggle_availability'
+          })
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-sm flex flex-col gap-1">
+            <span className="font-medium">{skill.title}</span>
+            <span className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
+              {renderDescription(resolveDescriptionSegments(
+                customDescription || skill.subtitle || skill.customDescription || '',
+                character,
+                skill.config,
+                skill.className
+              ))}
+            </span>
+          </span>
+          <Badge variant={available ? "default" : "secondary"}>
+            {available ? "Available" : "Used"}
+          </Badge>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">
@@ -124,11 +419,11 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
         {character.currentHitPoints === 0 && (
           <div className="flex items-start gap-3 col-span-2 mb-0">
             <Icon icon="lucide:skull" className="w-5 h-10 py-2.5 text-[#ce6565]" />
-            <div className="flex flex-col gap-2">
+            <div className="flex w-full flex-col gap-2">
               <div className="text-sm text-muted-foreground">Death Saves</div>
-              <div className="flex flex-row flex-wrap justify-between gap-x-6 gap-y-1.5">
-                <div className="flex flex-grow items-center gap-4">
-                  <span className="text-xs font-medium w-14 text-[#6ab08b]">Successes</span>
+              <div className="flex flex-row flex-wrap justify-start gap-x-2 gap-y-1.5">
+                <div className="w-fit flex items-center justify-start gap-4 border-[#6ab08b] border rounded-md px-2 py-1.5">
+                  <span className="text-xs font-medium w-12 text-[#6ab08b]">Success</span>
                   <div className="flex gap-1">
                     {Array.from({ length: 3 }, (_, i) => {
                       const isChecked = i < (character.deathSaves?.successes ?? 0)
@@ -151,8 +446,8 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
                     })}
                   </div>
                 </div>
-                <div className="flex flex-grow items-center gap-4">
-                  <span className="text-xs font-medium w-14 text-[#ce6565]">Failures</span>
+                <div className="w-fit flex items-center justify-start gap-4 border-[#ce6565] border rounded-md px-2 py-1.5">
+                  <span className="text-xs font-medium w-12 text-[#ce6565]">Fails</span>
                   <div className="flex gap-1">
                     {Array.from({ length: 3 }, (_, i) => {
                       const isChecked = i < (character.deathSaves?.failures ?? 0)
@@ -286,6 +581,27 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
             </div>
           )
         })()}
+
+        {/* Class Features for Combat */}
+        {combatFeatures.length > 0 && (
+          <div className="col-span-2 pt-4 border-t">
+            <div className="text-sm font-medium mb-2">Class Features</div>
+            <div className="flex flex-col gap-2">
+              {Array.from(featuresByClass.entries()).map(([className, features]) => (
+                <div key={className} className="flex flex-col gap-2">
+                  {featuresByClass.size > 1 && (
+                    <div className="text-sm font-medium text-muted-foreground">{className} Features</div>
+                  )}
+                  {features.map((skill, index) => (
+                    <div key={skill.id || `${className}-${index}`}>
+                      {renderFeatureSkill(skill, className)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Combat Notes - Only show if notes exist */}
         {character.otherTools && character.otherTools.trim() !== "" && (

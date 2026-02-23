@@ -47,7 +47,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
   }
 
   const addWeapon = () => {
-    setWeapons([...weapons, { name: "", attackBonus: "", damageType: "", weaponProperties: [] }])
+    setWeapons([...weapons, { name: "", attackBonus: "", damageType: "", weaponProperties: [], maxAmmunition: 0, usedAmmunition: 0 }])
   }
 
   const removeWeapon = (index: number) => {
@@ -114,6 +114,33 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                         <Icon icon="lucide:trash-2" className="w-4 h-4" />
                       </Button>
                     </div>
+                  </div>
+                  <div className="col-span-2 flex flex-col gap-2">
+                    <Label htmlFor={`weapon-ammo-${index}`} className="text-xs">
+                      Max Ammunition
+                    </Label>
+                    <Input
+                      id={`weapon-ammo-${index}`}
+                      type="number"
+                      min="0"
+                      value={weapon.maxAmmunition ?? 0}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        // Parse the value, defaulting to 0 if invalid or empty
+                        const maxAmmo = value === "" ? 0 : (Number.parseInt(value, 10) || 0)
+                        // Update both fields in a single operation to avoid state issues
+                        const updated = weapons.map((w, i) => {
+                          if (i === index) {
+                            const usedAmmo = Math.min(w.usedAmmunition ?? 0, maxAmmo)
+                            return { ...w, maxAmmunition: maxAmmo, usedAmmunition: usedAmmo }
+                          }
+                          return w
+                        })
+                        setWeapons(updated)
+                      }}
+                      placeholder="0 (no tracking)"
+                    />
+                    <span className="text-xs text-muted-foreground">Set to 0 to disable ammunition tracking</span>
                   </div>
                   <div className="col-span-2 flex flex-col gap-2">
                     <Label className="text-xs">Properties</Label>

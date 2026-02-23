@@ -1524,73 +1524,32 @@ function CharacterSheetContent() {
           // Replenish class-specific abilities
           const updatedSpellData = { ...character.spellData, spellSlots: updatedSpellSlots }
 
-          // Bardic Inspiration
-          if (character.spellData.bardicInspirationSlot) {
-            const bardicSlot = character.spellData.bardicInspirationSlot
-            const usesRestored = bardicSlot.usesPerRest - bardicSlot.currentUses
-            if (usesRestored > 0) {
-              classAbilityReplenishments.push({
-                abilityName: "Bardic Inspiration",
-                usesRestored,
-                maxUses: bardicSlot.usesPerRest
-              })
-            }
-            updatedSpellData.bardicInspirationSlot = {
-              ...bardicSlot,
-              currentUses: bardicSlot.usesPerRest
-            }
-          }
+          // LEGACY REST RESET - COMMENTED OUT
+          // Bardic Inspiration and Flash of Genius are now managed via database class_features system
+          // Rest resets are handled by resetAllFeatureUsage() which resets classFeatureSkillsUsage entries
+          // if (character.spellData.bardicInspirationSlot) { ... }
+          // if (character.spellData.flashOfGeniusSlot) { ... }
 
-          // Flash of Genius (Artificer)
-          if (character.spellData.flashOfGeniusSlot) {
-            const fogSlot = character.spellData.flashOfGeniusSlot
-            const usesRestored = fogSlot.usesPerRest - fogSlot.currentUses
-            if (usesRestored > 0) {
-              classAbilityReplenishments.push({
-                abilityName: "Flash of Genius",
-                usesRestored,
-                maxUses: fogSlot.usesPerRest
-              })
-            }
-            updatedSpellData.flashOfGeniusSlot = {
-              ...fogSlot,
-              currentUses: fogSlot.usesPerRest
-            }
-          }
+          // LEGACY REST RESET - COMMENTED OUT
+          // Divine Sense and Channel Divinity are now managed via database class_features system
+          // Rest resets are handled by resetAllFeatureUsage() which resets classFeatureSkillsUsage entries
+          // if (character.spellData.divineSenseSlot) {
+          //   const divineSlot = character.spellData.divineSenseSlot
+          //   const usesRestored = divineSlot.usesPerRest - divineSlot.currentUses
+          //   if (usesRestored > 0) {
+          //     classAbilityReplenishments.push({ abilityName: "Divine Sense", usesRestored, maxUses: divineSlot.usesPerRest })
+          //   }
+          //   updatedSpellData.divineSenseSlot = { ...divineSlot, currentUses: divineSlot.usesPerRest }
+          // }
 
-          // Divine Sense (Paladin)
-          if (character.spellData.divineSenseSlot) {
-            const divineSlot = character.spellData.divineSenseSlot
-            const usesRestored = divineSlot.usesPerRest - divineSlot.currentUses
-            if (usesRestored > 0) {
-              classAbilityReplenishments.push({
-                abilityName: "Divine Sense",
-                usesRestored,
-                maxUses: divineSlot.usesPerRest
-              })
-            }
-            updatedSpellData.divineSenseSlot = {
-              ...divineSlot,
-              currentUses: divineSlot.usesPerRest
-            }
-          }
-
-          // Channel Divinity (Paladin)
-          if (character.spellData.channelDivinitySlot) {
-            const channelSlot = character.spellData.channelDivinitySlot
-            const usesRestored = channelSlot.usesPerRest - channelSlot.currentUses
-            if (usesRestored > 0) {
-              classAbilityReplenishments.push({
-                abilityName: "Channel Divinity",
-                usesRestored,
-                maxUses: channelSlot.usesPerRest
-              })
-            }
-            updatedSpellData.channelDivinitySlot = {
-              ...channelSlot,
-              currentUses: channelSlot.usesPerRest
-            }
-          }
+          // if (character.spellData.channelDivinitySlot) {
+          //   const channelSlot = character.spellData.channelDivinitySlot
+          //   const usesRestored = channelSlot.usesPerRest - channelSlot.currentUses
+          //   if (usesRestored > 0) {
+          //     classAbilityReplenishments.push({ abilityName: "Channel Divinity", usesRestored, maxUses: channelSlot.usesPerRest })
+          //   }
+          //   updatedSpellData.channelDivinitySlot = { ...channelSlot, currentUses: channelSlot.usesPerRest }
+          // }
 
           // Cleansing Touch (Paladin)
           if (character.spellData.cleansingTouchSlot) {
@@ -1611,13 +1570,8 @@ function CharacterSheetContent() {
 
           // Legacy Warlock columns have been dropped - using unified system only
 
-          // Song of Rest (Bard) - reset to available
-          if (character.spellData.songOfRest) {
-            updatedSpellData.songOfRest = {
-              ...character.spellData.songOfRest,
-              available: true
-            }
-          }
+          // LEGACY: Song of Rest now managed via database class_features system
+          // if (character.spellData.songOfRest) { ... }
 
           // Replenish feat spell slots
           const updatedFeatSpellSlots = character.spellData.featSpellSlots.map(feat => {
@@ -2125,7 +2079,7 @@ function CharacterSheetContent() {
           const allFeatures = await Promise.all(
             updates.classes.map(async (charClass: any) => {
               if (charClass.class_id) {
-                const { features, error: featuresError } = await loadClassFeatures(charClass.class_id, charClass.level)
+                const { features, error: featuresError } = await loadClassFeatures(charClass.class_id, charClass.level, charClass.subclass)
                 if (featuresError) {
                   console.error(`Error loading class features for ${charClass.name}:`, featuresError)
                   return []
@@ -2141,7 +2095,7 @@ function CharacterSheetContent() {
         } else if (classData?.id) {
           // Fallback to single class loading
           const { loadClassFeatures } = await import('@/lib/database')
-          const { features, error: featuresError } = await loadClassFeatures(classData.id, updates.level || currentCharacter.level)
+          const { features, error: featuresError } = await loadClassFeatures(classData.id, updates.level || currentCharacter.level, updates.subclass || currentCharacter.subclass)
           if (featuresError) {
             console.error("Error loading class features:", featuresError)
           } else {
@@ -2180,29 +2134,17 @@ function CharacterSheetContent() {
         
         // Calculate class-specific features
         const charismaModifier = Math.floor((newCharacter.charisma - 10) / 2)
-        let bardicInspiration, songOfRest, flashOfGeniusSlot, divineSenseSlot, layOnHands, channelDivinitySlot, cleansingTouchSlot
+        let cleansingTouchSlot
+        // LEGACY: All class feature slots (bardicInspiration, songOfRest, flashOfGenius, 
+        // divineSense, layOnHands, channelDivinity) are now managed via database class_features system
         
         if (updates.classes && updates.classes.length > 1) {
-          // Use multiclass feature calculation
           const { getMulticlassFeatures } = await import('@/lib/character-data')
           const multiclassFeatures = await getMulticlassFeatures(newCharacter)
-          bardicInspiration = multiclassFeatures.bardicInspirationSlot
-          songOfRest = multiclassFeatures.songOfRest
-          flashOfGeniusSlot = multiclassFeatures.flashOfGeniusSlot
-          divineSenseSlot = multiclassFeatures.divineSenseSlot
-          layOnHands = multiclassFeatures.layOnHands
-          channelDivinitySlot = multiclassFeatures.channelDivinitySlot
           cleansingTouchSlot = multiclassFeatures.cleansingTouchSlot
         } else {
-          // Use single class feature calculation
-          bardicInspiration = getBardicInspirationData(newLevel, charismaModifier, classData)
-          songOfRest = getSongOfRestData(newLevel, classData)
-          // Calculate paladin features for single class
           if (updates.class?.toLowerCase() === "paladin" || currentCharacter.class.toLowerCase() === "paladin") {
             const paladinCharacter = { ...currentCharacter, ...updates, level: newLevel }
-            divineSenseSlot = getDivineSenseData(paladinCharacter)
-            layOnHands = getLayOnHandsData(paladinCharacter)
-            channelDivinitySlot = getChannelDivinityData(paladinCharacter)
             cleansingTouchSlot = getCleansingTouchData(paladinCharacter)
           }
         }
@@ -2241,12 +2183,9 @@ function CharacterSheetContent() {
             spellsKnown: newSpellsKnown,
             cantripsKnown: newCantripsKnown,
             spellSlots: newSpellSlots,
-            bardicInspirationSlot: bardicInspiration || undefined,
-            songOfRest: songOfRest || undefined,
-            flashOfGeniusSlot: flashOfGeniusSlot || undefined,
-            divineSenseSlot: divineSenseSlot || undefined,
-            layOnHands: layOnHands || undefined,
-            channelDivinitySlot: channelDivinitySlot || undefined,
+            // LEGACY: All class feature slots now managed by database class_features
+            // bardicInspirationSlot, songOfRest, flashOfGeniusSlot,
+            // divineSenseSlot, layOnHands, channelDivinitySlot
             cleansingTouchSlot: cleansingTouchSlot || undefined,
             // Legacy Warlock columns have been dropped - using unified system only
           },
@@ -2478,7 +2417,7 @@ function CharacterSheetContent() {
       }
     } else if (classData?.id) {
       // Fallback: load all features if no specific selection
-      const { features, error: featuresError } = await loadClassFeatures(classData.id, characterData.level)
+      const { features, error: featuresError } = await loadClassFeatures(classData.id, characterData.level, characterData.subclass)
       if (featuresError) {
         console.error("Error loading class features:", featuresError)
       } else {
@@ -2577,8 +2516,7 @@ function CharacterSheetContent() {
         spellsKnown: 0,
         spellSlots: [],
         spellNotes: "",
-        bardicInspirationSlot: undefined,
-        songOfRest: undefined,
+        // LEGACY: bardicInspirationSlot, songOfRest now managed by database class_features
         featSpellSlots: [],
         spells: [],
       },
@@ -2680,23 +2618,9 @@ function CharacterSheetContent() {
             })()
           : getSpellsKnown(tempCharacter, classData, undefined),
         spellSlots: calculatedSpellSlots, // Populate immediately
-        // Add class-specific features
-        bardicInspirationSlot: getBardicInspirationData(tempCharacter.level, Math.floor((tempCharacter.charisma - 10) / 2), classData) || undefined,
-        songOfRest: getSongOfRestData(tempCharacter.level, classData) || undefined,
-        flashOfGeniusSlot: (tempCharacter.class.toLowerCase() === "artificer" && tempCharacter.level >= 7)
-          ? (() => {
-              const usesPerRest = Math.max(1, Math.floor((tempCharacter.intelligence - 10) / 2))
-              return { 
-                usesPerRest, 
-                currentUses: usesPerRest,
-                replenishesOnLongRest: true
-              }
-            })()
-          : undefined,
-        // Add Paladin-specific features
-        divineSenseSlot: getDivineSenseData(tempCharacter),
-        layOnHands: getLayOnHandsData(tempCharacter),
-        channelDivinitySlot: getChannelDivinityData(tempCharacter),
+        // LEGACY: All class feature slots now managed by database class_features system
+        // bardicInspirationSlot, songOfRest, flashOfGeniusSlot,
+        // divineSenseSlot, layOnHands, channelDivinitySlot
         cleansingTouchSlot: getCleansingTouchData(tempCharacter),
         // Legacy Warlock columns have been dropped - using unified system only
         // Add Raven Queen Warlock-specific features
@@ -2920,25 +2844,20 @@ function CharacterSheetContent() {
     triggerAutoSave()
   }
 
-  const toggleBardicInspiration = (index: number) => {
-    if (!activeCharacter || !activeCharacter.spellData.bardicInspirationSlot) return
-
-    const bardicSlot = activeCharacter.spellData.bardicInspirationSlot
-    // Corrected logic: if clicking an available slot, use it; if clicking a used slot, restore it
-    const isAvailable = index < bardicSlot.currentUses
-    const newCurrentUses = isAvailable ? bardicSlot.currentUses - 1 : bardicSlot.currentUses + 1
-
-    const updatedSpellData = {
-      ...activeCharacter.spellData,
-      bardicInspirationSlot: {
-        ...bardicSlot,
-        currentUses: Math.max(0, Math.min(bardicSlot.usesPerRest, newCurrentUses)),
-      },
-    }
-
-    updateCharacter({ spellData: updatedSpellData })
-    triggerAutoSave()
-  }
+  // LEGACY TOGGLE - COMMENTED OUT
+  // Bardic Inspiration is now managed via database class_features system
+  // const toggleBardicInspiration = (index: number) => {
+  //   if (!activeCharacter || !activeCharacter.spellData.bardicInspirationSlot) return
+  //   const bardicSlot = activeCharacter.spellData.bardicInspirationSlot
+  //   const isAvailable = index < bardicSlot.currentUses
+  //   const newCurrentUses = isAvailable ? bardicSlot.currentUses - 1 : bardicSlot.currentUses + 1
+  //   const updatedSpellData = {
+  //     ...activeCharacter.spellData,
+  //     bardicInspirationSlot: { ...bardicSlot, currentUses: Math.max(0, Math.min(bardicSlot.usesPerRest, newCurrentUses)) },
+  //   }
+  //   updateCharacter({ spellData: updatedSpellData })
+  //   triggerAutoSave()
+  // }
 
   const toggleHitDie = (classIndex: number, dieIndex: number) => {
     if (!activeCharacter.hitDiceByClass || !activeCharacter.hitDiceByClass[classIndex]) return
@@ -2965,6 +2884,35 @@ function CharacterSheetContent() {
     triggerAutoSave()
   }
 
+  const toggleAmmunition = (weaponIndex: number, ammoIndex: number) => {
+    if (!activeCharacter.weapons || !activeCharacter.weapons[weaponIndex]) return
+
+    const weapon = activeCharacter.weapons[weaponIndex]
+    const maxAmmo = weapon.maxAmmunition ?? 0
+    if (maxAmmo === 0) return
+
+    const currentUsed = weapon.usedAmmunition ?? 0
+    const currentAvailable = maxAmmo - currentUsed
+
+    const updatedWeapons = [...activeCharacter.weapons]
+    if (ammoIndex < currentAvailable) {
+      // Mark as used
+      updatedWeapons[weaponIndex] = {
+        ...weapon,
+        usedAmmunition: currentUsed + 1
+      }
+    } else {
+      // Mark as available
+      updatedWeapons[weaponIndex] = {
+        ...weapon,
+        usedAmmunition: Math.max(0, currentUsed - 1)
+      }
+    }
+
+    updateCharacter({ weapons: updatedWeapons })
+    triggerAutoSave()
+  }
+
   const toggleDeathSave = (type: 'successes' | 'failures', index: number) => {
     if (!activeCharacter) return
     const current = activeCharacter.deathSaves ?? { successes: 0, failures: 0 }
@@ -2976,65 +2924,49 @@ function CharacterSheetContent() {
     triggerAutoSave()
   }
 
-  const toggleFlashOfGenius = (index: number) => {
-    if (!activeCharacter || !activeCharacter.spellData.flashOfGeniusSlot) return
+  // LEGACY TOGGLE - COMMENTED OUT
+  // Flash of Genius is now managed via database class_features system
+  // const toggleFlashOfGenius = (index: number) => {
+  //   if (!activeCharacter || !activeCharacter.spellData.flashOfGeniusSlot) return
+  //   const fog = activeCharacter.spellData.flashOfGeniusSlot
+  //   const isAvailable = index < fog.currentUses
+  //   const newCurrentUses = isAvailable ? fog.currentUses - 1 : fog.currentUses + 1
+  //   const updatedSpellData = {
+  //     ...activeCharacter.spellData,
+  //     flashOfGeniusSlot: { ...fog, currentUses: Math.max(0, Math.min(fog.usesPerRest, newCurrentUses)) },
+  //   }
+  //   updateCharacter({ spellData: updatedSpellData })
+  //   triggerAutoSave()
+  // }
 
-    const fog = activeCharacter.spellData.flashOfGeniusSlot
-    // Corrected logic: if clicking an available slot, use it; if clicking a used slot, restore it
-    const isAvailable = index < fog.currentUses
-    const newCurrentUses = isAvailable ? fog.currentUses - 1 : fog.currentUses + 1
+  // LEGACY TOGGLE FUNCTIONS - COMMENTED OUT
+  // Divine Sense and Channel Divinity are now managed via database class_features system
+  // Usage is tracked via classFeatureSkillsUsage with "feature-divine-sense" etc.
+  // const toggleDivineSense = (index: number) => {
+  //   if (!activeCharacter || !activeCharacter.spellData.divineSenseSlot) return
+  //   const divineSense = activeCharacter.spellData.divineSenseSlot
+  //   const isAvailable = index < divineSense.currentUses
+  //   const newCurrentUses = isAvailable ? divineSense.currentUses - 1 : divineSense.currentUses + 1
+  //   const updatedSpellData = {
+  //     ...activeCharacter.spellData,
+  //     divineSenseSlot: { ...divineSense, currentUses: Math.max(0, Math.min(divineSense.usesPerRest, newCurrentUses)) },
+  //   }
+  //   updateCharacter({ spellData: updatedSpellData })
+  //   triggerAutoSave()
+  // }
 
-    const updatedSpellData = {
-      ...activeCharacter.spellData,
-      flashOfGeniusSlot: {
-        ...fog,
-        currentUses: Math.max(0, Math.min(fog.usesPerRest, newCurrentUses)),
-      },
-    }
-
-    updateCharacter({ spellData: updatedSpellData })
-    triggerAutoSave()
-  }
-
-  const toggleDivineSense = (index: number) => {
-    if (!activeCharacter || !activeCharacter.spellData.divineSenseSlot) return
-
-    const divineSense = activeCharacter.spellData.divineSenseSlot
-    // Corrected logic: if clicking an available slot, use it; if clicking a used slot, restore it
-    const isAvailable = index < divineSense.currentUses
-    const newCurrentUses = isAvailable ? divineSense.currentUses - 1 : divineSense.currentUses + 1
-
-    const updatedSpellData = {
-      ...activeCharacter.spellData,
-      divineSenseSlot: {
-        ...divineSense,
-        currentUses: Math.max(0, Math.min(divineSense.usesPerRest, newCurrentUses)),
-      },
-    }
-
-    updateCharacter({ spellData: updatedSpellData })
-    triggerAutoSave()
-  }
-
-  const toggleChannelDivinity = (index: number) => {
-    if (!activeCharacter || !activeCharacter.spellData.channelDivinitySlot) return
-
-    const channelDivinity = activeCharacter.spellData.channelDivinitySlot
-    // Corrected logic: if clicking an available slot, use it; if clicking a used slot, restore it
-    const isAvailable = index < channelDivinity.currentUses
-    const newCurrentUses = isAvailable ? channelDivinity.currentUses - 1 : channelDivinity.currentUses + 1
-
-    const updatedSpellData = {
-      ...activeCharacter.spellData,
-      channelDivinitySlot: {
-        ...channelDivinity,
-        currentUses: Math.max(0, Math.min(channelDivinity.usesPerRest, newCurrentUses)),
-      },
-    }
-
-    updateCharacter({ spellData: updatedSpellData })
-    triggerAutoSave()
-  }
+  // const toggleChannelDivinity = (index: number) => {
+  //   if (!activeCharacter || !activeCharacter.spellData.channelDivinitySlot) return
+  //   const channelDivinity = activeCharacter.spellData.channelDivinitySlot
+  //   const isAvailable = index < channelDivinity.currentUses
+  //   const newCurrentUses = isAvailable ? channelDivinity.currentUses - 1 : channelDivinity.currentUses + 1
+  //   const updatedSpellData = {
+  //     ...activeCharacter.spellData,
+  //     channelDivinitySlot: { ...channelDivinity, currentUses: Math.max(0, Math.min(channelDivinity.usesPerRest, newCurrentUses)) },
+  //   }
+  //   updateCharacter({ spellData: updatedSpellData })
+  //   triggerAutoSave()
+  // }
 
   const toggleCleansingTouch = (index: number) => {
     if (!activeCharacter || !activeCharacter.spellData.cleansingTouchSlot) return
@@ -3098,19 +3030,17 @@ function CharacterSheetContent() {
     triggerAutoSave()
   }
 
-  const toggleSongOfRest = () => {
-    if (!activeCharacter || !activeCharacter.spellData.songOfRest) return
-
-    const updatedSpellData = {
-      ...activeCharacter.spellData,
-      songOfRest: {
-        ...activeCharacter.spellData.songOfRest,
-        available: !activeCharacter.spellData.songOfRest.available,
-      },
-    }
-    updateCharacter({ spellData: updatedSpellData })
-    triggerAutoSave()
-  }
+  // LEGACY TOGGLE - COMMENTED OUT
+  // Song of Rest is now managed via database class_features system
+  // const toggleSongOfRest = () => {
+  //   if (!activeCharacter || !activeCharacter.spellData.songOfRest) return
+  //   const updatedSpellData = {
+  //     ...activeCharacter.spellData,
+  //     songOfRest: { ...activeCharacter.spellData.songOfRest, available: !activeCharacter.spellData.songOfRest.available },
+  //   }
+  //   updateCharacter({ spellData: updatedSpellData })
+  //   triggerAutoSave()
+  // }
 
   const setActiveCharacterIdWithStorage = (characterId: string) => {
     setActiveCharacterId(characterId)
@@ -3352,12 +3282,14 @@ function CharacterSheetContent() {
               onEdit={() => setCombatModalOpen(true)}
               onToggleHitDie={toggleHitDie}
               onToggleDeathSave={toggleDeathSave}
+              onUpdateFeatureUsage={updateFeatureUsage}
               canEdit={canEditActiveCharacter}
             />
 
             <Weapons
               character={activeCharacter}
               onEdit={() => setWeaponsModalOpen(true)}
+              onToggleAmmunition={toggleAmmunition}
               canEdit={canEditActiveCharacter}
             />
 

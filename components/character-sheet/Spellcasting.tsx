@@ -9,7 +9,8 @@ import type { CharacterData } from "@/lib/character-data"
 import { getCombatColor, getClassFeatureColors } from "@/lib/color-mapping"
 import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
 import { getFeatureUsage, getFeatureCustomDescription, getFeatureMaxUses } from "@/lib/feature-usage-tracker"
-import { calculateUsesFromFormula } from "@/lib/class-feature-templates"
+import { calculateUsesFromFormula, resolveDescriptionSegments } from "@/lib/class-feature-templates"
+import type { DescriptionSegment } from "@/lib/class-feature-templates"
 import type { ClassFeatureSkill } from "@/lib/class-feature-types"
 import { loadClassFeatureSkills, loadClassData } from "@/lib/database"
 import { useState, useEffect } from "react"
@@ -360,152 +361,24 @@ export function Spellcasting({
 
     const className = getFeatureClassName(featureId)
 
-    switch (featureId) {
-      case 'genies-wrath':
-        return {
-          id: 'genies-wrath',
-          version: 1,
-          title: 'Genie\'s Wrath',
-          subtitle: 'Add damage to one attack per turn',
-          featureType: 'availability_toggle',
-          enabledAtLevel: 1,
-          enabledBySubclass: 'The Genie',
-          className: className,
-          config: {
-            defaultAvailable: true,
-            replenishOn: 'long_rest',
-            displayStyle: 'badge',
-            availableText: 'Available',
-            usedText: 'Used'
-          }
-        }
-      
-      case 'elemental-gift':
-        return {
-          id: 'elemental-gift',
-          version: 1,
-          title: 'Elemental Gift',
-          subtitle: 'Resistance and flight',
-          featureType: 'slots',
-          enabledAtLevel: 6,
-          enabledBySubclass: 'The Genie',
-          className: className,
-          config: {
-            usesFormula: 'proficiency_bonus',
-            replenishOn: 'long_rest',
-            displayStyle: 'circles'
-          }
-        }
-      
-      case 'song-of-rest':
-        return {
-          id: 'song-of-rest',
-          version: 1,
-          title: 'Song of Rest',
-          subtitle: 'Enhanced short rest healing',
-          featureType: 'availability_toggle',
-          enabledAtLevel: 2,
-          enabledBySubclass: null,
-          className: className,
-          config: {
-            defaultAvailable: true,
-            replenishOn: 'short_rest',
-            displayStyle: 'badge',
-            availableText: 'Available',
-            usedText: 'Used'
-          }
-        }
-      
-      case 'bardic-inspiration':
-        return {
-          id: 'bardic-inspiration',
-          version: 1,
-          title: 'Bardic Inspiration',
-          subtitle: 'Grant allies inspiration dice',
-          featureType: 'slots',
-          enabledAtLevel: 1,
-          enabledBySubclass: null,
-          className: className,
-          config: {
-            usesFormula: 'charisma_modifier',
-            dieType: ['d6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd8', 'd8', 'd8', 'd8', 'd10', 'd10', 'd10', 'd10', 'd12', 'd12', 'd12', 'd12'],
-            replenishOn: 'short_rest',
-            displayStyle: 'circles'
-          }
-        }
-      
-      case 'flash-of-genius':
-        return {
-          id: 'flash-of-genius',
-          version: 1,
-          title: 'Flash of Genius',
-          subtitle: 'Add Intelligence modifier to checks',
-          featureType: 'slots',
-          enabledAtLevel: 7,
-          enabledBySubclass: null,
-          className: className,
-          config: {
-            usesFormula: 'intelligence_modifier',
-            replenishOn: 'long_rest',
-            displayStyle: 'checkboxes'
-          }
-        }
-      
-      case 'divine-sense':
-        return {
-          id: 'divine-sense',
-          version: 1,
-          title: 'Divine Sense',
-          subtitle: 'Detect celestials, fiends, and undead',
-          featureType: 'slots',
-          enabledAtLevel: 1,
-          enabledBySubclass: null,
-          className: className,
-          config: {
-            usesFormula: '1 + charisma_modifier',
-            replenishOn: 'long_rest',
-            displayStyle: 'circles'
-          }
-        }
-      
-      case 'lay-on-hands':
-        return {
-          id: 'lay-on-hands',
-          version: 1,
-          title: 'Lay on Hands',
-          subtitle: 'Healing pool',
-          featureType: 'points_pool',
-          enabledAtLevel: 1,
-          enabledBySubclass: null,
-          className: className,
-          config: {
-            totalFormula: 'level * 5',
-            canSpendPartial: true,
-            replenishOn: 'long_rest',
-            displayStyle: 'input'
-          }
-        }
-      
-      case 'channel-divinity':
-        return {
-          id: 'channel-divinity',
-          version: 1,
-          title: 'Channel Divinity',
-          subtitle: 'Sacred Oath features',
-          featureType: 'slots',
-          enabledAtLevel: 2,
-          enabledBySubclass: null,
-          className: className,
-          config: {
-            usesFormula: '1',
-            replenishOn: 'short_rest',
-            displayStyle: 'circles'
-          }
-        }
-      
-      default:
-        return null
-    }
+    // LEGACY HARDCODED FEATURE DEFINITIONS - COMMENTED OUT
+    // These features are now managed by the database-driven class_features system.
+    // The database versions use IDs like "feature-divine-sense" instead of "divine-sense".
+    // Keeping this function for backward compatibility with features not yet migrated.
+    // ALL LEGACY HARDCODED FEATURE DEFINITIONS - COMMENTED OUT
+    // All class features are now managed by the database-driven class_features system.
+    // The database versions use IDs like "feature-divine-sense" instead of "divine-sense".
+    // switch (featureId) {
+    //   case 'genies-wrath':
+    //   case 'elemental-gift':
+    //   case 'divine-sense':
+    //   case 'lay-on-hands':
+    //   case 'channel-divinity':
+    //   case 'song-of-rest':
+    //   case 'bardic-inspiration':
+    //   case 'flash-of-genius':
+    // }
+    return null
   }
 
   // Render unified class features (excluding special UX)
@@ -563,6 +436,21 @@ export function Spellcasting({
           return
         }
         
+        // Skip legacy usage entries (e.g. "divine-sense") when a database version 
+        // (e.g. "feature-divine-sense") already exists in allFeatures
+        const hasDBVersion = allFeatures.some(f => f.id === `feature-${featureId}`)
+        if (hasDBVersion) {
+          return
+        }
+        
+        // Also skip "feature-*" usage entries that don't have a matching database feature
+        // (these are just usage tracking data, the feature definition comes from the database)
+        if (featureId.startsWith('feature-') && !allFeatures.some(f => f.id === featureId)) {
+          // This usage entry is for a database feature that should already be in allFeatures
+          // If it's not there, it means the feature was removed or is not loaded - skip it
+          return
+        }
+        
         // Create feature skill with proper configuration based on feature ID
         // Character usage data should only contain usage state, not feature configuration
         const featureSkill = createFeatureSkillFromId(featureId, usageData)
@@ -593,18 +481,35 @@ export function Spellcasting({
       // Check if this feature should be excluded
       // Only exclude if it's explicitly special_ux AND has a dedicated component
       const shouldExclude = (skill.featureType === 'special_ux' && 
-                           specialUXFeatures.some(special => 
-                             skill.id?.toLowerCase().includes(special) ||
-                             skill.title?.toLowerCase().includes(special)
-                           )) ||
-                           // Also exclude features that have dedicated components regardless of type
-                           specialUXFeatures.some(special => 
-                             skill.id?.toLowerCase().includes(special) ||
-                             skill.title?.toLowerCase().includes(special)
-                           )
+      specialUXFeatures.some(special => 
+        skill.id?.toLowerCase().includes(special) ||
+        skill.title?.toLowerCase().includes(special)
+      )) ||
+      // Also exclude features that have dedicated components regardless of type
+      specialUXFeatures.some(special => 
+        skill.id?.toLowerCase().includes(special) ||
+        skill.title?.toLowerCase().includes(special)
+      )
       
       if (shouldExclude) {
         return
+      }
+
+      // Filter by displayLocation: only show features that have 'spellcasting' in displayLocation
+      // If displayLocation is undefined/null, show for backward compatibility
+      if (skill.displayLocation !== undefined && skill.displayLocation !== null) {
+        // Debug logging for Bottled Respite
+        if (skill.title?.toLowerCase().includes('bottled') || skill.title?.toLowerCase().includes('respite')) {
+          console.log('Checking displayLocation for feature:', {
+            title: skill.title,
+            displayLocation: skill.displayLocation,
+            includesSpellcasting: skill.displayLocation.includes('spellcasting')
+          })
+        }
+        
+        if (!skill.displayLocation.includes('spellcasting')) {
+          return // Skip features that don't have 'spellcasting' in their displayLocation
+        }
       }
 
       // Find the class this feature belongs to
@@ -665,18 +570,90 @@ export function Spellcasting({
     }
   }
 
+  // Render a description with resolved variables styled as badges
+  const renderDescription = (segments: DescriptionSegment[]) => {
+    if (segments.length === 0) return null
+    // If there are no variable segments, render plain text
+    if (segments.every(s => s.type === 'text')) {
+      const text = segments.map(s => s.value).join('')
+      return text || null
+    }
+    return (
+      <>
+        {segments.map((seg, i) =>
+          seg.type === 'variable' ? (
+            <Badge key={i} variant="secondary" className="text-[11px] leading-none h-[18px] px-1.5 py-0 font-mono font-semibold align-middle">
+              {seg.value}
+            </Badge>
+          ) : (
+            <span key={i}>{seg.value}</span>
+          )
+        )}
+      </>
+    )
+  }
+
   // Render slots-based features
   const renderSlotsFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string, className?: string) => {
     if (!skill.id) return null
     
-    // Use updated maxUses from usage data if available, otherwise calculate from formula
+    // Get effective config with level-based scaling applied
     const slotConfig = skill.config as any
-    const maxUses = usage?.maxUses !== undefined 
-      ? usage.maxUses 
-      : (slotConfig?.usesFormula 
-          ? calculateUsesFromFormula(slotConfig.usesFormula, character, skill.className)
-          : getFeatureMaxUses(character, skill.id) || 0)
-    const currentUses = usage?.currentUses || maxUses
+    const classLevel = className ? getClassLevel(character, className) || character.level : character.level
+    
+    // Apply level-based scaling if override.levelScaling exists
+    let effectiveConfig = { ...slotConfig }
+    if (slotConfig.override && slotConfig.override.levelScaling) {
+      const levelScaling = slotConfig.override.levelScaling
+      const levels = Object.keys(levelScaling)
+        .map(Number)
+        .sort((a, b) => b - a) // Sort descending to find highest applicable level
+      
+      // Find the highest level that applies
+      for (const level of levels) {
+        if (classLevel >= level) {
+          const scalingConfig = levelScaling[level.toString()]
+          // Merge scaling config into effective config
+          effectiveConfig = { ...effectiveConfig, ...scalingConfig }
+          break
+        }
+      }
+    }
+    
+    // Calculate maxUses: ALWAYS use formula if available (formulas are dynamic based on stats)
+    // The saved usage.maxUses may be stale from initialization
+    let maxUses = 0
+    
+    if (effectiveConfig.usesFormula) {
+      // Calculate from formula - this is the source of truth for features with formulas
+      maxUses = calculateUsesFromFormula(effectiveConfig.usesFormula, character, skill.className)
+      
+      // Debug logging for database-loaded features
+      if ((skill as any)._isDatabaseLoaded) {
+        console.log('Calculating max uses for DATABASE feature:', {
+          title: skill.title,
+          id: skill.id,
+          classLevel: classLevel,
+          characterLevel: character.level,
+          baseFormula: slotConfig.usesFormula,
+          effectiveFormula: effectiveConfig.usesFormula,
+          calculated: maxUses,
+          proficiencyBonus: proficiencyBonus,
+          charisma: character.charisma,
+          charismaMod: charismaMod,
+          savedMaxUses: usage?.maxUses,
+          config: effectiveConfig,
+          hasLevelScaling: !!(slotConfig.override && slotConfig.override.levelScaling)
+        })
+      }
+    } else if (usage?.maxUses !== undefined) {
+      maxUses = usage.maxUses
+    } else {
+      maxUses = getFeatureMaxUses(character, skill.id) || 0
+    }
+    
+    // For currentUses: use saved value but cap it at maxUses (in case max decreased)
+    const currentUses = usage?.currentUses !== undefined ? Math.min(usage.currentUses, maxUses) : maxUses
 
     if (maxUses === 0) return null
 
@@ -687,68 +664,50 @@ export function Spellcasting({
     }
 
     return (
-      <div className="flex items-center justify-between p-2 border rounded gap-1 bg-background">
-        <div className="flex gap-1 flex-col">
-          <span className="text-sm font-medium">{skill.title}</span>
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            {(() => {
-              const baseDesc = customDescription || skill.subtitle || (skill as any).customDescription || ''
-              // For Bardic Inspiration, append the current die size based on Bard level and die progression
-              if (skill.id === 'bardic-inspiration') {
-                const bardLevel = (() => {
-                  if (character.classes && character.classes.length > 0) {
-                    const bardClass = character.classes.find(cls => cls.name.toLowerCase() === 'bard')
-                    return bardClass ? bardClass.level : (character.class.toLowerCase() === 'bard' ? character.level : 0)
-                  }
-                  return character.class.toLowerCase() === 'bard' ? character.level : 0
-                })()
-                const dieProgression = Array.isArray((slotConfig || {}).dieType) ? (slotConfig as any).dieType as string[] : undefined
-                const die = dieProgression && bardLevel > 0 
-                  ? dieProgression[Math.min(bardLevel - 1, dieProgression.length - 1)] || '1d6'
-                  : '1d6'
-                return (
-                  <>
-                    <Badge variant="secondary" className="text-[12px] leading-none h-5 px-1.5 py-0 align-middle">
-                    {`1${die}`}
-                    </Badge>
-                    {baseDesc ? ' ' : ''}
-                    {baseDesc}
-                  </>
-                )
-              }
-              return baseDesc
-            })()}
-          </span>
+      <div className="flex flex-col items-start justify-between gap-1 p-2 pr-3 border rounded gap-1 bg-background">
+        <div className="w-full flex gap-2 items-center justify-between">
+          <span className="flex flex-grow text-sm font-medium">{skill.title}</span>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: maxUses }, (_, i) => {
+              const isAvailable = i < currentUses
+              return (
+                <button
+                  key={i}
+                  onClick={() => {
+                    if (!canEdit) return
+                    if (onUpdateFeatureUsage && skill.id) {
+                      onUpdateFeatureUsage(skill.id, { 
+                        type: isAvailable ? 'use_slot' : 'restore_slot', 
+                        amount: 1 
+                      })
+                    }
+                  }}
+                  disabled={!canEdit}
+                  className={`w-4 h-4 rounded border-2 transition-colors ${
+                    isAvailable
+                      ? `${classColors.available} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                      : `${classColors.used} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                  }`}
+                  title={isAvailable ? "Available" : "Used"}
+                />
+              )
+            })}
+            <span className="text-xs text-muted-foreground ml-2 w-5 text-right font-mono">
+              {currentUses}/{maxUses}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          {Array.from({ length: maxUses }, (_, i) => {
-            const isAvailable = i < currentUses
-            return (
-              <button
-                key={i}
-                onClick={() => {
-                  if (!canEdit) return
-                  if (onUpdateFeatureUsage && skill.id) {
-                    onUpdateFeatureUsage(skill.id, { 
-                      type: isAvailable ? 'use_slot' : 'restore_slot', 
-                      amount: 1 
-                    })
-                  }
-                }}
-                disabled={!canEdit}
-                className={`w-4 h-4 rounded border-2 transition-colors ${
-                  isAvailable
-                    ? `${classColors.available} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
-                    : `${classColors.used} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
-                }`}
-                title={isAvailable ? "Available" : "Used"}
-              />
-            )
-          })}
-          <span className="text-xs text-muted-foreground ml-2 w-5 text-right">
-            {currentUses}/{maxUses}
+        {(customDescription || skill.subtitle || (skill as any).customDescription) && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
+              {renderDescription(resolveDescriptionSegments(
+                customDescription || skill.subtitle || (skill as any).customDescription || '',
+                character,
+                effectiveConfig,
+                skill.className,
+                { maxUses }
+              ))}
           </span>
-        </div>
+        )}
       </div>
     )
   }
@@ -757,22 +716,65 @@ export function Spellcasting({
   const renderPointsPoolFeature = (skill: ClassFeatureSkill, usage: any, customDescription: string) => {
     if (!skill.id) return null
     
-    // Calculate max points using class-specific level for multiclassed characters
+    // Get effective config with level-based scaling applied
     const pointsConfig = skill.config as any
-    const maxPoints = pointsConfig?.totalFormula 
-      ? calculateUsesFromFormula(pointsConfig.totalFormula, character, skill.className)
-      : usage?.maxPoints || 0
-    const currentPoints = usage?.currentPoints || maxPoints
+    const classLevel = skill.className ? getClassLevel(character, skill.className) || character.level : character.level
+    
+    // Apply level-based scaling if override.levelScaling exists
+    let effectiveConfig = { ...pointsConfig }
+    if (pointsConfig.override && pointsConfig.override.levelScaling) {
+      const levelScaling = pointsConfig.override.levelScaling
+      const levels = Object.keys(levelScaling)
+        .map(Number)
+        .sort((a, b) => b - a) // Sort descending to find highest applicable level
+      
+      // Find the highest level that applies
+      for (const level of levels) {
+        if (classLevel >= level) {
+          const scalingConfig = levelScaling[level.toString()]
+          // Merge scaling config into effective config
+          effectiveConfig = { ...effectiveConfig, ...scalingConfig }
+          break
+        }
+      }
+    }
+    
+    // Calculate max points: ALWAYS use formula if available (formulas are dynamic based on stats)
+    let maxPoints = 0
+    if (effectiveConfig?.totalFormula) {
+      maxPoints = calculateUsesFromFormula(effectiveConfig.totalFormula, character, skill.className)
+      
+      if ((skill as any)._isDatabaseLoaded) {
+        console.log('Calculating max points for DATABASE feature:', {
+          title: skill.title,
+          id: skill.id,
+          totalFormula: effectiveConfig.totalFormula,
+          calculated: maxPoints,
+          savedMaxPoints: usage?.maxPoints,
+        })
+      }
+    } else if (usage?.maxPoints !== undefined) {
+      maxPoints = usage.maxPoints
+    }
+    const currentPoints = usage?.currentPoints !== undefined ? Math.min(usage.currentPoints, maxPoints) : maxPoints
 
     if (maxPoints === 0) return null
 
     return (
-      <div className="flex items-center justify-between p-2 border rounded bg-background">
+      <div className="flex items-center justify-between p-2 pr-3 border rounded bg-background">
         <div className="flex gap-1 flex-col">
           <span className="text-sm font-medium">{skill.title}</span>
-          <span className="text-xs font-medium text-muted-foreground">
-            {customDescription || skill.subtitle || skill.customDescription}
-          </span>
+          {(customDescription || skill.subtitle || skill.customDescription) && (
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1 flex-wrap">
+                {renderDescription(resolveDescriptionSegments(
+                  customDescription || skill.subtitle || skill.customDescription || '',
+                  character,
+                  effectiveConfig,
+                  skill.className,
+                  { maxPoints }
+                ))}
+              </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -797,7 +799,7 @@ export function Spellcasting({
             className="w-16 px-2 py-1 text-sm border rounded text-center bg-card"
             title={`Remaining ${skill.title} points`}
           />
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground font-mono">
             / {maxPoints}
           </span>
         </div>
@@ -813,7 +815,7 @@ export function Spellcasting({
 
     return (
       <div 
-        className={`p-2 border rounded transition-colors bg-background ${canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed opacity-50'}`}
+        className={`p-2 border flex flex-col gap-1 rounded transition-colors bg-background ${canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed opacity-50'}`}
         onClick={() => {
           if (!canEdit) return
           if (onUpdateFeatureUsage && skill.id) {
@@ -823,17 +825,24 @@ export function Spellcasting({
           }
         }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <span className="text-sm flex flex-col gap-1">
             <span className="font-medium">{skill.title}</span>
-            <span className="text-xs text-muted-foreground">
-              {customDescription || skill.subtitle || skill.customDescription}
-            </span>
           </span>
           <Badge variant={available ? "default" : "secondary"}>
             {available ? "Available" : "Used"}
           </Badge>
         </div>
+        {(customDescription || skill.subtitle || skill.customDescription) && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
+            {renderDescription(resolveDescriptionSegments(
+              customDescription || skill.subtitle || skill.customDescription || '',
+              character,
+              skill.config,
+              skill.className
+            ))}
+          </span>
+        )}
       </div>
     )
   }
@@ -846,13 +855,20 @@ export function Spellcasting({
     if (maxSelections === 0) return null
 
     return (
-      <div className="p-2 border rounded bg-background">
+      <div className="p-2 pr-3 border rounded bg-background">
         <div className="flex items-center justify-between">
           <div className="flex gap-1 flex-col">
             <span className="text-sm font-medium">{skill.title}</span>
-            <span className="text-xs text-muted-foreground">
-              {customDescription || skill.subtitle || skill.customDescription}
-            </span>
+            {(customDescription || skill.subtitle || skill.customDescription) && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
+                {renderDescription(resolveDescriptionSegments(
+                  customDescription || skill.subtitle || skill.customDescription || '',
+                  character,
+                  skill.config,
+                  skill.className
+                ))}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
@@ -898,7 +914,7 @@ export function Spellcasting({
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-2">
         {/* Monk Abilities Section */}
         {isMonk(character) && (
           <div className="flex flex-col gap-2">
@@ -992,17 +1008,19 @@ export function Spellcasting({
         )}
 
         {/* Unified Class Features */}
-        {renderUnifiedClassFeatures()}
+        <div className="mt-3 border-t pt-3 gap-3 flex flex-col">
+            {renderUnifiedClassFeatures()}
+        </div>
 
 
         {/* Spell Slots */}
         {hasSpellcastingAbilities(character) && character.spellData.spellSlots && character.spellData.spellSlots.length > 0 && (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 mt-3">
             <div className="text-sm font-medium">Spell Slots</div>
             <div className="grid grid-cols-1 gap-2">
               {character.spellData.spellSlots.map((slot) => (
-                <div key={slot.level} className="p-2 border rounded flex items-center justify-between bg-background">
-                  <div className="text-sm font-medium mb-1">
+                <div key={slot.level} className="p-2 pr-3 border rounded flex items-center justify-between bg-background">
+                  <div className="text-sm font-medium">
                     {(slot as any).isWarlockSlot 
                       ? `Warlock Level ${slot.level}` 
                       : `Level ${slot.level}`}
@@ -1027,7 +1045,7 @@ export function Spellcasting({
                         />
                       )
                     })}
-                    <span className="text-xs text-muted-foreground ml-2">
+                    <span className="text-xs text-muted-foreground ml-2 font-mono">
                       {slot.total - slot.used}/{slot.total}
                     </span>
                   </div>
@@ -1039,13 +1057,13 @@ export function Spellcasting({
 
         {/* Feat Spell Slots */}
         {character.spellData.featSpellSlots && character.spellData.featSpellSlots.length > 0 && (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 mt-4">
             <div className="text-sm font-medium">Feat Spell Slots</div>
             <div className="flex flex-col gap-2">
               {character.spellData.featSpellSlots.map((featSlot, featIndex) => (
-                <div key={featIndex} className="p-2 border rounded bg-background">
+                <div key={featIndex} className="p-2 border rounded bg-background pr-3 flex flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium mb-1">{featSlot.spellName || `Feat ${featIndex + 1}`}</div>
+                    <div className="text-sm font-medium">{featSlot.spellName || `Feat ${featIndex + 1}`}</div>
                     <div className="flex items-center gap-1">
                     {Array.from({ length: featSlot.usesPerLongRest }, (_, i) => {
                       const isAvailable = i < (featSlot.usesPerLongRest - featSlot.currentUses)
@@ -1066,7 +1084,7 @@ export function Spellcasting({
                         />
                       )
                     })}
-                    <span className="text-xs text-muted-foreground ml-2">
+                    <span className="text-xs text-muted-foreground ml-2 font-mono">
                       {featSlot.usesPerLongRest - featSlot.currentUses}/{featSlot.usesPerLongRest}
                     </span>
                   </div>
@@ -1081,7 +1099,7 @@ export function Spellcasting({
 
         {/* Spell Notes */}
         {character.spellData.spellNotes && character.spellData.spellNotes.trim() !== "" && (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-3 pt-3 border-t mt-3">
             <div className="text-sm font-medium">Spell Notes</div>
             <RichTextDisplay
               content={character.spellData.spellNotes || "No spell notes"}

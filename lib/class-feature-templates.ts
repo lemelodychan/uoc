@@ -23,79 +23,6 @@ import { calculateProficiencyBonus } from './character-data'
  * These can be used as starting points when creating custom classes
  */
 export const FEATURE_TEMPLATES: Record<string, ClassFeatureSkill> = {
-  'bardic-inspiration': {
-    id: 'bardic-inspiration',
-    version: 1,
-    title: 'Bardic Inspiration',
-    subtitle: 'Grant allies inspiration dice',
-    featureType: 'slots',
-    enabledAtLevel: 1,
-    enabledBySubclass: null,
-    config: {
-      usesFormula: 'charisma_modifier',
-      dieType: createDieProgression('d6', 1, 'd8', 5, 'd10', 10, 'd12', 15),
-      replenishOn: 'short_rest',
-      displayStyle: 'circles'
-    } as SlotConfig
-  },
-  'flash-of-genius': {
-    id: 'flash-of-genius',
-    version: 1,
-    title: 'Flash of Genius',
-    subtitle: 'Add Intelligence modifier to checks',
-    featureType: 'slots',
-    enabledAtLevel: 7,
-    enabledBySubclass: null,
-    config: {
-      usesFormula: 'intelligence_modifier',
-      replenishOn: 'long_rest',
-      displayStyle: 'checkboxes'
-    } as SlotConfig
-  },
-  'divine-sense': {
-    id: 'divine-sense',
-    version: 1,
-    title: 'Divine Sense',
-    subtitle: 'Detect celestials, fiends, and undead',
-    featureType: 'slots',
-    enabledAtLevel: 1,
-    enabledBySubclass: null,
-    config: {
-      usesFormula: '1 + charisma_modifier',
-      replenishOn: 'long_rest',
-      displayStyle: 'circles'
-    } as SlotConfig
-  },
-  'lay-on-hands': {
-    id: 'lay-on-hands',
-    version: 1,
-    title: 'Lay on Hands',
-    subtitle: 'Healing pool',
-    featureType: 'points_pool',
-    enabledAtLevel: 1,
-    enabledBySubclass: null,
-    config: {
-      totalFormula: 'level * 5',
-      canSpendPartial: true,
-      replenishOn: 'long_rest',
-      displayStyle: 'slider',
-      minSpend: 1
-    } as PointsPoolConfig
-  },
-  'channel-divinity': {
-    id: 'channel-divinity',
-    version: 1,
-    title: 'Channel Divinity',
-    subtitle: 'Channel divine power',
-    featureType: 'slots',
-    enabledAtLevel: 2,
-    enabledBySubclass: null,
-    config: {
-      usesFormula: '1', // 1 at 2nd, 2 at 6th, 3 at 18th (handled by level checks)
-      replenishOn: 'short_rest',
-      displayStyle: 'circles'
-    } as SlotConfig
-  },
   'cleansing-touch': {
     id: 'cleansing-touch',
     version: 1,
@@ -166,23 +93,6 @@ export const FEATURE_TEMPLATES: Record<string, ClassFeatureSkill> = {
         hpFormula: '5 * level',
         acFormula: '18',
         attackBonusFormula: 'proficiency_bonus + intelligence_modifier'
-      }
-    } as SpecialUXConfig
-  },
-  'song-of-rest': {
-    id: 'song-of-rest',
-    version: 1,
-    title: 'Song of Rest',
-    subtitle: 'Enhanced short rest healing',
-    featureType: 'special_ux',
-    enabledAtLevel: 2,
-    enabledBySubclass: null,
-    config: {
-      componentId: 'song-of-rest',
-      customConfig: {
-        healingDieProgression: ['d6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd6', 'd8', 'd8', 'd8', 'd8', 'd10', 'd10', 'd10', 'd10', 'd12', 'd12', 'd12', 'd12'],
-        isToggleable: true,
-        requiresPerformance: true
       }
     } as SpecialUXConfig
   },
@@ -276,6 +186,9 @@ function createFormulaContext(character: CharacterData, className?: string): For
     }
   }
   
+  // Use character's proficiencyBonus if available, otherwise calculate from total level
+  const profBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level)
+  
   return {
     level: effectiveLevel,
     strength: character.strength,
@@ -284,7 +197,7 @@ function createFormulaContext(character: CharacterData, className?: string): For
     intelligence: character.intelligence,
     wisdom: character.wisdom,
     charisma: character.charisma,
-    proficiencyBonus: calculateProficiencyBonus(character.level)
+    proficiencyBonus: profBonus
   }
 }
 
@@ -297,25 +210,27 @@ function evaluateFormula(formula: string, context: FormulaContext): number {
     return parseInt(formula.split(':')[1]) || 0
   }
 
-  // Handle simple numeric values
-  const numericValue = parseInt(formula)
-  if (!isNaN(numericValue)) {
-    return numericValue
-  }
-
-  // Handle ability modifiers
-  const abilityModifierMatch = formula.match(/^(\w+)_modifier$/)
-  if (abilityModifierMatch) {
-    const ability = abilityModifierMatch[1] as keyof FormulaContext
-    const score = context[ability]
-    if (typeof score === 'number') {
-      return Math.max(1, Math.floor((score - 10) / 2))
-    }
-  }
-
-  // Handle proficiency bonus
-  if (formula === 'proficiency_bonus') {
+  // Handle proficiency bonus FIRST (before ability modifiers to avoid false matches)
+  if (formula === 'proficiency_bonus' || formula === 'proficiency') {
     return context.proficiencyBonus
+  }
+
+  // Handle simple ability modifiers (only if it's a simple modifier, not in an expression)
+  if (!formula.includes('+') && !formula.includes('-') && !formula.includes('*') && !formula.includes('/')) {
+    const abilityModifierMatch = formula.match(/^(\w+)_modifier$/)
+    if (abilityModifierMatch) {
+      const ability = abilityModifierMatch[1] as keyof FormulaContext
+      const score = context[ability]
+      if (typeof score === 'number') {
+        return Math.max(1, Math.floor((score - 10) / 2))
+      }
+    }
+    
+    // Handle simple numeric values (only if it's a pure number, not part of an expression)
+    const numericValue = parseInt(formula)
+    if (!isNaN(numericValue)) {
+      return numericValue
+    }
   }
 
   // Handle level-based formulas
@@ -345,10 +260,14 @@ function evaluateFormula(formula: string, context: FormulaContext): number {
     return getArtificerInfusionsKnown(context.level)
   }
 
-  // Handle expressions with ability modifiers
-  if (formula.includes('_modifier')) {
+  // Handle expressions with ability modifiers or proficiency bonus
+  if (formula.includes('_modifier') || formula.includes('proficiency_bonus') || formula.includes('proficiency')) {
     try {
       let expression = formula
+      // Replace proficiency bonus first (before ability modifiers to avoid conflicts)
+      expression = expression.replace(/proficiency_bonus/g, context.proficiencyBonus.toString())
+      expression = expression.replace(/\bproficiency\b/g, context.proficiencyBonus.toString())
+      
       // Replace ability modifiers
       expression = expression.replace(/charisma_modifier/g, Math.floor((context.charisma - 10) / 2).toString())
       expression = expression.replace(/intelligence_modifier/g, Math.floor((context.intelligence - 10) / 2).toString())
@@ -357,8 +276,27 @@ function evaluateFormula(formula: string, context: FormulaContext): number {
       expression = expression.replace(/dexterity_modifier/g, Math.floor((context.dexterity - 10) / 2).toString())
       expression = expression.replace(/constitution_modifier/g, Math.floor((context.constitution - 10) / 2).toString())
       
+      // Debug logging for complex formulas
+      if (formula.includes('+') || formula.includes('-') || formula.includes('*') || formula.includes('/')) {
+        console.log('Evaluating complex formula:', {
+          original: formula,
+          expression: expression,
+          context: {
+            proficiencyBonus: context.proficiencyBonus,
+            charisma: context.charisma,
+            charismaMod: Math.floor((context.charisma - 10) / 2)
+          }
+        })
+      }
+      
       const result = eval(expression)
-      return Math.max(1, Math.floor(result))
+      const finalResult = Math.max(1, Math.floor(result))
+      
+      if (formula.includes('+') || formula.includes('-') || formula.includes('*') || formula.includes('/')) {
+        console.log('Formula result:', { formula, result, finalResult })
+      }
+      
+      return finalResult
     } catch (error) {
       console.error(`Invalid formula: ${formula}`, error)
       return 0
@@ -475,4 +413,173 @@ export function getAllFeatureTemplates(): ClassFeatureSkill[] {
  */
 export function getFeatureTemplatesByType(featureType: string): ClassFeatureSkill[] {
   return Object.values(FEATURE_TEMPLATES).filter(template => template.featureType === featureType)
+}
+
+/**
+ * Resolve template variables in a feature description string.
+ * 
+ * Any {variable} token in the description is replaced with its computed value.
+ *
+ * Built-in variables:
+ *   {dice}                  - Current die from config (level scaling → baseDice → dieType[])
+ *   {proficiency_bonus}     - Proficiency bonus (also {proficiency})
+ *   {charisma_modifier}     - Charisma modifier (also {charisma_mod})
+ *   {intelligence_modifier} - Intelligence modifier (also {intelligence_mod})
+ *   {wisdom_modifier}       - Wisdom modifier (also {wisdom_mod})
+ *   {strength_modifier}     - Strength modifier (also {strength_mod})
+ *   {dexterity_modifier}    - Dexterity modifier (also {dexterity_mod})
+ *   {constitution_modifier} - Constitution modifier (also {constitution_mod})
+ *   {level}                 - Class level (or total level if no class)
+ *   {max_uses}              - Calculated max uses (pass as extra)
+ *   {max_points}            - Calculated max points (pass as extra)
+ *
+ * Config-driven variables:
+ *   Any string or number property on the effective config (after level scaling is applied)
+ *   is also available as a variable. For example, if config has { "dice": "1d8" }, then
+ *   {dice} resolves to "1d8". Properties from config.override are also included.
+ */
+export function resolveDescriptionVariables(
+  description: string,
+  character: CharacterData,
+  config?: any,
+  className?: string,
+  extras?: { maxUses?: number; maxPoints?: number }
+): string {
+  if (!description || !description.includes('{')) return description
+
+  const vars = buildVariableLookup(character, config, className, extras)
+
+  // Replace all {variable} tokens
+  return description.replace(/\{(\w+)\}/g, (match, varName) => {
+    return vars[varName] !== undefined ? vars[varName] : match
+  })
+}
+
+/**
+ * Segment type for styled description rendering.
+ * 'text' segments are plain text, 'variable' segments are resolved template values
+ * that should be displayed as styled badges.
+ */
+export interface DescriptionSegment {
+  type: 'text' | 'variable'
+  value: string
+}
+
+/**
+ * Like resolveDescriptionVariables, but returns an array of segments so the UI
+ * can render resolved variables with custom styling (e.g. badges with mono font).
+ *
+ * Text between variables is returned as 'text' segments, and each resolved
+ * {variable} is returned as a 'variable' segment with the computed value.
+ * Unresolved variables are kept as plain text.
+ */
+export function resolveDescriptionSegments(
+  description: string,
+  character: CharacterData,
+  config?: any,
+  className?: string,
+  extras?: { maxUses?: number; maxPoints?: number }
+): DescriptionSegment[] {
+  if (!description) return []
+  if (!description.includes('{')) return [{ type: 'text', value: description }]
+
+  const vars = buildVariableLookup(character, config, className, extras)
+
+  const segments: DescriptionSegment[] = []
+  let lastIndex = 0
+  const pattern = /\{(\w+)\}/g
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(description)) !== null) {
+    // Push text before the match
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', value: description.slice(lastIndex, match.index) })
+    }
+
+    const varName = match[1]
+    if (vars[varName] !== undefined) {
+      segments.push({ type: 'variable', value: vars[varName] })
+    } else {
+      // Unresolved variable → keep as plain text
+      segments.push({ type: 'text', value: match[0] })
+    }
+
+    lastIndex = match.index + match[0].length
+  }
+
+  // Push remaining text after last match
+  if (lastIndex < description.length) {
+    segments.push({ type: 'text', value: description.slice(lastIndex) })
+  }
+
+  return segments
+}
+
+/**
+ * Build the variable lookup map used by both resolveDescriptionVariables and resolveDescriptionSegments.
+ */
+function buildVariableLookup(
+  character: CharacterData,
+  config?: any,
+  className?: string,
+  extras?: { maxUses?: number; maxPoints?: number }
+): Record<string, string> {
+  const context = createFormulaContext(character, className)
+
+  const vars: Record<string, string> = {
+    'charisma_modifier': formatSignedMod(context.charisma),
+    'charisma_mod': formatSignedMod(context.charisma),
+    'intelligence_modifier': formatSignedMod(context.intelligence),
+    'intelligence_mod': formatSignedMod(context.intelligence),
+    'wisdom_modifier': formatSignedMod(context.wisdom),
+    'wisdom_mod': formatSignedMod(context.wisdom),
+    'strength_modifier': formatSignedMod(context.strength),
+    'strength_mod': formatSignedMod(context.strength),
+    'dexterity_modifier': formatSignedMod(context.dexterity),
+    'dexterity_mod': formatSignedMod(context.dexterity),
+    'constitution_modifier': formatSignedMod(context.constitution),
+    'constitution_mod': formatSignedMod(context.constitution),
+    'proficiency_bonus': String(context.proficiencyBonus),
+    'proficiency': String(context.proficiencyBonus),
+    'level': String(context.level),
+  }
+
+  if (config?.override && typeof config.override === 'object') {
+    for (const [key, value] of Object.entries(config.override)) {
+      if (typeof value === 'string' || typeof value === 'number') {
+        vars[key] = String(value)
+      }
+    }
+  }
+
+  if (config && typeof config === 'object') {
+    for (const [key, value] of Object.entries(config)) {
+      if (key === 'override') continue
+      if (typeof value === 'string' || typeof value === 'number') {
+        vars[key] = String(value)
+      }
+    }
+  }
+
+  if (!vars['dice']) {
+    if (config?.baseDice) {
+      vars['dice'] = String(config.baseDice)
+    } else if (config?.override?.baseDice) {
+      vars['dice'] = String(config.override.baseDice)
+    }
+  }
+  if (!vars['dice'] && config?.dieType && Array.isArray(config.dieType)) {
+    const dieIndex = Math.min(Math.max(context.level - 1, 0), config.dieType.length - 1)
+    vars['dice'] = config.dieType[dieIndex] || 'd6'
+  }
+
+  if (extras?.maxUses !== undefined) vars['max_uses'] = String(extras.maxUses)
+  if (extras?.maxPoints !== undefined) vars['max_points'] = String(extras.maxPoints)
+
+  return vars
+}
+
+/** Helper: compute ability modifier and return as a string (just the number, no sign) */
+function formatSignedMod(score: number): string {
+  return String(Math.floor((score - 10) / 2))
 }

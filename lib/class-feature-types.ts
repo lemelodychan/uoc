@@ -19,6 +19,7 @@ export interface ClassFeatureSkill {
   enabledAtLevel: number
   enabledBySubclass?: string | null
   className?: string  // Which class this feature belongs to (for multiclassing support)
+  displayLocation?: ('spellcasting' | 'combat')[]  // Where to display this feature: 'spellcasting' (Spellcasting section), 'combat' (Combat Stats section), or empty array (only in Class Features column)
   config: SlotConfig | PointsPoolConfig | OptionsListConfig | SpecialUXConfig | SkillModifierConfig | AvailabilityToggleConfig
 }
 

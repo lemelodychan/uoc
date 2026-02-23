@@ -95,30 +95,10 @@ export function getFeatureCustomDescription(character: CharacterData, featureId:
  * Always calculates from class feature configuration, never from character usage data
  */
 export function getFeatureMaxUses(character: CharacterData, featureId: string): number | undefined {
-  // Calculate max uses from class feature configuration only
-  
-  switch (featureId) {
-    case 'bardic-inspiration':
-      // Bardic Inspiration uses Charisma modifier
-      const charismaModifier = Math.floor((character.charisma - 10) / 2)
-      const maxUses = Math.max(1, charismaModifier)
-      return maxUses
-      
-    case 'flash-of-genius':
-      // Flash of Genius uses Intelligence modifier
-      const intelligenceModifier = Math.floor((character.intelligence - 10) / 2)
-      const flashMaxUses = Math.max(1, intelligenceModifier)
-      return flashMaxUses
-      
-    case 'divine-sense':
-      // Divine Sense uses 1 + Charisma modifier
-      const divineCharismaModifier = Math.floor((character.charisma - 10) / 2)
-      const divineMaxUses = Math.max(1, 1 + divineCharismaModifier)
-      return divineMaxUses
-      
-    default:
-      return undefined
-  }
+  // LEGACY: All hardcoded max uses calculations removed.
+  // Max uses are now calculated from formulas in the database class_features system
+  // via calculateUsesFromFormula() in class-feature-templates.ts
+  return undefined
 }
 
 /**
@@ -144,16 +124,9 @@ export function updateFeatureMaxUses(character: CharacterData, featureId: string
  * Update all features that depend on character stats (like proficiency bonus)
  */
 export function updateAllDynamicFeatures(character: CharacterData): FeatureUsageData {
-  let updatedUsage = getFeatureUsageData(character)
-  
-  // Update Elemental Gift if it exists
-  if (updatedUsage['elemental-gift']) {
-    updatedUsage = updateFeatureMaxUses(character, 'elemental-gift')
-  }
-  
-  // Add more features here as needed
-  
-  return updatedUsage
+  // LEGACY: Dynamic feature updates are now handled by the database class_features system.
+  // Max uses are recalculated from formulas during loadClassFeatureSkills and rendering.
+  return getFeatureUsageData(character)
 }
 
 /**
@@ -163,16 +136,9 @@ export function updateAllDynamicFeatures(character: CharacterData): FeatureUsage
 export function recalculateAllFeatureMaxUses(character: CharacterData): FeatureUsageData {
   let updatedUsage = { ...character.classFeatureSkillsUsage } || {}
   
-  // List of features that depend on character stats
-  const dynamicFeatures = [
-    'bardic-inspiration',
-    'flash-of-genius', 
-    'divine-sense',
-    'elemental-gift',
-    'lay-on-hands',
-    'channel-divinity',
-    'cleansing-touch'
-  ]
+  // LEGACY: All hardcoded feature IDs removed. Dynamic features are now managed
+  // by the database class_features system with formula-based calculations.
+  const dynamicFeatures: string[] = []
   
   for (const featureId of dynamicFeatures) {
     const usage = getFeatureUsage(character, featureId)
@@ -444,57 +410,20 @@ export function useFeatureSlot(
   featureId: string,
   amount: number = 1
 ): FeatureUsageData {
-  let usage = getFeatureUsage(character, featureId)
-  let workingCharacter = character
+  const usage = getFeatureUsage(character, featureId)
   
-  // Initialize feature if it doesn't exist
+  // LEGACY: All hardcoded feature initialization removed.
+  // Features are now initialized via database class_features system in loadClassFeatureSkills.
   if (!usage) {
-    // For Flash of Genius, initialize with Intelligence modifier
-    if (featureId === 'flash-of-genius' && character.class.toLowerCase() === 'artificer' && character.level >= 7) {
-      const maxUses = Math.max(1, Math.floor((character.intelligence - 10) / 2))
-      const updatedUsage = addSingleFeature(character, featureId, {
-        featureName: 'Flash of Genius',
-        featureType: 'slots',
-        enabledAtLevel: 7,
-        maxUses: maxUses
-      })
-      workingCharacter = { ...character, classFeatureSkillsUsage: updatedUsage }
-      usage = getFeatureUsage(workingCharacter, featureId)
-    }
-    // For Genie's Wrath, initialize with default values
-    else if (featureId === 'genies-wrath' && character.class.toLowerCase() === 'warlock' && character.subclass?.toLowerCase() === 'the genie' && character.level >= 1) {
-      const updatedUsage = addSingleFeature(character, featureId, {
-        featureName: 'Genie\'s Wrath',
-        featureType: 'availability_toggle',
-        enabledAtLevel: 1,
-        isAvailable: true
-      })
-      workingCharacter = { ...character, classFeatureSkillsUsage: updatedUsage }
-      usage = getFeatureUsage(workingCharacter, featureId)
-    }
-    // For Elemental Gift, initialize with values from class features table
-    else if (featureId === 'elemental-gift' && character.class.toLowerCase() === 'warlock' && character.subclass?.toLowerCase() === 'the genie' && character.level >= 6) {
-      const maxUses = getFeatureMaxUses(character, featureId) || 1 // Default to 1 if not found in class features
-      const updatedUsage = addSingleFeature(character, featureId, {
-        featureName: 'Elemental Gift',
-        featureType: 'slots',
-        enabledAtLevel: 6,
-        maxUses: maxUses
-      })
-      workingCharacter = { ...character, classFeatureSkillsUsage: updatedUsage }
-      usage = getFeatureUsage(workingCharacter, featureId)
-    }
-    else {
-      return getFeatureUsageData(character)
-    }
+    return getFeatureUsageData(character)
   }
   
-  if (!usage || usage.featureType !== 'slots') {
-    return getFeatureUsageData(workingCharacter)
+  if (usage.featureType !== 'slots') {
+    return getFeatureUsageData(character)
   }
   
   const newUses = Math.max(0, (usage.currentUses || 0) - amount)
-  return updateFeatureUsage(workingCharacter, featureId, { currentUses: newUses })
+  return updateFeatureUsage(character, featureId, { currentUses: newUses })
 }
 
 /**
@@ -505,49 +434,12 @@ export function restoreFeatureSlot(
   featureId: string,
   amount: number = 1
 ): FeatureUsageData {
-  let usage = getFeatureUsage(character, featureId)
-  let workingCharacter = character
+  const usage = getFeatureUsage(character, featureId)
   
-  // Initialize feature if it doesn't exist
+  // LEGACY: All hardcoded feature initialization removed.
+  // Features are now initialized via database class_features system in loadClassFeatureSkills.
   if (!usage) {
-    // For Flash of Genius, initialize with Intelligence modifier
-    if (featureId === 'flash-of-genius' && character.class.toLowerCase() === 'artificer' && character.level >= 7) {
-      const maxUses = Math.max(1, Math.floor((character.intelligence - 10) / 2))
-      const updatedUsage = addSingleFeature(character, featureId, {
-        featureName: 'Flash of Genius',
-        featureType: 'slots',
-        enabledAtLevel: 7,
-        maxUses: maxUses
-      })
-      workingCharacter = { ...character, classFeatureSkillsUsage: updatedUsage }
-      usage = getFeatureUsage(workingCharacter, featureId)
-    }
-    // For Genie's Wrath, initialize with default values
-    else if (featureId === 'genies-wrath' && character.class.toLowerCase() === 'warlock' && character.subclass?.toLowerCase() === 'the genie' && character.level >= 1) {
-      const updatedUsage = addSingleFeature(character, featureId, {
-        featureName: 'Genie\'s Wrath',
-        featureType: 'availability_toggle',
-        enabledAtLevel: 1,
-        isAvailable: true
-      })
-      workingCharacter = { ...character, classFeatureSkillsUsage: updatedUsage }
-      usage = getFeatureUsage(workingCharacter, featureId)
-    }
-    // For Elemental Gift, initialize with values from class features table
-    else if (featureId === 'elemental-gift' && character.class.toLowerCase() === 'warlock' && character.subclass?.toLowerCase() === 'the genie' && character.level >= 6) {
-      const maxUses = getFeatureMaxUses(character, featureId) || 1 // Default to 1 if not found in class features
-      const updatedUsage = addSingleFeature(character, featureId, {
-        featureName: 'Elemental Gift',
-        featureType: 'slots',
-        enabledAtLevel: 6,
-        maxUses: maxUses
-      })
-      workingCharacter = { ...character, classFeatureSkillsUsage: updatedUsage }
-      usage = getFeatureUsage(workingCharacter, featureId)
-    }
-    else {
-      return getFeatureUsageData(character)
-    }
+    return getFeatureUsageData(character)
   }
   
   if (!usage || usage.featureType !== 'slots') {

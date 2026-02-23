@@ -35,6 +35,7 @@ import type { ClassData, SubclassData } from "./class-utils"
 import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, calculateProficiencyBonus, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData } from "./character-data"
 import { getBardicInspirationData, getSongOfRestData } from "./class-utils"
 import { isSuperadmin, canAccessPrivateSheet, canEditCharacter as canEditCharacterRole, canEditCharacterInCampaign } from "./user-roles"
+import { calculateUsesFromFormula } from "./class-feature-templates"
 import type { UserProfile } from "./user-profiles"
 const supabase = createBrowserClient()
 
@@ -827,11 +828,12 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         featSpellSlots: data.feat_spell_slots || [],
         spells: data.spells || [],
         // All class features will be populated from class data below
-        bardicInspirationSlot: undefined,
-        songOfRest: undefined,
-        divineSenseSlot: undefined,
-        layOnHands: undefined,
-        channelDivinitySlot: undefined,
+        // LEGACY: All class feature slots now managed by database class_features system
+        // bardicInspirationSlot: undefined,
+        // songOfRest: undefined,
+        // divineSenseSlot: undefined,
+        // layOnHands: undefined,
+        // channelDivinitySlot: undefined,
         cleansingTouchSlot: undefined,
         // Legacy Warlock columns have been dropped - using unified system only
       },
@@ -884,10 +886,12 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         const { featureSkills } = await loadClassFeatureSkills(tempCharacter)
     
     // Initialize usage data for any features that don't have it yet
+    // Also update maxUses/maxPoints for existing features with formulas (they may be stale)
     for (const feature of featureSkills || []) {
-      if (!updatedUsage[feature.id]) {
+      const featureConfig = feature.config as any
         
-        // Determine initial values based on feature type
+      if (!updatedUsage[feature.id]) {
+        // New feature - initialize usage data
         let initialUsage: any = {
           featureName: feature.title,
           featureType: feature.featureType,
@@ -897,13 +901,24 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         
         switch (feature.featureType) {
           case 'slots':
-            const maxUses = getFeatureMaxUses(tempCharacter, feature.id) || 1
+            // Use formula if available, otherwise fall back to legacy lookup
+            let maxUses = 1
+            if (featureConfig?.usesFormula) {
+              maxUses = calculateUsesFromFormula(featureConfig.usesFormula, tempCharacter, feature.className)
+            } else {
+              maxUses = getFeatureMaxUses(tempCharacter, feature.id) || 1
+            }
             initialUsage.maxUses = maxUses
             initialUsage.currentUses = maxUses // All slots available initially
             break
             
           case 'points_pool':
-            const maxPoints = getFeatureMaxUses(tempCharacter, feature.id) || 1
+            let maxPoints = 1
+            if (featureConfig?.totalFormula) {
+              maxPoints = calculateUsesFromFormula(featureConfig.totalFormula, tempCharacter, feature.className)
+            } else {
+              maxPoints = getFeatureMaxUses(tempCharacter, feature.id) || 1
+            }
             initialUsage.maxPoints = maxPoints
             initialUsage.currentPoints = maxPoints // All points available initially
             break
@@ -927,14 +942,36 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         }
         
         updatedUsage[feature.id] = initialUsage
+      } else {
+        // Existing feature - update maxUses/maxPoints from formula if applicable
+        const existingUsage = updatedUsage[feature.id]
+        if (feature.featureType === 'slots' && featureConfig?.usesFormula) {
+          const newMax = calculateUsesFromFormula(featureConfig.usesFormula, tempCharacter, feature.className)
+          if (newMax !== existingUsage.maxUses) {
+            // Max changed (level up, stat change, etc) - update max and adjust current
+            updatedUsage[feature.id] = {
+              ...existingUsage,
+              maxUses: newMax,
+              currentUses: Math.min(existingUsage.currentUses || 0, newMax),
+              lastUpdated: new Date().toISOString()
+            }
+          }
+        } else if (feature.featureType === 'points_pool' && featureConfig?.totalFormula) {
+          const newMax = calculateUsesFromFormula(featureConfig.totalFormula, tempCharacter, feature.className)
+          if (newMax !== existingUsage.maxPoints) {
+            updatedUsage[feature.id] = {
+              ...existingUsage,
+              maxPoints: newMax,
+              currentPoints: Math.min(existingUsage.currentPoints || 0, newMax),
+              lastUpdated: new Date().toISOString()
+            }
+          }
+        }
       }
     }
     
-    // Update tempCharacter with initialized features
-    // Only update if new features were added (don't overwrite existing data)
-    if (Object.keys(updatedUsage).length > Object.keys(tempCharacter.classFeatureSkillsUsage || {}).length) {
+    // Always update tempCharacter with usage data (formulas may have recalculated maxUses)
       tempCharacter.classFeatureSkillsUsage = updatedUsage
-    }
     
     // Load spell slots from database or calculate them if not available
     let calculatedSpellSlots: any[] = data.spell_slots || []
@@ -1004,38 +1041,16 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         spellsKnown: getSpellsKnown(tempCharacter, classData, data.spells_known),
         spellSlots: calculatedSpellSlots, // Populate immediately
         // Add class-specific features (Bard, Artificer, Paladin) - use multiclass calculation if applicable
+        // LEGACY: All class feature slots now managed by database class_features system
+        // bardicInspirationSlot, songOfRest, flashOfGeniusSlot,
+        // divineSenseSlot, layOnHands, channelDivinitySlot
         ...(data.classes && data.classes.length > 1 ? await (async () => {
           const { getMulticlassFeatures } = await import('./character-data')
           const multiclassFeatures = await getMulticlassFeatures(tempCharacter)
           return {
-            bardicInspirationSlot: multiclassFeatures.bardicInspirationSlot ? {
-              ...multiclassFeatures.bardicInspirationSlot,
-              currentUses: multiclassFeatures.bardicInspirationSlot.usesPerRest
-            } : undefined,
-            songOfRest: multiclassFeatures.songOfRest || undefined,
-            divineSenseSlot: multiclassFeatures.divineSenseSlot || undefined,
-            layOnHands: multiclassFeatures.layOnHands || undefined,
-            channelDivinitySlot: multiclassFeatures.channelDivinitySlot || undefined,
             cleansingTouchSlot: multiclassFeatures.cleansingTouchSlot || undefined,
           }
         })() : {
-          // Single class feature calculation
-          bardicInspirationSlot: (() => {
-            const bardicInspiration = getBardicInspirationData(data.level, Math.floor((data.charisma - 10) / 2), classData)
-            if (bardicInspiration) {
-              return {
-                ...bardicInspiration,
-                currentUses: bardicInspiration.usesPerRest
-              }
-            }
-            return bardicInspiration || undefined
-          })(),
-          songOfRest: getSongOfRestData(data.level, classData) || undefined,
-          // Paladin features
-          // Legacy feature slots removed - using unified class_features_skills_usage instead
-          divineSenseSlot: undefined,
-          layOnHands: undefined,
-          channelDivinitySlot: undefined,
           cleansingTouchSlot: undefined,
         }),
       },
@@ -1094,10 +1109,10 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
     
     data.forEach(row => {
       if (row.classes && row.classes.length > 0) {
-        // Add multiclass features
+        // Add multiclass features - include subclass for proper filtering
         row.classes.forEach((charClass: any) => {
           if (charClass.class_id) {
-            uniqueClassFeatures.add(`${charClass.class_id}-${charClass.level}`)
+            uniqueClassFeatures.add(`${charClass.class_id}-${charClass.level}-${charClass.subclass || ''}`)
           }
         })
       } else if (row.class_name) {
@@ -1133,12 +1148,17 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           }
         }
       } else {
-        // Handle multiclass characters - use class_id directly
-        const lastDashIndex = featureKey.lastIndexOf('-')
-        const classId = featureKey.substring(0, lastDashIndex)
-        const level = featureKey.substring(lastDashIndex + 1)
+        // Handle multiclass characters - format: classId-level-subclass
+        const parts = featureKey.split('-')
+        // The subclass (if any) is the last part, level is second-to-last
+        // But classId can contain dashes (UUIDs), so we parse from the end
+        const subclass = parts.length > 2 ? parts[parts.length - 1] : undefined
+        const level = parts.length > 2 ? parts[parts.length - 2] : parts[parts.length - 1]
+        const classId = parts.length > 2 
+          ? parts.slice(0, parts.length - 2).join('-')
+          : parts.slice(0, parts.length - 1).join('-')
         
-        const { features } = await loadClassFeatures(classId, parseInt(level))
+        const { features } = await loadClassFeatures(classId, parseInt(level), subclass || undefined)
         if (features) {
           classFeaturesMap.set(featureKey, features)
         }
@@ -1156,7 +1176,7 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
       classFeatures = row.classes
         .map((charClass: any) => {
           if (charClass.class_id) {
-            return classFeaturesMap.get(`${charClass.class_id}-${charClass.level}`) || []
+            return classFeaturesMap.get(`${charClass.class_id}-${charClass.level}-${charClass.subclass || ''}`) || []
           }
           return []
         })
@@ -1246,11 +1266,12 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             featSpellSlots: row.feat_spell_slots || [],
             spells: row.spells || [],
             // All class features will be populated from class data below
-            bardicInspirationSlot: undefined,
-            songOfRest: undefined,
-            divineSenseSlot: undefined,
-            layOnHands: undefined,
-            channelDivinitySlot: undefined,
+            // LEGACY: All class feature slots now managed by database class_features system
+            // bardicInspirationSlot: undefined,
+            // songOfRest: undefined,
+            // divineSenseSlot: undefined,
+            // layOnHands: undefined,
+            // channelDivinitySlot: undefined,
             cleansingTouchSlot: undefined,
             // Legacy Warlock columns have been dropped - using unified system only
           },
@@ -1302,10 +1323,12 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
         const { featureSkills } = await loadClassFeatureSkills(tempCharacter)
         
         // Initialize usage data for any features that don't have it yet
+        // Also update maxUses/maxPoints for existing features with formulas (they may be stale)
         for (const feature of featureSkills || []) {
-          if (!updatedUsage[feature.id]) {
+          const featureConfig = feature.config as any
             
-            // Determine initial values based on feature type
+          if (!updatedUsage[feature.id]) {
+            // New feature - initialize usage data
             let initialUsage: any = {
               featureName: feature.title,
               featureType: feature.featureType,
@@ -1315,13 +1338,23 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             
             switch (feature.featureType) {
               case 'slots':
-                const maxUses = getFeatureMaxUses(tempCharacter, feature.id) || 1
+                let maxUses = 1
+                if (featureConfig?.usesFormula) {
+                  maxUses = calculateUsesFromFormula(featureConfig.usesFormula, tempCharacter, feature.className)
+                } else {
+                  maxUses = getFeatureMaxUses(tempCharacter, feature.id) || 1
+                }
                 initialUsage.maxUses = maxUses
                 initialUsage.currentUses = maxUses // All slots available initially
                 break
                 
               case 'points_pool':
-                const maxPoints = getFeatureMaxUses(tempCharacter, feature.id) || 1
+                let maxPoints = 1
+                if (featureConfig?.totalFormula) {
+                  maxPoints = calculateUsesFromFormula(featureConfig.totalFormula, tempCharacter, feature.className)
+                } else {
+                  maxPoints = getFeatureMaxUses(tempCharacter, feature.id) || 1
+                }
                 initialUsage.maxPoints = maxPoints
                 initialUsage.currentPoints = maxPoints // All points available initially
                 break
@@ -1345,14 +1378,35 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             }
             
             updatedUsage[feature.id] = initialUsage
+          } else {
+            // Existing feature - update maxUses/maxPoints from formula if applicable
+            const existingUsage = updatedUsage[feature.id]
+            if (feature.featureType === 'slots' && featureConfig?.usesFormula) {
+              const newMax = calculateUsesFromFormula(featureConfig.usesFormula, tempCharacter, feature.className)
+              if (newMax !== existingUsage.maxUses) {
+                updatedUsage[feature.id] = {
+                  ...existingUsage,
+                  maxUses: newMax,
+                  currentUses: Math.min(existingUsage.currentUses || 0, newMax),
+                  lastUpdated: new Date().toISOString()
+                }
+              }
+            } else if (feature.featureType === 'points_pool' && featureConfig?.totalFormula) {
+              const newMax = calculateUsesFromFormula(featureConfig.totalFormula, tempCharacter, feature.className)
+              if (newMax !== existingUsage.maxPoints) {
+                updatedUsage[feature.id] = {
+                  ...existingUsage,
+                  maxPoints: newMax,
+                  currentPoints: Math.min(existingUsage.currentPoints || 0, newMax),
+                  lastUpdated: new Date().toISOString()
+                }
+              }
+            }
           }
         }
         
-        // Update tempCharacter with initialized features
-        // Only update if new features were added (don't overwrite existing data)
-        if (Object.keys(updatedUsage).length > Object.keys(tempCharacter.classFeatureSkillsUsage || {}).length) {
+        // Always update tempCharacter with usage data (formulas may have recalculated maxUses)
           tempCharacter.classFeatureSkillsUsage = updatedUsage
-        }
 
         // Load spell slots from database or calculate them if not available
         let calculatedSpellSlots: any[] = row.spell_slots || []
@@ -1421,38 +1475,16 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
             spellsKnown: getSpellsKnown(tempCharacter, classData, row.spells_known),
             spellSlots: calculatedSpellSlots, // Populate immediately
             // Add class-specific features (Bard, Artificer, Paladin) - use multiclass calculation if applicable
+            // LEGACY: All class feature slots now managed by database class_features system
+            // bardicInspirationSlot, songOfRest, flashOfGeniusSlot,
+            // divineSenseSlot, layOnHands, channelDivinitySlot
             ...(row.classes && row.classes.length > 1 ? await (async () => {
               const { getMulticlassFeatures } = await import('./character-data')
               const multiclassFeatures = await getMulticlassFeatures(tempCharacter)
               return {
-                bardicInspirationSlot: multiclassFeatures.bardicInspirationSlot ? {
-                  ...multiclassFeatures.bardicInspirationSlot,
-                  currentUses: multiclassFeatures.bardicInspirationSlot.usesPerRest
-                } : undefined,
-                songOfRest: multiclassFeatures.songOfRest || undefined,
-                divineSenseSlot: multiclassFeatures.divineSenseSlot || undefined,
-                layOnHands: multiclassFeatures.layOnHands || undefined,
-                channelDivinitySlot: multiclassFeatures.channelDivinitySlot || undefined,
                 cleansingTouchSlot: multiclassFeatures.cleansingTouchSlot || undefined,
               }
             })() : {
-              // Single class feature calculation
-              bardicInspirationSlot: (() => {
-                const bardicInspiration = getBardicInspirationData(row.level, Math.floor((row.charisma - 10) / 2), classData)
-                if (bardicInspiration) {
-                  return {
-                    ...bardicInspiration,
-                    currentUses: bardicInspiration.usesPerRest
-                  }
-                }
-                return bardicInspiration || undefined
-              })(),
-              songOfRest: getSongOfRestData(row.level, classData) || undefined,
-              // Paladin features
-              // Legacy feature slots removed - using unified class_features_skills_usage instead
-              divineSenseSlot: undefined,
-              layOnHands: undefined,
-              channelDivinitySlot: undefined,
               cleansingTouchSlot: undefined,
             }),
           },
@@ -1460,181 +1492,11 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
       })
     )
 
-    // Initialize Warlock features for all Warlock characters
-    for (const character of charactersWithFeatures) {
-      if (character.class.toLowerCase() === 'warlock') {
-        const { addSingleFeature } = await import('./feature-usage-tracker')
-        let updatedUsage = character.classFeatureSkillsUsage || {}
-        
-        // Initialize Genie's Wrath (Genie Warlock level 1+)
-        if (character.subclass?.toLowerCase() === 'the genie' && character.level >= 1 && !updatedUsage['genies-wrath']) {
-          updatedUsage = addSingleFeature(character, 'genies-wrath', {
-            featureName: 'Genie\'s Wrath',
-            featureType: 'availability_toggle',
-            enabledAtLevel: 1,
-            isAvailable: true
-          })
-        }
-        
-        // Initialize Elemental Gift (Genie Warlock level 6+) - only if it doesn't exist
-        if (character.subclass?.toLowerCase() === 'the genie' && character.level >= 6 && !updatedUsage['elemental-gift']) {
-          // Only initialize if feature doesn't exist - don't overwrite existing data
-          const { getFeatureMaxUses } = await import('./feature-usage-tracker')
-          const maxUses = getFeatureMaxUses(character, 'elemental-gift') || 1
-          
-          updatedUsage = addSingleFeature(character, 'elemental-gift', {
-            featureName: 'Elemental Gift',
-            featureType: 'slots',
-            enabledAtLevel: 6,
-            maxUses: maxUses,
-            currentUses: maxUses // All slots available immediately
-          })
-        }
-        
-        // Initialize Eldritch Invocations (Warlock level 2+)
-        if (character.level >= 2 && !updatedUsage['eldritch-invocations']) {
-          const maxInvocations = Math.floor(character.level / 2) + 1
-          updatedUsage = addSingleFeature(character, 'eldritch-invocations', {
-            featureName: 'Eldritch Invocations',
-            featureType: 'options_list',
-            enabledAtLevel: 2,
-            maxSelections: maxInvocations,
-            selectedOptions: []
-          })
-        }
-
-        // Initialize Metamagic (Sorcerer level 3+)
-        if (!updatedUsage['metamagic']) {
-          // Determine sorcerer level (supports multiclass)
-          const sorcererClass = character.classes?.find(c => c.name.toLowerCase() === 'sorcerer')
-          const sorcererLevel = sorcererClass?.level || (character.class.toLowerCase() === 'sorcerer' ? character.level : 0)
-          if (sorcererLevel >= 3) {
-            const maxKnown = sorcererLevel >= 17 ? 4 : sorcererLevel >= 10 ? 3 : 2
-            updatedUsage = addSingleFeature(character, 'metamagic', {
-              featureName: 'Metamagic',
-              featureType: 'options_list',
-              enabledAtLevel: 3,
-              maxSelections: maxKnown,
-              selectedOptions: []
-            })
-          }
-        }
-        
-        // Update character with initialized features
-        // Only update if new features were added (don't overwrite existing data)
-        if (Object.keys(updatedUsage).length > Object.keys(character.classFeatureSkillsUsage || {}).length) {
-          character.classFeatureSkillsUsage = updatedUsage
-        }
-      }
-      
-      // Initialize Paladin features for all Paladin characters
-      if (character.class.toLowerCase() === 'paladin') {
-        const { addSingleFeature } = await import('./feature-usage-tracker')
-        let updatedUsage = character.classFeatureSkillsUsage || {}
-        
-        // Initialize Lay on Hands (Paladin level 1+) - only if it doesn't exist
-        if (character.level >= 1 && !updatedUsage['lay-on-hands']) {
-          // Calculate max points from class feature or fallback to hardcoded
-          // For multiclassed characters, use Paladin class level specifically
-          const paladinClass = character.classes?.find(c => c.name.toLowerCase() === 'paladin')
-          const paladinLevel = paladinClass?.level || character.level
-          let maxPoints = paladinLevel * 5 // Default Lay on Hands formula
-          
-          // Try to get from class features if available
-          if (character.classFeatures) {
-            const layOnHandsFeature = character.classFeatures.find(f => 
-              f.title?.toLowerCase().includes('lay on hands') && 
-              f.class_features_skills && 
-              typeof f.class_features_skills === 'object' &&
-              'config' in f.class_features_skills &&
-              f.class_features_skills.config?.totalFormula
-            )
-            
-            if (layOnHandsFeature && layOnHandsFeature.class_features_skills && 
-                typeof layOnHandsFeature.class_features_skills === 'object' &&
-                'config' in layOnHandsFeature.class_features_skills) {
-              const config = layOnHandsFeature.class_features_skills.config
-              if (config?.totalFormula) {
-                const { calculateUsesFromFormula } = await import('./class-feature-templates')
-                maxPoints = calculateUsesFromFormula(config.totalFormula, character, 'paladin')
-              }
-            }
-          }
-          
-          // Calculate current points from legacy data if available
-          let currentPoints = maxPoints
-          if (character.spellData?.layOnHands) {
-            currentPoints = character.spellData.layOnHands.currentHitPoints
-          }
-          
-          updatedUsage = addSingleFeature(character, 'lay-on-hands', {
-            featureName: 'Lay on Hands',
-            featureType: 'points_pool',
-            enabledAtLevel: 1,
-            maxPoints: maxPoints,
-            currentPoints: currentPoints
-          })
-        }
-        
-        // Initialize Divine Sense (Paladin level 1+) - only if it doesn't exist
-        if (character.level >= 1 && !updatedUsage['divine-sense']) {
-          // Calculate max uses from class features or fallback to hardcoded
-          const { getFeatureMaxUses } = require('./feature-usage-tracker')
-          let maxUses = getFeatureMaxUses(character, 'divine-sense') || 0
-          
-          // Fallback to hardcoded calculation if not found in class features
-          if (maxUses === 0) {
-            maxUses = 1 + Math.floor((character.level - 1) / 2) // Default Divine Sense formula
-          }
-          
-          // Calculate current uses from legacy data if available
-          let currentUses = maxUses
-          if (character.spellData?.divineSenseSlot) {
-            currentUses = character.spellData.divineSenseSlot.currentUses
-          }
-          
-          updatedUsage = addSingleFeature(character, 'divine-sense', {
-            featureName: 'Divine Sense',
-            featureType: 'slots',
-            enabledAtLevel: 1,
-            maxUses: maxUses,
-            currentUses: currentUses
-          })
-        }
-        
-        // Initialize Channel Divinity (Paladin level 3+) - only if it doesn't exist
-        if (character.level >= 3 && !updatedUsage['channel-divinity']) {
-          // Calculate max uses from class features or fallback to hardcoded
-          const { getFeatureMaxUses } = require('./feature-usage-tracker')
-          let maxUses = getFeatureMaxUses(character, 'channel-divinity') || 0
-          
-          // Fallback to hardcoded calculation if not found in class features
-          if (maxUses === 0) {
-            maxUses = 1 // Default Channel Divinity formula (1 use per rest)
-          }
-          
-          // Calculate current uses from legacy data if available
-          let currentUses = maxUses
-          if (character.spellData?.channelDivinitySlot) {
-            currentUses = character.spellData.channelDivinitySlot.currentUses
-          }
-          
-          updatedUsage = addSingleFeature(character, 'channel-divinity', {
-            featureName: 'Channel Divinity',
-            featureType: 'slots',
-            enabledAtLevel: 3,
-            maxUses: maxUses,
-            currentUses: currentUses
-          })
-        }
-        
-        // Update character with initialized features
-        // Only update if new features were added (don't overwrite existing data)
-        if (Object.keys(updatedUsage).length > Object.keys(character.classFeatureSkillsUsage || {}).length) {
-          character.classFeatureSkillsUsage = updatedUsage
-        }
-      }
-    }
+    // LEGACY: All class feature initialization (Warlock, Paladin, Bard, Artificer) 
+    // is now handled by the database class_features system via loadClassFeatureSkills.
+    // The legacy hardcoded initialization blocks for genies-wrath, elemental-gift, 
+    // eldritch-invocations, metamagic, lay-on-hands, divine-sense, and channel-divinity
+    // have been removed. Features are now loaded from the database with proper formulas.
 
     // Recalculate max uses for all features that depend on character stats
     const { recalculateAllFeatureMaxUses } = await import('./feature-usage-tracker')
@@ -1766,8 +1628,31 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
       return { error: error.message }
     }
 
-    // Filter out hidden features unless includeHidden is true
-    let features = data?.filter(feature => includeHidden || !feature.is_hidden).map(feature => ({
+    // Resolve the subclass class_id for cross-checking subclass ownership
+    let subclassClassId: string | null = null
+    if (subclass && classData && !classData.subclass) {
+      // We're loading from a base class ID - find the matching subclass class_id
+      const { data: subclassLookup } = await supabase
+        .from("classes")
+        .select("id")
+        .eq("name", classData.name)
+        .eq("subclass", subclass)
+        .limit(1)
+        .maybeSingle()
+      if (subclassLookup) subclassClassId = subclassLookup.id
+    }
+
+    // Filter out hidden features and features belonging to OTHER subclasses
+    let features = data?.filter(feature => {
+      if (!includeHidden && feature.is_hidden) return false
+      // If this feature has a subclass_id, it belongs to a specific subclass
+      // Only include it if it matches the character's subclass
+      if (feature.subclass_id) {
+        if (!subclassClassId) return false // Character has no subclass, skip subclass features
+        return feature.subclass_id === subclassClassId
+      }
+      return true
+    }).map(feature => ({
       id: feature.id,
       class_id: feature.class_id,
       level: feature.level,
@@ -1800,6 +1685,12 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
         .maybeSingle()
 
       if (!baseClassError && baseClassData) {
+        // Resolve the subclass class_id for filtering base class features
+        let thisSubclassClassId = subclassClassId
+        if (!thisSubclassClassId && classData.subclass) {
+          thisSubclassClassId = classId // If we loaded from a subclass class_id, that IS the subclass
+        }
+        
         // Load base class features
         const { data: baseFeatures, error: baseError } = await supabase
           .from("class_features")
@@ -1809,9 +1700,16 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
           .order("level", { ascending: true })
 
         if (!baseError && baseFeatures) {
-          // Filter out hidden features unless includeHidden is true, then map to feature objects
+          // Filter: exclude hidden and features belonging to OTHER subclasses
           const baseClassFeatures = baseFeatures
-            .filter(feature => includeHidden || !feature.is_hidden)
+            .filter(feature => {
+              if (!includeHidden && feature.is_hidden) return false
+              if (feature.subclass_id) {
+                if (!thisSubclassClassId) return false
+                return feature.subclass_id === thisSubclassClassId
+              }
+              return true
+            })
             .map(feature => ({
               id: feature.id,
               class_id: feature.class_id,
@@ -1843,6 +1741,19 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
         .maybeSingle()
 
       if (!baseClassError && baseClassData) {
+        // Resolve the subclass class_id for filtering
+        let fallbackSubclassId = subclassClassId
+        if (!fallbackSubclassId && subclass) {
+          const { data: subLookup } = await supabase
+            .from("classes")
+            .select("id")
+            .eq("name", classData.name)
+            .eq("subclass", subclass)
+            .limit(1)
+            .maybeSingle()
+          if (subLookup) fallbackSubclassId = subLookup.id
+        }
+        
         // Load base class features
         const { data: baseFeatures, error: baseError } = await supabase
           .from("class_features")
@@ -1852,9 +1763,16 @@ export const loadClassFeatures = async (classId: string, level: number, subclass
           .order("level", { ascending: true })
 
         if (!baseError && baseFeatures) {
-          // Filter out hidden features unless includeHidden is true and map to feature objects
+          // Filter: exclude hidden and features belonging to OTHER subclasses
           const baseClassFeatures = baseFeatures
-            .filter(feature => includeHidden || !feature.is_hidden)
+            .filter(feature => {
+              if (!includeHidden && feature.is_hidden) return false
+              if (feature.subclass_id) {
+                if (!fallbackSubclassId) return false
+                return feature.subclass_id === fallbackSubclassId
+              }
+              return true
+            })
             .map(feature => ({
               id: feature.id,
               class_id: feature.class_id,
@@ -3780,39 +3698,315 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
       
       // Also try to load from database as fallback/supplement
       try {
-        const { data: classData } = await supabase
+        // Get base class ID and subclass class ID separately for proper filtering
+        let baseClassId: string | null = null
+        let subclassClassId: string | null = null
+        
+        // Get base class ID
+        const { data: baseClassData } = await supabase
           .from('classes')
           .select('id')
           .eq('name', charClass.name)
-          .eq('subclass', charClass.subclass || null)
+          .is('subclass', null)
           .maybeSingle()
 
-        if (classData) {
-          const { data: features } = await supabase
-            .from('class_features')
-            .select('class_features_skills, is_hidden')
-            .eq('class_id', classData.id)
-            .lte('level', charClass.level)
+        if (baseClassData) {
+          baseClassId = baseClassData.id
+        }
+        
+        // Get subclass class ID if subclass is set
+        if (charClass.subclass) {
+          const { data: subclassData } = await supabase
+            .from('classes')
+            .select('id')
+            .eq('name', charClass.name)
+            .eq('subclass', charClass.subclass)
+            .maybeSingle()
+          
+          if (subclassData) {
+            subclassClassId = subclassData.id
+          }
+        }
 
-          for (const feature of features || []) {
+        // Load base class features - ONLY those without a subclass_id (shared class features)
+        const allDbFeatures: any[] = []
+        
+        if (baseClassId) {
+          const { data: baseFeatures } = await supabase
+            .from('class_features')
+            .select('id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type')
+            .eq('class_id', baseClassId)
+            .lte('level', charClass.level)
+          
+          for (const feature of baseFeatures || []) {
+            // For base class features: only include those with NO subclass_id
+            // Features with a subclass_id belong to a specific subclass and should
+            // only be loaded when that subclass matches the character's subclass
+            if (feature.subclass_id) {
+              // This is a subclass feature stored under the base class
+              // Only include it if the subclass_id matches the character's subclass class ID
+              if (subclassClassId && feature.subclass_id === subclassClassId) {
+                allDbFeatures.push({ ...feature, _isSubclassFeature: true })
+              }
+              // Otherwise skip it - it belongs to a different subclass
+            } else {
+              allDbFeatures.push(feature)
+            }
+          }
+        }
+        
+        // Load subclass-specific features (stored under the subclass class_id)
+        if (subclassClassId && subclassClassId !== baseClassId) {
+          const { data: subFeatures } = await supabase
+            .from('class_features')
+            .select('id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type')
+            .eq('class_id', subclassClassId)
+            .lte('level', charClass.level)
+          
+          for (const feature of subFeatures || []) {
+            // Avoid duplicates (features already loaded from base class query)
+            if (!allDbFeatures.some(f => f.id === feature.id)) {
+              allDbFeatures.push({ ...feature, _isSubclassFeature: true })
+            }
+          }
+        }
+
+        for (const feature of allDbFeatures) {
             // Skip hidden features
             if (feature.is_hidden) {
               continue
             }
             
-            if (feature.class_features_skills) {
-              const skills = Array.isArray(feature.class_features_skills) 
+            if (feature.class_features_skills && feature.feature_skill_type) {
+              // class_features_skills can be a simplified object (from feature management modal)
+              // or a full ClassFeatureSkill object (from templates)
+              const skillsData = Array.isArray(feature.class_features_skills) 
                 ? feature.class_features_skills 
                 : [feature.class_features_skills]
-              // Ensure each skill has the correct className property
-              const skillsWithClassName = skills.map(skill => ({
-                ...skill,
-                className: charClass.name
-              }))
-              featureSkills.push(...skillsWithClassName)
+              
+              for (const skillData of skillsData) {
+                // Check if this is already a full ClassFeatureSkill object (has id, version, featureType)
+                if (skillData && typeof skillData === 'object' && skillData.id && skillData.version && skillData.featureType) {
+                  // It's already a full ClassFeatureSkill, just add className and ensure displayLocation is preserved
+                  // Mark as database-loaded for debugging
+                  featureSkills.push({
+                    ...skillData,
+                    className: charClass.name,
+                    displayLocation: skillData.displayLocation, // Preserve displayLocation from the full object
+                    _isDatabaseLoaded: true
+                  } as ClassFeatureSkill & { _isDatabaseLoaded?: boolean })
+                } else if (skillData && typeof skillData === 'object') {
+                  // It's a simplified object from the feature management modal
+                  // Construct a full ClassFeatureSkill from the feature and skillData
+                  // Generate a feature ID from the feature title
+                  const featureId = `feature-${feature.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
+                  
+                  // Convert config from feature management modal format to ClassFeatureSkill format
+                  let convertedConfig: any = {}
+                  const rawConfig = skillData.config || {}
+                  
+                  // Helper function to normalize formula format (convert _mod to _modifier)
+                  const normalizeFormula = (formula: string): string => {
+                    if (!formula || typeof formula !== 'string') return formula
+                    // Replace ability modifier shortcuts with full names
+                    return formula
+                      .replace(/\bcharisma_mod\b/g, 'charisma_modifier')
+                      .replace(/\bintelligence_mod\b/g, 'intelligence_modifier')
+                      .replace(/\bwisdom_mod\b/g, 'wisdom_modifier')
+                      .replace(/\bstrength_mod\b/g, 'strength_modifier')
+                      .replace(/\bdexterity_mod\b/g, 'dexterity_modifier')
+                      .replace(/\bconstitution_mod\b/g, 'constitution_modifier')
+                      .replace(/\bproficiency\b/g, 'proficiency_bonus')
+                  }
+                  
+                  if (feature.feature_skill_type === 'slots') {
+                    // Start with base config
+                    convertedConfig = { ...rawConfig }
+                    
+                    // Check for override.baseMaxSlots first (this overrides the base formula)
+                    let baseFormula: string | undefined = undefined
+                    if (rawConfig.override && rawConfig.override.baseMaxSlots) {
+                      // Use the override base formula (normalize it)
+                      baseFormula = normalizeFormula(rawConfig.override.baseMaxSlots)
+                    } else if (rawConfig.maxSlotsSource) {
+                      // Convert maxSlotsSource to usesFormula
+                      const sourceMap: Record<string, string> = {
+                        'proficiency': 'proficiency_bonus',
+                        'charisma_mod': 'charisma_modifier',
+                        'intelligence_mod': 'intelligence_modifier',
+                        'wisdom_mod': 'wisdom_modifier',
+                        'strength_mod': 'strength_modifier',
+                        'dexterity_mod': 'dexterity_modifier',
+                        'constitution_mod': 'constitution_modifier',
+                        'level': 'level',
+                        'class_level': 'level',
+                        'custom': rawConfig.customMaxSlots ? `fixed:${rawConfig.customMaxSlots}` : 'fixed:1'
+                      }
+                      
+                      let mappedFormula = sourceMap[rawConfig.maxSlotsSource] || rawConfig.maxSlotsSource
+                      
+                      // Check if maxSlotsSource contains a complex formula
+                      if (rawConfig.maxSlotsSource.includes('+') || rawConfig.maxSlotsSource.includes('-') || rawConfig.maxSlotsSource.includes('*') || rawConfig.maxSlotsSource.includes('/')) {
+                        // It's already a complex formula, normalize it
+                        baseFormula = normalizeFormula(rawConfig.maxSlotsSource)
+                      } else {
+                        // Simple source, use the mapped value
+                        baseFormula = mappedFormula
+                      }
+                    } else if (rawConfig.usesFormula) {
+                      // Already has usesFormula, normalize it
+                      baseFormula = normalizeFormula(rawConfig.usesFormula)
+                    }
+                    
+                    // Set the base usesFormula
+                    if (baseFormula) {
+                      convertedConfig.usesFormula = baseFormula
+                    } else {
+                      // Default if nothing specified
+                      convertedConfig.usesFormula = 'proficiency_bonus'
+                    }
+                    
+                    // Remove maxSlotsSource from config as we've converted it
+                    delete convertedConfig.maxSlotsSource
+                    
+                    // Convert replenishLogic to replenishOn
+                    if (rawConfig.replenishLogic) {
+                      const replenishMap: Record<string, string> = {
+                        'all_long_rest': 'long_rest',
+                        'all_short_rest': 'short_rest',
+                        'all_dawn': 'dawn',
+                        'dice_long_rest': 'long_rest',
+                        'dice_short_rest': 'short_rest',
+                        'one_long_rest': 'long_rest',
+                        'one_short_rest': 'short_rest'
+                      }
+                      convertedConfig.replenishOn = replenishMap[rawConfig.replenishLogic] || rawConfig.replenishLogic
+                      // Keep replenishLogic and replenishDice for level scaling if present
+                      if (rawConfig.replenishDice) {
+                        convertedConfig.replenishDice = rawConfig.replenishDice
+                      }
+                    } else if (!convertedConfig.replenishOn) {
+                      convertedConfig.replenishOn = 'long_rest' // Default
+                    }
+                    
+                    // Ensure displayStyle has a default
+                    if (!convertedConfig.displayStyle) {
+                      convertedConfig.displayStyle = 'circles' // Default
+                    }
+                    
+                    // Normalize any formulas in override.levelScaling
+                    if (convertedConfig.override && convertedConfig.override.levelScaling) {
+                      const levelScaling = convertedConfig.override.levelScaling
+                      Object.keys(levelScaling).forEach(level => {
+                        const scalingConfig = levelScaling[level]
+                        if (scalingConfig.maxSlotsSource) {
+                          // Convert maxSlotsSource in level scaling to usesFormula
+                          if (scalingConfig.maxSlotsSource.includes('+') || scalingConfig.maxSlotsSource.includes('-') || scalingConfig.maxSlotsSource.includes('*') || scalingConfig.maxSlotsSource.includes('/')) {
+                            scalingConfig.usesFormula = normalizeFormula(scalingConfig.maxSlotsSource)
+                          } else {
+                            const sourceMap: Record<string, string> = {
+                              'proficiency': 'proficiency_bonus',
+                              'charisma_mod': 'charisma_modifier',
+                              'intelligence_mod': 'intelligence_modifier',
+                              'wisdom_mod': 'wisdom_modifier',
+                              'strength_mod': 'strength_modifier',
+                              'dexterity_mod': 'dexterity_modifier',
+                              'constitution_mod': 'constitution_modifier',
+                              'level': 'level',
+                              'class_level': 'level'
+                            }
+                            scalingConfig.usesFormula = sourceMap[scalingConfig.maxSlotsSource] || scalingConfig.maxSlotsSource
+                          }
+                          delete scalingConfig.maxSlotsSource
+                        } else if (scalingConfig.usesFormula) {
+                          scalingConfig.usesFormula = normalizeFormula(scalingConfig.usesFormula)
+                        }
+                      })
+                    }
+                    
+                    // Normalize override.usesFormula if present
+                    if (convertedConfig.override && convertedConfig.override.usesFormula) {
+                      convertedConfig.override.usesFormula = normalizeFormula(convertedConfig.override.usesFormula)
+                    }
+                    
+                  } else if (feature.feature_skill_type === 'points_pool') {
+                    // Points pool config - preserve all properties including override
+                    convertedConfig = { ...rawConfig }
+                    // Normalize formulas in points pool config
+                    if (convertedConfig.totalFormula) {
+                      convertedConfig.totalFormula = normalizeFormula(convertedConfig.totalFormula)
+                    }
+                    // Normalize level scaling formulas
+                    if (convertedConfig.override && convertedConfig.override.levelScaling) {
+                      const levelScaling = convertedConfig.override.levelScaling
+                      Object.keys(levelScaling).forEach(level => {
+                        const scalingConfig = levelScaling[level]
+                        if (scalingConfig.totalFormula) {
+                          scalingConfig.totalFormula = normalizeFormula(scalingConfig.totalFormula)
+                        }
+                      })
+                    }
+                  } else if (feature.feature_skill_type === 'availability_toggle') {
+                    // Availability toggle config - copy as-is
+                    convertedConfig = { ...rawConfig }
+                  } else if (feature.feature_skill_type === 'skill_modifier') {
+                    // Skill modifier config - normalize modifierFormula
+                    convertedConfig = { ...rawConfig }
+                    if (convertedConfig.modifierFormula) {
+                      convertedConfig.modifierFormula = normalizeFormula(convertedConfig.modifierFormula)
+                    }
+                  } else {
+                    // For other types, copy config as-is but normalize any formulas
+                    convertedConfig = { ...rawConfig }
+                    // Look for common formula fields and normalize them
+                    if (convertedConfig.usesFormula) {
+                      convertedConfig.usesFormula = normalizeFormula(convertedConfig.usesFormula)
+                    }
+                    if (convertedConfig.totalFormula) {
+                      convertedConfig.totalFormula = normalizeFormula(convertedConfig.totalFormula)
+                    }
+                    if (convertedConfig.modifierFormula) {
+                      convertedConfig.modifierFormula = normalizeFormula(convertedConfig.modifierFormula)
+                    }
+                  }
+                  
+                  // Debug logging for all database-loaded features
+                  console.log('Loading DATABASE feature:', {
+                    featureTitle: feature.title,
+                    featureLevel: feature.level,
+                    featureSkillType: feature.feature_skill_type,
+                    rawConfig: JSON.parse(JSON.stringify(rawConfig)), // Deep clone for logging
+                    convertedConfig: JSON.parse(JSON.stringify(convertedConfig)), // Deep clone for logging
+                    displayLocation: skillData.displayLocation,
+                    skillData: JSON.parse(JSON.stringify(skillData)) // Deep clone for logging
+                  })
+                  
+                  const fullSkill: ClassFeatureSkill = {
+                    id: featureId,
+                    version: 1,
+                    title: feature.title,
+                    subtitle: undefined,
+                    customDescription: skillData.customDescription,
+                    featureType: (feature.feature_skill_type as any),
+                    enabledAtLevel: feature.level,
+                    enabledBySubclass: feature._isSubclassFeature ? (charClass.subclass || null) : null,
+                    className: charClass.name,
+                    displayLocation: skillData.displayLocation || undefined, // Read displayLocation from the simplified object
+                    config: convertedConfig,
+                    // Mark as database-loaded for debugging
+                    _isDatabaseLoaded: true
+                  } as ClassFeatureSkill & { _isDatabaseLoaded?: boolean }
+                  
+                  // Debug logging for constructed skill
+                  if (feature.title.toLowerCase().includes('bottled') || feature.title.toLowerCase().includes('respite')) {
+                    console.log('Constructed ClassFeatureSkill:', fullSkill)
+                  }
+                  
+                  featureSkills.push(fullSkill)
+                }
+              }
             }
           }
-        }
       } catch (dbError) {
       }
     }

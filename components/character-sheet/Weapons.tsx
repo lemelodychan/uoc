@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
+import { getCombatColor } from "@/lib/color-mapping"
 
 interface WeaponsProps {
   character: CharacterData
   onEdit: () => void
+  onToggleAmmunition?: (weaponIndex: number, ammoIndex: number) => void
   canEdit?: boolean
 }
 
-export function Weapons({ character, onEdit, canEdit = true }: WeaponsProps) {
+export function Weapons({ character, onEdit, onToggleAmmunition, canEdit = true }: WeaponsProps) {
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">
@@ -32,26 +34,69 @@ export function Weapons({ character, onEdit, canEdit = true }: WeaponsProps) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2">
-          {character.weapons.map((weapon, index) => (
-            <div key={index} className="p-2 border text-sm font-medium rounded flex flex-row gap-2 bg-background">
-              <div className="w-full flex flex-col gap-1">
-                <span>{weapon.name}</span>
-                  {weapon.weaponProperties && weapon.weaponProperties.length > 0 && (
-                    <div className="flex flex-wrap gap-0 mb-1">
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {weapon.weaponProperties
-                          .map((prop, i) => (i === 0 ? prop.charAt(0).toUpperCase() + prop.slice(1) : prop))
-                          .join(", ")}
+          {character.weapons.map((weapon, index) => {
+            const maxAmmo = weapon.maxAmmunition ?? 0
+            const usedAmmo = weapon.usedAmmunition ?? 0
+            const hasAmmunition = maxAmmo > 0
+            
+            return (
+              <div key={index} className="p-2 border text-sm font-medium rounded flex flex-col gap-2 bg-background">
+                <div className="flex flex-row gap-2">
+                  <div className="w-full flex flex-col gap-1">
+                    <span>{weapon.name}</span>
+                    {weapon.weaponProperties && weapon.weaponProperties.length > 0 && (
+                      <div className="flex flex-wrap gap-0 mb-1">
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {weapon.weaponProperties
+                            .map((prop, i) => (i === 0 ? prop.charAt(0).toUpperCase() + prop.slice(1) : prop))
+                            .join(", ")}
+                        </span>
+                      </div>
+                    )}
+                    <Badge variant="outline" className="text-xs h-fit">{weapon.damageType}</Badge>
+                  </div>
+                  <div className="flex flex-col gap-1 w-fit items-end">
+                    <Badge variant="secondary" className="text-xs h-fit">{weapon.attackBonus} ATK</Badge>
+                  </div>
+                </div>
+                
+                {/* Ammunition Slots */}
+                {hasAmmunition && (
+                  <div className="flex flex-wrap gap-2 pt-1 pb-1 justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Ammunition:
+                    </span>
+                    <div className="flex items-center gap-1 pr-1">
+                      <div className="flex items-center flex-wrap gap-1">
+                        {Array.from({ length: maxAmmo }, (_, i) => {
+                          const isAvailable = i < (maxAmmo - usedAmmo)
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                if (!canEdit || !onToggleAmmunition) return
+                                onToggleAmmunition(index, i)
+                              }}
+                              disabled={!canEdit}
+                              className={`w-3 h-3 rounded border-2 transition-colors ${
+                                isAvailable
+                                  ? `${getCombatColor('spellSlotAvailable')} ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
+                                  : `${getCombatColor('spellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                              }`}
+                              title={isAvailable ? "Available" : "Used"}
+                            />
+                          )
+                        })}
+                      </div>
+                      <span className="text-xs text-muted-foreground ml-2 font-mono">
+                        {maxAmmo - usedAmmo}/{maxAmmo}
                       </span>
                     </div>
-                  )}
-                  <Badge variant="outline" className="text-xs h-fit">{weapon.damageType}</Badge>
+                  </div>
+                )}
               </div>
-              <div className="flex flex-col gap-1 w-fit items-end">
-                <Badge variant="secondary" className="text-xs h-fit">{weapon.attackBonus} ATK</Badge>
-              </div>
-            </div>
-          ))}
+            )
+          })}
           {character.weapons.length === 0 && (
             <div className="text-sm text-muted-foreground text-center py-4">No weapons equipped</div>
           )}

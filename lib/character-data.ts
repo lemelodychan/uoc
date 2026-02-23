@@ -105,6 +105,8 @@ export interface CharacterData {
     attackBonus: string
     damageType: string
     weaponProperties?: string[]
+    maxAmmunition?: number // Maximum ammunition (0 = no tracking)
+    usedAmmunition?: number // Number of ammunition used (0 to maxAmmunition)
   }>
   weaponNotes: string
   features: Array<{
