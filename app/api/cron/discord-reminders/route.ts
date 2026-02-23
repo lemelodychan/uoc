@@ -17,11 +17,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error }, { status: 500 })
   }
 
-  // Fallback to environment variable if campaigns don't have webhook URLs
-  const DEFAULT_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || process.env.DISCORD_WEBHOOK
-
   console.log(`[Cron] Running at ${new Date().toISOString()}, found ${campaigns?.length || 0} campaigns`)
-  console.log(`[Cron] Default webhook URL from env: ${DEFAULT_WEBHOOK_URL ? 'SET' : 'NOT SET'}`)
 
   const nowUtc = new Date()
   const twentyFourHMs = 24 * 60 * 60 * 1000
@@ -32,23 +28,23 @@ export async function GET(req: Request) {
   await Promise.all((campaigns || []).map(async (c) => {
     processed++
     
-    // Use environment variable as fallback if campaign doesn't have webhook URL
-    const webhookUrl = c.discordWebhookUrl || DEFAULT_WEBHOOK_URL
-    
-    if (!webhookUrl) {
-      console.log(`[Cron] Campaign "${c.name}": Skipped - no webhook URL (campaign or env)`)
+    // Skip if campaign doesn't have a Discord webhook URL configured
+    if (!c.discordWebhookUrl) {
+      console.log(`[Cron] Campaign "${c.name}": Skipped - no Discord webhook URL configured`)
       skipped++
       return
     }
     
+    // Skip if notifications are disabled
     if (!c.discordNotificationsEnabled) {
       console.log(`[Cron] Campaign "${c.name}": Skipped - notifications disabled`)
       skipped++
       return
     }
     
+    // Skip if no upcoming session is scheduled
     if (!c.nextSessionDate || !c.nextSessionNumber) {
-      console.log(`[Cron] Campaign "${c.name}": Skipped - missing session date or number`)
+      console.log(`[Cron] Campaign "${c.name}": Skipped - no upcoming session scheduled`)
       skipped++
       return
     }
@@ -77,20 +73,19 @@ export async function GET(req: Request) {
     const diff = sessionUtc.getTime() - nowUtc.getTime()
     const hoursUntilSession = diff / (1000 * 60 * 60)
 
-    // Send if:
-    // 1. Within [24h window +/- 10m] and not already sent, OR
-    // 2. Session is less than 24 hours away and reminder not sent (for immediate notifications)
-    const window = 10 * 60 * 1000
+    // Send reminder if:
+    // - Session is exactly 24 hours away (within a 10 minute window) AND
+    // - Reminder hasn't been sent yet AND
+    // - Session hasn't passed yet
+    const window = 10 * 60 * 1000 // 10 minute window
     const within24HourWindow = Math.abs(diff - twentyFourHMs) <= window
-    const lessThan24Hours = diff < twentyFourHMs && diff > 0
-    const shouldSendReminder = !c.discordReminderSent && (within24HourWindow || lessThan24Hours)
+    const shouldSendReminder = !c.discordReminderSent && within24HourWindow && diff > 0
     
     console.log(`[Cron] Campaign "${c.name}":`)
     console.log(`  - Session UTC: ${sessionUtc.toISOString()}`)
     console.log(`  - Hours until session: ${hoursUntilSession.toFixed(2)}`)
     console.log(`  - Reminder already sent: ${c.discordReminderSent}`)
-    console.log(`  - Within 24h window: ${within24HourWindow}`)
-    console.log(`  - Less than 24h away: ${lessThan24Hours}`)
+    console.log(`  - Within 24h window (±10min): ${within24HourWindow}`)
     console.log(`  - Should send reminder: ${shouldSendReminder}`)
     
     if (shouldSendReminder) {
@@ -98,9 +93,9 @@ export async function GET(req: Request) {
       const qc = formatInTimeZone(sessionUtc, 'America/Montreal', 'MMMM d, yyyy HH:mm')
       const jp = formatInTimeZone(sessionUtc, 'Asia/Tokyo', 'MMMM d, yyyy HH:mm')
       const content = `@everyone Session #${c.nextSessionNumber} of ${c.name} starts in 24 hours (Europe ${eu} / Quebec ${qc} / Tokyo ${jp})`
-      console.log(`[Cron] Campaign "${c.name}": Attempting to send reminder to webhook`)
+      console.log(`[Cron] Campaign "${c.name}": Sending reminder to Discord webhook`)
       try {
-        const response = await fetch(webhookUrl, {
+        const response = await fetch(c.discordWebhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content })
