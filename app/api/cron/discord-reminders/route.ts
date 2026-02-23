@@ -5,9 +5,6 @@ import { formatInTimeZone } from 'date-fns-tz'
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic'
 
-// Force dynamic rendering to prevent caching
-export const dynamic = 'force-dynamic'
-
 // Vercel cron jobs are automatically authenticated by Vercel's infrastructure
 export async function GET(req: Request) {
   // Log immediately to verify the endpoint is being called
