@@ -425,24 +425,46 @@ export const calculateProficiencyBonus = (level: number): number => {
 export const calculateSkillBonus = (character: CharacterData, skill: Skill): number => {
   const abilityScore = character[skill.ability]
   const abilityModifier = calculateModifier(abilityScore)
-  const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level || 1)
+  
+  // For multiclass characters, use total level across all classes for proficiency bonus
+  const totalLevel = character.classes && character.classes.length > 0
+    ? getTotalLevel(character.classes)
+    : character.level || 1
+  
+  const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(totalLevel)
 
   // Check if character is a Bard (single class or multiclass)
   const isBard = (character.class?.toLowerCase() === "bard" || 
     character.classes?.some(c => c.name.toLowerCase() === "bard")) ?? false
 
+  let baseBonus = 0
   switch (skill.proficiency) {
     case "proficient":
-      return abilityModifier + proficiencyBonus
+      baseBonus = abilityModifier + proficiencyBonus
+      break
     case "expertise":
-      return abilityModifier + proficiencyBonus * 2
+      baseBonus = abilityModifier + proficiencyBonus * 2
+      break
     default:
       // Jack of All Trades: Bards add half proficiency bonus (rounded down) to skills they're not proficient in
       if (isBard) {
-        return abilityModifier + Math.floor(proficiencyBonus / 2)
+        baseBonus = abilityModifier + Math.floor(proficiencyBonus / 2)
+      } else {
+        baseBonus = abilityModifier
       }
-      return abilityModifier
   }
+
+  // Add skill modifier bonuses from class features (e.g., Tool Expertise, etc.)
+  const { calculateSkillModifierBonus } = require('./class-feature-config')
+  const skillModifierBonus = calculateSkillModifierBonus(
+    character,
+    skill.name.toLowerCase().replace(/\s+/g, '_'),
+    'skill',
+    skill.proficiency === 'proficient' || skill.proficiency === 'expertise',
+    proficiencyBonus
+  )
+
+  return baseBonus + skillModifierBonus
 }
 
 export const calculateToolBonus = (character: CharacterData, tool: ToolProficiency): number => {

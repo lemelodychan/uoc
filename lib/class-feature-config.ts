@@ -202,9 +202,24 @@ export function calculateSkillModifierBonus(
   skillName: string,
   skillType: 'skill' | 'saving_throw' | 'ability_check' | 'attack_roll' | 'damage_roll',
   isProficient: boolean,
-  proficiencyBonus: number
+  proficiencyBonus?: number
 ): number {
   let totalBonus = 0
+
+  // Calculate proficiency bonus from total character level for multiclass characters
+  // This ensures multiclass characters use their total level (e.g., level 2 monk/6 wizard = level 8 = proficiency +3)
+  let effectiveProficiencyBonus = proficiencyBonus
+  if (effectiveProficiencyBonus === undefined) {
+    // Import calculateProficiencyBonus and getTotalLevel
+    const { calculateProficiencyBonus, getTotalLevel } = require('./character-data')
+    
+    // For multiclass characters, use total level across all classes
+    const totalLevel = character.classes && character.classes.length > 0
+      ? getTotalLevel(character.classes)
+      : character.level || 1
+    
+    effectiveProficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(totalLevel)
+  }
 
   // Get all class features that might affect this skill
   const relevantFeatures = character.classes
@@ -232,8 +247,8 @@ export function calculateSkillModifierBonus(
       if (condition.type === 'not_proficient' && isProficient) continue
     }
 
-    // Calculate the modifier value
-    const modifierValue = evaluateModifierFormula(config.modifierFormula, proficiencyBonus)
+    // Calculate the modifier value using the effective proficiency bonus
+    const modifierValue = evaluateModifierFormula(config.modifierFormula, effectiveProficiencyBonus)
     totalBonus += modifierValue
   }
 
