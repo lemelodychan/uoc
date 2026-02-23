@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase-server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     // Verify caller is authenticated and superadmin
