@@ -34,7 +34,7 @@ export function Weapons({ character, onEdit, onToggleAmmunition, canEdit = true 
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2">
-          {character.weapons.map((weapon, index) => {
+          {(character.weapons || []).map((weapon, index) => {
             const maxAmmo = weapon.maxAmmunition ?? 0
             const usedAmmo = weapon.usedAmmunition ?? 0
             const hasAmmunition = maxAmmo > 0

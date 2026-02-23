@@ -41,7 +41,7 @@ export function FeaturesModal({ isOpen, onClose, character, onSave }: FeaturesMo
           <DialogTitle>Edit Features & Traits</DialogTitle>
         </DialogHeader>
         <div className="grid gap-2 p-4 max-h-[50vh] overflow-y-auto">
-          {character.features.map((feature, index) => (
+          {(character.features || []).map((feature, index) => (
             <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-card">
               <div className="flex flex-col gap-1">
                 <div className="font-semibold text-md">{feature.name || "Unnamed Feature"}</div>

@@ -20,7 +20,7 @@ interface EquipmentModalProps {
 export function EquipmentModal({ isOpen, onClose, character, onSave }: EquipmentModalProps) {
   const [equipment, setEquipment] = useState(character.equipment)
   const [magicItems, setMagicItems] = useState(character.magicItems || [])
-  const [toolsProficiencies, setToolsProficiencies] = useState<ToolProficiency[]>(character.toolsProficiencies)
+  const [toolsProficiencies, setToolsProficiencies] = useState<ToolProficiency[]>(character.toolsProficiencies || [])
   const [isMagicItemsModalOpen, setIsMagicItemsModalOpen] = useState(false)
   const [editingMagicItemIndex, setEditingMagicItemIndex] = useState<number | null>(null)
 
@@ -28,7 +28,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
   useEffect(() => {
     setEquipment(character.equipment)
     setMagicItems(character.magicItems || [])
-    setToolsProficiencies(character.toolsProficiencies)
+    setToolsProficiencies(character.toolsProficiencies || [])
   }, [character.equipment, character.magicItems, character.toolsProficiencies])
 
   const handleSave = () => {

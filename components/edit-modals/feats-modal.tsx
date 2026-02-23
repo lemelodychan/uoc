@@ -41,7 +41,7 @@ export function FeatsModal({ isOpen, onClose, character, onSave }: FeatsModalPro
           <DialogTitle>Edit Feats</DialogTitle>
         </DialogHeader>
         <div className="grid gap-2 p-4 max-h-[50vh] overflow-y-auto">
-          {character.feats.map((feat, index) => (
+          {(character.feats || []).map((feat, index) => (
             <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-card">
               <div className="flex flex-col gap-1">
                 <div className="font-semibold text-md">{feat.name || "Unnamed Feat"}</div>

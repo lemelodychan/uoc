@@ -54,7 +54,7 @@ export function FeatureEditModal({ isOpen, onClose, character, featureIndex, onS
       onSave({ features: [...character.features, newFeature] })
     } else {
       // Update existing feature
-      const updatedFeatures = character.features.map((feature, index) => 
+      const updatedFeatures = (character.features || []).map((feature, index) => 
         index === featureIndex 
           ? { ...feature, name, description, usesPerLongRest, refuelingDie: refuelingDie || undefined }
           : feature

@@ -1514,6 +1514,196 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
   }
 }
 
+// Load minimal character data for skeleton display (campaign homepage)
+export const loadCharactersMinimal = async (): Promise<{ characters?: CharacterData[]; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("characters")
+      .select(`
+        id,
+        name,
+        class_name,
+        subclass,
+        class_id,
+        level,
+        classes,
+        image_url,
+        user_id,
+        visibility,
+        is_npc,
+        campaign_id,
+        party_status!left(status)
+      `)
+      .order("updated_at", { ascending: false })
+
+    if (error) {
+      console.error("Error loading minimal characters:", error)
+      return { error: error.message }
+    }
+
+    // Convert to minimal CharacterData format
+    const minimalCharacters: CharacterData[] = data.map((row) => ({
+      id: row.id,
+      name: row.name,
+      class: row.class_name,
+      subclass: row.subclass,
+      class_id: row.class_id,
+      level: row.level,
+      classes: row.classes || [{
+        name: row.class_name,
+        subclass: row.subclass,
+        class_id: row.class_id,
+        level: row.level
+      }],
+      background: "",
+      race: "",
+      alignment: "",
+      userId: row.user_id || undefined,
+      visibility: row.visibility || 'public',
+      isNPC: row.is_npc || false,
+      strength: 10,
+      dexterity: 10,
+      constitution: 10,
+      intelligence: 10,
+      wisdom: 10,
+      charisma: 10,
+      armorClass: 10,
+      initiative: 0,
+      speed: 30,
+      currentHitPoints: 0,
+      maxHitPoints: 0,
+      savingThrowProficiencies: [],
+      skills: [],
+      weapons: [],
+      features: [],
+      spellData: {
+        spellAttackBonus: 0,
+        spellSaveDC: 8,
+        cantripsKnown: 0,
+        spellsKnown: 0,
+        spellSlots: [],
+        spellNotes: "",
+        featSpellSlots: [],
+        spells: [],
+      },
+      spellSlotsUsed: {
+        1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+      },
+      imageUrl: row.image_url || undefined,
+      partyStatus: row.party_status?.status || 'active',
+      campaignId: row.campaign_id || undefined,
+      classFeatureSkillsUsage: {},
+    }))
+
+    return { characters: minimalCharacters }
+  } catch (error) {
+    console.error("Error loading minimal characters:", error)
+    return { error: "Failed to load minimal characters" }
+  }
+}
+
+// Progressive loading: Load minimal data for all, full data only when needed
+// This optimizes initial load by deferring heavy processing
+export const loadCharactersProgressive = async (
+  activeCampaignId?: string
+): Promise<{ characters?: CharacterData[]; error?: string }> => {
+  try {
+    // Load minimal data for ALL characters (very fast - single query, no processing)
+    const { data: allData, error: allError } = await supabase
+      .from("characters")
+      .select(`
+        id,
+        name,
+        class_name,
+        subclass,
+        class_id,
+        level,
+        classes,
+        image_url,
+        user_id,
+        visibility,
+        is_npc,
+        campaign_id,
+        party_status!left(status)
+      `)
+      .order("updated_at", { ascending: false })
+
+    if (allError) {
+      console.error("Error loading characters for progressive load:", allError)
+      return { error: allError.message }
+    }
+
+    if (!allData || allData.length === 0) {
+      return { characters: [] }
+    }
+
+    // Create minimal characters for ALL (no heavy processing)
+    // Full data will be loaded on-demand when characters are viewed
+    const minimalCharacters: CharacterData[] = allData.map((row) => ({
+      id: row.id,
+      name: row.name,
+      class: row.class_name,
+      subclass: row.subclass,
+      class_id: row.class_id,
+      level: row.level,
+      classes: row.classes || [{
+        name: row.class_name,
+        subclass: row.subclass,
+        class_id: row.class_id,
+        level: row.level
+      }],
+      background: "",
+      race: "",
+      alignment: "",
+      userId: row.user_id || undefined,
+      visibility: row.visibility || 'public',
+      isNPC: row.is_npc || false,
+      strength: 10,
+      dexterity: 10,
+      constitution: 10,
+      intelligence: 10,
+      wisdom: 10,
+      charisma: 10,
+      armorClass: 10,
+      initiative: 0,
+      speed: 30,
+      currentHitPoints: 0,
+      maxHitPoints: 0,
+      savingThrowProficiencies: [],
+      skills: [],
+      weapons: [],
+      features: [],
+      spellData: {
+        spellAttackBonus: 0,
+        spellSaveDC: 8,
+        cantripsKnown: 0,
+        spellsKnown: 0,
+        spellSlots: [],
+        spellNotes: "",
+        featSpellSlots: [],
+        spells: [],
+      },
+      spellSlotsUsed: {
+        1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+      },
+      imageUrl: row.image_url || undefined,
+      partyStatus: row.party_status?.status || 'active',
+      campaignId: row.campaign_id || undefined,
+      classFeatureSkillsUsage: {},
+      toolsProficiencies: [], // Empty array for minimal characters
+      magicItems: [], // Empty array for minimal characters
+      feats: [], // Empty array for minimal characters
+      weapons: [], // Empty array for minimal characters
+      features: [], // Empty array for minimal characters
+    }))
+
+    return { characters: minimalCharacters }
+  } catch (error) {
+    console.error("Error in progressive character loading:", error)
+    return { error: "Failed to load characters progressively" }
+  }
+}
+
 export const deleteCharacter = async (characterId: string): Promise<{ success: boolean; error?: string }> => {
   try {
     const { error } = await supabase.from("characters").delete().eq("id", characterId)

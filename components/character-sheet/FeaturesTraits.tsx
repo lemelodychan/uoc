@@ -69,7 +69,7 @@ export function FeaturesTraits({
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2">
-          {character.features.map((feature, index) => (
+          {(character.features || []).map((feature, index) => (
             <div key={index} className="p-2 pr-3 border rounded flex flex-col gap-0.5 bg-background">
               <div className="font-medium flex items-start justify-between">
                 <span className="text-sm">{feature.name}</span>

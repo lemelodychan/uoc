@@ -18,22 +18,96 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [authMethod, setAuthMethod] = useState<"magic-link" | "password" | null>(null)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [isAuthenticating, setIsAuthenticating] = useState(true) // Start with true to show loading immediately
+  const [isInitialCheck, setIsInitialCheck] = useState(true) // Track if we've done initial auth check
   
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  // Redirect if already logged in
+  // Check for auth callback errors and handle authentication state
   useEffect(() => {
-    const checkUser = async () => {
-      const supabaseClient = createClient()
-      const { data: { user } } = await supabaseClient.auth.getUser()
+    let subscription: { unsubscribe: () => void } | null = null
+    let checkInterval: NodeJS.Timeout | null = null
+
+    const checkAuthState = async () => {
+      const error = searchParams.get("error")
+      
+      // Handle error from auth callback
+      if (error === "auth_callback_error") {
+        setIsAuthenticating(false)
+        setIsInitialCheck(false)
+        setMessage({
+          type: "error",
+          text: "Authentication failed. Please try again or use password login."
+        })
+        // Clean up URL
+        router.replace("/login", { scroll: false })
+        return
+      }
+
+      // Immediately check if already logged in
+      const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         router.replace("/")
+        return
+      }
+
+      // If no user found, stop showing loading state and show login form
+      setIsAuthenticating(false)
+      setIsInitialCheck(false)
+
+      // Set up auth state listener to detect when user becomes authenticated
+      // This handles the case where magic link authentication completes
+      const {
+        data: { subscription: authSubscription },
+      } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_IN" && session) {
+          setIsAuthenticating(true)
+          // Small delay to ensure cookies are set
+          setTimeout(() => {
+            router.replace("/")
+            router.refresh()
+          }, 100)
+        }
+      })
+
+      subscription = authSubscription
+
+      // Fallback: periodically check if user becomes authenticated
+      // This handles edge cases where auth state change might not fire
+      checkInterval = setInterval(async () => {
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (currentUser) {
+          setIsAuthenticating(true)
+          if (checkInterval) {
+            clearInterval(checkInterval)
+          }
+          router.replace("/")
+          router.refresh()
+        }
+      }, 500) // Check more frequently
+
+      // Stop checking after 5 seconds to avoid infinite polling
+      setTimeout(() => {
+        if (checkInterval) {
+          clearInterval(checkInterval)
+          checkInterval = null
+        }
+      }, 5000)
+    }
+    
+    checkAuthState()
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+      if (checkInterval) {
+        clearInterval(checkInterval)
       }
     }
-    checkUser()
-  }, [router])
+  }, [router, searchParams, supabase])
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,6 +173,32 @@ function LoginForm() {
     await supabase.auth.signOut()
     router.push("/login")
     router.refresh()
+  }
+
+  // Show loading state when authenticating or during initial check
+  if (isAuthenticating || isInitialCheck) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background from-slate-50 to-slate-100 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="align-center justify-center flex">
+              <LogoSVG width={120} height={77} className="h-12 w-auto" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex flex-col items-center justify-center space-y-4 py-8">
+              <Icon icon="lucide:loader-2" className="h-8 w-8 animate-spin text-primary" />
+              <div className="text-center space-y-2">
+                <p className="text-lg font-medium">Letting you in...</p>
+                <p className="text-sm text-muted-foreground">
+                  Please wait while we log you in. You'll be redirected shortly.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

@@ -87,7 +87,7 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadCharacter, loadAllCharacters, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
+import { saveCharacter, loadCharacter, loadAllCharacters, loadCharactersProgressive, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
 import { useClassFeaturesPreloader } from "@/hooks/use-class-features"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
@@ -648,126 +648,187 @@ function CharacterSheetContent() {
   const loadFromDatabaseFirst = async () => {
     setIsInitialLoading(true)
 
-    // Test connection first
-    const { success, error } = await testConnection()
-    setDbConnected(success)
-
-    if (success) {
-      try {
-        const { characters: dbCharacters, error: loadError } = await loadAllCharacters()
-        const { campaigns: dbCampaigns, error: campaignLoadError } = await loadAllCampaigns()
-        
-        // Fetch users from API route to get last_login synced from Auth
-        let dbUsers: UserProfile[] | undefined = undefined
-        let usersLoadError: string | undefined = undefined
-        try {
-          const usersRes = await fetch('/api/users/list')
-          if (usersRes.ok) {
-            const data = await usersRes.json()
-            dbUsers = data.users
-          } else {
-            const errorData = await usersRes.json().catch(() => ({}))
-            usersLoadError = errorData.error || 'Failed to load users'
-          }
-        } catch (e: any) {
-          usersLoadError = e?.message || 'Failed to load users'
-        }
-        
-        if (loadError) {
-          console.error("Failed to load characters:", loadError)
-          setCharacters(sampleCharacters)
-          setActiveCharacterId("1")
-          toast({
-            title: "Database Error",
-            description: "Failed to load characters from database. Using sample data.",
-            variant: "destructive",
-          })
-        } else if (dbCharacters && dbCharacters.length > 0) {
-          setCharacters(dbCharacters)
-          setCampaigns(dbCampaigns || [])
-          setUsers(dbUsers || [])
-          
-          // Preload class features for all characters in the background
-          preloadForCharacters(dbCharacters).catch(error => {
-            // Failed to preload class features - non-critical
-          })
-
-          // Set campaign by default - prioritize default campaign, then first active campaign
-          const defaultCampaign = (dbCampaigns || []).find(c => c.isDefault)
-          const activeCampaign = defaultCampaign || (dbCampaigns || []).find(c => c.isActive)
-          let selectedCampaignId = "all"
-          if (activeCampaign) {
-            selectedCampaignId = activeCampaign.id
-            setSelectedCampaignId(activeCampaign.id)
-          }
-
-          // Filter characters based on selected campaign
-          const filteredCharacters = selectedCampaignId === "all" 
-            ? dbCharacters 
-            : dbCharacters.filter(character => {
-                if (selectedCampaignId === "no-campaign") {
-                  return !character.campaignId
-                }
-                return character.campaignId === selectedCampaignId
-              })
-
-          // Check for character ID in URL parameters first
-          const characterFromUrl = searchParams.get('character')
-          const savedActiveCharacterId = loadActiveCharacterFromLocalStorage()
-          
-          let validCharacterId: string | null = null
-          
-          // Priority 1: Character from URL parameter
-          if (characterFromUrl && dbCharacters.find((c) => c.id === characterFromUrl)) {
-            validCharacterId = characterFromUrl
-          }
-          // Priority 2: Saved character from localStorage
-          else if (savedActiveCharacterId && dbCharacters.find((c) => c.id === savedActiveCharacterId)) {
-            validCharacterId = savedActiveCharacterId
-          }
-
-          // If no valid character found or character is not in the filtered campaign, select first character from filtered list
-          if (!validCharacterId || !filteredCharacters.find(c => c.id === validCharacterId)) {
-            validCharacterId = filteredCharacters.length > 0 ? filteredCharacters[0].id : dbCharacters[0]?.id
-          }
-
-          setActiveCharacterId(validCharacterId)
-          saveActiveCharacterToLocalStorage(validCharacterId)
-
-          // Spell slots are now calculated during initial load
-          toast({
-            title: "Success",
-            description: `Loaded ${dbCharacters.length} character(s) from database.`,
-          })
+    // Step 1: Load campaigns first (needed to determine active campaign for progressive loading)
+    const [connectionTest, campaignsPromise, usersPromise] = await Promise.allSettled([
+      testConnection(),
+      loadAllCampaigns(),
+      fetch('/api/users/list').then(async (res) => {
+        if (res.ok) {
+          const data = await res.json()
+          return { users: data.users, error: undefined }
         } else {
-          setCharacters(sampleCharacters)
-          setActiveCharacterId("1")
-          toast({
-            title: "No Characters Found",
-            description: "No characters found in database. Starting with sample data.",
-          })
+          const errorData = await res.json().catch(() => ({}))
+          return { users: undefined, error: errorData.error || 'Failed to load users' }
         }
-      } catch (error) {
-        console.error("Error loading characters:", error)
-        setCharacters(sampleCharacters)
-        setActiveCharacterId("1")
-        toast({
-          title: "Database Error",
-          description: "Failed to connect to database. Using sample data.",
-          variant: "destructive",
-        })
-      }
-    } else {
+      }).catch((e: any) => ({ users: undefined, error: e?.message || 'Failed to load users' }))
+    ])
+
+    // Handle connection test result
+    const connectionResult = connectionTest.status === 'fulfilled' ? connectionTest.value : { success: false, error: 'Connection test failed' }
+    setDbConnected(connectionResult.success)
+
+    // Handle campaigns loading
+    const campaignsResult = campaignsPromise.status === 'fulfilled'
+      ? campaignsPromise.value
+      : { campaigns: undefined, error: 'Failed to load campaigns' }
+    const { campaigns: dbCampaigns } = campaignsResult
+
+    // Handle users loading
+    const usersResult = usersPromise.status === 'fulfilled'
+      ? usersPromise.value
+      : { users: undefined, error: 'Failed to load users' }
+    const dbUsers = usersResult.users
+
+    // Set campaigns and users immediately
+    setCampaigns(dbCampaigns || [])
+    setUsers(dbUsers || [])
+
+    // Step 2: Determine active campaign for progressive loading
+    const defaultCampaign = (dbCampaigns || []).find(c => c.isDefault)
+    const activeCampaign = defaultCampaign || (dbCampaigns || []).find(c => c.isActive)
+    const activeCampaignId = activeCampaign?.id
+
+    // Step 3: Load characters with minimal data only (very fast - no heavy processing)
+    const charactersResult = await loadCharactersProgressive(activeCampaignId)
+    const { characters: dbCharacters, error: loadError } = charactersResult
+
+    // Process results
+    if (loadError || !dbCharacters || dbCharacters.length === 0) {
+      console.error("Failed to load characters:", loadError)
       setCharacters(sampleCharacters)
       setActiveCharacterId("1")
       toast({
-        title: "Database Offline",
-        description: "Using offline mode with sample data. Check your Supabase configuration.",
+        title: loadError ? "Database Error" : "No Characters Found",
+        description: loadError 
+          ? "Failed to load characters from database. Using sample data."
+          : "No characters found in database. Starting with sample data.",
         variant: "destructive",
       })
+      setIsInitialLoading(false)
+      return
     }
 
+    // Set campaign by default
+    let selectedCampaignId = "all"
+    if (activeCampaign) {
+      selectedCampaignId = activeCampaign.id
+      setSelectedCampaignId(activeCampaign.id)
+    }
+
+    // Determine active character ID early (before loading full data)
+    const characterFromUrl = searchParams.get('character')
+    const savedActiveCharacterId = loadActiveCharacterFromLocalStorage()
+
+    // Filter characters based on selected campaign
+    const filteredCharacters = selectedCampaignId === "all" 
+      ? dbCharacters 
+      : dbCharacters.filter(character => {
+          if (selectedCampaignId === "no-campaign") {
+            return !character.campaignId
+          }
+          return character.campaignId === selectedCampaignId
+        })
+
+    // Determine valid character ID
+    let validCharacterId: string | null = null
+    
+    // Priority 1: Character from URL parameter
+    if (characterFromUrl && dbCharacters.find((c) => c.id === characterFromUrl)) {
+      validCharacterId = characterFromUrl
+    }
+    // Priority 2: Saved character from localStorage
+    else if (savedActiveCharacterId && dbCharacters.find((c) => c.id === savedActiveCharacterId)) {
+      validCharacterId = savedActiveCharacterId
+    }
+
+    // If no valid character found or character is not in the filtered campaign, select first character from filtered list
+    if (!validCharacterId || !filteredCharacters.find(c => c.id === validCharacterId)) {
+      validCharacterId = filteredCharacters.length > 0 ? filteredCharacters[0].id : dbCharacters[0]?.id
+    }
+
+    // Set minimal characters immediately for fast initial render
+    setCharacters(dbCharacters)
+    setActiveCharacterId(validCharacterId)
+    saveActiveCharacterToLocalStorage(validCharacterId)
+
+    // Mark loading as complete - UI can now render with minimal data
     setIsInitialLoading(false)
+
+    // Step 4: Load full data ONLY for the active character (critical path)
+    // This ensures the character sheet works immediately
+    if (validCharacterId) {
+      const { character: activeCharacter } = await loadCharacter(validCharacterId)
+      if (activeCharacter) {
+        setCharacters(prev => 
+          prev.map(c => c.id === validCharacterId ? activeCharacter : c)
+        )
+      }
+    }
+
+    // Step 5: Load full data for other active characters in background (non-blocking)
+    // Priority: active characters from active campaign, then other active characters
+    setTimeout(async () => {
+      const charactersToLoad: string[] = []
+      
+      // Active characters from active campaign (if any)
+      if (activeCampaignId) {
+        const activeFromCampaign = dbCharacters
+          .filter(char => 
+            char.campaignId === activeCampaignId && 
+            char.partyStatus === 'active' &&
+            char.id !== validCharacterId &&
+            (!char.skills || char.skills.length === 0)
+          )
+          .slice(0, 5) // Limit to 5 to avoid too much processing
+        charactersToLoad.push(...activeFromCampaign.map(c => c.id))
+      }
+      
+      // Other active characters (limit to 5 more)
+      const otherActive = dbCharacters
+        .filter(char => 
+          char.partyStatus === 'active' &&
+          !charactersToLoad.includes(char.id) &&
+          char.id !== validCharacterId &&
+          (!char.skills || char.skills.length === 0)
+        )
+        .slice(0, 5)
+      charactersToLoad.push(...otherActive.map(c => c.id))
+      
+      if (charactersToLoad.length > 0) {
+        const fullResults = await Promise.all(
+          charactersToLoad.map(id => loadCharacter(id))
+        )
+        
+        setCharacters(prev => {
+          const updated = [...prev]
+          fullResults.forEach(result => {
+            if (result.character) {
+              const index = updated.findIndex(c => c.id === result.character!.id)
+              if (index >= 0) {
+                updated[index] = result.character
+              }
+            }
+          })
+          return updated
+        })
+      }
+
+      // Preload class features for loaded characters in the background (non-blocking)
+      const loadedCharacters = dbCharacters.filter(c => 
+        c.id === validCharacterId || charactersToLoad.includes(c.id)
+      )
+      if (loadedCharacters.length > 0) {
+        preloadForCharacters(loadedCharacters).catch(error => {
+          console.warn("Failed to preload class features:", error)
+        })
+      }
+    }, 100) // Small delay to let initial render complete
+
+    // Show success toast (non-blocking)
+    toast({
+      title: "Success",
+      description: `Loaded ${dbCharacters.length} character(s) from database.`,
+    })
   }
 
   // Long Rest Functions
@@ -3042,9 +3103,22 @@ function CharacterSheetContent() {
   //   triggerAutoSave()
   // }
 
-  const setActiveCharacterIdWithStorage = (characterId: string) => {
+  const setActiveCharacterIdWithStorage = async (characterId: string) => {
     setActiveCharacterId(characterId)
     saveActiveCharacterToLocalStorage(characterId)
+    
+    // Check if character is minimal (skeleton) and load full data if needed
+    const character = characters.find(c => c.id === characterId)
+    if (character && (!character.skills || character.skills.length === 0)) {
+      // Character is minimal - load full data in background
+      const { character: fullCharacter } = await loadCharacter(characterId)
+      if (fullCharacter) {
+        // Update the character in the characters array
+        setCharacters(prev => 
+          prev.map(c => c.id === characterId ? fullCharacter : c)
+        )
+      }
+    }
   }
 
   const handleEldritchCannonSave = (updates: Partial<CharacterData>) => {

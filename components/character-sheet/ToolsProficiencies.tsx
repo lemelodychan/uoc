@@ -188,7 +188,7 @@ export function ToolsProficiencies({
           <div className="flex flex-col gap-3 border-t pt-4 mt-4">
             <div className="text-sm font-medium">Magic Items</div>
             <div className="flex flex-col gap-2">
-              {character.magicItems.map((item, index) => (
+              {(character.magicItems || []).map((item, index) => (
                 <div key={index} className="p-2 pr-3 border rounded bg-background">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium">{item.name || "Unnamed Magic Item"}</h4>
