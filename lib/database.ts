@@ -603,6 +603,8 @@ export const saveCharacter = async (
       hit_points: character.currentHitPoints,
       max_hit_points: character.maxHitPoints,
       temporary_hit_points: character.temporaryHitPoints ?? 0,
+      temp_max_hp: character.tempMaxHP ?? 0,
+      death_saves: character.deathSaves ?? { successes: 0, failures: 0 },
       exhaustion: character.exhaustion ?? 0,
       hit_dice_total: character.hitDice?.total ?? 0,
       hit_dice_used: character.hitDice?.used ?? 0,
@@ -801,6 +803,8 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       currentHitPoints: data.hit_points, // Fixed: hit_points -> currentHitPoints
       maxHitPoints: data.max_hit_points,
       temporaryHitPoints: data.temporary_hit_points || 0,
+      tempMaxHP: data.temp_max_hp ?? 0,
+      deathSaves: data.death_saves ?? { successes: 0, failures: 0 },
       exhaustion: data.exhaustion || 0,
       hitDice: data.hit_dice_total ? {
         total: data.hit_dice_total,
@@ -1218,6 +1222,8 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           currentHitPoints: row.hit_points,
           maxHitPoints: row.max_hit_points,
           temporaryHitPoints: row.temporary_hit_points || 0,
+          tempMaxHP: row.temp_max_hp ?? 0,
+          deathSaves: row.death_saves ?? { successes: 0, failures: 0 },
           exhaustion: row.exhaustion || 0,
           hitDice: row.hit_dice_total ? {
             total: row.hit_dice_total,

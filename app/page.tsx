@@ -1733,6 +1733,7 @@ function CharacterSheetContent() {
             hitDice: updatedHitDice,
             classFeatureSkillsUsage: updatedClassFeatureSkillsUsage,
             exhaustion: Math.max(0, (character.exhaustion || 0) - 1), // Reduce exhaustion by 1 (minimum 0)
+            deathSaves: { successes: 0, failures: 0 }, // Reset death saves on long rest
           }
         }
         return character
@@ -2956,6 +2957,17 @@ function CharacterSheetContent() {
     triggerAutoSave()
   }
 
+  const toggleDeathSave = (type: 'successes' | 'failures', index: number) => {
+    if (!activeCharacter) return
+    const current = activeCharacter.deathSaves ?? { successes: 0, failures: 0 }
+    const currentCount = current[type]
+    // If clicking a filled slot, remove it (and all after); if clicking an empty slot, fill up to it
+    const newCount = index < currentCount ? index : index + 1
+    const updatedDeathSaves = { ...current, [type]: Math.max(0, Math.min(3, newCount)) }
+    updateCharacter({ deathSaves: updatedDeathSaves })
+    triggerAutoSave()
+  }
+
   const toggleFlashOfGenius = (index: number) => {
     if (!activeCharacter || !activeCharacter.spellData.flashOfGeniusSlot) return
 
@@ -3331,6 +3343,7 @@ function CharacterSheetContent() {
               character={activeCharacter}
               onEdit={() => setCombatModalOpen(true)}
               onToggleHitDie={toggleHitDie}
+              onToggleDeathSave={toggleDeathSave}
               canEdit={canEditActiveCharacter}
             />
 

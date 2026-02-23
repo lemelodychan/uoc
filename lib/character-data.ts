@@ -70,6 +70,11 @@ export interface CharacterData {
   currentHitPoints: number
   maxHitPoints: number
   temporaryHitPoints?: number
+  tempMaxHP?: number // Temporary max HP modifier (can be positive or negative)
+  deathSaves?: {
+    successes: number // 0-3
+    failures: number  // 0-3
+  }
   exhaustion?: number
   hitDice?: {
     total: number

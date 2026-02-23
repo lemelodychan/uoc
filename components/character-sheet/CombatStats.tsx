@@ -14,6 +14,7 @@ interface CombatStatsProps {
   character: CharacterData
   onEdit: () => void
   onToggleHitDie: (classIndex: number, dieIndex: number) => void
+  onToggleDeathSave?: (type: 'successes' | 'failures', index: number) => void
   canEdit?: boolean
 }
 
@@ -21,7 +22,7 @@ const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
-export function CombatStats({ character, onEdit, onToggleHitDie, canEdit = true }: CombatStatsProps) {
+export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSave, canEdit = true }: CombatStatsProps) {
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">
@@ -99,14 +100,19 @@ export function CombatStats({ character, onEdit, onToggleHitDie, canEdit = true 
             })()}`}>
               {(() => {
                 const exhaustion = character.exhaustion || 0
-                const effectiveMaxHP = exhaustion >= 4 ? Math.floor(character.maxHitPoints / 2) : character.maxHitPoints
+                const tempMaxHP = character.tempMaxHP ?? 0
+                const baseMax = character.maxHitPoints + tempMaxHP
+                const effectiveMaxHP = exhaustion >= 4 ? Math.floor(baseMax / 2) : baseMax
                 const tempHP = (character.temporaryHitPoints ?? 0) > 0 ? character.temporaryHitPoints as number : 0
                 return (
                   <>
                     {character.currentHitPoints}/
                     {effectiveMaxHP + tempHP}
+                    {tempMaxHP !== 0 && (
+                      <span className={`${tempMaxHP > 0 ? getCombatColor('tempHP') : 'text-[#ce6565]'} text-xs font-medium`}>({tempMaxHP > 0 ? '+' : ''}{tempMaxHP})</span>
+                    )}
                     {tempHP > 0 && (
-                      <span className={`${getCombatColor('tempHP')} text-xs font-medium`}>(+{tempHP})</span>
+                      <span className={`${getCombatColor('tempHP')} text-xs font-medium`}>(+{tempHP} temp)</span>
                     )}
                   </>
                 )
@@ -114,6 +120,66 @@ export function CombatStats({ character, onEdit, onToggleHitDie, canEdit = true 
             </div>
           </div>
         </div>
+        {/* Death Saves - show when HP is 0 */}
+        {character.currentHitPoints === 0 && (
+          <div className="flex items-start gap-3 col-span-2 mb-0">
+            <Icon icon="lucide:skull" className="w-5 h-10 py-2.5 text-[#ce6565]" />
+            <div className="flex flex-col gap-2">
+              <div className="text-sm text-muted-foreground">Death Saves</div>
+              <div className="flex flex-row flex-wrap justify-between gap-x-6 gap-y-1.5">
+                <div className="flex flex-grow items-center gap-4">
+                  <span className="text-xs font-medium w-14 text-[#6ab08b]">Successes</span>
+                  <div className="flex gap-1">
+                    {Array.from({ length: 3 }, (_, i) => {
+                      const isChecked = i < (character.deathSaves?.successes ?? 0)
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (!canEdit || !onToggleDeathSave) return
+                            onToggleDeathSave('successes', i)
+                          }}
+                          disabled={!canEdit}
+                          className={`w-3 h-3 rounded-md border-2 transition-colors ${
+                            isChecked
+                              ? `bg-[#6ab08b] border-[#6ab08b] ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
+                              : `bg-card border-border ${canEdit ? 'cursor-pointer hover:border-[#6ab08b]' : 'cursor-not-allowed opacity-50'}`
+                          }`}
+                          title={isChecked ? "Success" : "Not yet"}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="flex flex-grow items-center gap-4">
+                  <span className="text-xs font-medium w-14 text-[#ce6565]">Failures</span>
+                  <div className="flex gap-1">
+                    {Array.from({ length: 3 }, (_, i) => {
+                      const isChecked = i < (character.deathSaves?.failures ?? 0)
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (!canEdit || !onToggleDeathSave) return
+                            onToggleDeathSave('failures', i)
+                          }}
+                          disabled={!canEdit}
+                          className={`w-3 h-3 rounded-md border-2 transition-colors ${
+                            isChecked
+                              ? `bg-[#ce6565] border-[#ce6565] ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
+                              : `bg-card border-border ${canEdit ? 'cursor-pointer hover:border-[#ce6565]' : 'cursor-not-allowed opacity-50'}`
+                          }`}
+                          title={isChecked ? "Failure" : "Not yet"}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Exhaustion - only show if > 0 */}
         {(character.exhaustion ?? 0) > 0 && (
           <div className="flex items-center gap-3 col-span-2 mb-0">

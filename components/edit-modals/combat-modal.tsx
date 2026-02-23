@@ -26,6 +26,8 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
     currentHitPoints: character.currentHitPoints,
     maxHitPoints: character.maxHitPoints,
     temporaryHitPoints: character.temporaryHitPoints || 0,
+    tempMaxHP: character.tempMaxHP ?? 0,
+    deathSaves: character.deathSaves ?? { successes: 0, failures: 0 },
     exhaustion: character.exhaustion || 0,
     // Legacy single hit dice support
     hitDiceTotal: character.hitDice?.total || 0,
@@ -46,6 +48,8 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
       currentHitPoints: character.currentHitPoints,
       maxHitPoints: character.maxHitPoints,
       temporaryHitPoints: character.temporaryHitPoints || 0,
+      tempMaxHP: character.tempMaxHP ?? 0,
+      deathSaves: character.deathSaves ?? { successes: 0, failures: 0 },
       exhaustion: character.exhaustion || 0,
       hitDiceTotal: character.hitDice?.total || 0,
       hitDiceRemaining: character.hitDice ? (character.hitDice.total - character.hitDice.used) : 0,
@@ -53,7 +57,7 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
       hitDiceByClass: character.hitDiceByClass || [],
       combatNotes: character.otherTools || "",
     })
-  }, [character.armorClass, character.initiative, character.speed, character.currentHitPoints, character.maxHitPoints, character.temporaryHitPoints, character.exhaustion, character.hitDice, character.hitDiceByClass, character.otherTools])
+  }, [character.armorClass, character.initiative, character.speed, character.currentHitPoints, character.maxHitPoints, character.temporaryHitPoints, character.tempMaxHP, character.deathSaves, character.exhaustion, character.hitDice, character.hitDiceByClass, character.otherTools])
 
   const addHitDieClass = () => {
     setFormData({
@@ -86,6 +90,8 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
       currentHitPoints: formData.currentHitPoints,
       maxHitPoints: formData.maxHitPoints,
       temporaryHitPoints: formData.temporaryHitPoints,
+      tempMaxHP: formData.tempMaxHP,
+      deathSaves: formData.deathSaves,
       exhaustion: formData.exhaustion,
       otherTools: formData.combatNotes,
     }
@@ -209,6 +215,81 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
                 className="w-full"
               />
             </div>
+            <div className="grid grid-cols-[112px_auto] mb-0 items-center gap-3">
+              <Label htmlFor="tempMaxHP" className="text-right">
+                Temp Max HP
+              </Label>
+              <Input
+                id="tempMaxHP"
+                type="number"
+                value={formData.tempMaxHP}
+                onChange={(e) => setFormData({ ...formData, tempMaxHP: Number.parseInt(e.target.value) || 0 })}
+                className="w-full"
+                placeholder="0"
+              />
+            </div>
+
+            {/* Death Saves - show when current HP is 0 */}
+            {formData.currentHitPoints === 0 && (
+              <div className="col-span-2 p-3 border rounded-lg bg-card">
+                <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                  <Icon icon="lucide:skull" className="w-4 h-4 text-[#ce6565]" />
+                  Death Saves
+                </h4>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <Label className="text-right w-[80px] text-[#6ab08b]">Successes</Label>
+                    <div className="flex gap-1.5">
+                      {Array.from({ length: 3 }, (_, i) => {
+                        const isChecked = i < formData.deathSaves.successes
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              const newSuccesses = isChecked ? i : i + 1
+                              setFormData({ ...formData, deathSaves: { ...formData.deathSaves, successes: newSuccesses } })
+                            }}
+                            className={`w-4 h-4 rounded-md border-2 transition-colors ${
+                              isChecked
+                                ? 'bg-[#6ab08b] border-[#6ab08b] cursor-pointer hover:opacity-80'
+                                : 'bg-card border-border cursor-pointer hover:border-[#6ab08b]'
+                            }`}
+                            title={isChecked ? "Success" : "Not yet"}
+                          />
+                        )
+                      })}
+                    </div>
+                    <span className="text-sm text-muted-foreground">{formData.deathSaves.successes}/3</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Label className="text-right w-[80px] text-[#ce6565]">Failures</Label>
+                    <div className="flex gap-1.5">
+                      {Array.from({ length: 3 }, (_, i) => {
+                        const isChecked = i < formData.deathSaves.failures
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              const newFailures = isChecked ? i : i + 1
+                              setFormData({ ...formData, deathSaves: { ...formData.deathSaves, failures: newFailures } })
+                            }}
+                            className={`w-4 h-4 rounded-md border-2 transition-colors ${
+                              isChecked
+                                ? 'bg-[#ce6565] border-[#ce6565] cursor-pointer hover:opacity-80'
+                                : 'bg-card border-border cursor-pointer hover:border-[#ce6565]'
+                            }`}
+                            title={isChecked ? "Failure" : "Not yet"}
+                          />
+                        )
+                      })}
+                    </div>
+                    <span className="text-sm text-muted-foreground">{formData.deathSaves.failures}/3</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Hit Dice Section */}
