@@ -548,6 +548,13 @@ export const saveCharacter = async (
   character: CharacterData,
 ): Promise<{ success: boolean; error?: string; characterId?: string }> => {
   try {
+    // Ensure user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error("[v0] Authentication error:", authError?.message || "No authenticated user")
+      return { success: false, error: authError?.message || "Not authenticated" }
+    }
+
     let characterId = character.id
 
     // If the ID is not a valid UUID (like "1", "2", etc.), generate a new UUID
@@ -561,16 +568,58 @@ export const saveCharacter = async (
     // Preserve existing background_data from database if character.backgroundData is undefined/null
     // This prevents overwriting background_data when doing partial updates (e.g., editing personality traits)
     let backgroundDataToSave = character.backgroundData
-    if (!backgroundDataToSave && characterId) {
-      // Try to load existing background_data from database to preserve it
-      const { data: existingData } = await supabase
+    let existingCharacterData: any = null
+    if (characterId) {
+      // Try to load existing character data from database to preserve it and check permissions
+      const { data: existingData, error: fetchError } = await supabase
         .from("characters")
-        .select("background_data")
+        .select("background_data, user_id, visibility, campaign_id")
         .eq("id", characterId)
         .maybeSingle()
       
-      if (existingData?.background_data) {
-        backgroundDataToSave = existingData.background_data
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        // PGRST116 is "not found" which is fine for new characters
+        console.error("[v0] Error fetching existing character:", fetchError)
+        return { success: false, error: fetchError.message }
+      }
+      
+      if (existingData) {
+        existingCharacterData = existingData
+        if (existingData.background_data) {
+          backgroundDataToSave = existingData.background_data
+        }
+        
+        // Verify user has permission to update this character
+        // Check if user is owner, superadmin, or DM of the character's campaign
+        const isOwner = existingData.user_id === user.id
+        const isPublic = existingData.visibility === 'public'
+        
+        if (!isOwner && !isPublic) {
+          // Check if user is superadmin
+          const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("permission_level")
+            .eq("user_id", user.id)
+            .maybeSingle()
+          
+          const isSuperadmin = profile?.permission_level === 'superadmin'
+          
+          // Check if user is DM of the character's campaign
+          let isDM = false
+          if (existingData.campaign_id) {
+            const { data: campaign } = await supabase
+              .from("campaigns")
+              .select("dungeon_master_id")
+              .eq("id", existingData.campaign_id)
+              .maybeSingle()
+            
+            isDM = campaign?.dungeon_master_id === user.id
+          }
+          
+          if (!isSuperadmin && !isDM) {
+            return { success: false, error: "You don't have permission to update this character" }
+          }
+        }
       }
     }
 
@@ -590,8 +639,9 @@ export const saveCharacter = async (
       alignment: character.alignment,
       image_url: character.imageUrl || null,
       aesthetic_images: character.aestheticImages || null,
-      user_id: character.userId || null,
-      visibility: character.visibility || 'public',
+      // Ensure user_id is set - use existing if character exists, otherwise use current user
+      user_id: existingCharacterData?.user_id || character.userId || user.id,
+      visibility: character.visibility || existingCharacterData?.visibility || 'public',
       is_npc: character.isNPC || false,
       strength: character.strength,
       dexterity: character.dexterity,
@@ -714,6 +764,13 @@ export const saveCharacter = async (
 
     if (error) {
       console.error("[v0] Database save error:", error)
+      // Provide more specific error message for RLS policy violations
+      if (error.code === '42501' || error.message?.includes('permission denied') || error.message?.includes('row-level security')) {
+        return { 
+          success: false, 
+          error: `Permission denied: ${error.message}. Please ensure you have permission to update this character.` 
+        }
+      }
       return { success: false, error: error.message }
     }
 
@@ -3125,6 +3182,44 @@ export const upsertClassFeature = async (feature: {
   class_features_skills?: any 
 }): Promise<{ success: boolean; id?: string; error?: string }> => {
   try {
+    // Ensure user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error in upsertClassFeature:", authError?.message || "No authenticated user")
+      return { success: false, error: authError?.message || "Not authenticated" }
+    }
+
+    // Verify user has permission to update this class (must be owner or superadmin)
+    const { data: classData, error: classFetchError } = await supabase
+      .from('classes')
+      .select('created_by, is_custom')
+      .eq('id', feature.class_id)
+      .maybeSingle()
+
+    if (classFetchError) {
+      console.error("Error fetching class for permission check:", classFetchError)
+      return { success: false, error: classFetchError.message }
+    }
+
+    if (!classData) {
+      return { success: false, error: "Class not found" }
+    }
+
+    // Check if user is owner (for custom classes) or superadmin
+    const isOwner = classData.is_custom && classData.created_by === user.id
+    if (!isOwner) {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("permission_level")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      
+      const isSuperadmin = profile?.permission_level === 'superadmin'
+      if (!isSuperadmin) {
+        return { success: false, error: "You don't have permission to update this class" }
+      }
+    }
+
     // Ensure subclass_id is properly set based on feature_type
     const normalizedSubclassId = feature.feature_type === 'subclass' ? feature.subclass_id : null
     
@@ -3149,6 +3244,14 @@ export const upsertClassFeature = async (feature: {
         // Invalidate cache for this class
         await invalidateClassFeaturesCache(feature.class_id)
         return { success: true, id: feature.id }
+      }
+      
+      // If update failed due to RLS, provide better error message
+      if (updateError.code === '42501' || updateError.message?.includes('permission denied') || updateError.message?.includes('row-level security')) {
+        return { 
+          success: false, 
+          error: `Permission denied: ${updateError.message}. Please ensure you have permission to update this class feature.` 
+        }
       }
     }
     
@@ -3179,6 +3282,13 @@ export const upsertClassFeature = async (feature: {
       
       if (updateError) {
         console.error("Error updating existing class feature:", updateError)
+        // Provide more specific error message for RLS policy violations
+        if (updateError.code === '42501' || updateError.message?.includes('permission denied') || updateError.message?.includes('row-level security')) {
+          return { 
+            success: false, 
+            error: `Permission denied: ${updateError.message}. Please ensure you have permission to update this class feature.` 
+          }
+        }
         return { success: false, error: updateError.message }
       }
       
@@ -3198,6 +3308,13 @@ export const upsertClassFeature = async (feature: {
     const { error } = await supabase.from("class_features").insert(payload)
     if (error) {
       console.error("Error creating class feature:", error)
+      // Provide more specific error message for RLS policy violations
+      if (error.code === '42501' || error.message?.includes('permission denied') || error.message?.includes('row-level security')) {
+        return { 
+          success: false, 
+          error: `Permission denied: ${error.message}. Please ensure you have permission to create class features.` 
+        }
+      }
       return { success: false, error: error.message }
     }
     
@@ -4226,6 +4343,60 @@ export const saveClassFeatureSkillsUsage = async (
   usage: FeatureSkillUsage
 ): Promise<{ success: boolean; error?: string }> => {
   try {
+    // Ensure user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error in saveClassFeatureSkillsUsage:", authError?.message || "No authenticated user")
+      return { success: false, error: authError?.message || "Not authenticated" }
+    }
+
+    // Verify user has permission to update this character
+    const { data: existingCharacter, error: fetchError } = await supabase
+      .from('characters')
+      .select('user_id, visibility, campaign_id')
+      .eq('id', characterId)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error("Error fetching character for permission check:", fetchError)
+      return { success: false, error: fetchError.message }
+    }
+
+    if (!existingCharacter) {
+      return { success: false, error: "Character not found" }
+    }
+
+    // Check permissions
+    const isOwner = existingCharacter.user_id === user.id
+    const isPublic = existingCharacter.visibility === 'public'
+    
+    if (!isOwner && !isPublic) {
+      // Check if user is superadmin
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("permission_level")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      
+      const isSuperadmin = profile?.permission_level === 'superadmin'
+      
+      // Check if user is DM of the character's campaign
+      let isDM = false
+      if (existingCharacter.campaign_id) {
+        const { data: campaign } = await supabase
+          .from("campaigns")
+          .select("dungeon_master_id")
+          .eq("id", existingCharacter.campaign_id)
+          .maybeSingle()
+        
+        isDM = campaign?.dungeon_master_id === user.id
+      }
+      
+      if (!isSuperadmin && !isDM) {
+        return { success: false, error: "You don't have permission to update this character" }
+      }
+    }
+
     const { error } = await supabase
       .from('characters')
       .update({ class_features_skills_usage: usage })
@@ -4233,6 +4404,13 @@ export const saveClassFeatureSkillsUsage = async (
 
     if (error) {
       console.error("Error saving class feature skills usage:", error)
+      // Provide more specific error message for RLS policy violations
+      if (error.code === '42501' || error.message?.includes('permission denied') || error.message?.includes('row-level security')) {
+        return { 
+          success: false, 
+          error: `Permission denied: ${error.message}. Please ensure you have permission to update this character.` 
+        }
+      }
       return { success: false, error: error.message }
     }
 
@@ -4424,6 +4602,44 @@ export const updateClassFeatureSkills = async (
   featureSkills: ClassFeatureSkill[]
 ): Promise<{ success: boolean; error?: string }> => {
   try {
+    // Ensure user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error in updateClassFeatureSkills:", authError?.message || "No authenticated user")
+      return { success: false, error: authError?.message || "Not authenticated" }
+    }
+
+    // Verify user has permission to update this class (must be owner or superadmin)
+    const { data: classData, error: fetchError } = await supabase
+      .from('classes')
+      .select('created_by, is_custom')
+      .eq('id', classId)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error("Error fetching class for permission check:", fetchError)
+      return { success: false, error: fetchError.message }
+    }
+
+    if (!classData) {
+      return { success: false, error: "Class not found" }
+    }
+
+    // Check if user is owner (for custom classes) or superadmin
+    const isOwner = classData.is_custom && classData.created_by === user.id
+    if (!isOwner) {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("permission_level")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      
+      const isSuperadmin = profile?.permission_level === 'superadmin'
+      if (!isSuperadmin) {
+        return { success: false, error: "You don't have permission to update this class" }
+      }
+    }
+
     // Update all features for this class with the new feature skills
     const { error } = await supabase
       .from('class_features')
@@ -4432,6 +4648,13 @@ export const updateClassFeatureSkills = async (
 
     if (error) {
       console.error("Error updating class feature skills:", error)
+      // Provide more specific error message for RLS policy violations
+      if (error.code === '42501' || error.message?.includes('permission denied') || error.message?.includes('row-level security')) {
+        return { 
+          success: false, 
+          error: `Permission denied: ${error.message}. Please ensure you have permission to update this class.` 
+        }
+      }
       return { success: false, error: error.message }
     }
 
