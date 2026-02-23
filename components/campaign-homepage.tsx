@@ -446,6 +446,15 @@ export function CampaignHomepage({
       const result = await response.json()
       
       // Log the debug information
+      if (result.debugLogs && Array.isArray(result.debugLogs)) {
+        console.group('🔍 Discord Notification Test Debug Logs')
+        result.debugLogs.forEach((log: string) => {
+          console.log(log)
+        })
+        console.groupEnd()
+      } else {
+        console.log('📋 Test result:', result)
+      }
       
       if (response.ok) {
         if (result.sent > 0) {
@@ -461,6 +470,14 @@ export function CampaignHomepage({
           })
         }
       } else {
+        console.error('❌ Test endpoint error:', result.error, result.details)
+        if (result.debugLogs && Array.isArray(result.debugLogs)) {
+          console.group('🔍 Error Debug Logs')
+          result.debugLogs.forEach((log: string) => {
+            console.log(log)
+          })
+          console.groupEnd()
+        }
         toast({
           title: "Failed to send notification",
           description: result.error || "An error occurred while sending the notification.",

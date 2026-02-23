@@ -3168,27 +3168,37 @@ export const updateCampaign = async (campaign: Campaign): Promise<{ success: boo
       }
     }
 
+    // Build update object, explicitly handling undefined values
+    const updateData: any = {
+      name: campaign.name,
+      description: campaign.description,
+      updated_at: campaign.updated_at,
+      characters: campaign.characters,
+      is_active: campaign.isActive || false,
+      dungeon_master_id: campaign.dungeonMasterId || null,
+      level_up_mode_enabled: campaign.levelUpModeEnabled || false,
+      next_session_date: campaign.nextSessionDate || null,
+      next_session_time: campaign.nextSessionTime || null,
+      next_session_timezone: campaign.nextSessionTimezone || null,
+      next_session_number: campaign.nextSessionNumber || null,
+      discord_notifications_enabled: campaign.discordNotificationsEnabled || false,
+      discord_reminder_sent: campaign.discordReminderSent || false,
+      logo_light_url: campaign.logoLightUrl || null,
+      logo_dark_url: campaign.logoDarkUrl || null,
+      is_default: campaign.isDefault || false
+    }
+    
+    // Explicitly set discord_webhook_url - use null for empty/undefined, or the actual value
+    updateData.discord_webhook_url = campaign.discordWebhookUrl && campaign.discordWebhookUrl.trim() 
+      ? campaign.discordWebhookUrl.trim() 
+      : null
+
+    console.log(`[updateCampaign] Updating campaign ${campaign.id}, discord_webhook_url:`, 
+      updateData.discord_webhook_url ? `${updateData.discord_webhook_url.substring(0, 50)}...` : 'null')
+
     const { error } = await supabase
       .from("campaigns")
-      .update({
-        name: campaign.name,
-        description: campaign.description,
-        updated_at: campaign.updated_at,
-        characters: campaign.characters,
-        is_active: campaign.isActive || false,
-        dungeon_master_id: campaign.dungeonMasterId || null,
-        level_up_mode_enabled: campaign.levelUpModeEnabled || false,
-        next_session_date: campaign.nextSessionDate || null,
-        next_session_time: campaign.nextSessionTime || null,
-        next_session_timezone: campaign.nextSessionTimezone || null,
-        next_session_number: campaign.nextSessionNumber || null,
-        discord_webhook_url: campaign.discordWebhookUrl || null,
-        discord_notifications_enabled: campaign.discordNotificationsEnabled || false,
-        discord_reminder_sent: campaign.discordReminderSent || false,
-        logo_light_url: campaign.logoLightUrl || null,
-        logo_dark_url: campaign.logoDarkUrl || null,
-        is_default: campaign.isDefault || false
-      })
+      .update(updateData)
       .eq("id", campaign.id)
 
     if (error) {

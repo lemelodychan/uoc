@@ -36,6 +36,13 @@ export async function GET(req: Request) {
       return
     }
     
+    // Validate webhook URL format
+    if (!c.discordWebhookUrl.startsWith('https://discord.com/api/webhooks/')) {
+      console.error(`[Cron] Campaign "${c.name}": Invalid webhook URL format: ${c.discordWebhookUrl.substring(0, 50)}...`)
+      skipped++
+      return
+    }
+    
     // Skip if notifications are disabled
     if (!c.discordNotificationsEnabled) {
       console.log(`[Cron] Campaign "${c.name}": Skipped - notifications disabled`)
@@ -95,8 +102,9 @@ export async function GET(req: Request) {
       const jp = formatInTimeZone(sessionUtc, 'Asia/Tokyo', 'MMMM d, yyyy HH:mm')
       const content = `@everyone Session #${c.nextSessionNumber} of ${c.name} starts in 24 hours (Europe ${eu} / Quebec ${qc} / Tokyo ${jp})`
       console.log(`[Cron] Campaign "${c.name}": Sending reminder to Discord webhook`)
+      console.log(`[Cron] Campaign "${c.name}": Webhook URL: ${c.discordWebhookUrl?.substring(0, 50)}...`)
       try {
-        const response = await fetch(c.discordWebhookUrl, {
+        const response = await fetch(c.discordWebhookUrl!, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content })
