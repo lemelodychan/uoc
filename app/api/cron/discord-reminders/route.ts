@@ -8,19 +8,30 @@ export const dynamic = 'force-dynamic'
 // Vercel cron jobs are automatically authenticated by Vercel's infrastructure
 export async function GET(req: Request) {
   // Log immediately to verify the endpoint is being called
-  console.log('[Cron] ========================================')
-  console.log('[Cron] Endpoint called at', new Date().toISOString())
-  console.log('[Cron] URL:', req.url)
+  // Use console.error for better visibility in Vercel logs
+  console.error('[Cron] ========================================')
+  console.error('[Cron] Endpoint called at', new Date().toISOString())
+  console.error('[Cron] URL:', req.url)
+  console.error('[Cron] Method:', req.method)
+  
+  // Log all headers for debugging
+  const headers: Record<string, string> = {}
+  req.headers.forEach((value, key) => {
+    headers[key] = value
+  })
+  console.error('[Cron] All headers:', JSON.stringify(headers, null, 2))
   
   // Log headers for debugging (Vercel cron jobs send specific headers)
   const userAgent = req.headers.get('user-agent') || ''
   const vercelCron = req.headers.get('x-vercel-cron') || req.headers.get('vercel-cron')
-  console.log('[Cron] User-Agent:', userAgent)
-  console.log('[Cron] Vercel-Cron header:', vercelCron)
+  console.error('[Cron] User-Agent:', userAgent)
+  console.error('[Cron] Vercel-Cron header:', vercelCron)
   
   // Vercel cron jobs are automatically authenticated at the infrastructure level
   // We only check CRON_SECRET if it's explicitly provided (for manual testing)
   const CRON_SECRET = process.env.CRON_SECRET
+  console.error('[Cron] CRON_SECRET env var:', CRON_SECRET ? 'SET' : 'NOT SET')
+  
   if (CRON_SECRET) {
     const providedSecret = req.headers.get('x-cron-secret')
     // Only reject if a secret was provided but it's wrong
@@ -31,7 +42,7 @@ export async function GET(req: Request) {
     }
   }
   
-  console.log('[Cron] Authentication passed, starting execution')
+  console.error('[Cron] Authentication passed, starting execution')
 
   const { campaigns, error } = await loadAllCampaigns(true) // Use service role to bypass RLS
   if (error) {
@@ -39,7 +50,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error }, { status: 500 })
   }
 
-  console.log(`[Cron] Running at ${new Date().toISOString()}, found ${campaigns?.length || 0} campaigns`)
+  console.error(`[Cron] Running at ${new Date().toISOString()}, found ${campaigns?.length || 0} campaigns`)
 
   const nowUtc = new Date()
   let sent = 0
