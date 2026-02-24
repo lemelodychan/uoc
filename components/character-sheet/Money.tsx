@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { getCombatColor } from "@/lib/color-mapping"
+import { MoneySkeleton } from "./character-sheet-skeletons"
 
 interface MoneyProps {
   character: CharacterData
   onEdit: () => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
-export function Money({ character, onEdit, canEdit = true }: MoneyProps) {
+export function Money({ character, onEdit, canEdit = true, isLoading = false }: MoneyProps) {
+  if (isLoading) return <MoneySkeleton />
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">

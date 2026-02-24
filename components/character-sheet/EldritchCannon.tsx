@@ -8,15 +8,18 @@ import type { CharacterData } from "@/lib/character-data"
 import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
 import { getMaxEldritchCannons } from "@/lib/class-feature-config"
 import { getFeatureUsage } from "@/lib/feature-usage-tracker"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface EldritchCannonProps {
   character: CharacterData
   onEdit: () => void
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
-export function EldritchCannon({ character, onEdit, onUpdateFeatureUsage, canEdit = true }: EldritchCannonProps) {
+export function EldritchCannon({ character, onEdit, onUpdateFeatureUsage, canEdit = true, isLoading = false }: EldritchCannonProps) {
+  if (isLoading) return <SectionCardSkeleton contentLines={4} />
   // Check if character has the eldritch cannon feature (level 3+ Artillerist)
   const hasEldritchCannon = hasClassFeature(character, 'eldritch-cannon', 3)
   const artificerLevel = getClassLevel(character, 'artificer')

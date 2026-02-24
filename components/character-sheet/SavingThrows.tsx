@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateSavingThrowBonus } from "@/lib/character-data"
 import { Icon } from "@iconify/react"
+import { SavingThrowsSkeleton } from "./character-sheet-skeletons"
 
 interface SavingThrowsProps {
   character: CharacterData
@@ -13,6 +14,7 @@ interface SavingThrowsProps {
   onUpdateSavingThrows: (savingThrowProficiencies: any[]) => void
   onTriggerAutoSave: () => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -24,8 +26,10 @@ export function SavingThrows({
   proficiencyBonus, 
   onUpdateSavingThrows, 
   onTriggerAutoSave,
-  canEdit = true
+  canEdit = true,
+  isLoading = false
 }: SavingThrowsProps) {
+  if (isLoading) return <SavingThrowsSkeleton />
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader>

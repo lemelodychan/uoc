@@ -7,15 +7,18 @@ import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
 import { getCombatColor } from "@/lib/color-mapping"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface WeaponsProps {
   character: CharacterData
   onEdit: () => void
   onToggleAmmunition?: (weaponIndex: number, ammoIndex: number) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
-export function Weapons({ character, onEdit, onToggleAmmunition, canEdit = true }: WeaponsProps) {
+export function Weapons({ character, onEdit, onToggleAmmunition, canEdit = true, isLoading = false }: WeaponsProps) {
+  if (isLoading) return <SectionCardSkeleton contentLines={4} />
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">

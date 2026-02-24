@@ -78,10 +78,11 @@ interface ClassFeaturesProps {
   onCleanupFeatures?: () => Promise<void>
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 
-export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal, onCleanupFeatures, onUpdateFeatureUsage, canEdit = true }: ClassFeaturesProps) {
+export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal, onCleanupFeatures, onUpdateFeatureUsage, canEdit = true, isLoading = false }: ClassFeaturesProps) {
   // Use the new class features hook with caching
   const { 
     features: allFeatures, 
@@ -90,6 +91,9 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
     fromCache, 
     refresh: refreshFeatures 
   } = useClassFeatures(character)
+
+  // Character data loading (minimal record) - show skeleton
+  if (isLoading) return <ClassFeaturesSkeleton count={3} />
 
   // Map of class name -> selected subclass class_id (to filter subclass features)
   const [subclassIdByClass, setSubclassIdByClass] = useState<Record<string, string | null>>({})

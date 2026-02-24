@@ -9,6 +9,7 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
 import { getCombatColor } from "@/lib/color-mapping"
 import { calculateToolBonus } from "@/lib/character-data"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface ToolsProficienciesProps {
   character: CharacterData
@@ -19,6 +20,7 @@ interface ToolsProficienciesProps {
   onOpenFeatureModal: (content: { title: string; description: string; needsAttunement?: boolean; maxUses?: number; dailyRecharge?: string; usesPerLongRest?: number | string; refuelingDie?: string }) => void
   onTriggerAutoSave: () => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 export function ToolsProficiencies({ 
@@ -29,8 +31,10 @@ export function ToolsProficiencies({
   onToggleMagicItemUse,
   onOpenFeatureModal,
   onTriggerAutoSave,
-  canEdit = true
+  canEdit = true,
+  isLoading = false
 }: ToolsProficienciesProps) {
+  if (isLoading) return <SectionCardSkeleton contentLines={6} />
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">

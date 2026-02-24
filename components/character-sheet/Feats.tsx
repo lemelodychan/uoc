@@ -1,6 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
@@ -10,9 +11,11 @@ interface FeatsProps {
   onEdit: () => void
   onOpenFeatureModal: (content: { title: string; description: string }) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
-export function Feats({ character, onEdit, onOpenFeatureModal, canEdit = true }: FeatsProps) {
+export function Feats({ character, onEdit, onOpenFeatureModal, canEdit = true, isLoading = false }: FeatsProps) {
+  if (isLoading) return <SectionCardSkeleton contentLines={4} />
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">
@@ -31,7 +34,7 @@ export function Feats({ character, onEdit, onOpenFeatureModal, canEdit = true }:
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2">
-          {character.feats.map((feat, index) => (
+          {(character.feats || []).map((feat, index) => (
             <div key={index} className="p-2 border rounded-lg flex items-center justify-between bg-background">
               <div className="font-medium text-sm">{feat.name}</div>
               <Button
@@ -46,7 +49,7 @@ export function Feats({ character, onEdit, onOpenFeatureModal, canEdit = true }:
               </Button>
             </div>
           ))}
-          {character.feats.length === 0 && (
+          {(character.feats || []).length === 0 && (
             <div className="text-sm text-muted-foreground text-center py-4">No feats</div>
           )}
         </div>

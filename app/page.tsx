@@ -87,13 +87,25 @@ import {
   type Skill,
   type ToolProficiency,
 } from "@/lib/character-data"
-import { saveCharacter, loadCharacter, loadAllCharacters, loadCharactersProgressive, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
+import { saveCharacter, patchCharacter, loadCharacter, loadAllCharacters, loadCharactersProgressive, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, deleteCharacter as deleteCharacterDB, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
 import { useClassFeaturesPreloader } from "@/hooks/use-class-features"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { CampaignHomepage } from "@/components/campaign-homepage"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  exportCharacterAsJson,
+  exportCharacterAsCsv,
+  downloadFile,
+  sanitizeFilename,
+} from "@/lib/character-export"
 
 const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
@@ -153,6 +165,7 @@ function CharacterSheetContent() {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const multiclassDataChangedRef = useRef<boolean>(false)
+  const importCharacterFileInputRef = useRef<HTMLInputElement>(null)
   const [featureModalOpen, setFeatureModalOpen] = useState(false)
   const [featureModalContent, setFeatureModalContent] = useState<{ title: string; description: string; needsAttunement?: boolean; maxUses?: number; dailyRecharge?: string; usesPerLongRest?: number | string; refuelingDie?: string } | null>(null)
   const [featureModalIsClassFeature, setFeatureModalIsClassFeature] = useState(false)
@@ -171,6 +184,7 @@ function CharacterSheetContent() {
   const [metamagicModalOpen, setMetamagicModalOpen] = useState(false)
   const [diceRollModalOpen, setDiceRollModalOpen] = useState(false)
   const [levelUpModalOpen, setLevelUpModalOpen] = useState(false)
+  const [deleteCharacterModalOpen, setDeleteCharacterModalOpen] = useState(false)
   const [campaignManagementModalOpen, setCampaignManagementModalOpen] = useState(false)
   const [campaignCreationModalOpen, setCampaignCreationModalOpen] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -337,6 +351,8 @@ function CharacterSheetContent() {
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const activeCharacter = characters.find((c) => c.id === activeCharacterId) || characters[0]
+  // Show section skeletons while full character data is loading (minimal record from progressive load)
+  const isCharacterDataLoading = !!(activeCharacter && (!activeCharacter.skills || activeCharacter.skills.length === 0))
   
   // Access control checks
   const canViewActiveCharacter = activeCharacter ? (
@@ -484,7 +500,6 @@ function CharacterSheetContent() {
     setCharacters((prev) => prev.map((char) => {
       if (char.id === activeCharacterId) {
         // Preserve backgroundData and backgroundId only if they're not being explicitly updated
-        // This allows intentional updates while preventing accidental overwrites from other fields
         const preservedFields: Partial<CharacterData> = {}
         if (!('backgroundId' in updates)) {
           preservedFields.backgroundId = char.backgroundId
@@ -492,8 +507,11 @@ function CharacterSheetContent() {
         if (!('backgroundData' in updates)) {
           preservedFields.backgroundData = char.backgroundData
         }
-        
-        const updatedChar = { ...char, ...updates, ...preservedFields }
+        // Patch only: omit undefined so we never overwrite existing data with undefined
+        const patch = Object.fromEntries(
+          Object.entries(updates).filter(([, v]) => v !== undefined)
+        ) as Partial<CharacterData>
+        const updatedChar = { ...char, ...patch, ...preservedFields }
         
         // If level changed, update feature max uses that depend on proficiency bonus
         if (updates.level && updates.level !== char.level) {
@@ -2210,9 +2228,10 @@ function CharacterSheetContent() {
           }
         }
 
-        // Create comprehensive updates
+        // Build patch from current character: only changed/derived fields (never duplicate or replace entire character)
         const comprehensiveUpdates: Partial<CharacterData> = {
           ...updates,
+          level: newLevel,
           class_id: classData?.id,
           classFeatures: classFeatures.map(feature => ({
             id: `feature-${Date.now()}-${Math.random()}`,
@@ -2262,7 +2281,7 @@ function CharacterSheetContent() {
         }
 
         updateCharacter(comprehensiveUpdates)
-        
+
         toast({
           title: "Character Updated",
           description: classChanged ? 
@@ -2273,15 +2292,31 @@ function CharacterSheetContent() {
         console.error("Error updating character with class data:", error)
         // Fallback to basic update if class data loading fails
         updateCharacter(updates)
+        const { success, error: patchErr } = await patchCharacter(activeCharacterId, updates)
+        if (!success) {
+          toast({
+            title: "Warning",
+            description: patchErr || "Character updated locally, but save failed.",
+            variant: "destructive",
+          })
+        }
+      }
+    } else {
+      // No class/level change: patch only the edited fields so we don't re-save classes, spellData, etc.
+      updateCharacter(updates, { autosave: false })
+      const { success, error: patchErr } = await patchCharacter(activeCharacterId, updates)
+      if (success) {
         toast({
-          title: "Warning",
-          description: "Character updated, but some class features may need to be refreshed.",
+          title: "Saved",
+          description: "Character information updated successfully.",
+        })
+      } else {
+        toast({
+          title: "Save failed",
+          description: patchErr || "Could not save changes.",
           variant: "destructive",
         })
       }
-    } else {
-      // No class/level change, just update normally
-      updateCharacter(updates)
     }
   }
 
@@ -3121,6 +3156,90 @@ function CharacterSheetContent() {
     }
   }
 
+  const handleDeleteCharacter = async () => {
+    if (!activeCharacterId || !activeCharacter) return
+    const { success, error } = await deleteCharacterDB(activeCharacterId)
+    setDeleteCharacterModalOpen(false)
+    if (success) {
+      const remaining = characters.filter(c => c.id !== activeCharacterId)
+      setCharacters(remaining)
+      const nextId: string = remaining.length > 0 ? remaining[0].id : ""
+      setActiveCharacterId(nextId)
+      saveActiveCharacterToLocalStorage(nextId)
+      toast({
+        title: "Character deleted",
+        description: `${activeCharacter.name} has been permanently deleted.`,
+      })
+    } else {
+      toast({
+        title: "Delete failed",
+        description: error || "Could not delete character.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const triggerImportCharacterJson = () => {
+    importCharacterFileInputRef.current?.click()
+  }
+
+  const handleImportCharacterFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file || !currentCampaign?.id) return
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text) as Record<string, unknown>
+      if (!parsed || typeof parsed.name !== "string") {
+        toast({
+          title: "Invalid file",
+          description: "The JSON file does not look like an exported character (missing name).",
+          variant: "destructive",
+        })
+        return
+      }
+      const { user } = await getCurrentUser()
+      const newId = globalThis.crypto?.randomUUID?.() ?? `import-${Date.now()}`
+      const { exportedAt: _exportedAt, ...rest } = parsed
+      const imported: CharacterData = {
+        ...rest,
+        id: newId,
+        name: parsed.name as string,
+        campaignId: currentCampaign.id,
+        userId: (parsed.isNPC && currentCampaign.dungeonMasterId) ? currentCampaign.dungeonMasterId : (user?.id ?? undefined),
+      } as CharacterData
+      setCharacters((prev) => [...prev, imported])
+      setActiveCharacterId(newId)
+      saveActiveCharacterToLocalStorage(newId)
+      const { success, error, characterId } = await saveCharacter(imported)
+      if (success) {
+        const finalId = characterId ?? newId
+        await reloadCharacterFromDatabase(finalId)
+        if (characterId && characterId !== newId) {
+          setActiveCharacterId(characterId)
+          saveActiveCharacterToLocalStorage(characterId)
+        }
+        toast({
+          title: "Character imported",
+          description: `${imported.name} has been imported and added to ${currentCampaign.name}.`,
+        })
+      } else {
+        toast({
+          title: "Import failed",
+          description: error ?? "Could not save character to database.",
+          variant: "destructive",
+        })
+      }
+    } catch (err) {
+      console.error("Import character JSON error:", err)
+      toast({
+        title: "Import failed",
+        description: err instanceof Error ? err.message : "Invalid JSON or file could not be read.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleEldritchCannonSave = (updates: Partial<CharacterData>) => {
     // Unified system only (legacy eldritchCannon column has been dropped)
     updateCharacter(updates)
@@ -3221,23 +3340,77 @@ function CharacterSheetContent() {
             />
           ) : currentView === 'character' ? (
             <>
-              {/* Breadcrumbs */}
-              <div className="mb-4 flex items-center gap-1 text-sm text-muted-foreground">
-                <button
-                  onClick={() => setCurrentView('campaign')}
-                  className="hover:text-primary transition-colors hover:cursor-pointer"
-                >
-                  {currentCampaign?.name || 'Campaign'}
-                </button>
-                <Icon icon="lucide:chevron-right" className="w-4 h-4" />
-                <span className="text-muted-foreground">
-                  {activeCharacter.isNPC ? `NPC: ${activeCharacter.name}` : `Character: ${activeCharacter.name}`}
-                </span>
+              {/* Breadcrumbs + Admin Export */}
+              <div className="mb-4 flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentView('campaign')}
+                    className="hover:text-primary transition-colors hover:cursor-pointer"
+                  >
+                    {currentCampaign?.name || 'Campaign'}
+                  </button>
+                  <Icon icon="lucide:chevron-right" className="w-4 h-4" />
+                  <span className="text-muted-foreground">
+                    {activeCharacter.isNPC ? `NPC: ${activeCharacter.name}` : `Character: ${activeCharacter.name}`}
+                  </span>
+                </div>
+                {((isUserSuperadmin || currentCampaign?.dungeonMasterId === currentUser?.id) && activeCharacter) && (
+                  <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Icon icon="lucide:download" className="w-4 h-4" />
+                          Export
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            const json = exportCharacterAsJson(activeCharacter, { full: false })
+                            const filename = `${sanitizeFilename(activeCharacter.name)}-export.json`
+                            downloadFile(json, filename, "application/json")
+                          }}
+                        >
+                          Download as JSON (summary)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            const json = exportCharacterAsJson(activeCharacter, { full: true })
+                            const filename = `${sanitizeFilename(activeCharacter.name)}-export-full.json`
+                            downloadFile(json, filename, "application/json")
+                          }}
+                        >
+                          Download as JSON (full)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            const csv = exportCharacterAsCsv(activeCharacter)
+                            const filename = `${sanitizeFilename(activeCharacter.name)}-export.csv`
+                            downloadFile(csv, filename, "text/csv;charset=utf-8")
+                          }}
+                        >
+                          Download as CSV
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    {isUserSuperadmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteCharacterModalOpen(true)}
+                      >
+                        <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                        Delete character
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div className={!canViewActiveCharacter ? 'blur-sm pointer-events-none' : ''}>
                 <div className="mb-6 rounded-lg border rounded-lg flex flex-col gap-0 overflow-hidden">
-                  <AestheticImages character={activeCharacter} />
+                  <AestheticImages character={activeCharacter} isLoading={isCharacterDataLoading} />
                   <CharacterHeader
                     character={activeCharacter}
                     proficiencyBonus={proficiencyBonus}
@@ -3248,6 +3421,7 @@ function CharacterSheetContent() {
                     canEdit={canEditActiveCharacter}
                     levelUpEnabled={currentCampaign?.levelUpModeEnabled || false}
                     campaign={currentCampaign}
+                    isLoading={isCharacterDataLoading}
                   />
                 </div>
                 
@@ -3293,6 +3467,7 @@ function CharacterSheetContent() {
                 charismaMod={charismaMod}
                 onEdit={() => setAbilitiesModalOpen(true)}
                 canEdit={canEditActiveCharacter}
+                isLoading={isCharacterDataLoading}
               />
 
               <SavingThrows
@@ -3301,6 +3476,7 @@ function CharacterSheetContent() {
                 onUpdateSavingThrows={(savingThrowProficiencies) => updateCharacter({ savingThrowProficiencies })}
                 onTriggerAutoSave={triggerAutoSave}
                 canEdit={canEditActiveCharacter}
+                isLoading={isCharacterDataLoading}
               />
 
               <Skills
@@ -3310,6 +3486,7 @@ function CharacterSheetContent() {
                 onSetSkillSortMode={setSkillSortMode}
                 onUpdateSkillProficiency={updateSkillProficiency}
                 canEdit={canEditActiveCharacter}
+                isLoading={isCharacterDataLoading}
               />
 
               <FeaturesTraits
@@ -3322,6 +3499,7 @@ function CharacterSheetContent() {
                   setFeatureModalOpen(true)
                 }}
                 canEdit={canEditActiveCharacter}
+                isLoading={isCharacterDataLoading}
               />
 
               <Feats
@@ -3333,18 +3511,21 @@ function CharacterSheetContent() {
                   setFeatureModalOpen(true)
                 }}
                 canEdit={canEditActiveCharacter}
+                isLoading={isCharacterDataLoading}
               />
 
               <Money
                 character={activeCharacter}
                 onEdit={() => setMoneyModalOpen(true)}
                 canEdit={canEditActiveCharacter}
+                isLoading={isCharacterDataLoading}
               />
 
               <Languages
                 character={activeCharacter}
                 onEdit={() => setLanguagesModalOpen(true)}
                 canEdit={canEditActiveCharacter}
+                isLoading={isCharacterDataLoading}
               />
 
           </div>
@@ -3358,6 +3539,7 @@ function CharacterSheetContent() {
               onToggleDeathSave={toggleDeathSave}
               onUpdateFeatureUsage={updateFeatureUsage}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
 
             <Weapons
@@ -3365,6 +3547,7 @@ function CharacterSheetContent() {
               onEdit={() => setWeaponsModalOpen(true)}
               onToggleAmmunition={toggleAmmunition}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
 
             <EldritchCannonComponent
@@ -3372,6 +3555,7 @@ function CharacterSheetContent() {
               onEdit={() => setEldritchCannonModalOpen(true)}
               onUpdateFeatureUsage={updateFeatureUsage}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
 
             <Spellcasting
@@ -3391,6 +3575,7 @@ function CharacterSheetContent() {
               hasSpellcastingAbilities={hasSpellcastingAbilities}
               onUpdateFeatureUsage={updateFeatureUsage}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
 
             <ToolsProficiencies
@@ -3405,6 +3590,7 @@ function CharacterSheetContent() {
               }}
               onTriggerAutoSave={triggerAutoSave}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
 
           </div>
@@ -3423,6 +3609,7 @@ function CharacterSheetContent() {
               }}
               onUpdateFeatureUsage={updateFeatureUsage}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
 
             <Infusions
@@ -3434,6 +3621,7 @@ function CharacterSheetContent() {
               }}
               onUpdateFeatureUsage={updateFeatureUsage}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
 
             <EldritchInvocations
@@ -3444,6 +3632,7 @@ function CharacterSheetContent() {
                 setFeatureModalOpen(true)
               }}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
 
             <Metamagic
@@ -3454,6 +3643,7 @@ function CharacterSheetContent() {
                 setFeatureModalOpen(true)
               }}
               canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
             />
           </div>
 
@@ -3479,6 +3669,7 @@ function CharacterSheetContent() {
               }}
               onEditCampaign={handleEditCampaign}
               onCreateCharacter={createNewCharacter}
+              onImportCharacterJson={(isUserSuperadmin || currentCampaign?.dungeonMasterId === currentUser?.id) ? triggerImportCharacterJson : undefined}
               currentUserId={currentUser?.id}
               onStartLongRest={handleStartLongRest}
               onToggleLevelUpMode={handleToggleLevelUpMode}
@@ -3609,6 +3800,14 @@ function CharacterSheetContent() {
         currentUserId={currentUser?.id}
         dungeonMasterId={currentCampaign?.dungeonMasterId}
         campaignId={currentCampaign?.id}
+      />
+      <input
+        ref={importCharacterFileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        aria-hidden
+        onChange={handleImportCharacterFile}
       />
       <Dialog open={featureModalOpen} onOpenChange={(open) => {
         setFeatureModalOpen(open)
@@ -4046,9 +4245,34 @@ function CharacterSheetContent() {
         onClose={() => setLevelUpModalOpen(false)}
         character={activeCharacter}
         onSave={(updates) => {
-          updateCharacter({ ...updates, levelUpCompleted: true })
+          // Keep levelUpCompleted false so the same character can level up again
+          // without the DM having to toggle level up mode
+          updateCharacter({ ...updates, levelUpCompleted: false })
         }}
       />
+
+      {/* Superadmin: Delete character confirmation */}
+      <Dialog open={deleteCharacterModalOpen} onOpenChange={setDeleteCharacterModalOpen}>
+        <DialogContent className="sm:max-w-[425px] p-0 gap-0">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle>Delete character</DialogTitle>
+            <DialogClose className="absolute right-4 top-4 z-50 bg-card border border-border rounded shadow px-2 py-2 text-sm">
+              <Icon icon="lucide:x" className="w-4 h-4" />
+            </DialogClose>
+            </DialogHeader>
+          <DialogDescription className="p-4">
+            Are you sure you want to permanently delete <span className="font-bold">{activeCharacter?.name}</span>? This cannot be undone.
+          </DialogDescription>
+          <DialogFooter className="gap-2 p-4 border-t">
+            <Button variant="outline" onClick={() => setDeleteCharacterModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteCharacter}>
+              Delete character
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   )

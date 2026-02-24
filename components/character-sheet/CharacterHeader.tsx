@@ -9,6 +9,7 @@ import type { CharacterData } from "@/lib/character-data"
 import { calculateTotalLevel } from "@/lib/character-data"
 import { racesCache } from "@/lib/races-cache"
 import { loadBackgroundDetails } from "@/lib/database"
+import { CharacterHeaderSkeleton } from "./character-sheet-skeletons"
 
 interface CharacterHeaderProps {
   character: CharacterData
@@ -20,6 +21,7 @@ interface CharacterHeaderProps {
   canEdit?: boolean
   levelUpEnabled?: boolean
   campaign?: any
+  isLoading?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -35,7 +37,8 @@ export function CharacterHeader({
   onLevelUp,
   canEdit = true,
   levelUpEnabled = false,
-  campaign
+  campaign,
+  isLoading = false
 }: CharacterHeaderProps) {
   const showLevelUpButton = canEdit && levelUpEnabled
   const levelUpCompleted = character.levelUpCompleted || false
@@ -66,6 +69,8 @@ export function CharacterHeader({
       setBackgroundName(character.background || "")
     }
   }, [character.id, character.backgroundId, character.background])
+
+  if (isLoading) return <CharacterHeaderSkeleton />
 
   // Format race display based on raceIds
   const formatRaceDisplay = (): string => {

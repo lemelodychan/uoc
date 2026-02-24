@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { getAbilityModifierColor } from "@/lib/color-mapping"
 import type { CharacterData } from "@/lib/character-data"
+import { AbilityScoresSkeleton } from "./character-sheet-skeletons"
 
 interface AbilityScoresProps {
   character: CharacterData
@@ -17,6 +18,7 @@ interface AbilityScoresProps {
   charismaMod: number
   onEdit: () => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -33,8 +35,10 @@ export function AbilityScores({
   wisdomMod, 
   charismaMod, 
   onEdit,
-  canEdit = true
+  canEdit = true,
+  isLoading = false
 }: AbilityScoresProps) {
+  if (isLoading) return <AbilityScoresSkeleton />
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">

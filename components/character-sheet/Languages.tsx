@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface LanguagesProps {
   character: CharacterData
   onEdit: () => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
-export function Languages({ character, onEdit, canEdit = true }: LanguagesProps) {
+export function Languages({ character, onEdit, canEdit = true, isLoading = false }: LanguagesProps) {
+  if (isLoading) return <SectionCardSkeleton contentLines={3} />
   return (
     <Card className="flex flex-col gap-3">
       <CardHeader className="pb-0">

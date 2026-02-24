@@ -2,12 +2,15 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import type { CharacterData } from "@/lib/character-data"
+import { AestheticImagesSkeleton } from "./character-sheet-skeletons"
 
 interface AestheticImagesProps {
   character: CharacterData
+  isLoading?: boolean
 }
 
-export function AestheticImages({ character }: AestheticImagesProps) {
+export function AestheticImages({ character, isLoading = false }: AestheticImagesProps) {
+  if (isLoading) return <AestheticImagesSkeleton />
   // Don't render if no aesthetic images are provided
   if (!character.aestheticImages || character.aestheticImages.length === 0) {
     return null

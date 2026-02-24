@@ -9,6 +9,7 @@ import type { CharacterData } from "@/lib/character-data"
 import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
 import { getMaxInfusedItems, getInfusionsKnown } from "@/lib/class-feature-config"
 import { getFeatureUsage } from "@/lib/feature-usage-tracker"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface InfusionsProps {
   character: CharacterData
@@ -16,9 +17,11 @@ interface InfusionsProps {
   onOpenFeatureModal: (content: { title: string; description: string; needsAttunement?: boolean; maxUses?: number; dailyRecharge?: string; usesPerLongRest?: number | string; refuelingDie?: string }) => void
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
-export function Infusions({ character, onEdit, onOpenFeatureModal, onUpdateFeatureUsage, canEdit = true }: InfusionsProps) {
+export function Infusions({ character, onEdit, onOpenFeatureModal, onUpdateFeatureUsage, canEdit = true, isLoading = false }: InfusionsProps) {
+  if (isLoading) return <SectionCardSkeleton contentLines={4} />
   // Check if character has the infusions feature (level 2+ Artificer)
   const hasInfusions = hasClassFeature(character, 'infusions', 2)
   const artificerLevel = getClassLevel(character, 'artificer')

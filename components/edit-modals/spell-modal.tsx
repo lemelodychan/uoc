@@ -82,15 +82,15 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[70vh] p-0 gap-0">
-        <DialogHeader className="p-4 border-b">
+      <DialogContent className="max-w-3xl max-h-[90vh] p-0 gap-0 flex flex-col">
+        <DialogHeader className="p-4 border-b shrink-0">
           <DialogTitle className="mb-2">Edit Spell Data</DialogTitle>
           <DialogDescription className="mb-2">
             Edit your character's spell attack bonus, save DC, and spell notes. Spell slots and cantrips are calculated from your class and level.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 p-4 max-h-[50vh] overflow-y-auto">
+        <div className="space-y-6 p-4 flex-1 min-h-0 overflow-y-auto">
           {/* Basic Spell Stats */}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
@@ -218,7 +218,7 @@ export function SpellModal({ isOpen, onClose, character, onSave }: SpellModalPro
           </div>
 
         </div>
-        <DialogFooter className="p-4 border-t">
+        <DialogFooter className="p-4 border-t shrink-0">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

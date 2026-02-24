@@ -14,6 +14,7 @@ import type { DescriptionSegment } from "@/lib/class-feature-templates"
 import type { ClassFeatureSkill } from "@/lib/class-feature-types"
 import { loadClassFeatureSkills, loadClassData } from "@/lib/database"
 import { useState, useEffect } from "react"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface SpellcastingProps {
   character: CharacterData
@@ -31,6 +32,7 @@ interface SpellcastingProps {
   hasSpellcastingAbilities: (character: CharacterData) => boolean
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -69,7 +71,8 @@ export function Spellcasting({
   canEdit = true,
   onToggleFeatSpellSlot,
   hasSpellcastingAbilities,
-  onUpdateFeatureUsage
+  onUpdateFeatureUsage,
+  isLoading = false
 }: SpellcastingProps) {
   const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
@@ -214,6 +217,8 @@ export function Spellcasting({
 
     calculateCounts()
   }, [character.id, character.level, character.class, character.classes])
+
+  if (isLoading) return <SectionCardSkeleton contentLines={8} />
 
   // Show component for monks/barbarians (even without spellcasting) or characters with spellcasting abilities
   if (!isMonk(character) && !isBarbarian(character) && !hasSpellcastingAbilities(character)) {

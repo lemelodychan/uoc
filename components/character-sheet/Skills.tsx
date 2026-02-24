@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateSkillBonus, calculatePassivePerception, calculatePassiveInsight } from "@/lib/character-data"
 import { Icon } from "@iconify/react"
+import { SkillsSkeleton } from "./character-sheet-skeletons"
 
 interface SkillsProps {
   character: CharacterData
@@ -15,6 +16,7 @@ interface SkillsProps {
   onSetSkillSortMode: (mode: 'alpha' | 'ability') => void
   onUpdateSkillProficiency: (skillName: string, proficiencyType: "proficient" | "expertise", checked: boolean) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 const formatModifier = (mod: number): string => {
@@ -27,10 +29,12 @@ export function Skills({
   skillSortMode, 
   onSetSkillSortMode, 
   onUpdateSkillProficiency,
-  canEdit = true
+  canEdit = true,
+  isLoading = false
 }: SkillsProps) {
+  if (isLoading) return <SkillsSkeleton />
   const abilityOrder = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"] as const
-  const sortedSkills = [...character.skills].sort((a, b) => {
+  const sortedSkills = [...(character.skills || [])].sort((a, b) => {
     if (skillSortMode === 'alpha') {
       return a.name.localeCompare(b.name)
     }

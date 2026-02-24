@@ -7,15 +7,18 @@ import type { CharacterData } from "@/lib/character-data"
 import { getWarlockInvocationsKnown } from "@/lib/character-data"
 import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
 import { getFeatureUsage } from "@/lib/feature-usage-tracker"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface EldritchInvocationsProps {
   character: CharacterData
   onEdit: () => void
   onOpenFeatureModal: (content: { title: string; description: string }) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
-export function EldritchInvocations({ character, onEdit, onOpenFeatureModal, canEdit = true }: EldritchInvocationsProps) {
+export function EldritchInvocations({ character, onEdit, onOpenFeatureModal, canEdit = true, isLoading = false }: EldritchInvocationsProps) {
+  if (isLoading) return <SectionCardSkeleton contentLines={4} />
   // Check if character has the eldritch invocations feature (level 2+ Warlock)
   const hasEldritchInvocations = hasClassFeature(character, 'eldritch-invocations', 2)
   const warlockLevel = getClassLevel(character, 'warlock')

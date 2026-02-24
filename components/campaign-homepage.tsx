@@ -25,6 +25,12 @@ import { useCampaignNotes } from "@/hooks/use-campaign-notes"
 import { CampaignNotesSkeleton, CampaignNotesListSkeleton, CampaignNotesEmptySkeleton } from "./campaign-notes-skeleton"
 import { useUser } from "@/lib/user-context"
 import { useToast } from "@/hooks/use-toast"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface CampaignHomepageProps {
   campaign: Campaign | undefined
@@ -36,6 +42,8 @@ interface CampaignHomepageProps {
   onBackToCharacters: () => void
   onEditCampaign?: () => void
   onCreateCharacter?: () => void
+  /** When provided and user is superadmin, Add character becomes a dropdown with Create from scratch + Import JSON */
+  onImportCharacterJson?: () => void
   currentUserId?: string
   onStartLongRest?: () => void
   onToggleLevelUpMode?: () => void
@@ -61,6 +69,7 @@ export function CampaignHomepage({
   onBackToCharacters,
   onEditCampaign,
   onCreateCharacter,
+  onImportCharacterJson,
   currentUserId,
   onStartLongRest,
   onToggleLevelUpMode,
@@ -773,15 +782,37 @@ export function CampaignHomepage({
               </Button>
             )}
             {canEdit && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={onCreateCharacter}
-                className="flex items-center gap-2"
-              >
-                <Icon icon="lucide:user-plus" className="w-4 h-4" />
-                Add new Character
-              </Button>
+              (isSuperadmin || isDungeonMaster) && onImportCharacterJson ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="default" size="sm" className="flex items-center gap-2">
+                      <Icon icon="lucide:user-plus" className="w-4 h-4" />
+                      Add new Character
+                      <Icon icon="lucide:chevron-down" className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={onCreateCharacter}>
+                      <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
+                      Create from scratch
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onImportCharacterJson}>
+                      <Icon icon="lucide:file-json" className="w-4 h-4 mr-2" />
+                      Import JSON
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={onCreateCharacter}
+                  className="flex items-center gap-2"
+                >
+                  <Icon icon="lucide:user-plus" className="w-4 h-4" />
+                  Add new Character
+                </Button>
+              )
             )}
           </div>
         </div>
@@ -828,15 +859,37 @@ export function CampaignHomepage({
                 <Icon icon="lucide:trending-up" className="w-4 h-4" />
                 {levelUpModeEnabled ? "Disable Level Up" : "Enable Level Up"}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onCreateCharacter}
-                className="flex items-center gap-2 text-foreground"
-              >
-                <Icon icon="lucide:user-plus" className="w-4 h-4" />
-                Add NPC
-              </Button>
+              {(isSuperadmin || isDungeonMaster) && onImportCharacterJson ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2 text-foreground">
+                      <Icon icon="lucide:user-plus" className="w-4 h-4" />
+                      Add NPC
+                      <Icon icon="lucide:chevron-down" className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={onCreateCharacter}>
+                      <Icon icon="lucide:plus" className="w-4 h-4 mr-2" />
+                      Create from scratch
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onImportCharacterJson}>
+                      <Icon icon="lucide:file-json" className="w-4 h-4 mr-2" />
+                      Import JSON
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onCreateCharacter}
+                  className="flex items-center gap-2 text-foreground"
+                >
+                  <Icon icon="lucide:user-plus" className="w-4 h-4" />
+                  Add NPC
+                </Button>
+              )}
             </div>
           </CardHeader>
 

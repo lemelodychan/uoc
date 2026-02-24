@@ -8,6 +8,7 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
 import { calculateProficiencyBonus } from "@/lib/character-data"
 import { getCombatColor } from "@/lib/color-mapping"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface FeaturesTraitsProps {
   character: CharacterData
@@ -15,6 +16,7 @@ interface FeaturesTraitsProps {
   onToggleFeatureUse: (featureIndex: number, slotIndex: number) => void
   onOpenFeatureModal: (content: { title: string; description: string; needsAttunement?: boolean; maxUses?: number; dailyRecharge?: string; usesPerLongRest?: number | string; refuelingDie?: string }) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 const getFeatureUsesPerLongRest = (feature: any, character: CharacterData): number => {
@@ -47,9 +49,11 @@ export function FeaturesTraits({
   onEdit, 
   onToggleFeatureUse, 
   onOpenFeatureModal,
-  canEdit = true
+  canEdit = true,
+  isLoading = false
 }: FeaturesTraitsProps) {
   const [featureOverflowMap, setFeatureOverflowMap] = useState<Record<number, boolean>>({})
+  if (isLoading) return <SectionCardSkeleton contentLines={5} />
 
   return (
     <Card className="flex flex-col gap-3">

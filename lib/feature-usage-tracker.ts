@@ -443,12 +443,12 @@ export function restoreFeatureSlot(
   }
   
   if (!usage || usage.featureType !== 'slots') {
-    return getFeatureUsageData(workingCharacter)
+    return getFeatureUsageData(character)
   }
   
   const maxUses = usage.maxUses || 0
   const newUses = Math.min(maxUses, (usage.currentUses || 0) + amount)
-  return updateFeatureUsage(workingCharacter, featureId, { currentUses: newUses })
+  return updateFeatureUsage(character, featureId, { currentUses: newUses })
 }
 
 /**

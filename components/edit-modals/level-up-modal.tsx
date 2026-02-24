@@ -13,7 +13,7 @@ import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { FeatEditModal } from "./feat-edit-modal"
 import type { CharacterData, CharacterClass } from "@/lib/character-data"
-import { calculateModifier, calculateProficiencyBonus, calculateSkillBonus, getHitDiceByClass, calculateTotalLevel, isSingleClass } from "@/lib/character-data"
+import { calculateModifier, calculateProficiencyBonus, calculateSkillBonus, getHitDiceByClass, calculateTotalLevel } from "@/lib/character-data"
 import { loadClassFeatures, loadClassesWithDetails, loadRaceDetails, type RaceData } from "@/lib/database"
 import type { ClassData } from "@/lib/class-utils"
 
@@ -79,7 +79,11 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   const [newFeatures, setNewFeatures] = useState<NewFeatures[]>([])
   const [asiChoice, setAsiChoice] = useState<ASIChoice | null>(null)
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
-  const [step, setStep] = useState<'class_selection' | 'new_class_selection' | 'skill_selection' | 'hp_roll' | 'features' | 'asi_choice' | 'summary'>('class_selection')
+  const [step, setStep] = useState<'class_selection' | 'new_class_selection' | 'skill_selection' | 'hp_roll' | 'subclass_selection' | 'features' | 'asi_choice' | 'summary'>('class_selection')
+  const [levelUpSubclassOptions, setLevelUpSubclassOptions] = useState<string[]>([])
+  const [levelUpSubclassSelectionLevel, setLevelUpSubclassSelectionLevel] = useState<number>(3)
+  const [selectedSubclassInLevelUp, setSelectedSubclassInLevelUp] = useState<string>('')
+  const [isLoadingSubclassCheck, setIsLoadingSubclassCheck] = useState(false)
   const [editableCharacter, setEditableCharacter] = useState<CharacterData>(character)
   const [customFeatName, setCustomFeatName] = useState('')
   const [customFeatDescription, setCustomFeatDescription] = useState('')
@@ -117,6 +121,9 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     setAvailableClasses([])
     setNewClassSelection(null)
     setIsLoadingClasses(false)
+    setLevelUpSubclassOptions([])
+    setLevelUpSubclassSelectionLevel(3)
+    setSelectedSubclassInLevelUp('')
   }
 
   // Load main race data when modal opens
@@ -371,38 +378,75 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     })
   }
 
-  const loadNewFeatures = async () => {
-    if (!selectedClass) return
+  const handleContinueFromHpRoll = async () => {
+    if (!selectedClass || !hpRollResult) return
+    const selectedClassNewLevel = newClassSelection ? 1 : (selectedClass.level + 1)
+    let subclassSelectionLevel: number
+    let subclasses: string[] = []
+
+    if (newClassSelection) {
+      subclassSelectionLevel = newClassSelection.classData.subclass_selection_level ?? 3
+      const { classes } = await loadClassesWithDetails()
+      if (classes) {
+        subclasses = classes
+          .filter(c => c.name === selectedClass.name && c.subclass != null)
+          .map(c => c.subclass!)
+          .sort()
+      }
+    } else {
+      setIsLoadingSubclassCheck(true)
+      try {
+        const { classes, error } = await loadClassesWithDetails()
+        if (error || !classes) {
+          loadNewFeatures()
+          return
+        }
+        const baseClass = classes.find(c => c.name === selectedClass.name && !c.subclass)
+        subclassSelectionLevel = baseClass?.subclass_selection_level ?? 3
+        subclasses = classes
+          .filter(c => c.name === selectedClass.name && c.subclass != null)
+          .map(c => c.subclass!)
+          .sort()
+      } finally {
+        setIsLoadingSubclassCheck(false)
+      }
+    }
+
+    const needsSubclass = selectedClassNewLevel >= subclassSelectionLevel && !selectedClass.subclass && subclasses.length > 0
+    if (needsSubclass) {
+      setLevelUpSubclassOptions(subclasses)
+      setLevelUpSubclassSelectionLevel(subclassSelectionLevel)
+      setSelectedSubclassInLevelUp('')
+      setStep('subclass_selection')
+    } else {
+      loadNewFeatures()
+    }
+  }
+
+  const loadNewFeatures = async (selectedClassOverride?: CharacterClass | null) => {
+    const classToUse = selectedClassOverride ?? selectedClass
+    if (!classToUse) return
 
     setIsLoadingFeatures(true)
     try {
-      // For single-class characters, the class level should match the character level
-      // For multiclass characters, we use the individual class level
-      const isSingleClassCharacter = isSingleClass(character.classes)
-      
-      let selectedClassNewLevel: number
-      if (isSingleClassCharacter) {
-        // Single class: class level should match character level
-        selectedClassNewLevel = selectedClass.level + 1
-      } else {
-        // Multiclass: use the individual class level
-        selectedClassNewLevel = selectedClass.level + 1
-      }
-      
+      // When adding a new class (multiclassing), we're taking level 1 in that class → show level 1 features.
+      // When leveling an existing class, we're gaining (classToUse.level + 1) → show that level's features.
+      const selectedClassNewLevel = newClassSelection ? 1 : (classToUse.level + 1)
+
       console.log('Level up debug:', {
         characterLevel: character.level,
         totalLevelFromClasses: calculateTotalLevel(character.classes),
         newLevel: newLevel,
-        selectedClassName: selectedClass.name,
-        selectedClassCurrentLevel: selectedClass.level,
+        selectedClassName: classToUse.name,
+        selectedClassCurrentLevel: classToUse.level,
         selectedClassNewLevel: selectedClassNewLevel,
-        isSingleClass: isSingleClassCharacter,
-        totalClasses: character.classes?.length
+        isNewClass: !!newClassSelection,
+        subclass: classToUse.subclass
       })
-      
-      // Load features for the selected class's new level only
+
+      // Load features for the selected class's new level only (subclass affects which features are returned)
       // includeHidden = true to include ASI features during level up
-      const { features } = await loadClassFeatures(selectedClass.class_id || '', selectedClassNewLevel, selectedClass.subclass, true)
+      const { features } = await loadClassFeatures(classToUse.class_id || '', selectedClassNewLevel, classToUse.subclass, true)
       if (features) {
         // Filter to only show features that are exactly at the selected class's new level
         const newLevelFeatures = features.filter(feature => feature.level === selectedClassNewLevel)
@@ -552,12 +596,12 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     const isNewClass = newClassSelection !== null
     
     if (isNewClass && newClassSelection) {
-      // Adding a new class at level 1
+      // Adding a new class at level 1 (include subclass if selected during level-up flow)
       const newCharacterClass: CharacterClass = {
         name: newClassSelection.classData.name,
         level: 1,
         class_id: newClassSelection.classData.id,
-        subclass: undefined
+        subclass: selectedClass?.subclass
       }
       
       updatedClasses = [...(editableCharacter.classes || []), newCharacterClass]
@@ -577,12 +621,13 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
       // The skills are already updated in editableCharacter from the sidebar preview
       // No need to duplicate the skill logic here since it's already handled
     } else {
-      // Leveling up existing class
+      // Leveling up existing class (include subclass if selected during level-up flow)
       updatedClasses = editableCharacter.classes?.map(c => 
         c.name === selectedClass.name 
           ? { 
               ...c, 
-              level: c.level + 1 // Always increment the individual class level
+              level: c.level + 1,
+              ...(selectedClass.subclass != null ? { subclass: selectedClass.subclass } : {})
             }
           : c
       ) || []
@@ -651,22 +696,22 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
       classFeatures: updatedClassFeatures
     }
 
-    // Handle ASI
+    // Handle ASI — apply bonuses once using original character as base (editableCharacter
+    // already has ASI applied for sidebar preview, so using it here would double-count)
     if (asiChoice?.type === 'ability_scores' && asiChoice.abilityScores) {
-      // Apply ability score improvements
       const { first, second } = asiChoice.abilityScores
       if (first) {
         const firstAbility = first.toLowerCase() as keyof CharacterData
         updatedCharacter = {
           ...updatedCharacter,
-          [firstAbility]: (editableCharacter[firstAbility] as number) + (second ? 1 : 2)
+          [firstAbility]: (character[firstAbility] as number) + (second ? 1 : 2)
         }
       }
       if (second) {
         const secondAbility = second.toLowerCase() as keyof CharacterData
         updatedCharacter = {
           ...updatedCharacter,
-          [secondAbility]: (editableCharacter[secondAbility] as number) + 1
+          [secondAbility]: (character[secondAbility] as number) + 1
         }
       }
     } else if (asiChoice?.type === 'feat' && asiChoice.feat) {
@@ -1300,6 +1345,36 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
             </div>
           )}
 
+          {/* Step: Subclass selection (when leveling to subclass selection level) */}
+          {step === 'subclass_selection' && selectedClass && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-lg font-semibold">Choose Subclass</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedClass.name} gains a subclass at level {levelUpSubclassSelectionLevel}. Select your subclass before viewing class features.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="level-up-subclass">Subclass (required)</Label>
+                <Select
+                  value={selectedSubclassInLevelUp}
+                  onValueChange={setSelectedSubclassInLevelUp}
+                >
+                  <SelectTrigger id="level-up-subclass" className="w-full">
+                    <SelectValue placeholder="Select a subclass..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {levelUpSubclassOptions.map((subclassName) => (
+                      <SelectItem key={subclassName} value={subclassName}>
+                        {subclassName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
           {/* Step 5: New Features */}
           {step === 'features' && (
             <div className="flex flex-col gap-4">
@@ -1310,11 +1385,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                 </p>
                 {selectedClass && (
                   <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                    Loading features for {selectedClass.name} level {
-                      character.classes && character.classes.length === 1 
-                        ? newLevel 
-                        : selectedClass.level + 1
-                    }
+                    Loading features for {selectedClass.name} level {newClassSelection ? 1 : selectedClass.level + 1}
                   </p>
                 )}
               </div>
@@ -1665,8 +1736,10 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                         setStep('class_selection')
                         resetChoices()
                       }
-                    } else if (step === 'features') {
+                    } else if (step === 'subclass_selection') {
                       setStep('hp_roll')
+                    } else if (step === 'features') {
+                      setStep(levelUpSubclassOptions.length > 0 ? 'subclass_selection' : 'hp_roll')
                     } else if (step === 'asi_choice') {
                       setStep('features')
                     } else if (step === 'summary') {
@@ -1694,8 +1767,32 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
               
               {step === 'hp_roll' && (
                 <Button 
-                  onClick={loadNewFeatures} 
-                  disabled={!hpRollResult || isLoadingFeatures}
+                  onClick={handleContinueFromHpRoll} 
+                  disabled={!hpRollResult || isLoadingFeatures || isLoadingSubclassCheck}
+                >
+                  {(isLoadingFeatures || isLoadingSubclassCheck) ? (
+                    <>
+                      <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                      {isLoadingSubclassCheck ? 'Checking...' : 'Loading Features...'}
+                    </>
+                  ) : (
+                    <>
+                      Continue
+                      <Icon icon="lucide:arrow-right" className="w-4 h-4" />
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {step === 'subclass_selection' && (
+                <Button 
+                  onClick={() => {
+                    if (!selectedClass || !selectedSubclassInLevelUp) return
+                    const updatedClass: CharacterClass = { ...selectedClass, subclass: selectedSubclassInLevelUp }
+                    setSelectedClass(updatedClass)
+                    loadNewFeatures(updatedClass)
+                  }}
+                  disabled={!selectedSubclassInLevelUp || isLoadingFeatures}
                 >
                   {isLoadingFeatures ? (
                     <>

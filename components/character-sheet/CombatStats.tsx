@@ -15,6 +15,7 @@ import type { DescriptionSegment } from "@/lib/class-feature-templates"
 import { getFeatureMaxUses } from "@/lib/feature-usage-tracker"
 import type { ClassFeatureSkill } from "@/lib/class-feature-types"
 import { useState, useEffect } from "react"
+import { CombatStatsSkeleton } from "./character-sheet-skeletons"
 
 interface CombatStatsProps {
   character: CharacterData
@@ -23,13 +24,14 @@ interface CombatStatsProps {
   onToggleDeathSave?: (type: 'successes' | 'failures', index: number) => void
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
-export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSave, onUpdateFeatureUsage, canEdit = true }: CombatStatsProps) {
+export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSave, onUpdateFeatureUsage, canEdit = true, isLoading = false }: CombatStatsProps) {
   const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
 
@@ -49,6 +51,8 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
 
     loadFeatures()
   }, [character.id, character.level, character.classes])
+
+  if (isLoading) return <CombatStatsSkeleton />
 
   // Filter features for combat display
   const combatFeatures = classFeatureSkills.filter(skill => {

@@ -7,12 +7,14 @@ import { Icon } from "@iconify/react"
 import type { CharacterData } from "@/lib/character-data"
 import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
 import { getFeatureUsage } from "@/lib/feature-usage-tracker"
+import { SectionCardSkeleton } from "./character-sheet-skeletons"
 
 interface MetamagicProps {
   character: CharacterData
   onEdit: () => void
   onOpenFeatureModal: (content: { title: string; description: string }) => void
   canEdit?: boolean
+  isLoading?: boolean
 }
 
 function getMetamagicKnownBySorcererLevel(sorcererLevel: number): number {
@@ -22,7 +24,8 @@ function getMetamagicKnownBySorcererLevel(sorcererLevel: number): number {
   return 0
 }
 
-export function Metamagic({ character, onEdit, onOpenFeatureModal, canEdit = true }: MetamagicProps) {
+export function Metamagic({ character, onEdit, onOpenFeatureModal, canEdit = true, isLoading = false }: MetamagicProps) {
+  if (isLoading) return <SectionCardSkeleton contentLines={4} />
   const hasMetamagic = hasClassFeature(character, 'metamagic', 3)
   const sorcererLevel = getClassLevel(character, 'sorcerer')
   const metamagicUsage = getFeatureUsage(character, 'metamagic')

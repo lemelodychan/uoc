@@ -1400,7 +1400,7 @@ export const getHitDiceByClass = (classes: CharacterClass[]): Array<{
   }))
 }
 
-// Get saving throw proficiencies from all classes
+// Get saving throw proficiencies for multiclass: only the first class (taken at level 1) grants save proficiencies.
 export const getMulticlassSavingThrowProficiencies = (classes: CharacterClass[]): SavingThrowProficiency[] => {
   const classSavingThrows: Record<string, string[]> = {
     'barbarian': ['strength', 'constitution'],
@@ -1422,17 +1422,17 @@ export const getMulticlassSavingThrowProficiencies = (classes: CharacterClass[])
   const allAbilities: Array<"strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma"> = [
     "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"
   ]
-  
+
   const proficiencies: SavingThrowProficiency[] = allAbilities.map(ability => ({
     ability,
     proficient: false
   }))
 
-  // Mark the appropriate ones as proficient based on classes
+  // Only the first class (taken at level 1) grants saving throw proficiencies when multiclassing
   const proficientAbilities = new Set<string>()
-  
-  for (const charClass of classes) {
-    const savingThrows = classSavingThrows[charClass.name.toLowerCase()] || []
+  const firstClass = classes[0]
+  if (firstClass) {
+    const savingThrows = classSavingThrows[firstClass.name.toLowerCase()] || []
     for (const ability of savingThrows) {
       proficientAbilities.add(ability)
     }

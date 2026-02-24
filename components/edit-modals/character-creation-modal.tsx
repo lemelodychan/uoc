@@ -3108,9 +3108,12 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     // Note: Secondary race (raceIds[1]) is purely cosmetic and does not contribute features, bonuses, or other mechanical effects
     // Only the main race (raceIds[0]) provides mechanical benefits
 
-    // Add Custom Lineage feat if selected
+    // Add Custom Lineage feat if selected (avoid double-add: feat may already be in editableCharacter.feats from the modal save)
     const customLineageFeat = customLineageChoices?.feat ? [customLineageChoices.feat] : []
-    const allFeats = [...(editableCharacter.feats || []), ...customLineageFeat]
+    const featsFromEditable = (editableCharacter.feats || []).filter(
+      f => !customLineageChoices?.feat || f.name !== customLineageChoices.feat?.name
+    )
+    const allFeats = [...featsFromEditable, ...customLineageFeat]
     
     // Prepare languages - combine Custom Lineage language if applicable
     let finalLanguages = editableCharacter.languages || "Common"

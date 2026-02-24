@@ -641,7 +641,10 @@ export const saveCharacter = async (
       aesthetic_images: character.aestheticImages || null,
       // Ensure user_id is set - use existing if character exists, otherwise use current user
       user_id: existingCharacterData?.user_id || character.userId || user.id,
-      visibility: character.visibility || existingCharacterData?.visibility || 'public',
+      // Persist visibility: prefer character.visibility so edits (e.g. private) always save
+      visibility: (character.visibility === 'private' || character.visibility === 'public')
+        ? character.visibility
+        : (existingCharacterData?.visibility || 'public'),
       is_npc: character.isNPC || false,
       strength: character.strength,
       dexterity: character.dexterity,
@@ -760,7 +763,8 @@ export const saveCharacter = async (
     // Legacy Warlock columns have been dropped - using unified system only
 
 
-    const { error } = await supabase.from("characters").upsert(saveData)
+    // Upsert by id: update existing row when id matches, never duplicate
+    const { error } = await supabase.from("characters").upsert(saveData, { onConflict: "id" })
 
     if (error) {
       console.error("[v0] Database save error:", error)
@@ -778,6 +782,108 @@ export const saveCharacter = async (
   } catch (error) {
     console.error("Error saving character:", error)
     return { success: false, error: "Failed to save character" }
+  }
+}
+
+/** Map CharacterData (camelCase) keys to database column names. Only keys that can be patched. */
+const CHARACTER_TO_DB_COLUMNS: Record<string, string> = {
+  name: 'name',
+  class: 'class_name',
+  class_id: 'class_id',
+  subclass: 'subclass',
+  level: 'level',
+  classes: 'classes',
+  hitDiceByClass: 'hit_dice_by_class',
+  background: 'background',
+  backgroundId: 'background_id',
+  backgroundData: 'background_data',
+  raceIds: 'race',
+  alignment: 'alignment',
+  imageUrl: 'image_url',
+  aestheticImages: 'aesthetic_images',
+  visibility: 'visibility',
+  isNPC: 'is_npc',
+  strength: 'strength',
+  dexterity: 'dexterity',
+  constitution: 'constitution',
+  intelligence: 'intelligence',
+  wisdom: 'wisdom',
+  charisma: 'charisma',
+  armorClass: 'armor_class',
+  initiative: 'initiative',
+  currentHitPoints: 'hit_points',
+  maxHitPoints: 'max_hit_points',
+  temporaryHitPoints: 'temporary_hit_points',
+  tempMaxHP: 'temp_max_hp',
+  deathSaves: 'death_saves',
+  exhaustion: 'exhaustion',
+  speed: 'speed',
+  skills: 'skills',
+  weapons: 'weapons',
+  weaponNotes: 'weapons_notes',
+  features: 'features',
+  toolsProficiencies: 'tools',
+  feats: 'feats',
+  savingThrowProficiencies: 'saving_throw_proficiencies',
+  equipment: 'equipment',
+  magicItems: 'magic_items',
+  languages: 'languages',
+  otherTools: 'other_tools',
+  money: 'money',
+  equipmentProficiencies: 'equipment_proficiencies',
+  featureNotes: 'feature_custom_descriptions',
+  personalityTraits: 'personality_traits',
+  backstory: 'backstory',
+  notes: 'notes',
+  campaignId: 'campaign_id',
+}
+
+/**
+ * Patch only the provided character fields in the database. Use when editing basic info
+ * so we don't re-save classes, spellData, etc. Only updates columns present in updates.
+ */
+export const patchCharacter = async (
+  characterId: string,
+  updates: Partial<CharacterData>
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: authError?.message || "Not authenticated" }
+    }
+
+    const payload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined) continue
+      const dbCol = CHARACTER_TO_DB_COLUMNS[key]
+      if (!dbCol) continue
+      if (key === 'raceIds') {
+        payload[dbCol] = Array.isArray(value) && value.length > 0 ? value : []
+      } else if (key === 'hitDice' && value && typeof value === 'object') {
+        payload.hit_dice_total = (value as { total?: number }).total ?? 0
+        payload.hit_dice_used = (value as { used?: number }).used ?? 0
+        payload.hit_dice_type = (value as { dieType?: string }).dieType ?? 'd8'
+      } else {
+        payload[dbCol] = value
+      }
+    }
+
+    const { error } = await supabase
+      .from('characters')
+      .update(payload)
+      .eq('id', characterId)
+
+    if (error) {
+      console.error("[patchCharacter] Database error:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (error) {
+    console.error("Error patching character:", error)
+    return { success: false, error: String(error) }
   }
 }
 
