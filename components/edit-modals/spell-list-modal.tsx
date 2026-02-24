@@ -356,7 +356,12 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
       }
       onSave({ spells: next })
       // After adding/saving, switch to the relevant tab for the spell
-      const targetTab = (payload.tag && payload.tag.trim()) ? `tag:${payload.tag.trim()}` : "basic"
+      const targetTab =
+        payload.tag && payload.tag.trim()
+          ? `tag:${payload.tag.trim()}`
+          : payload.isPrepared
+            ? "prepared"
+            : "all"
       setActiveTab(targetTab)
       return next
     })
@@ -405,13 +410,14 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
     return acc
   }, {})
 
-  // Base (untagged) spells grouped by level
-  const baseSpells = spells.filter((s) => !s.tag)
-  const spellsByLevel = baseSpells.reduce<{ [key: number]: Spell[] }>((acc, spell) => {
+  // Prepared spells grouped by level
+  const preparedSpells = spells.filter((s) => s.isPrepared)
+  const preparedSpellsByLevel = preparedSpells.reduce<{ [key: number]: Spell[] }>((acc, spell) => {
     if (!acc[spell.level]) acc[spell.level] = []
     acc[spell.level].push(spell)
     return acc
   }, {})
+
   // Tagged spells grouped by tag then level
   const taggedSpells = spells.filter((s) => !!s.tag)
   const tagKeys = Array.from(new Set(taggedSpells.map((s) => (s.tag as string).trim()))).filter(Boolean)
@@ -426,10 +432,10 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
   })
 
   // Build tabs metadata
-  const baseCount = baseSpells.length
+  const preparedCount = preparedSpells.length
   const tabs = [
     { id: "all", label: "All", count: spells.length },
-    { id: "basic", label: "Basic Spells", count: baseCount },
+    { id: "prepared", label: "Prepared", count: preparedCount },
     ...tagKeys
       .slice()
       .sort((a, b) => a.localeCompare(b))
@@ -450,15 +456,17 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
 
         <div className="flex flex-col gap-0 min-h-[70vh] max-h-[70vh] overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 gap-0 min-h-0">
-            <div className="flex items-center justify-between gap-4 p-4 pt-0 border-b bg-card">
-              <TabsList>
-                {tabs.map((t) => (
-                  <TabsTrigger key={t.id} value={t.id}>
-                    {t.label}
-                    <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px]">{t.count}</Badge>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            <div className="flex items-center gap-4 p-4 pt-0 border-b bg-card">
+              <div className="flex-1 min-w-0 overflow-x-auto">
+                <TabsList className="flex w-full min-w-max">
+                  {tabs.map((t) => (
+                    <TabsTrigger key={t.id} value={t.id}>
+                      {t.label}
+                      <Badge variant="secondary" className="px-1.5 py-0.5 text-[10px]">{t.count}</Badge>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
             </div>
 
             <TabsContent value="all" className="flex-1 min-h-0 overflow-y-auto bg-background">
@@ -538,9 +546,9 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
               </div>
             </TabsContent>
 
-            <TabsContent value="basic" className="flex-1 min-h-0 overflow-y-auto bg-background">
+            <TabsContent value="prepared" className="flex-1 min-h-0 overflow-y-auto bg-background">
               <div className="p-4">
-                {Object.entries(spellsByLevel)
+                {Object.entries(preparedSpellsByLevel)
                   .sort(([a], [b]) => parseInt(a) - parseInt(b))
                   .map(([level, levelSpells]) => (
                     <div key={level} className="space-y-2 flex flex-col gap-0 mb-10 last:mb-0">
@@ -551,18 +559,23 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
                       <div className="grid grid-cols-1 gap-3">
                         {levelSpells
                           .slice()
-                          .sort((a,b)=> ( (b.isPrepared?1:0) - (a.isPrepared?1:0) ) || a.name.localeCompare(b.name))
+                          .sort((a, b) => a.name.localeCompare(b.name))
                           .map((spell, index) => {
-                            const key = `${spell.level}-${spell.name}-${index}`
+                            const key = `prepared-${spell.level}-${spell.name}-${index}`
                             const isOpen = !!expanded[key]
                             const globalIndex = spells.findIndex((s) => s === spell)
                             return (
-                              <div key={key} className={`p-3 bg-card border rounded-lg ${!spell.isPrepared && spell.level > 0 ? 'opacity-60' : ''}`}>
+                              <div key={key} className="p-3 bg-card border rounded-lg">
                                 <div className="flex flex-col gap-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-2">
                                       {(spell.description || spell.higherLevel) && (
-                                        <button type="button" className={`w-5 h-5 flex items-center justify-center rounded border hover:bg-muted`} onClick={() => toggleExpanded(key)} aria-label="Toggle details">
+                                        <button
+                                          type="button"
+                                          className="w-5 h-5 flex items-center justify-center rounded border hover:bg-muted"
+                                          onClick={() => toggleExpanded(key)}
+                                          aria-label="Toggle details"
+                                        >
                                           {isOpen ? (
                                             <Icon icon="lucide:chevron-down" className="w-4 h-4" />
                                           ) : (
@@ -577,32 +590,94 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
                                     </div>
                                     <div className="flex items-center gap-2">
                                       {spell.level > 0 && (
-                                        <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => canEdit && togglePrepared(spell)} variant="outline" size="sm" disabled={!canEdit}>{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
+                                        <Toggle
+                                          aria-label="Prepared"
+                                          pressed={!!spell.isPrepared}
+                                          onPressedChange={() => canEdit && togglePrepared(spell)}
+                                          variant="outline"
+                                          size="sm"
+                                          disabled={!canEdit}
+                                        >
+                                          {spell.isPrepared ? "Prepared" : "Prepare"}
+                                        </Toggle>
                                       )}
                                       {canEdit && (
                                         <>
-                                          <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
-                                          <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              setEditIndex(globalIndex)
+                                              setNewSpell(spell)
+                                              setNewSpellModalOpen(true)
+                                            }}
+                                          >
+                                            Edit
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => removeSpell(globalIndex)}
+                                            className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"
+                                          >
+                                            <Icon icon="lucide:trash-2" className="w-4 h-4" />
+                                          </Button>
                                         </>
                                       )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2 flex-wrap text-xs">
                                     {renderCastingBadge(spell.castingTime)}
-                                    {spell.duration && <Badge variant="secondary">{spell.duration.includes('Concentration') ? `Concentration, ${spell.duration.replace('Concentration, ', '')}` : spell.duration}</Badge>}
+                                    {spell.duration && (
+                                      <Badge variant="secondary">
+                                        {spell.duration.includes("Concentration")
+                                          ? `Concentration, ${spell.duration.replace("Concentration, ", "")}`
+                                          : spell.duration}
+                                      </Badge>
+                                    )}
                                     {spell.saveThrow && <Badge variant="outline">{spell.saveThrow} saving throw</Badge>}
                                     {spell.damage && <Badge variant="outline">{spell.damage} damage</Badge>}
                                   </div>
                                   {(spell.description || spell.higherLevel) && isOpen && (
                                     <div className="mt-2 flex flex-col gap-3 border-t pt-3">
                                       <div className="flex flex-row gap-6 items-center flex-wrap">
-                                        {spell.range && (<div className="text-xs flex items-center gap-2"><span className="font-medium">Range:</span><Badge variant="outline">{spell.range}</Badge></div>)}
-                                        {spell.duration && (<div className="text-xs flex items-center gap-2"><span className="font-medium">Duration:</span><Badge variant="outline">{spell.duration}</Badge></div>)}
-                                        {spell.components && (<div className="text-xs font-medium flex items-center gap-2">Components: <Badge variant="outline">{`${spell.components.v ? "V, " : ""}${spell.components.s ? "S, " : ""}${spell.components.m ? "M" : ""}`.replace(/, $/, "")}</Badge></div>)}
+                                        {spell.range && (
+                                          <div className="text-xs flex items-center gap-2">
+                                            <span className="font-medium">Range:</span>
+                                            <Badge variant="outline">{spell.range}</Badge>
+                                          </div>
+                                        )}
+                                        {spell.duration && (
+                                          <div className="text-xs flex items-center gap-2">
+                                            <span className="font-medium">Duration:</span>
+                                            <Badge variant="outline">{spell.duration}</Badge>
+                                          </div>
+                                        )}
+                                        {spell.components && (
+                                          <div className="text-xs font-medium flex items-center gap-2">
+                                            Components:{" "}
+                                            <Badge variant="outline">
+                                              {`${spell.components.v ? "V, " : ""}${
+                                                spell.components.s ? "S, " : ""
+                                              }${spell.components.m ? "M" : ""}`.replace(/, $/, "")}
+                                            </Badge>
+                                          </div>
+                                        )}
                                       </div>
-                                      {spell.description && (<RichTextDisplay content={spell.description} className="text-sm text-muted-foreground" />)}
-                                      {spell.higherLevel && (<div className="text-xs text-muted-foreground italic mt-2">Using a Higher-Level Spell Slot: {spell.higherLevel}</div>)}
-                                      <Badge className={getSchoolColor(spell.school)}>School of {spell.school}</Badge>
+                                      {spell.description && (
+                                        <RichTextDisplay
+                                          content={spell.description}
+                                          className="text-sm text-muted-foreground"
+                                        />
+                                      )}
+                                      {spell.higherLevel && (
+                                        <div className="text-xs text-muted-foreground italic mt-2">
+                                          Using a Higher-Level Spell Slot: {spell.higherLevel}
+                                        </div>
+                                      )}
+                                      <Badge className={getSchoolColor(spell.school)}>
+                                        School of {spell.school}
+                                      </Badge>
                                     </div>
                                   )}
                                 </div>
