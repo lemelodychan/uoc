@@ -14,7 +14,8 @@ import { Icon } from "@iconify/react"
 import { loadAllClasses, loadAllRaces, loadRaceDetails, loadClassesWithDetails, loadClassFeatures, loadBackgroundsWithDetails, loadBackgroundDetails, type BackgroundData } from "@/lib/database"
 import { useUser } from "@/lib/user-context"
 import type { CharacterData } from "@/lib/character-data"
-import { createDefaultSkills, calculateModifier, calculateSkillBonus, createClassBasedSavingThrowProficiencies, createDefaultSavingThrowProficiencies, calculateProficiencyBonus, getMulticlassEquipmentProficiencies } from "@/lib/character-data"
+import { createDefaultSkills, calculateModifier, calculateSkillBonus, createClassBasedSavingThrowProficiencies, createDefaultSavingThrowProficiencies, calculateProficiencyBonus, getMulticlassEquipmentProficiencies, getSpellsPreparedForClass } from "@/lib/character-data"
+import { getCantripsKnownFromClass, getSpellsKnownFromClass } from "@/lib/spell-slot-calculator"
 import type { RaceData } from "@/lib/database"
 import type { ClassData } from "@/lib/class-utils"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
@@ -124,6 +125,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   const POINT_BUY_BASE = 8
   const POINT_BUY_MIN = 8
   const POINT_BUY_MAX = 15
+  const ABILITY_SCORE_DISPLAY_MAX = 19 // 15 point buy + race + ASI/feat cap
   
   // Basic info
   const [name, setName] = useState("")
@@ -1236,12 +1238,13 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         )
       } as any
       
-      // Update tool proficiencies - add new race proficiencies
-      const updatedToolsProfs = newProficiencies.tools.length > 0
-        ? [
-            ...(prev.toolsProficiencies || []),
-            ...newProficiencies.tools.map(tool => typeof tool === 'string' ? { name: tool, proficiency: 'proficient' as const } : tool)
-          ]
+      // Update tool proficiencies - add new race proficiencies (deduplicate by name to avoid stacking when race changes)
+      const existingToolNames = new Set((prev.toolsProficiencies || []).map((t: any) => typeof t === 'string' ? t : t.name))
+      const newToolsDeduped = newProficiencies.tools
+        .map(tool => typeof tool === 'string' ? { name: tool, proficiency: 'proficient' as const } : tool)
+        .filter((t: any) => !existingToolNames.has(t.name))
+      const updatedToolsProfs = newToolsDeduped.length > 0
+        ? [...(prev.toolsProficiencies || []), ...newToolsDeduped]
         : prev.toolsProficiencies || []
       
       // Apply speed
@@ -2523,27 +2526,36 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       }
     }
     
-    // Now apply all ASI feature bonuses from all selected features
+    // Compute total ASI increase per ability from all selected ASI features (do not add on top of previous ASI)
+    const asiIncreasePerAbility: Record<string, number> = {
+      strength: 0,
+      dexterity: 0,
+      constitution: 0,
+      intelligence: 0,
+      wisdom: 0,
+      charisma: 0,
+    }
     Array.from(newChoices.entries()).forEach(([id, choice]) => {
       if (selectedFeatures.has(id) && choice.type === 'ability_scores' && choice.abilityScores) {
         const first = choice.abilityScores.first?.toLowerCase()
         const second = choice.abilityScores.second?.toLowerCase()
-        
         if (first) {
-          const firstKey = first as keyof CharacterData
-          const firstValue = (updatedCharacter[firstKey] as number) || baseScore
           const firstIncrease = (second && second !== first) ? 1 : 2
-          updatedCharacter[firstKey] = (firstValue + firstIncrease) as any
+          asiIncreasePerAbility[first] = (asiIncreasePerAbility[first] ?? 0) + firstIncrease
         }
-        
         if (second && second !== first) {
-          const secondKey = second as keyof CharacterData
-          const secondValue = (updatedCharacter[secondKey] as number) || baseScore
-          updatedCharacter[secondKey] = (secondValue + 1) as any
+          asiIncreasePerAbility[second] = (asiIncreasePerAbility[second] ?? 0) + 1
         }
       }
     })
-    
+    // Apply ASI totals to base+race (recompute from base+race, never on top of existing ASI)
+    ;(Object.keys(asiIncreasePerAbility) as (keyof CharacterData)[]).forEach((key) => {
+      if (key in updatedCharacter && typeof updatedCharacter[key] === 'number') {
+        const basePlusRace = (updatedCharacter[key] as number) || baseScore
+        updatedCharacter[key] = (basePlusRace + (asiIncreasePerAbility[key] ?? 0)) as any
+      }
+    })
+
     setEditableCharacter(updatedCharacter)
   }
   
@@ -2735,9 +2747,62 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       }
     }
     
-    if (!background.trim()) {
-      setError("Background is required")
+    if (!selectedBackgroundId) {
+      setError("Please select a background")
       return
+    }
+    // Validate background skill/tool/language choices when background has choice options
+    if (selectedBackgroundData) {
+      const skillsData = (() => {
+        if (Array.isArray(selectedBackgroundData.skill_proficiencies)) {
+          return { fixed: selectedBackgroundData.skill_proficiencies, choice: undefined }
+        }
+        if (selectedBackgroundData.skill_proficiencies && typeof selectedBackgroundData.skill_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.skill_proficiencies)) {
+          return {
+            fixed: (selectedBackgroundData.skill_proficiencies as any).fixed || [],
+            choice: (selectedBackgroundData.skill_proficiencies as any).choice || undefined
+          }
+        }
+        return { fixed: [], choice: undefined }
+      })()
+      if (skillsData.choice && backgroundSkillChoices.length < (skillsData.choice.count || 1)) {
+        setError(`Please select ${skillsData.choice.count || 1} skill${(skillsData.choice.count || 1) > 1 ? 's' : ''} for your background`)
+        return
+      }
+      const toolsData = (() => {
+        if (Array.isArray(selectedBackgroundData.tool_proficiencies)) {
+          return { fixed: selectedBackgroundData.tool_proficiencies, choice: undefined }
+        }
+        if (selectedBackgroundData.tool_proficiencies && typeof selectedBackgroundData.tool_proficiencies === 'object' && !Array.isArray(selectedBackgroundData.tool_proficiencies)) {
+          return {
+            fixed: (selectedBackgroundData.tool_proficiencies as any).fixed || [],
+            choice: (selectedBackgroundData.tool_proficiencies as any).choice || undefined
+          }
+        }
+        return { fixed: [], choice: undefined }
+      })()
+      if (toolsData.choice && backgroundToolChoices.length < (toolsData.choice.count || 1)) {
+        setError(`Please select ${toolsData.choice.count || 1} tool${(toolsData.choice.count || 1) > 1 ? 's' : ''} for your background`)
+        return
+      }
+      const langsData = (() => {
+        if (Array.isArray(selectedBackgroundData.languages)) {
+          return { fixed: selectedBackgroundData.languages, choice: undefined }
+        }
+        if (selectedBackgroundData.languages && typeof selectedBackgroundData.languages === 'object' && !Array.isArray(selectedBackgroundData.languages)) {
+          return {
+            fixed: (selectedBackgroundData.languages as any).fixed || [],
+            choice: (selectedBackgroundData.languages as any).choice || undefined
+          }
+        }
+        return { fixed: [], choice: undefined }
+      })()
+      const trimmedLangInputs = backgroundLanguageInputs.map(input => input.trim()).filter(l => l !== '')
+      const languagesToCheck = trimmedLangInputs.length > 0 ? trimmedLangInputs : backgroundLanguageChoices
+      if (langsData.choice && languagesToCheck.length < (langsData.choice.count || 1)) {
+        setError(`Please enter ${langsData.choice.count || 1} language${(langsData.choice.count || 1) > 1 ? 's' : ''} for your background`)
+        return
+      }
     }
     if (characterClasses.length === 0) {
       setError("At least one class is required")
@@ -2771,6 +2836,31 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
           return
         }
       }
+    }
+    
+    // Validate ASI choices for selected ASI features
+    const selectedASIFeatures = classFeatures.filter(f =>
+      isASIFeature(f) && selectedFeatures.has(f.id)
+    )
+    for (const feature of selectedASIFeatures) {
+      const asiChoice = asiChoices.get(feature.id)
+      if (!asiChoice ||
+          (asiChoice.type === 'ability_scores' && !asiChoice.abilityScores?.first) ||
+          (asiChoice.type === 'feat' && !asiChoice.feat)) {
+        setError(`Please complete your ASI selection for ${feature.name || feature.title}`)
+        return
+      }
+    }
+    
+    // Validate point buy is complete
+    const pointsSpent = getTotalPointsSpent()
+    if (pointsSpent > POINT_BUY_TOTAL) {
+      setError(`You have spent ${pointsSpent} points, but only ${POINT_BUY_TOTAL} points are available. Please adjust your ability scores.`)
+      return
+    }
+    if (pointsSpent < POINT_BUY_TOTAL) {
+      setError(`You have only spent ${pointsSpent} of ${POINT_BUY_TOTAL} available points. Please assign all points before continuing.`)
+      return
     }
     
     if (!hpRollResult) {
@@ -3127,9 +3217,11 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     onClose()
   }
 
-  const handleClose = () => {
-    resetAllState()
-    onClose()
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      resetAllState()
+      onClose()
+    }
   }
 
   const availableSubclasses = selectedClass 
@@ -3188,6 +3280,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     return choiceFeature?.skill_options || []
   }
 
+  // Ability score updates must set absolute values or go through a full recompute (base + race + ASI); never pass additive deltas.
   const updateEditableCharacter = useCallback((updates: Partial<CharacterData>) => {
     setEditableCharacter(prev => ({ ...prev, ...updates }))
   }, [])
@@ -3459,7 +3552,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   ), [editableCharacter, hpRollResult, abilityScoreChoices, asiChoices, updateEditableCharacter])
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[1200px] max-h-[80vh] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
@@ -6422,9 +6515,9 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                         const hasASIModification = asiBonus > 0
                         const hasAnyModification = hasRaceModification || hasASIModification
                         
-                        // Determine min/max values
+                        // Determine min/max values (total ability score capped at ABILITY_SCORE_DISPLAY_MAX)
                         const minValue = POINT_BUY_MIN
-                        const maxValue = POINT_BUY_MAX + raceBonus + asiBonus
+                        const maxValue = Math.min(ABILITY_SCORE_DISPLAY_MAX, POINT_BUY_MAX + raceBonus + asiBonus)
                         
                         return (
                           <div key={ability} className={`flex flex-col gap-2 p-3 border rounded-lg ${hasAnyModification ? 'bg-primary/5 border-primary/50' : ''}`}>
@@ -6442,10 +6535,14 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                   value={value}
                                   onChange={(e) => {
                                     const newValue = parseInt(e.target.value) || POINT_BUY_BASE
+                                    // Hard cap total ability score at 19
+                                    if (newValue < 1 || newValue > ABILITY_SCORE_DISPLAY_MAX) {
+                                      return
+                                    }
                                     // Validate the base score (before race/ASI bonuses)
                                     const newBaseScore = newValue - raceBonus - asiBonus
                                     
-                                    // Check point buy limits
+                                    // Check point buy limits (base 8-15)
                                     if (newBaseScore < POINT_BUY_MIN || newBaseScore > POINT_BUY_MAX) {
                                       return // Don't update if out of point buy range
                                     }
@@ -6700,6 +6797,54 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                         </p>
                       ))}
                       <p className="text-xs text-muted-foreground">Total Level: {level}</p>
+                      {(() => {
+                        const abilityScores = {
+                          strength: (editableCharacter.strength ?? 8) as number,
+                          dexterity: (editableCharacter.dexterity ?? 8) as number,
+                          constitution: (editableCharacter.constitution ?? 8) as number,
+                          intelligence: (editableCharacter.intelligence ?? 8) as number,
+                          wisdom: (editableCharacter.wisdom ?? 8) as number,
+                          charisma: (editableCharacter.charisma ?? 8) as number,
+                        }
+                        let totalCantrips = 0
+                        let totalSpellsKnown = 0
+                        const spellsPreparedByClass: { name: string; value: number }[] = []
+                        try {
+                          characterClasses.forEach((charClass) => {
+                            const classData = classDataMap.get(charClass.name) as any
+                            if (classData) {
+                              totalCantrips += getCantripsKnownFromClass(classData, charClass.level)
+                              if (classData.show_spells_known ?? classData.showSpellsKnown) {
+                                totalSpellsKnown += getSpellsKnownFromClass(classData, charClass.level)
+                              }
+                              const prepared = getSpellsPreparedForClass(charClass.name, charClass.level, abilityScores)
+                              if (prepared > 0) {
+                                spellsPreparedByClass.push({ name: charClass.name, value: prepared })
+                              }
+                            }
+                          })
+                        } catch {
+                          // Graceful fallback if class data missing
+                        }
+                        const totalPrepared = spellsPreparedByClass.reduce((s, x) => s + x.value, 0)
+                        const hasSpellcasting = totalCantrips > 0 || totalSpellsKnown > 0 || totalPrepared > 0
+                        if (!hasSpellcasting) return null
+                        return (
+                          <div className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border/50 space-y-1">
+                            {totalCantrips > 0 && <p>Cantrips known: <strong className="text-foreground">{totalCantrips}</strong></p>}
+                            {totalSpellsKnown > 0 && <p>Spells known: <strong className="text-foreground">{totalSpellsKnown}</strong></p>}
+                            {totalPrepared > 0 && (
+                              <p>
+                                Spells prepared: <strong className="text-foreground">
+                                  {spellsPreparedByClass.length > 1
+                                    ? spellsPreparedByClass.map(({ name, value }) => `${name} ${value}`).join(", ")
+                                    : totalPrepared}
+                                </strong>
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
 
@@ -6920,7 +7065,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
           <div className="flex justify-between w-full">
             <div className="flex gap-2">
               {step === 'basic_info' ? (
-                <Button variant="outline" onClick={handleClose}>
+                <Button variant="outline" onClick={() => handleOpenChange(false)}>
                   Cancel
                 </Button>
               ) : (

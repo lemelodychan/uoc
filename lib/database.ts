@@ -2694,8 +2694,8 @@ export const loadClassesWithDetails = async (): Promise<{
     spell_slots_7?: any | null
     spell_slots_8?: any | null
     spell_slots_9?: any | null
-    cantrips_known?: number | null
-    spells_known?: number | null
+    cantrips_known?: number[] | null
+    spells_known?: number[] | null
     spell_progression: any | null
     max_spell_slots: any | null
     // Column toggles for spell progression matrix
@@ -2768,26 +2768,24 @@ export const getClassDataWithSubclassPriority = (classes: any[], className: stri
     return baseClass
   }
   
-  // Merge base class with subclass, prioritizing subclass spellcasting data
+  // Merge base class with subclass; each field is overridden only when the subclass defines that field
   const mergedClass = {
     ...baseClass,
     ...subclass,
-    // Override with subclass data if subclass has spellcasting enabled
-    show_spells_known: subclass.show_spells_known ? subclass.show_spells_known : baseClass.show_spells_known,
-    show_sorcery_points: subclass.show_spells_known ? subclass.show_sorcery_points : baseClass.show_sorcery_points,
-    show_martial_arts: subclass.show_spells_known ? subclass.show_martial_arts : baseClass.show_martial_arts,
-    show_ki_points: subclass.show_spells_known ? subclass.show_ki_points : baseClass.show_ki_points,
-    show_unarmored_movement: subclass.show_spells_known ? subclass.show_unarmored_movement : baseClass.show_unarmored_movement,
-    show_rage: subclass.show_spells_known ? subclass.show_rage : baseClass.show_rage,
-    show_rage_damage: subclass.show_spells_known ? subclass.show_rage_damage : baseClass.show_rage_damage,
-    // Override progression data if subclass has spellcasting enabled
-    spells_known: subclass.show_spells_known ? subclass.spells_known : baseClass.spells_known,
-    sorcery_points: subclass.show_spells_known ? subclass.sorcery_points : baseClass.sorcery_points,
-    martial_arts_dice: subclass.show_spells_known ? subclass.martial_arts_dice : baseClass.martial_arts_dice,
-    ki_points: subclass.show_spells_known ? subclass.ki_points : baseClass.ki_points,
-    unarmored_movement: subclass.show_spells_known ? subclass.unarmored_movement : baseClass.unarmored_movement,
-    rage_uses: subclass.show_spells_known ? subclass.rage_uses : baseClass.rage_uses,
-    rage_damage: subclass.show_spells_known ? subclass.rage_damage : baseClass.rage_damage,
+    show_spells_known: subclass.show_spells_known != null ? subclass.show_spells_known : baseClass.show_spells_known,
+    show_sorcery_points: subclass.show_sorcery_points != null ? subclass.show_sorcery_points : baseClass.show_sorcery_points,
+    show_martial_arts: subclass.show_martial_arts != null ? subclass.show_martial_arts : baseClass.show_martial_arts,
+    show_ki_points: subclass.show_ki_points != null ? subclass.show_ki_points : baseClass.show_ki_points,
+    show_unarmored_movement: subclass.show_unarmored_movement != null ? subclass.show_unarmored_movement : baseClass.show_unarmored_movement,
+    show_rage: subclass.show_rage != null ? subclass.show_rage : baseClass.show_rage,
+    show_rage_damage: subclass.show_rage_damage != null ? subclass.show_rage_damage : baseClass.show_rage_damage,
+    spells_known: subclass.spells_known != null ? subclass.spells_known : baseClass.spells_known,
+    sorcery_points: subclass.sorcery_points != null ? subclass.sorcery_points : baseClass.sorcery_points,
+    martial_arts_dice: subclass.martial_arts_dice != null ? subclass.martial_arts_dice : baseClass.martial_arts_dice,
+    ki_points: subclass.ki_points != null ? subclass.ki_points : baseClass.ki_points,
+    unarmored_movement: subclass.unarmored_movement != null ? subclass.unarmored_movement : baseClass.unarmored_movement,
+    rage_uses: subclass.rage_uses != null ? subclass.rage_uses : baseClass.rage_uses,
+    rage_damage: subclass.rage_damage != null ? subclass.rage_damage : baseClass.rage_damage,
   }
   
   return mergedClass

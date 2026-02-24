@@ -656,6 +656,21 @@ export const getSpellcastingAbility = (className: string): string => {
   return spellcastingAbilities[className.toLowerCase()] || 'charisma'
 }
 
+// Prepared casters (5e): Cleric, Druid, Paladin, Wizard. Spells prepared = class level + spellcasting ability modifier (minimum 1).
+const PREPARED_CASTER_CLASSES = ['cleric', 'druid', 'paladin', 'wizard']
+
+export const getSpellsPreparedForClass = (
+  className: string,
+  classLevel: number,
+  abilityScores: Record<string, number>
+): number => {
+  const name = className.toLowerCase()
+  if (!PREPARED_CASTER_CLASSES.includes(name) || classLevel < 1) return 0
+  const ability = getSpellcastingAbility(className)
+  const modifier = calculateModifier(abilityScores[ability] ?? 10)
+  return Math.max(1, classLevel + modifier)
+}
+
 // Get the highest spellcasting ability modifier for multiclass characters
 export const getMulticlassSpellcastingAbilityModifier = (character: CharacterData): number => {
   if (!character.classes || character.classes.length <= 1) {

@@ -616,9 +616,10 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     
     const totalLevelBasedBonus = levelBasedHpBonus + existingRaceFeatureBonus
     
-    // Update max HP: add the roll result plus the level-based bonus
-    const newMaxHP = editableCharacter.maxHitPoints + hpRollResult.total + totalLevelBasedBonus
-    const newCurrentHP = editableCharacter.currentHitPoints + hpRollResult.total + totalLevelBasedBonus
+    // Update max HP: add the roll result plus the level-based bonus (use character, not editableCharacter,
+    // since editableCharacter already has the roll applied by the HP preview effect — adding again would double-count)
+    const newMaxHP = character.maxHitPoints + hpRollResult.total + totalLevelBasedBonus
+    const newCurrentHP = character.currentHitPoints + hpRollResult.total + totalLevelBasedBonus
 
     // Add new features
     const updatedClassFeatures = [

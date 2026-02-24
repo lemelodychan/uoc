@@ -429,6 +429,7 @@ export function RaceEditorPage({
       return (
         <div className="flex flex-col gap-3">
           {patternSelector}
+          <p className="text-xs text-muted-foreground">In character creation, total ability score is capped at 19 (point buy 15 + race + ASI/feat).</p>
           <div className="flex flex-col gap-2 p-3 bg-background border rounded-lg">
             <Label>Ability Score Increases</Label>
             <div className="flex flex-col gap-2">
