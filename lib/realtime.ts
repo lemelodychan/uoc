@@ -27,65 +27,108 @@ export interface LongRestEventData {
   awaiting_confirmation: boolean
 }
 
-// Store polling interval reference for cleanup
-let pollingInterval: NodeJS.Timeout | null = null
+// Store polling state for cleanup when re-subscribing
+let currentPollTimeout: ReturnType<typeof setTimeout> | null = null
 let lastCheckedEventId: string | null = null
 
+const POLL_INTERVAL_MS = 2000
+const MAX_POLL_INTERVAL_MS = 30000
+const BACKOFF_MULTIPLIER = 1.5
+const RETRY_ATTEMPTS = 3
+const RETRY_DELAY_MS = 1000
+const CONSECUTIVE_FAILURES_BEFORE_NOTIFY = 3
+
 /**
- * Subscribe to long rest events using database polling instead of websockets
- * This avoids websocket connection issues while maintaining collaborative functionality
+ * Fetch pending long rest events with retries (handles idle tab timeouts).
  */
-export const subscribeToLongRestEvents = (
-  onLongRestEvent: (event: LongRestEvent) => void,
-  onError?: (error: any) => void
-) => {
-  
-  // Clear any existing polling
-  if (pollingInterval) {
-    clearInterval(pollingInterval)
-  }
-  
-  // Poll the database every 2 seconds for new long rest events
-  pollingInterval = setInterval(async () => {
+async function fetchPendingEvents(): Promise<{ data: LongRestEvent[] | null; error: any }> {
+  let lastError: any = null
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
     try {
       const { data, error } = await supabase
         .from('long_rest_events')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
-        .limit(5) // Get more events to handle multiple pending events
+        .limit(5)
 
       if (error) {
-        console.error("[Realtime] Error polling for events:", error)
-        onError?.(error)
-        return
+        lastError = error
+        if (attempt < RETRY_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+        }
+        continue
       }
+      return { data: (data || []) as LongRestEvent[], error: null }
+    } catch (err) {
+      lastError = err
+      if (attempt < RETRY_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+      }
+    }
+  }
+  return { data: null, error: lastError }
+}
 
-      if (data && data.length > 0) {
-        // Process events in order, but only if we haven't seen them before
-        for (const event of data) {
-          if (event.id !== lastCheckedEventId) {
-            lastCheckedEventId = event.id
-            onLongRestEvent(event as LongRestEvent)
-            break // Only process one event at a time to avoid conflicts
+/**
+ * Subscribe to long rest events using database polling instead of websockets.
+ * Uses retries and exponential backoff when idle to avoid ERR_CONNECTION_TIMED_OUT
+ * and only notifies after sustained failures.
+ */
+export const subscribeToLongRestEvents = (
+  onLongRestEvent: (event: LongRestEvent) => void,
+  onError?: (error: any) => void
+) => {
+  if (currentPollTimeout) {
+    clearTimeout(currentPollTimeout)
+    currentPollTimeout = null
+  }
+
+  let currentIntervalMs = POLL_INTERVAL_MS
+  let consecutiveFailures = 0
+
+  const scheduleNext = () => {
+    currentPollTimeout = setTimeout(async () => {
+      currentPollTimeout = null
+      const { data, error } = await fetchPendingEvents()
+
+      if (error) {
+        consecutiveFailures++
+        console.error("[Realtime] Error polling for events:", error)
+        if (consecutiveFailures >= CONSECUTIVE_FAILURES_BEFORE_NOTIFY) {
+          onError?.(error)
+        }
+        currentIntervalMs = Math.min(
+          Math.round(currentIntervalMs * BACKOFF_MULTIPLIER),
+          MAX_POLL_INTERVAL_MS
+        )
+      } else {
+        consecutiveFailures = 0
+        currentIntervalMs = POLL_INTERVAL_MS
+        if (data && data.length > 0) {
+          for (const event of data) {
+            if (event.id !== lastCheckedEventId) {
+              lastCheckedEventId = event.id
+              onLongRestEvent(event)
+              break
+            }
           }
         }
       }
-    } catch (error) {
-      console.error("[Realtime] Polling error:", error)
-      onError?.(error)
-    }
-  }, 2000) // Poll every 2 seconds
-  
-  // Return subscription object with cleanup function
+      scheduleNext()
+    }, currentIntervalMs)
+  }
+
+  scheduleNext()
+
   return {
     unsubscribe: () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval)
-        pollingInterval = null
+      if (currentPollTimeout) {
+        clearTimeout(currentPollTimeout)
+        currentPollTimeout = null
       }
       lastCheckedEventId = null
-    }
+    },
   }
 }
 

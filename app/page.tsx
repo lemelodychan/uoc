@@ -179,6 +179,11 @@ function CharacterSheetContent() {
   const [longRestModalOpen, setLongRestModalOpen] = useState(false)
   const [currentLongRestEvent, setCurrentLongRestEvent] = useState<LongRestEvent | null>(null)
   const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
+  const lastRealtimeErrorToastRef = useRef<number>(0)
+  const REALTIME_ERROR_TOAST_THROTTLE_MS = 120000 // 2 minutes
+  const realtimeSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
+  const realtimeIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const REALTIME_IDLE_MS = 60000 // 1 min no activity → pause polling; scroll/click/key re-subscribe
   const [eldritchCannonModalOpen, setEldritchCannonModalOpen] = useState(false)
   const [eldritchInvocationsModalOpen, setEldritchInvocationsModalOpen] = useState(false)
   const [metamagicModalOpen, setMetamagicModalOpen] = useState(false)
@@ -1966,31 +1971,79 @@ function CharacterSheetContent() {
     }
   }, [activeCharacter, characters, currentLongRestEvent, applyLongRestEffects, toast])
 
-  // Set up real-time subscription for long rest events
+  // Set up real-time subscription for long rest events; pause when idle, re-subscribe on scroll/click/key
   useEffect(() => {
-    if (dbConnected) {
-      
-      const subscription = subscribeToLongRestEvents(
+    if (!dbConnected) return
+
+    const startSubscription = () => {
+      const sub = subscribeToLongRestEvents(
         (event: LongRestEvent) => {
           handleIncomingLongRestEvent(event)
         },
         (error) => {
           console.error("[Realtime] Subscription error:", error)
-          toast({
-            title: "Connection Error",
-            description: "Lost connection to real-time updates. Some features may not sync properly.",
-            variant: "destructive",
-          })
+          const now = Date.now()
+          if (now - lastRealtimeErrorToastRef.current >= REALTIME_ERROR_TOAST_THROTTLE_MS) {
+            lastRealtimeErrorToastRef.current = now
+            toast({
+              title: "Connection Error",
+              description: "Lost connection to real-time updates. Reconnecting in the background.",
+              variant: "destructive",
+            })
+          }
         }
       )
-      
-      setRealtimeSubscription(subscription)
-      
-      return () => {
-        subscription?.unsubscribe()
-      }
+      realtimeSubscriptionRef.current = sub
+      setRealtimeSubscription(sub)
+      return sub
     }
-  }, [dbConnected, handleIncomingLongRestEvent]) // Use memoized function
+
+    const scheduleIdleTimeout = () => {
+      if (realtimeIdleTimeoutRef.current) {
+        clearTimeout(realtimeIdleTimeoutRef.current)
+        realtimeIdleTimeoutRef.current = null
+      }
+      realtimeIdleTimeoutRef.current = setTimeout(() => {
+        realtimeIdleTimeoutRef.current = null
+        const sub = realtimeSubscriptionRef.current
+        if (sub) {
+          sub.unsubscribe()
+          realtimeSubscriptionRef.current = null
+          setRealtimeSubscription(null)
+        }
+      }, REALTIME_IDLE_MS)
+    }
+
+    const onActivity = () => {
+      if (!realtimeSubscriptionRef.current) {
+        startSubscription()
+      }
+      scheduleIdleTimeout()
+    }
+
+    startSubscription()
+    scheduleIdleTimeout()
+
+    const opts = { passive: true, capture: true } as const
+    window.addEventListener("scroll", onActivity, opts)
+    window.addEventListener("click", onActivity, opts)
+    window.addEventListener("keydown", onActivity, opts)
+    window.addEventListener("touchstart", onActivity, opts)
+
+    return () => {
+      if (realtimeIdleTimeoutRef.current) {
+        clearTimeout(realtimeIdleTimeoutRef.current)
+        realtimeIdleTimeoutRef.current = null
+      }
+      realtimeSubscriptionRef.current?.unsubscribe()
+      realtimeSubscriptionRef.current = null
+      setRealtimeSubscription(null)
+      window.removeEventListener("scroll", onActivity, opts)
+      window.removeEventListener("click", onActivity, opts)
+      window.removeEventListener("keydown", onActivity, opts)
+      window.removeEventListener("touchstart", onActivity, opts)
+    }
+  }, [dbConnected, handleIncomingLongRestEvent])
 
   const loadCharactersFromDatabase = async () => {
     if (!dbConnected) {
