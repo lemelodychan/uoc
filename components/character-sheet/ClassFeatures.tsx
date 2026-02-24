@@ -92,9 +92,6 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
     refresh: refreshFeatures 
   } = useClassFeatures(character)
 
-  // Character data loading (minimal record) - show skeleton
-  if (isLoading) return <ClassFeaturesSkeleton count={3} />
-
   // Map of class name -> selected subclass class_id (to filter subclass features)
   const [subclassIdByClass, setSubclassIdByClass] = useState<Record<string, string | null>>({})
 
@@ -153,6 +150,9 @@ export function ClassFeatures({ character, onRefreshFeatures, onOpenFeatureModal
       isCancelled = true
     }
   }, [character.classes, character.class, (character as any).subclass])
+
+  // Character data loading (minimal record) - show skeleton (must be after all hooks)
+  if (isLoading) return <ClassFeaturesSkeleton count={3} />
 
   return (
     <Card className="flex flex-col gap-3">

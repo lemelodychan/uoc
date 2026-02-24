@@ -15,6 +15,7 @@ import type { ClassFeatureSkill } from "@/lib/class-feature-types"
 import { loadClassFeatureSkills, loadClassData } from "@/lib/database"
 import { useState, useEffect } from "react"
 import { SectionCardSkeleton } from "./character-sheet-skeletons"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface SpellcastingProps {
   character: CharacterData
@@ -55,6 +56,22 @@ const isBarbarian = (character: CharacterData): boolean => {
   return character.class.toLowerCase() === 'barbarian'
 }
 
+// Spells Known classes (fixed list per long rest / level)
+const SPELLS_KNOWN_CLASSES = ['bard', 'sorcerer', 'warlock', 'ranger', 'paladin']
+// Spells Prepared classes (INT or WIS mod + class level)
+const SPELLS_PREPARED_CLASSES = ['cleric', 'druid', 'wizard', 'artificer']
+
+function getModifierForPreparedClass(
+  className: string,
+  intelligenceMod: number,
+  wisdomMod: number
+): number {
+  const c = className.toLowerCase()
+  if (c === 'wizard' || c === 'artificer') return intelligenceMod
+  if (c === 'cleric' || c === 'druid') return wisdomMod
+  return 0
+}
+
 
 export function Spellcasting({ 
   character, 
@@ -79,9 +96,12 @@ export function Spellcasting({
   const [monkClassData, setMonkClassData] = useState<any>(null)
   const [barbarianClassData, setBarbarianClassData] = useState<any>(null)
   // Calculate cantrips and spells known from classes table data
-  const [cantripsKnown, setCantripsKnown] = useState<{ total: number; breakdown: string }>({ total: 0, breakdown: "0" })
-  const [spellsKnown, setSpellsKnown] = useState<{ total: number; breakdown: string }>({ total: 0, breakdown: "0" })
-  const [shouldShowSpellsKnown, setShouldShowSpellsKnown] = useState<boolean>(true)
+  const [cantripsKnown, setCantripsKnown] = useState<{
+    total: number
+    breakdown: string
+    byClass: { className: string; value: number }[]
+  }>({ total: 0, breakdown: "0", byClass: [] })
+  const [spellsKnownByClass, setSpellsKnownByClass] = useState<{ className: string; value: number }[]>([])
   const [isLoadingCounts, setIsLoadingCounts] = useState(false)
 
 
@@ -138,7 +158,7 @@ export function Spellcasting({
     }
   }, [character.id, character.classes])
 
-  // Calculate cantrips and spells known from classes table
+  // Calculate cantrips and spells known (per class for "Spells Known" classes only)
   useEffect(() => {
     const calculateCounts = async () => {
       if (!hasSpellcastingAbilities(character)) {
@@ -147,69 +167,44 @@ export function Spellcasting({
 
       setIsLoadingCounts(true)
       try {
-        if (character.classes && character.classes.length > 0) {
-          // Multiclassed character - sum up from all classes and build breakdown
-          let totalCantrips = 0
-          let totalSpells = 0
-          let anyClassShowsSpells = false
-          const cantripBreakdowns: string[] = []
-          const spellBreakdowns: string[] = []
+        const classes = character.classes?.length
+          ? character.classes
+          : character.class
+            ? [{ name: character.class, level: character.level, subclass: character.subclass }]
+            : []
 
-          for (const charClass of character.classes) {
-            const { fetchClassData, getCantripsKnownFromClass, getSpellsKnownFromClass } = await import('@/lib/spell-slot-calculator')
-            const classData = await fetchClassData(charClass.name, undefined)
-            
-            if (classData) {
-              const classCantrips = getCantripsKnownFromClass(classData, charClass.level)
-              totalCantrips += classCantrips
-              // Only add to breakdown if the class contributes cantrips
-              if (classCantrips > 0) {
-                cantripBreakdowns.push(classCantrips.toString())
-              }
-              
-              if (classData.show_spells_known) {
-                const classSpells = getSpellsKnownFromClass(classData, charClass.level)
-                totalSpells += classSpells
-                // Only add to breakdown if the class contributes spells
-                if (classSpells > 0) {
-                  spellBreakdowns.push(classSpells.toString())
-                }
-                anyClassShowsSpells = true
-              }
-            }
-          }
+        let totalCantrips = 0
+        const cantripBreakdowns: string[] = []
+        const cantripsByClass: { className: string; value: number }[] = []
+        const knownList: { className: string; value: number }[] = []
 
-          const cantripBreakdown = cantripBreakdowns.length > 1 ? cantripBreakdowns.join(" + ") : cantripBreakdowns[0] || "0"
-          const spellBreakdown = spellBreakdowns.length > 1 ? spellBreakdowns.join(" + ") : spellBreakdowns[0] || "0"
-
-          setCantripsKnown({ total: totalCantrips, breakdown: cantripBreakdown })
-          setSpellsKnown({ total: totalSpells, breakdown: spellBreakdown })
-          setShouldShowSpellsKnown(anyClassShowsSpells)
-        } else {
-          // Single class character
+        for (const charClass of classes) {
           const { fetchClassData, getCantripsKnownFromClass, getSpellsKnownFromClass } = await import('@/lib/spell-slot-calculator')
-          const classData = await fetchClassData(character.class, undefined)
-          
+          const classData = await fetchClassData(charClass.name, undefined)
+
           if (classData) {
-            const cantrips = getCantripsKnownFromClass(classData, character.level)
-            setCantripsKnown({ total: cantrips, breakdown: cantrips.toString() })
-            
-            if (classData.show_spells_known) {
-              const spells = getSpellsKnownFromClass(classData, character.level)
-              setSpellsKnown({ total: spells, breakdown: spells.toString() })
-              setShouldShowSpellsKnown(true)
-            } else {
-              setSpellsKnown({ total: 0, breakdown: "0" })
-              setShouldShowSpellsKnown(false)
+            const classCantrips = getCantripsKnownFromClass(classData, charClass.level)
+            totalCantrips += classCantrips
+            if (classCantrips > 0) {
+              cantripBreakdowns.push(classCantrips.toString())
+              cantripsByClass.push({ className: charClass.name, value: classCantrips })
+            }
+
+            // Spells Known: only for Bard, Sorcerer, Warlock, Ranger, Paladin
+            if (SPELLS_KNOWN_CLASSES.includes(charClass.name.toLowerCase())) {
+              const value = getSpellsKnownFromClass(classData, charClass.level)
+              knownList.push({ className: charClass.name, value })
             }
           }
         }
+
+        const cantripBreakdown = cantripBreakdowns.length > 1 ? cantripBreakdowns.join("+") : cantripBreakdowns[0] || "0"
+        setCantripsKnown({ total: totalCantrips, breakdown: cantripBreakdown, byClass: cantripsByClass })
+        setSpellsKnownByClass(knownList)
       } catch (error) {
         console.error('Error calculating spell counts:', error)
-        // Fallback to character data
-        setCantripsKnown({ total: character.spellData.cantripsKnown, breakdown: character.spellData.cantripsKnown.toString() })
-        setSpellsKnown({ total: character.spellData.spellsKnown, breakdown: character.spellData.spellsKnown.toString() })
-        setShouldShowSpellsKnown(true)
+        setCantripsKnown({ total: character.spellData.cantripsKnown, breakdown: character.spellData.cantripsKnown.toString(), byClass: [] })
+        setSpellsKnownByClass([])
       } finally {
         setIsLoadingCounts(false)
       }
@@ -224,6 +219,29 @@ export function Spellcasting({
   if (!isMonk(character) && !isBarbarian(character) && !hasSpellcastingAbilities(character)) {
     return null
   }
+
+  // Spells Prepared per class (Cleric, Druid, Wizard, Artificer): modifier + class level, minimum 1
+  const classesForPrepared = character.classes?.length
+    ? character.classes
+    : character.class
+      ? [{ name: character.class, level: character.level }]
+      : []
+  const spellsPreparedByClass = classesForPrepared
+    .filter((c) => SPELLS_PREPARED_CLASSES.includes(c.name.toLowerCase()))
+    .map((c) => {
+      const mod = getModifierForPreparedClass(c.name, intelligenceMod, wisdomMod)
+      const cLower = c.name.toLowerCase()
+      const modLabel = cLower === "wizard" || cLower === "artificer" ? "INT" : "WIS"
+      return {
+        className: c.name,
+        value: Math.max(1, mod + c.level),
+        level: c.level,
+        modLabel,
+        modValue: mod,
+      }
+    })
+
+  const hasSpellsRow = cantripsKnown.total > 0 || spellsKnownByClass.length > 0 || spellsPreparedByClass.length > 0
 
   // Determine spellcasting ability modifier based on class
   const getSpellcastingModifier = () => {
@@ -977,33 +995,91 @@ export function Spellcasting({
                 </div>
               </div>
               
-              {/* Cantrips and Spells row - only show if character has cantrips or spells known */}
-              {(cantripsKnown.total > 0 || spellsKnown.total > 0) && (
-                <div className={`grid gap-2 items-start ${shouldShowSpellsKnown ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
-                    <div className="text-sm text-muted-foreground">Cantrips</div>
-                    <div className="text-xl font-bold font-mono">
-                      {isLoadingCounts ? (
-                        <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
-                      ) : (
-                        cantripsKnown.breakdown
-                      )}
-                    </div>
-                  </div>
-                  {shouldShowSpellsKnown && (
-                    <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
-                      <div className="text-sm text-muted-foreground">Spells</div>
+              {/* Cantrips and Spells row: Cantrips | Spells Known (per class) | Spells Prepared (per class) - equal-width grid */}
+              {hasSpellsRow && (() => {
+                const columnCount = 1 + spellsKnownByClass.length + spellsPreparedByClass.length
+                return (
+                <div
+                  className="grid gap-2 items-stretch"
+                  style={{ gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}
+                >
+                  {/* Cantrips */}
+                  {cantripsKnown.byClass.length >= 2 ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-center border p-2 rounded-lg flex flex-col items-center justify-start gap-1 bg-background cursor-default">
+                          <div className="text-xs text-muted-foreground">Cantrips</div>
+                          <div className="text-xl font-bold font-mono">
+                            {isLoadingCounts ? (
+                              <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                            ) : (
+                              cantripsKnown.breakdown
+                            )}
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs flex flex-col gap-1 items-center">
+                        <div className="font-medium">Cantrips</div>
+                        <div className="text-[11px] opacity-80 flex flex-col gap-0.5 items-center text-center">
+                          {cantripsKnown.byClass.map(({ className, value }) => (
+                            <span key={className} className="capitalize">{className}: {value}</span>
+                          ))}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <div className="text-center border p-2 rounded-lg flex flex-col items-center justify-start gap-1 bg-background">
+                      <div className="text-xs text-muted-foreground">Cantrips</div>
                       <div className="text-xl font-bold font-mono">
                         {isLoadingCounts ? (
                           <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
                         ) : (
-                          spellsKnown.breakdown
+                          cantripsKnown.breakdown
                         )}
                       </div>
                     </div>
                   )}
+                  {/* Spells Known (Bard, Sorcerer, Warlock, Ranger, Paladin) - one block per class */}
+                  {spellsKnownByClass.map(({ className, value }) => (
+                    <Tooltip key={`known-${className}`}>
+                      <TooltipTrigger asChild>
+                        <div className="text-center border p-2 rounded-lg flex flex-col items-center justify-center gap-1 bg-background cursor-default">
+                          <div className="text-xs text-muted-foreground capitalize">{className} Spells</div>
+                          <div className="text-xl font-bold font-mono">
+                            {isLoadingCounts ? (
+                              <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin" />
+                            ) : (
+                              value
+                            )}
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs flex flex-col gap-1 items-center">
+                        <div className="font-medium">Spells Known</div>
+                        <div className="text-[11px] opacity-80">From {className} level progression</div>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                  {/* Spells Prepared (Cleric, Druid, Wizard, Artificer) - one block per class */}
+                  {spellsPreparedByClass.map(({ className, value, level, modLabel, modValue }) => (
+                    <Tooltip key={`prepared-${className}`}>
+                      <TooltipTrigger asChild>
+                        <div className="text-center border p-2 rounded-lg flex flex-col items-center justify-center gap-1 bg-background cursor-default">
+                          <div className="text-xs text-muted-foreground capitalize">{className} Spells</div>
+                          <div className="text-xl font-bold font-mono">{value}</div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs flex flex-col gap-1 items-center">
+                        <div className="font-medium">Spells Prepared</div>
+                        <div className="text-[11px] opacity-80">
+                          {modLabel} modifier ({modValue >= 0 ? "+" : ""}{modValue}) + {className} level ({level}) = {value}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
                 </div>
-              )}
+                )
+              })()}
             </div>
             <Button className="w-full" variant="outline" size="sm" onClick={onOpenSpellList}>
               <Icon icon="lucide:book-open" className="w-4 h-4" />
