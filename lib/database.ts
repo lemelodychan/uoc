@@ -1041,7 +1041,34 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       campaignId: data.campaign_id || undefined,
       classFeatureSkillsUsage: data.class_features_skills_usage || {},
     }
-    
+
+    // Hydrate classData cache for each class entry
+    // This loads class metadata once so downstream functions can read from it
+    if (tempCharacter.classes && tempCharacter.classes.length > 0) {
+      for (const charClass of tempCharacter.classes) {
+        try {
+          const { classData: loadedClassData } = await loadClassData(charClass.name, charClass.subclass || undefined)
+          if (loadedClassData) {
+            charClass.classData = {
+              spellcasting_ability: loadedClassData.spellcasting_ability || null,
+              is_prepared_caster: loadedClassData.is_prepared_caster || false,
+              caster_type: loadedClassData.caster_type || null,
+              slots_replenish_on: loadedClassData.slots_replenish_on || 'long_rest',
+              hit_die: loadedClassData.hit_die,
+              saving_throw_proficiencies: loadedClassData.saving_throw_proficiencies,
+              equipment_proficiencies: loadedClassData.equipment_proficiencies,
+              invocations_known: loadedClassData.invocations_known || null,
+              infusions_known: loadedClassData.infusions_known || null,
+              spells_known: loadedClassData.spells_known || null,
+              cantrips_known: loadedClassData.cantrips_known || null,
+            }
+          }
+        } catch (e) {
+          // Silently continue - classData is optional, functions have hardcoded fallbacks
+        }
+      }
+    }
+
         // Initialize features automatically based on what's available for the character
         // This is class-agnostic and works for any combination of classes
         const { addSingleFeature, getFeatureMaxUses } = await import('./feature-usage-tracker')
@@ -4161,7 +4188,7 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
         if (baseClassId) {
           const { data: baseFeatures } = await supabase
             .from('class_features')
-            .select('id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type')
+            .select('id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type, passive_bonuses')
             .eq('class_id', baseClassId)
             .lte('level', charClass.level)
           
@@ -4186,7 +4213,7 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
         if (subclassClassId && subclassClassId !== baseClassId) {
           const { data: subFeatures } = await supabase
             .from('class_features')
-            .select('id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type')
+            .select('id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type, passive_bonuses')
             .eq('class_id', subclassClassId)
             .lte('level', charClass.level)
           

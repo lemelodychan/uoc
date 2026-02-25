@@ -309,19 +309,22 @@ function evaluateFormula(formula: string, context: FormulaContext): number {
 
 /**
  * Get Warlock invocations known by level
+ * Delegates to character-data.ts version which supports classData param
  */
 function getWarlockInvocationsKnown(level: number): number {
-  const invocationsKnown = [0, 2, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5, 6, 6, 7, 7, 7, 7, 8, 8]
-  return invocationsKnown[Math.min(level - 1, 19)] || 0
+  // Import dynamically to avoid circular dependency
+  const { getWarlockInvocationsKnown: getFromCharData } = require('./character-data')
+  return getFromCharData(level)
 }
 
 /**
  * Get Artificer infusions known by level
+ * Delegates to character-data.ts version which supports classData param
  */
 function getArtificerInfusionsKnown(level: number): number {
-  const infusionsKnown = [0, 0, 4, 4, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 10, 10, 10, 10, 12, 12, 12]
-  const levelIndex = Math.min(level - 1, infusionsKnown.length - 1)
-  return infusionsKnown[levelIndex] || 0
+  // Import dynamically to avoid circular dependency
+  const { getArtificerInfusionsKnown: getFromCharData } = require('./character-data')
+  return getFromCharData(level)
 }
 
 /**

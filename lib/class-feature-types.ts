@@ -132,6 +132,44 @@ export interface FormulaContext {
 }
 
 /**
+ * AC calculation bonus from class features (e.g., Unarmored Defense, Draconic Resilience)
+ */
+export interface ACCalculationBonus {
+  formula: string  // e.g., '10 + dexterity_modifier + constitution_modifier'
+  condition: 'no_armor' | 'no_armor_no_shield' | 'always'
+  allows_shield: boolean
+}
+
+/**
+ * Skill/passive bonus from class features (e.g., Jack of All Trades)
+ */
+export interface SkillPassiveBonus {
+  type: 'half_proficiency' | 'double_proficiency' | 'flat'
+  condition: 'not_proficient' | 'proficient' | 'always'
+  applies_to: string  // 'all_skills', 'all_tools', or specific skill name
+  also_applies_to?: string[]  // e.g., ['passive_perception', 'initiative']
+  flat_value?: number  // For 'flat' type bonuses
+}
+
+/**
+ * Tool bonus from class features (e.g., Tool Expertise)
+ */
+export interface ToolPassiveBonus {
+  type: 'double_proficiency' | 'flat'
+  condition: 'proficient' | 'always'
+  applies_to: string  // 'all_tools' or specific tool name
+}
+
+/**
+ * Combined passive bonuses structure stored in class_features.passive_bonuses JSONB
+ */
+export interface PassiveBonuses {
+  ac_calculation?: ACCalculationBonus
+  skill_bonus?: SkillPassiveBonus
+  tool_bonus?: ToolPassiveBonus
+}
+
+/**
  * Validation result for feature skill configuration
  */
 export interface ValidationResult {

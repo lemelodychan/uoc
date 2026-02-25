@@ -1,8 +1,23 @@
+export interface CharacterClassData {
+  spellcasting_ability?: string | null
+  is_prepared_caster?: boolean
+  caster_type?: 'full' | 'half' | 'third' | 'pact' | null
+  slots_replenish_on?: 'short_rest' | 'long_rest'
+  hit_die?: number
+  saving_throw_proficiencies?: string[]
+  equipment_proficiencies?: any
+  invocations_known?: number[] | null
+  infusions_known?: number[] | null
+  spells_known?: number[] | null
+  cantrips_known?: number[] | null
+}
+
 export interface CharacterClass {
   name: string
   subclass?: string
   class_id?: string
   level: number
+  classData?: CharacterClassData
 }
 
 export interface Campaign {
@@ -414,6 +429,32 @@ export const calculateModifier = (score: number): number => {
   return Math.floor((score - 10) / 2)
 }
 
+/**
+ * Check if a character has a specific passive bonus from loaded class features.
+ * This is a lightweight check that looks at classFeatureSkillsUsage for features
+ * with passive_bonuses matching the given criteria.
+ * Returns true if a matching passive bonus is found.
+ */
+export const checkPassiveBonusFromFeatures = (
+  character: CharacterData,
+  bonusKey: string,
+  bonusType: string,
+  condition: string
+): boolean => {
+  // Check classFeatureSkillsUsage for features that declare passive bonuses
+  if (!character.classFeatureSkillsUsage) return false
+  for (const [, usage] of Object.entries(character.classFeatureSkillsUsage)) {
+    const passiveBonuses = (usage as any)?.passiveBonuses
+    if (passiveBonuses && passiveBonuses[bonusKey]) {
+      const bonus = passiveBonuses[bonusKey]
+      if (bonus.type === bonusType && bonus.condition === condition) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
 export const calculateProficiencyBonus = (level: number): number => {
   if (level >= 17) return 6
   if (level >= 13) return 5
@@ -425,17 +466,22 @@ export const calculateProficiencyBonus = (level: number): number => {
 export const calculateSkillBonus = (character: CharacterData, skill: Skill): number => {
   const abilityScore = character[skill.ability]
   const abilityModifier = calculateModifier(abilityScore)
-  
+
   // For multiclass characters, use total level across all classes for proficiency bonus
   const totalLevel = character.classes && character.classes.length > 0
     ? getTotalLevel(character.classes)
     : character.level || 1
-  
+
   const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(totalLevel)
 
-  // Check if character is a Bard (single class or multiclass)
-  const isBard = (character.class?.toLowerCase() === "bard" || 
+  // Data-driven: check for half-proficiency passive bonus (Jack of All Trades)
+  // Look for a class feature that grants half_proficiency to non-proficient skills
+  const hasHalfProficiencyBonus = checkPassiveBonusFromFeatures(character, 'skill_bonus', 'half_proficiency', 'not_proficient')
+  // Hardcoded fallback: check if character is a Bard
+  const hasJackOfAllTrades = hasHalfProficiencyBonus || (
+    (character.class?.toLowerCase() === "bard" ||
     character.classes?.some(c => c.name.toLowerCase() === "bard")) ?? false
+  )
 
   let baseBonus = 0
   switch (skill.proficiency) {
@@ -446,8 +492,8 @@ export const calculateSkillBonus = (character: CharacterData, skill: Skill): num
       baseBonus = abilityModifier + proficiencyBonus * 2
       break
     default:
-      // Jack of All Trades: Bards add half proficiency bonus (rounded down) to skills they're not proficient in
-      if (isBard) {
+      // Half proficiency to skills not proficient in (Jack of All Trades or similar)
+      if (hasJackOfAllTrades) {
         baseBonus = abilityModifier + Math.floor(proficiencyBonus / 2)
       } else {
         baseBonus = abilityModifier
@@ -469,12 +515,16 @@ export const calculateSkillBonus = (character: CharacterData, skill: Skill): num
 
 export const calculateToolBonus = (character: CharacterData, tool: ToolProficiency): number => {
   const proficiencyBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level || 1)
-  const isArtificer = (character.class?.toLowerCase() === "artificer" || 
+
+  // Data-driven: check for double_proficiency tool passive bonus (Tool Expertise)
+  const hasToolExpertisePassive = checkPassiveBonusFromFeatures(character, 'tool_bonus', 'double_proficiency', 'proficient')
+  // Hardcoded fallback: Artificer level 6+
+  const isArtificer = (character.class?.toLowerCase() === "artificer" ||
     character.classes?.some(c => c.name.toLowerCase() === "artificer")) ?? false
-  const hasToolExpertise = isArtificer && character.level >= 6
+  const hasToolExpertise = hasToolExpertisePassive || (isArtificer && character.level >= 6)
 
   // If a manual modifier is set, treat it as the base proficiency-derived bonus and
-  // apply Artificer Tool Expertise doubling when applicable.
+  // apply Tool Expertise doubling when applicable.
   if (tool.manualModifier !== undefined) {
     const base = tool.manualModifier
     return hasToolExpertise && base > 0 ? base * 2 : base
@@ -493,7 +543,7 @@ export const calculateToolBonus = (character: CharacterData, tool: ToolProficien
       multiplier = 0
   }
 
-  // Artificer Tool Expertise (level 6+): double tool proficiency
+  // Tool Expertise: double tool proficiency when proficient
   if (hasToolExpertise && multiplier > 0) {
     multiplier = Math.min(2, multiplier * 2)
   }
@@ -549,10 +599,19 @@ export const createDefaultSavingThrowProficiencies = (): SavingThrowProficiency[
   }))
 }
 
-export const createClassBasedSavingThrowProficiencies = (className: string): SavingThrowProficiency[] => {
+export const createClassBasedSavingThrowProficiencies = (className: string, classData?: CharacterClassData): SavingThrowProficiency[] => {
   const defaultProficiencies = createDefaultSavingThrowProficiencies()
-  
-  // Define class-based saving throw proficiencies
+
+  // Data-driven: read from classData if available
+  if (classData?.saving_throw_proficiencies && classData.saving_throw_proficiencies.length > 0) {
+    const dbProficiencies = classData.saving_throw_proficiencies.map(s => s.toLowerCase())
+    return defaultProficiencies.map(proficiency => ({
+      ...proficiency,
+      proficient: dbProficiencies.includes(proficiency.ability)
+    }))
+  }
+
+  // Hardcoded fallback
   const classSavingThrows: Record<string, string[]> = {
     "Bard": ["dexterity", "charisma"],
     "Artificer": ["constitution", "intelligence"],
@@ -568,9 +627,9 @@ export const createClassBasedSavingThrowProficiencies = (className: string): Sav
     "Warlock": ["wisdom", "charisma"],
     "Druid": ["intelligence", "wisdom"]
   }
-  
+
   const classProficiencies = classSavingThrows[className] || []
-  
+
   return defaultProficiencies.map(proficiency => ({
     ...proficiency,
     proficient: classProficiencies.includes(proficiency.ability)
@@ -580,42 +639,50 @@ export const createClassBasedSavingThrowProficiencies = (className: string): Sav
 export const calculatePassivePerception = (character: CharacterData, proficiencyBonus: number = 2): number => {
   const perceptionSkill = character.skills.find(skill => skill.name === "Perception")
   const wisdomModifier = calculateModifier(character.wisdom)
-  
-  // Check if character is a Bard (single class or multiclass)
-  const isBard = character.class.toLowerCase() === "bard" || 
+
+  // Data-driven: check for half-proficiency passive bonus (Jack of All Trades)
+  const hasHalfProficiencyBonus = checkPassiveBonusFromFeatures(character, 'skill_bonus', 'half_proficiency', 'not_proficient')
+  // Hardcoded fallback
+  const hasJackOfAllTrades = hasHalfProficiencyBonus || (
+    character.class?.toLowerCase() === "bard" ||
     character.classes?.some(c => c.name.toLowerCase() === "bard")
-  
+  )
+
   let skillBonus = wisdomModifier
   if (perceptionSkill?.proficiency === "proficient") {
     skillBonus += proficiencyBonus
   } else if (perceptionSkill?.proficiency === "expertise") {
     skillBonus += proficiencyBonus * 2
-  } else if (isBard) {
-    // Jack of All Trades: Bards add half proficiency bonus (rounded down) to skills they're not proficient in
+  } else if (hasJackOfAllTrades) {
+    // Half proficiency to non-proficient skills (Jack of All Trades or similar)
     skillBonus += Math.floor(proficiencyBonus / 2)
   }
-  
+
   return 10 + skillBonus
 }
 
 export const calculatePassiveInsight = (character: CharacterData, proficiencyBonus: number = 2): number => {
   const insightSkill = character.skills.find(skill => skill.name === "Insight")
   const wisdomModifier = calculateModifier(character.wisdom)
-  
-  // Check if character is a Bard (single class or multiclass)
-  const isBard = character.class.toLowerCase() === "bard" || 
+
+  // Data-driven: check for half-proficiency passive bonus (Jack of All Trades)
+  const hasHalfProficiencyBonus = checkPassiveBonusFromFeatures(character, 'skill_bonus', 'half_proficiency', 'not_proficient')
+  // Hardcoded fallback
+  const hasJackOfAllTrades = hasHalfProficiencyBonus || (
+    character.class?.toLowerCase() === "bard" ||
     character.classes?.some(c => c.name.toLowerCase() === "bard")
-  
+  )
+
   let skillBonus = wisdomModifier
   if (insightSkill?.proficiency === "proficient") {
     skillBonus += proficiencyBonus
   } else if (insightSkill?.proficiency === "expertise") {
     skillBonus += proficiencyBonus * 2
-  } else if (isBard) {
-    // Jack of All Trades: Bards add half proficiency bonus (rounded down) to skills they're not proficient in
+  } else if (hasJackOfAllTrades) {
+    // Half proficiency to non-proficient skills (Jack of All Trades or similar)
     skillBonus += Math.floor(proficiencyBonus / 2)
   }
-  
+
   return 10 + skillBonus
 }
 
@@ -636,7 +703,13 @@ export const calculateSavingThrowBonus = (
 }
 
 // Get the primary spellcasting ability for a class
-export const getSpellcastingAbility = (className: string): string => {
+export const getSpellcastingAbility = (className: string, classData?: CharacterClassData): string => {
+  // Data-driven: read from classData if available
+  if (classData?.spellcasting_ability) {
+    return classData.spellcasting_ability
+  }
+
+  // Hardcoded fallback
   const spellcastingAbilities: Record<string, string> = {
     'artificer': 'intelligence',
     'bard': 'charisma',
@@ -652,7 +725,7 @@ export const getSpellcastingAbility = (className: string): string => {
     'monk': 'wisdom', // Way of the Four Elements
     'barbarian': 'wisdom', // Path of the Totem Warrior (some features)
   }
-  
+
   return spellcastingAbilities[className.toLowerCase()] || 'charisma'
 }
 
@@ -662,11 +735,13 @@ const PREPARED_CASTER_CLASSES = ['cleric', 'druid', 'paladin', 'wizard']
 export const getSpellsPreparedForClass = (
   className: string,
   classLevel: number,
-  abilityScores: Record<string, number>
+  abilityScores: Record<string, number>,
+  classData?: CharacterClassData
 ): number => {
-  const name = className.toLowerCase()
-  if (!PREPARED_CASTER_CLASSES.includes(name) || classLevel < 1) return 0
-  const ability = getSpellcastingAbility(className)
+  // Data-driven: check classData.is_prepared_caster if available
+  const isPrepared = classData?.is_prepared_caster ?? PREPARED_CASTER_CLASSES.includes(className.toLowerCase())
+  if (!isPrepared || classLevel < 1) return 0
+  const ability = getSpellcastingAbility(className, classData)
   const modifier = calculateModifier(abilityScores[ability] ?? 10)
   return Math.max(1, classLevel + modifier)
 }
@@ -675,39 +750,30 @@ export const getSpellsPreparedForClass = (
 export const getMulticlassSpellcastingAbilityModifier = (character: CharacterData): number => {
   if (!character.classes || character.classes.length <= 1) {
     // Single class - use the primary class's spellcasting ability
-    const spellcastingAbility = getSpellcastingAbility(character.class)
+    const firstClass = character.classes?.[0]
+    const spellcastingAbility = getSpellcastingAbility(character.class, firstClass?.classData)
     const modifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
     return modifier
   }
-  
+
   // Multiclass - find the highest ability modifier among spellcasting classes
-  // Define which classes are spellcasters
-  const spellcastingClasses = ['artificer', 'bard', 'cleric', 'druid', 'paladin', 'ranger', 'sorcerer', 'warlock', 'wizard']
-  
-  const characterSpellcastingClasses = character.classes.filter(charClass => 
-    spellcastingClasses.includes(charClass.name.toLowerCase())
-  )
-  
+  const characterSpellcastingClasses = getSpellcastingClasses(character.classes)
+
   if (characterSpellcastingClasses.length === 0) {
-    // No spellcasting classes, return 0
     return 0
   }
-  
+
   // Find the highest ability modifier among all spellcasting abilities
-  let highestModifier = -10 // Start with a very low value
-  let bestClass = ''
-  let bestAbility = ''
-  
+  let highestModifier = -10
+
   for (const charClass of characterSpellcastingClasses) {
-    const ability = getSpellcastingAbility(charClass.name)
+    const ability = getSpellcastingAbility(charClass.name, charClass.classData)
     const modifier = calculateModifier(character[ability as keyof CharacterData] as number)
     if (modifier > highestModifier) {
       highestModifier = modifier
-      bestClass = charClass.name
-      bestAbility = ability
     }
   }
-  
+
   return highestModifier
 }
 
@@ -885,8 +951,14 @@ export const getCleansingTouchData = (character: CharacterData): { usesPerRest: 
 }
 
 // Artificer infusion calculations
-export const getArtificerInfusionsKnown = (level: number): number => {
-  // Artificer infusions known progression
+export const getArtificerInfusionsKnown = (level: number, classData?: CharacterClassData): number => {
+  // Data-driven: read from classData if available
+  if (classData?.infusions_known && Array.isArray(classData.infusions_known)) {
+    const idx = Math.min(level - 1, classData.infusions_known.length - 1)
+    if (idx >= 0) return classData.infusions_known[idx] || 0
+  }
+
+  // Hardcoded fallback
   const infusionsKnown = [0, 0, 4, 4, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 10, 10, 10, 10, 12, 12, 12]
   const levelIndex = Math.min(level - 1, infusionsKnown.length - 1)
   return infusionsKnown[levelIndex] || 0
@@ -1338,14 +1410,26 @@ export const createQueensRightHand = (level: number) => ({
   currentUses: level >= 14 ? 1 : 0
 })
 
-export const getWarlockSpellsKnown = (level: number): number => {
-  // Warlock spells known progression
+export const getWarlockSpellsKnown = (level: number, classData?: CharacterClassData): number => {
+  // Data-driven: read from classData if available
+  if (classData?.spells_known && Array.isArray(classData.spells_known)) {
+    const idx = Math.min(level - 1, classData.spells_known.length - 1)
+    if (idx >= 0 && classData.spells_known[idx] > 0) return classData.spells_known[idx]
+  }
+
+  // Hardcoded fallback
   const spellsKnown = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15]
   return spellsKnown[Math.min(level - 1, 19)] || 2
 }
 
-export const getWarlockCantripsKnown = (level: number): number => {
-  // Warlock cantrips known progression: 2 at 1st-3rd, 3 at 4th-9th, 4 at 10th+
+export const getWarlockCantripsKnown = (level: number, classData?: CharacterClassData): number => {
+  // Data-driven: read from classData if available
+  if (classData?.cantrips_known && Array.isArray(classData.cantrips_known)) {
+    const idx = Math.min(level - 1, classData.cantrips_known.length - 1)
+    if (idx >= 0 && classData.cantrips_known[idx] > 0) return classData.cantrips_known[idx]
+  }
+
+  // Hardcoded fallback: 2 at 1st-3rd, 3 at 4th-9th, 4 at 10th+
   if (level >= 10) return 4
   if (level >= 4) return 3
   return 2
@@ -1364,10 +1448,16 @@ export const getPrimaryClass = (classes: CharacterClass[]): CharacterClass | nul
 }
 
 export const getSpellcastingClasses = (classes: CharacterClass[]): CharacterClass[] => {
-  const spellcastingClasses = ['wizard', 'sorcerer', 'warlock', 'bard', 'cleric', 'druid', 'ranger', 'paladin', 'artificer']
-  return classes.filter(charClass => 
-    spellcastingClasses.includes(charClass.name.toLowerCase())
-  )
+  // Hardcoded fallback list
+  const spellcastingClassNames = ['wizard', 'sorcerer', 'warlock', 'bard', 'cleric', 'druid', 'ranger', 'paladin', 'artificer']
+  return classes.filter(charClass => {
+    // Data-driven: check if classData indicates a spellcasting ability
+    if (charClass.classData) {
+      return charClass.classData.spellcasting_ability != null
+    }
+    // Hardcoded fallback
+    return spellcastingClassNames.includes(charClass.name.toLowerCase())
+  })
 }
 
 export const getHitDiceByClass = (classes: CharacterClass[]): Array<{
@@ -1376,6 +1466,7 @@ export const getHitDiceByClass = (classes: CharacterClass[]): Array<{
   total: number
   used: number
 }> => {
+  // Hardcoded fallback map
   const hitDieTypes: Record<string, string> = {
     'barbarian': 'd12',
     'fighter': 'd10',
@@ -1392,16 +1483,24 @@ export const getHitDiceByClass = (classes: CharacterClass[]): Array<{
     'sorcerer': 'd6'
   }
 
-  return classes.map(charClass => ({
-    className: charClass.name,
-    dieType: hitDieTypes[charClass.name.toLowerCase()] || 'd8',
-    total: charClass.level,
-    used: 0 // Will be loaded from database
-  }))
+  return classes.map(charClass => {
+    // Data-driven: read hit_die from classData if available
+    let dieType = hitDieTypes[charClass.name.toLowerCase()] || 'd8'
+    if (charClass.classData?.hit_die) {
+      dieType = `d${charClass.classData.hit_die}`
+    }
+    return {
+      className: charClass.name,
+      dieType,
+      total: charClass.level,
+      used: 0 // Will be loaded from database
+    }
+  })
 }
 
 // Get saving throw proficiencies for multiclass: only the first class (taken at level 1) grants save proficiencies.
 export const getMulticlassSavingThrowProficiencies = (classes: CharacterClass[]): SavingThrowProficiency[] => {
+  // Hardcoded fallback map
   const classSavingThrows: Record<string, string[]> = {
     'barbarian': ['strength', 'constitution'],
     'bard': ['dexterity', 'charisma'],
@@ -1432,9 +1531,17 @@ export const getMulticlassSavingThrowProficiencies = (classes: CharacterClass[])
   const proficientAbilities = new Set<string>()
   const firstClass = classes[0]
   if (firstClass) {
-    const savingThrows = classSavingThrows[firstClass.name.toLowerCase()] || []
-    for (const ability of savingThrows) {
-      proficientAbilities.add(ability)
+    // Data-driven: read from classData if available
+    if (firstClass.classData?.saving_throw_proficiencies && firstClass.classData.saving_throw_proficiencies.length > 0) {
+      for (const ability of firstClass.classData.saving_throw_proficiencies) {
+        proficientAbilities.add(ability.toLowerCase())
+      }
+    } else {
+      // Hardcoded fallback
+      const savingThrows = classSavingThrows[firstClass.name.toLowerCase()] || []
+      for (const ability of savingThrows) {
+        proficientAbilities.add(ability)
+      }
     }
   }
 
@@ -1443,12 +1550,13 @@ export const getMulticlassSavingThrowProficiencies = (classes: CharacterClass[])
     ...proficiency,
     proficient: proficientAbilities.has(proficiency.ability)
   }))
-  
+
   return result
 }
 
 // Get equipment proficiencies from all classes
 export const getMulticlassEquipmentProficiencies = (classes: CharacterClass[]): EquipmentProficiencies => {
+  // Hardcoded fallback map
   const classEquipment: Record<string, Partial<EquipmentProficiencies>> = {
     'barbarian': {
       lightArmor: true,
@@ -1560,10 +1668,21 @@ export const getMulticlassEquipmentProficiencies = (classes: CharacterClass[]): 
 
   // Combine proficiencies from all classes
   for (const charClass of classes) {
-    const classProficiencies = classEquipment[charClass.name.toLowerCase()] || {}
-    for (const [key, value] of Object.entries(classProficiencies)) {
-      if (value && key in proficiencies) {
-        (proficiencies as any)[key] = true
+    // Data-driven: read from classData.equipment_proficiencies if available
+    if (charClass.classData?.equipment_proficiencies) {
+      const dbProfs = charClass.classData.equipment_proficiencies
+      for (const [key, value] of Object.entries(dbProfs)) {
+        if (value && key in proficiencies) {
+          (proficiencies as any)[key] = true
+        }
+      }
+    } else {
+      // Hardcoded fallback
+      const classProficiencies = classEquipment[charClass.name.toLowerCase()] || {}
+      for (const [key, value] of Object.entries(classProficiencies)) {
+        if (value && key in proficiencies) {
+          (proficiencies as any)[key] = true
+        }
       }
     }
   }
@@ -1574,49 +1693,65 @@ export const getMulticlassEquipmentProficiencies = (classes: CharacterClass[]): 
 // Calculate multiclassing spell slots according to D&D 5e rules
 export const getMulticlassSpellSlots = (classes: CharacterClass[]): SpellSlot[] => {
   const spellcastingClasses = getSpellcastingClasses(classes)
-  const warlockClasses = classes.filter(charClass => charClass.name.toLowerCase() === "warlock")
-  
-  // Separate Warlock levels (Pact Magic) from other spellcasting classes
-  const nonWarlockSpellcasters = spellcastingClasses.filter(charClass => charClass.name.toLowerCase() !== "warlock")
-  
+
+  // Separate pact magic casters (short rest recovery) from standard spellcasters
+  const pactMagicClasses = spellcastingClasses.filter(charClass => {
+    // Data-driven: check slots_replenish_on or caster_type
+    if (charClass.classData) {
+      return charClass.classData.slots_replenish_on === 'short_rest' || charClass.classData.caster_type === 'pact'
+    }
+    // Hardcoded fallback
+    return charClass.name.toLowerCase() === "warlock"
+  })
+
+  const standardSpellcasters = spellcastingClasses.filter(charClass => {
+    if (charClass.classData) {
+      return charClass.classData.slots_replenish_on !== 'short_rest' && charClass.classData.caster_type !== 'pact'
+    }
+    return charClass.name.toLowerCase() !== "warlock"
+  })
+
   let spellSlots: SpellSlot[] = []
-  
-  // Calculate spell slots for non-Warlock spellcasters using multiclassing table
-  if (nonWarlockSpellcasters.length > 0) {
-    const totalSpellcasterLevel = nonWarlockSpellcasters.reduce((total, charClass) => {
-      // Apply D&D 5e multiclassing rules for spellcaster level calculation
+
+  // Calculate spell slots for standard spellcasters using multiclassing table
+  if (standardSpellcasters.length > 0) {
+    const totalSpellcasterLevel = standardSpellcasters.reduce((total, charClass) => {
+      // Data-driven: use caster_type to determine level contribution
+      const casterType = charClass.classData?.caster_type
+      if (casterType) {
+        switch (casterType) {
+          case 'full': return total + charClass.level
+          case 'half': return total + Math.floor(charClass.level / 2)
+          case 'third': return total + Math.floor(charClass.level / 3)
+          default: return total + charClass.level
+        }
+      }
+
+      // Hardcoded fallback
       const className = charClass.name.toLowerCase()
-      
-      // Full casters: Wizard, Sorcerer, Bard, Cleric, Druid
       if (['wizard', 'sorcerer', 'bard', 'cleric', 'druid'].includes(className)) {
         return total + charClass.level
-      }
-      // Half casters: Paladin, Ranger, Artificer
-      else if (['paladin', 'ranger', 'artificer'].includes(className)) {
+      } else if (['paladin', 'ranger', 'artificer'].includes(className)) {
         return total + Math.floor(charClass.level / 2)
-      }
-      // Third casters: Eldritch Knight Fighter, Arcane Trickster Rogue
-      // Note: These would need to be identified by subclass, not just class
-      // For now, we'll assume they're not present in the current system
-      else {
+      } else {
         return total + charClass.level // Fallback to full level
       }
     }, 0)
-    
+
     // Use the standard multiclassing spell slot table
     const multiclassSpellSlots = getMulticlassSpellSlotTable(totalSpellcasterLevel)
     spellSlots = [...multiclassSpellSlots]
   }
-  
-  // Add Warlock Pact Magic slots separately
-  if (warlockClasses.length > 0) {
-    const totalWarlockLevel = warlockClasses.reduce((total, charClass) => total + charClass.level, 0)
-    const warlockSlots = getWarlockSpellSlots(totalWarlockLevel)
-    // Mark Warlock slots with a special property to distinguish them in the UI
-    const markedWarlockSlots = warlockSlots.map(slot => ({ ...slot, isWarlockSlot: true }))
-    spellSlots = [...spellSlots, ...markedWarlockSlots]
+
+  // Add Pact Magic slots separately (Warlock or any class with short rest recovery)
+  if (pactMagicClasses.length > 0) {
+    const totalPactLevel = pactMagicClasses.reduce((total, charClass) => total + charClass.level, 0)
+    const pactSlots = getWarlockSpellSlots(totalPactLevel)
+    // Mark pact magic slots to distinguish them in the UI
+    const markedPactSlots = pactSlots.map(slot => ({ ...slot, isWarlockSlot: true }))
+    spellSlots = [...spellSlots, ...markedPactSlots]
   }
-  
+
   return spellSlots
 }
 
@@ -1679,6 +1814,7 @@ const getMulticlassSpellSlotTable = (totalLevel: number): SpellSlot[] => {
 }
 
 // Get combined class features for multiclassed characters
+// This function uses classData when available to avoid hardcoded class name checks
 export const getMulticlassFeatures = async (character: CharacterData): Promise<{
   bardicInspirationSlot?: any
   songOfRest?: any
@@ -1689,20 +1825,19 @@ export const getMulticlassFeatures = async (character: CharacterData): Promise<{
   cleansingTouchSlot?: any
 }> => {
   const features: any = {}
-  
-  // Check for Bard features
+
+  // Check for Bard features (or any class with bardic inspiration in classData)
   const bardClasses = character.classes.filter(charClass => charClass.name.toLowerCase() === "bard")
   if (bardClasses.length > 0) {
     const totalBardLevel = bardClasses.reduce((total, charClass) => total + charClass.level, 0)
     const charismaModifier = Math.floor((character.charisma - 10) / 2)
-    
-    // Import the functions we need
+
     const { getBardicInspirationData, getSongOfRestData } = await import('./class-utils')
-    
+
     features.bardicInspirationSlot = getBardicInspirationData(totalBardLevel, charismaModifier)
     features.songOfRest = getSongOfRestData(totalBardLevel)
   }
-  
+
   // Check for Artificer features
   const artificerClasses = character.classes.filter(charClass => charClass.name.toLowerCase() === "artificer")
   if (artificerClasses.length > 0) {
@@ -1716,29 +1851,33 @@ export const getMulticlassFeatures = async (character: CharacterData): Promise<{
       }
     }
   }
-  
+
   // Check for Paladin features
   const paladinClasses = character.classes.filter(charClass => charClass.name.toLowerCase() === "paladin")
   if (paladinClasses.length > 0) {
     const totalPaladinLevel = paladinClasses.reduce((total, charClass) => total + charClass.level, 0)
-    
-    // Import Paladin functions
+
     const { getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData } = await import('./character-data')
-    
-    // Create a temporary character with Paladin level for calculations
+
     const tempPaladinCharacter = { ...character, level: totalPaladinLevel }
-    
+
     features.divineSenseSlot = getDivineSenseData(tempPaladinCharacter)
     features.layOnHands = getLayOnHandsData(tempPaladinCharacter)
     features.channelDivinitySlot = getChannelDivinityData(tempPaladinCharacter)
     features.cleansingTouchSlot = getCleansingTouchData(tempPaladinCharacter)
   }
-  
+
   return features
 }
 
-export const getWarlockInvocationsKnown = (level: number): number => {
-  // Warlock Eldritch Invocations known progression (0-indexed array for levels 1-20)
+export const getWarlockInvocationsKnown = (level: number, classData?: CharacterClassData): number => {
+  // Data-driven: read from classData if available
+  if (classData?.invocations_known && Array.isArray(classData.invocations_known)) {
+    const idx = Math.min(level - 1, classData.invocations_known.length - 1)
+    if (idx >= 0) return classData.invocations_known[idx] || 0
+  }
+
+  // Hardcoded fallback
   const invocationsKnown = [0, 2, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5, 6, 6, 7, 7, 7, 7, 8, 8]
   return invocationsKnown[Math.min(level - 1, 19)] || 0
 }

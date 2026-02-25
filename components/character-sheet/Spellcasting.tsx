@@ -56,16 +56,41 @@ const isBarbarian = (character: CharacterData): boolean => {
   return character.class.toLowerCase() === 'barbarian'
 }
 
-// Spells Known classes (fixed list per long rest / level)
+// Spells Known classes - hardcoded fallback (used when classData is not available)
 const SPELLS_KNOWN_CLASSES = ['bard', 'sorcerer', 'warlock', 'ranger', 'paladin']
-// Spells Prepared classes (INT or WIS mod + class level)
+// Spells Prepared classes - hardcoded fallback
 const SPELLS_PREPARED_CLASSES = ['cleric', 'druid', 'wizard', 'artificer']
 
+/**
+ * Check if a class is a prepared caster using classData first, then fallback.
+ */
+function isPreparedCaster(charClass: { name: string; classData?: any }): boolean {
+  if (charClass.classData?.is_prepared_caster !== undefined) {
+    return charClass.classData.is_prepared_caster
+  }
+  return SPELLS_PREPARED_CLASSES.includes(charClass.name.toLowerCase())
+}
+
+/**
+ * Get the spellcasting ability modifier for a prepared caster.
+ * Uses classData.spellcasting_ability when available, falls back to hardcoded.
+ */
 function getModifierForPreparedClass(
   className: string,
   intelligenceMod: number,
-  wisdomMod: number
+  wisdomMod: number,
+  charismaMod?: number,
+  classData?: any
 ): number {
+  // Data-driven: read spellcasting_ability from classData
+  if (classData?.spellcasting_ability) {
+    const ability = classData.spellcasting_ability.toLowerCase()
+    if (ability === 'intelligence') return intelligenceMod
+    if (ability === 'wisdom') return wisdomMod
+    if (ability === 'charisma') return charismaMod ?? 0
+    return 0
+  }
+  // Hardcoded fallback
   const c = className.toLowerCase()
   if (c === 'wizard' || c === 'artificer') return intelligenceMod
   if (c === 'cleric' || c === 'druid') return wisdomMod
@@ -190,8 +215,9 @@ export function Spellcasting({
               cantripsByClass.push({ className: charClass.name, value: classCantrips })
             }
 
-            // Spells Known: only for Bard, Sorcerer, Warlock, Ranger, Paladin
-            if (SPELLS_KNOWN_CLASSES.includes(charClass.name.toLowerCase())) {
+            // Spells Known: for non-prepared casters that have spells_known data
+            const isPrepared = isPreparedCaster(charClass)
+            if (!isPrepared && SPELLS_KNOWN_CLASSES.includes(charClass.name.toLowerCase())) {
               const value = getSpellsKnownFromClass(classData, charClass.level)
               knownList.push({ className: charClass.name, value })
             }
@@ -227,11 +253,18 @@ export function Spellcasting({
       ? [{ name: character.class, level: character.level }]
       : []
   const spellsPreparedByClass = classesForPrepared
-    .filter((c) => SPELLS_PREPARED_CLASSES.includes(c.name.toLowerCase()))
-    .map((c) => {
-      const mod = getModifierForPreparedClass(c.name, intelligenceMod, wisdomMod)
-      const cLower = c.name.toLowerCase()
-      const modLabel = cLower === "wizard" || cLower === "artificer" ? "INT" : "WIS"
+    .filter((c: any) => isPreparedCaster(c))
+    .map((c: any) => {
+      const mod = getModifierForPreparedClass(c.name, intelligenceMod, wisdomMod, charismaMod, c.classData)
+      // Determine modifier label from classData or hardcoded
+      const ability = c.classData?.spellcasting_ability?.toLowerCase()
+      let modLabel = "INT"
+      if (ability === 'wisdom') modLabel = "WIS"
+      else if (ability === 'charisma') modLabel = "CHA"
+      else if (!ability) {
+        const cLower = c.name.toLowerCase()
+        modLabel = cLower === "wizard" || cLower === "artificer" ? "INT" : "WIS"
+      }
       return {
         className: c.name,
         value: Math.max(1, mod + c.level),
@@ -360,8 +393,15 @@ export function Spellcasting({
       }
     }
 
-    // Determine which class this feature belongs to based on the feature ID and character's classes
+    // Determine which class this feature belongs to based on usage data or feature ID
     const getFeatureClassName = (featureId: string): string => {
+      // Check if usage data has className stored (set by loadClassFeatureSkills)
+      const usage = character.classFeatureSkillsUsage?.[featureId]
+      if (usage && (usage as any)?.className) {
+        return (usage as any).className
+      }
+
+      // Hardcoded fallback mapping
       // Warlock features
       if (['genies-wrath', 'elemental-gift', 'mystic-arcanum', 'genies-vessel', 'limited-wish'].includes(featureId)) {
         return character.classes?.find(c => c.name.toLowerCase() === 'warlock')?.name || 'Warlock'
@@ -434,8 +474,13 @@ export function Spellcasting({
       
       // Ensure className is set for features from database
       if (!feature.className) {
-        // Determine which class this feature belongs to based on the feature ID
-        if (['song-of-rest', 'bardic-inspiration'].includes(feature.id)) {
+        // Check usage data for className first (data-driven)
+        const usage = character.classFeatureSkillsUsage?.[feature.id]
+        if (usage && (usage as any)?.className) {
+          feature.className = (usage as any).className
+        }
+        // Hardcoded fallback mapping
+        else if (['song-of-rest', 'bardic-inspiration'].includes(feature.id)) {
           feature.className = character.classes?.find(c => c.name.toLowerCase() === 'bard')?.name || 'Bard'
         } else if (['genies-wrath', 'elemental-gift', 'mystic-arcanum', 'genies-vessel', 'limited-wish'].includes(feature.id)) {
           feature.className = character.classes?.find(c => c.name.toLowerCase() === 'warlock')?.name || 'Warlock'
@@ -444,7 +489,6 @@ export function Spellcasting({
         } else if (['divine-sense', 'lay-on-hands', 'channel-divinity', 'cleansing-touch'].includes(feature.id)) {
           feature.className = character.classes?.find(c => c.name.toLowerCase() === 'paladin')?.name || 'Paladin'
         } else {
-          // Default to the first class if no match found
           feature.className = character.classes?.[0]?.name || character.class
         }
       }

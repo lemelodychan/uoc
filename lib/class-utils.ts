@@ -52,6 +52,12 @@ export interface ClassData {
   max_spell_slots?: Record<string, Record<string, number>>
   class_features?: Record<string, any>
   spellcasting_ability?: string
+  // Data-driven spellcasting metadata (populated from DB)
+  is_prepared_caster?: boolean
+  caster_type?: 'full' | 'half' | 'third' | 'pact' | null
+  slots_replenish_on?: 'short_rest' | 'long_rest'
+  invocations_known?: number[] | null
+  infusions_known?: number[] | null
 }
 
 export interface SubclassData {

@@ -19,6 +19,13 @@ export interface ClassSpellData {
   bardic_inspiration_uses: number[]
   bardic_inspiration_die: string[]
   show_spells_known: boolean
+  // Data-driven spellcasting metadata
+  spellcasting_ability?: string | null
+  is_prepared_caster?: boolean
+  caster_type?: 'full' | 'half' | 'third' | 'pact' | null
+  slots_replenish_on?: 'short_rest' | 'long_rest'
+  invocations_known?: number[] | null
+  infusions_known?: number[] | null
 }
 
 export const calculateSpellSlotsFromClass = (classData: ClassSpellData | null, level: number): SpellSlot[] => {
@@ -259,6 +266,12 @@ export const fetchClassDataById = async (classId: string): Promise<ClassSpellDat
       bardic_inspiration_uses: parseSpellSlotArray(data.bardic_inspiration_uses),
       bardic_inspiration_die: data.bardic_inspiration_die || [],
       show_spells_known: data.show_spells_known || false,
+      spellcasting_ability: data.spellcasting_ability || null,
+      is_prepared_caster: data.is_prepared_caster || false,
+      caster_type: data.caster_type || null,
+      slots_replenish_on: data.slots_replenish_on || 'long_rest',
+      invocations_known: data.invocations_known || null,
+      infusions_known: data.infusions_known || null,
     }
 
     return classData
@@ -318,8 +331,13 @@ export const fetchClassData = async (className: string, subclass?: string): Prom
       bardic_inspiration_uses: parseSpellSlotArray(data.bardic_inspiration_uses),
       bardic_inspiration_die: data.bardic_inspiration_die || [],
       show_spells_known: data.show_spells_known || false,
+      spellcasting_ability: data.spellcasting_ability || null,
+      is_prepared_caster: data.is_prepared_caster || false,
+      caster_type: data.caster_type || null,
+      slots_replenish_on: data.slots_replenish_on || 'long_rest',
+      invocations_known: data.invocations_known || null,
+      infusions_known: data.infusions_known || null,
     }
-
 
     return classData
   } catch (error) {
