@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast"
 import { ProficiencyCheckboxes, SKILL_OPTIONS } from "@/components/ui/proficiency-checkboxes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { PassiveBonusesEditor } from "@/components/ui/passive-bonuses-editor"
+import type { PassiveBonuses } from "@/lib/class-feature-types"
 
 interface BackgroundEditorPageProps {
   backgroundData: BackgroundData
@@ -990,9 +992,63 @@ export function BackgroundEditorPage({
         </Card>
       </div>
 
+      {/* Background Feature */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Background Feature</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="feature-name">Feature Name</Label>
+            <Input
+              id="feature-name"
+              value={editingBackground.background_feature?.name || ""}
+              onChange={(e) => setEditingBackground(prev => ({
+                ...prev,
+                background_feature: e.target.value
+                  ? { ...(prev.background_feature || { description: "" }), name: e.target.value }
+                  : prev.background_feature ? { ...prev.background_feature, name: "" } : null
+              }))}
+              placeholder="e.g. Shelter of the Faithful, Criminal Contact"
+              disabled={!canEdit}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Feature Description</Label>
+            <RichTextEditor
+              value={editingBackground.background_feature?.description || ""}
+              onChange={(value) => setEditingBackground(prev => ({
+                ...prev,
+                background_feature: value
+                  ? { ...(prev.background_feature || { name: "" }), description: value }
+                  : prev.background_feature ? { ...prev.background_feature, description: "" } : null
+              }))}
+              placeholder="Describe the mechanical and narrative effect of this background feature"
+              rows={5}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium">Passive Bonuses</Label>
+            <p className="text-xs text-muted-foreground">
+              Optional mechanical effects from this background feature (AC formulas, skill bonuses, tool bonuses).
+            </p>
+            <PassiveBonusesEditor
+              value={(editingBackground.background_feature?.passive_bonuses ?? null) as PassiveBonuses | null}
+              onChange={(val) => setEditingBackground(prev => ({
+                ...prev,
+                background_feature: prev.background_feature
+                  ? { ...prev.background_feature, passive_bonuses: val ?? undefined }
+                  : { name: "", description: "", passive_bonuses: val ?? undefined }
+              }))}
+              disabled={!canEdit}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Defining Events */}
       {renderNumberedItems(
-        'defining_events', 
+        'defining_events',
         'Background Setup',
         editingBackground.defining_events_title,
         (value) => setEditingBackground(prev => ({ ...prev, defining_events_title: value || null }))

@@ -13,13 +13,14 @@ import { Separator } from "@/components/ui/separator"
 import { Icon } from "@iconify/react"
 import { loadAllClasses, loadAllRaces, loadRaceDetails, loadClassesWithDetails, loadClassFeatures, loadBackgroundsWithDetails, loadBackgroundDetails, type BackgroundData } from "@/lib/database"
 import { useUser } from "@/lib/user-context"
-import type { CharacterData } from "@/lib/character-data"
+import type { CharacterData, InnateSpell, ArmorItem, ArmorType } from "@/lib/character-data"
 import { createDefaultSkills, calculateModifier, calculateSkillBonus, createClassBasedSavingThrowProficiencies, createDefaultSavingThrowProficiencies, calculateProficiencyBonus, getMulticlassEquipmentProficiencies, getSpellsPreparedForClass } from "@/lib/character-data"
 import { getCantripsKnownFromClass, getSpellsKnownFromClass } from "@/lib/spell-slot-calculator"
 import type { RaceData } from "@/lib/database"
 import type { ClassData } from "@/lib/class-utils"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { FeatEditModal } from "./feat-edit-modal"
+import { FeatSelectionModal } from "./feat-selection-modal"
 import { SKILL_OPTIONS } from "@/components/ui/proficiency-checkboxes"
 import { getAbilityModifierColor } from "@/lib/color-mapping"
 
@@ -92,6 +93,7 @@ interface CharacterCreationData {
     slings: boolean
     quarterstaffs: boolean
   }
+  armor?: ArmorItem[]
 }
 
 interface CharacterCreationModalProps {
@@ -118,7 +120,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   const { isSuperadmin } = useUser()
   
   // Step management
-  const [step, setStep] = useState<'basic_info' | 'race_selection' | 'background_selection' | 'class_selection' | 'class_features' | 'hp_roll' | 'summary'>('basic_info')
+  const [step, setStep] = useState<'basic_info' | 'race_selection' | 'background_selection' | 'class_selection' | 'class_features' | 'hp_roll' | 'armor_selection' | 'summary'>('basic_info')
   
   // Point buy system constants (defined early so they're accessible throughout)
   const POINT_BUY_TOTAL = 27
@@ -212,11 +214,38 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     } | null
   }>>(new Map())
   const [featEditModalOpen, setFeatEditModalOpen] = useState(false)
+  const [featSelectionModalForASI, setFeatSelectionModalForASI] = useState(false)
   const [editingFeatIndex, setEditingFeatIndex] = useState<number | null>(null)
   const [editingFeatForFeatureId, setEditingFeatForFeatureId] = useState<string | null>(null)
   const [needsASI, setNeedsASI] = useState(false)
   const [isLoadingASI, setIsLoadingASI] = useState(false)
   
+  // Armor selection
+  const [selectedArmor, setSelectedArmor] = useState<ArmorItem[]>([])
+  const [showCustomArmorForm, setShowCustomArmorForm] = useState(false)
+  const [customArmorForm, setCustomArmorForm] = useState({ name: '', armorType: 'light' as ArmorType, baseAC: 0, addDexModifier: true, dexCap: null as number | null, stealthDisadvantage: false, strengthRequirement: null as number | null, magicBonus: 0 })
+
+  // Armor catalog
+  const PHB_ARMOR_CATALOG = [
+    // Light Armor
+    { id: 'padded', name: 'Padded', armorType: 'light' as ArmorType, baseAC: 11, addDexModifier: true, stealthDisadvantage: true },
+    { id: 'leather', name: 'Leather', armorType: 'light' as ArmorType, baseAC: 11, addDexModifier: true },
+    { id: 'studded_leather', name: 'Studded Leather', armorType: 'light' as ArmorType, baseAC: 12, addDexModifier: true },
+    // Medium Armor
+    { id: 'hide', name: 'Hide', armorType: 'medium' as ArmorType, baseAC: 12, addDexModifier: true, dexCap: 2 },
+    { id: 'chain_shirt', name: 'Chain Shirt', armorType: 'medium' as ArmorType, baseAC: 13, addDexModifier: true, dexCap: 2 },
+    { id: 'scale_mail', name: 'Scale Mail', armorType: 'medium' as ArmorType, baseAC: 14, addDexModifier: true, dexCap: 2, stealthDisadvantage: true },
+    { id: 'breastplate', name: 'Breastplate', armorType: 'medium' as ArmorType, baseAC: 14, addDexModifier: true, dexCap: 2 },
+    { id: 'half_plate', name: 'Half Plate', armorType: 'medium' as ArmorType, baseAC: 15, addDexModifier: true, dexCap: 2, stealthDisadvantage: true },
+    // Heavy Armor
+    { id: 'ring_mail', name: 'Ring Mail', armorType: 'heavy' as ArmorType, baseAC: 14, addDexModifier: false, stealthDisadvantage: true },
+    { id: 'chain_mail', name: 'Chain Mail', armorType: 'heavy' as ArmorType, baseAC: 16, addDexModifier: false, stealthDisadvantage: true, strengthRequirement: 13 },
+    { id: 'splint', name: 'Splint', armorType: 'heavy' as ArmorType, baseAC: 17, addDexModifier: false, stealthDisadvantage: true, strengthRequirement: 15 },
+    { id: 'plate', name: 'Plate', armorType: 'heavy' as ArmorType, baseAC: 18, addDexModifier: false, stealthDisadvantage: true, strengthRequirement: 15 },
+    // Shield
+    { id: 'shield', name: 'Shield', armorType: 'shield' as ArmorType, baseAC: 2, addDexModifier: false },
+  ]
+
   // Class features
   const [classFeatures, setClassFeatures] = useState<Array<{
     id: string
@@ -258,15 +287,21 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       shortswords: false,
       scimitars: false,
       lightCrossbows: false,
+      longbows: false,
+      shortbows: false,
       darts: false,
       slings: false,
       quarterstaffs: false,
+      warhammers: false,
+      battleaxes: false,
+      handaxes: false,
+      lightHammers: false,
     },
     languages: "",
     maxHitPoints: 8,
     currentHitPoints: 8,
   })
-  
+
   // Data loading
   const [classes, setClasses] = useState<ClassOption[]>([])
   const [classesData, setClassesData] = useState<Array<{id: string, name: string, subclass: string | null, subclass_selection_level?: number}>>([])
@@ -312,7 +347,11 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     setAsiChoices(new Map())
     setNeedsASI(false)
     setFeatEditModalOpen(false)
+    setFeatSelectionModalForASI(false)
     setEditingFeatIndex(null)
+    setSelectedArmor([])
+    setShowCustomArmorForm(false)
+    setCustomArmorForm({ name: '', armorType: 'light', baseAC: 0, addDexModifier: true, dexCap: null, stealthDisadvantage: false, strengthRequirement: null, magicBonus: 0 })
     setClassFeatures([])
     setSelectedFeatures(new Set())
     setIsLoadingFeatures(false)
@@ -341,9 +380,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         shortswords: false,
         scimitars: false,
         lightCrossbows: false,
+        longbows: false,
+        shortbows: false,
         darts: false,
         slings: false,
         quarterstaffs: false,
+        warhammers: false,
+        battleaxes: false,
+        handaxes: false,
+        lightHammers: false,
       },
       languages: "",
       maxHitPoints: 8,
@@ -471,9 +516,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
           shortswords: false,
           scimitars: false,
           lightCrossbows: false,
+          longbows: false,
+          shortbows: false,
           darts: false,
           slings: false,
           quarterstaffs: false,
+          warhammers: false,
+          battleaxes: false,
+          handaxes: false,
+          lightHammers: false,
         }
         
         // Reset tools
@@ -1058,9 +1109,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       shortswords: false,
       scimitars: false,
       lightCrossbows: false,
+      longbows: false,
+      shortbows: false,
       darts: false,
       slings: false,
       quarterstaffs: false,
+      warhammers: false,
+      battleaxes: false,
+      handaxes: false,
+      lightHammers: false,
     }
     previousRaceEquipmentSet.forEach(weaponKey => {
       if (updatedEquipmentProficiencies && weaponKey in updatedEquipmentProficiencies) {
@@ -1094,16 +1151,77 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       speedToRevert += previousHalfElfVersatilityChoice.option.speed_bonus
     }
     
+    // Collect new race-specific data to revert from previous race features
+    const previousRaceDarkvision = previousRace.features?.find(
+      (f: any) => f.feature_type === 'darkvision'
+    )?.darkvision_range ?? null
+    const previousRaceDamageResistances: string[] = (previousRace.features || [])
+      .filter((f: any) => f.feature_type === 'damage_resistance')
+      .flatMap((f: any) => f.damage_types || [])
+    const previousRaceDamageImmunities: string[] = (previousRace.features || [])
+      .filter((f: any) => f.feature_type === 'damage_immunity')
+      .flatMap((f: any) => f.damage_types || [])
+    const previousRaceConditionImmunities: string[] = (previousRace.features || [])
+      .filter((f: any) => f.feature_type === 'condition_immunity')
+      .flatMap((f: any) => f.condition_types || [])
+    const previousRaceLanguages: string[] = (previousRace.features || [])
+      .filter((f: any) => f.feature_type === 'language_proficiency')
+      .flatMap((f: any) => f.languages || [])
+
     // Revert all modifications
-    setEditableCharacter(prev => ({
-      ...prev,
-      ...baseScores,
-      skills: updatedSkillsWithoutRace,
-      equipmentProficiencies: updatedEquipmentProficiencies,
-      toolsProficiencies: updatedToolsProficiencies,
-      speed: Math.max(30, (prev.speed || 30) - speedToRevert) // Revert speed bonuses
-    }))
-    
+    setEditableCharacter(prev => {
+      // Revert speed
+      const revertedSpeed = Math.max(30, (prev.speed || 30) - speedToRevert)
+
+      // Revert darkvision
+      const revertedDarkvision = previousRaceDarkvision !== null && prev.darkvision === previousRaceDarkvision
+        ? null
+        : prev.darkvision ?? null
+
+      // Revert damage resistances
+      const revertedDamageResistances = (prev.damageResistances || []).filter(
+        (r: string) => !previousRaceDamageResistances.includes(r)
+      )
+
+      // Revert damage immunities
+      const revertedDamageImmunities = (prev.damageImmunities || []).filter(
+        (i: string) => !previousRaceDamageImmunities.includes(i)
+      )
+
+      // Revert condition immunities
+      const revertedConditionImmunities = (prev.conditionImmunities || []).filter(
+        (c: string) => !previousRaceConditionImmunities.includes(c)
+      )
+
+      // Revert race-granted languages from the languages string
+      const prevLangStr = prev.languages || ""
+      const prevLangArr = prevLangStr.split(',').map((l: string) => l.trim()).filter(Boolean)
+      const revertedLangArr = prevLangArr.filter(
+        (lang: string) => !previousRaceLanguages.some(rl => rl.toLowerCase() === lang.toLowerCase())
+      )
+      const revertedLanguages = revertedLangArr.join(', ') || "Common"
+
+      // Revert innate spells granted by the previous race
+      const revertedInnateSpells = (prev.innateSpells || []).filter(
+        (s: InnateSpell) => !(s.source === 'race' && s.sourceName === previousRace.name)
+      )
+
+      return {
+        ...prev,
+        ...baseScores,
+        skills: updatedSkillsWithoutRace,
+        equipmentProficiencies: updatedEquipmentProficiencies,
+        toolsProficiencies: updatedToolsProficiencies,
+        speed: revertedSpeed,
+        darkvision: revertedDarkvision,
+        damageResistances: revertedDamageResistances,
+        damageImmunities: revertedDamageImmunities,
+        conditionImmunities: revertedConditionImmunities,
+        languages: revertedLanguages,
+        innateSpells: revertedInnateSpells,
+      }
+    })
+
     // Clear all race-related state
     setAbilityScoreChoices([])
     setSelectedProficiencies({ skills: [], equipment: [], tools: [] })
@@ -1169,9 +1287,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         shortswords: false,
         scimitars: false,
         lightCrossbows: false,
+        longbows: false,
+        shortbows: false,
         darts: false,
         slings: false,
         quarterstaffs: false,
+        warhammers: false,
+        battleaxes: false,
+        handaxes: false,
+        lightHammers: false,
       }
       
       // Start with current tool proficiencies (already reverted if this is a race change)
@@ -1180,23 +1304,26 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       // Note: Ability scores are already updated by handleAbilityScoreIncreases above
       // We just need to handle proficiencies here
       
-      // Apply features (skills, equipment, tools)
+      // Apply features (skills, equipment, tools, darkvision, resistances, languages, innate spells)
       const newProficiencies: SelectedProficiencies = { skills: [], equipment: [], tools: [] }
-      
+      let newDarkvisionRange: number | null = null
+      const newDamageResistances: string[] = []
+      const newDamageImmunities: string[] = []
+      const newConditionImmunities: string[] = []
+      const newLanguages: string[] = []
+      const newInnateSpells: InnateSpell[] = []
+
       if (race.features && Array.isArray(race.features)) {
         race.features.forEach((feature: any) => {
           if (feature.feature_type === 'skill_proficiency') {
             if (feature.feature_skill_type === 'choice' && feature.skill_options) {
-              // Choice-based skill proficiency - don't auto-select, store options
-              // Will be handled in UI
+              // Choice-based skill proficiency - handled in UI
             } else if (Array.isArray(feature.skill_options) && feature.skill_options.length > 0) {
-              // Fixed multiple skill proficiencies
               feature.skill_options.forEach((opt: string) => {
                 const skillName = (opt || '').toLowerCase().replace(/\s+/g, '_')
                 if (skillName) newProficiencies.skills.push(skillName)
               })
             } else if (feature.feature_skill_type) {
-              // Fixed single skill proficiency (backward compatibility)
               const skillName = feature.feature_skill_type.toLowerCase().replace(/\s+/g, '_')
               newProficiencies.skills.push(skillName)
             }
@@ -1207,18 +1334,46 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
             })
           } else if (feature.feature_type === 'tool_proficiency') {
             if (feature.tool_choice_type === 'choice' && feature.tool_options) {
-              // Choice-based tool proficiency - don't auto-select, store options
-              // Will be handled in UI
+              // Choice-based tool proficiency - handled in UI
             } else if (feature.tools) {
-              // Fixed tool proficiency
               feature.tools.forEach((tool: string) => {
                 newProficiencies.tools.push(tool)
               })
             }
+          } else if (feature.feature_type === 'darkvision') {
+            if (feature.darkvision_range) {
+              newDarkvisionRange = Math.max(newDarkvisionRange || 0, feature.darkvision_range)
+            }
+          } else if (feature.feature_type === 'damage_resistance' && feature.damage_types) {
+            feature.damage_types.forEach((dt: string) => {
+              if (!newDamageResistances.includes(dt)) newDamageResistances.push(dt)
+            })
+          } else if (feature.feature_type === 'damage_immunity' && feature.damage_types) {
+            feature.damage_types.forEach((dt: string) => {
+              if (!newDamageImmunities.includes(dt)) newDamageImmunities.push(dt)
+            })
+          } else if (feature.feature_type === 'condition_immunity' && feature.condition_types) {
+            feature.condition_types.forEach((ct: string) => {
+              if (!newConditionImmunities.includes(ct)) newConditionImmunities.push(ct)
+            })
+          } else if (feature.feature_type === 'language_proficiency' && feature.languages) {
+            feature.languages.forEach((lang: string) => {
+              if (!newLanguages.includes(lang)) newLanguages.push(lang)
+            })
+          } else if (feature.feature_type === 'innate_spellcasting' && feature.spell_name) {
+            newInnateSpells.push({
+              name: feature.spell_name,
+              spellLevel: feature.spell_level ?? 0,
+              usesPerDay: feature.uses_per_day ?? 'at_will',
+              castingAbility: feature.casting_ability,
+              source: 'race',
+              sourceName: race.name,
+              concentration: feature.concentration
+            })
           }
         })
       }
-      
+
       setSelectedProficiencies(newProficiencies)
       
       // Update editable character skills - add new race proficiencies
@@ -1249,13 +1404,57 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       
       // Apply speed
       const newSpeed = race.speed || prev.speed || 30
-      
+
+      // Merge languages (avoid duplicates)
+      const currentLangStr = prev.languages || ""
+      const currentLangArr = currentLangStr.split(',').map((l: string) => l.trim()).filter(Boolean)
+      const langsToAdd = newLanguages.filter(lang =>
+        !currentLangArr.some((l: string) => l.toLowerCase() === lang.toLowerCase())
+      )
+      const updatedLanguages = langsToAdd.length > 0
+        ? `${currentLangStr}${currentLangStr ? ', ' : ''}${langsToAdd.join(', ')}`
+        : currentLangStr
+
+      // Merge damage resistances (avoid duplicates)
+      const currentResistances = prev.damageResistances || []
+      const updatedResistances = [
+        ...currentResistances,
+        ...newDamageResistances.filter(r => !currentResistances.includes(r))
+      ]
+
+      // Merge damage immunities (avoid duplicates)
+      const currentImmunities = prev.damageImmunities || []
+      const updatedImmunities = [
+        ...currentImmunities,
+        ...newDamageImmunities.filter(i => !currentImmunities.includes(i))
+      ]
+
+      // Merge condition immunities (avoid duplicates)
+      const currentCondImmunities = prev.conditionImmunities || []
+      const updatedCondImmunities = [
+        ...currentCondImmunities,
+        ...newConditionImmunities.filter(c => !currentCondImmunities.includes(c))
+      ]
+
+      // Merge innate spells (avoid exact-name duplicates from same race)
+      const currentInnateSpells = prev.innateSpells || []
+      const innateSpellsToAdd = newInnateSpells.filter(spell =>
+        !currentInnateSpells.some(s => s.name === spell.name && s.source === 'race' && s.sourceName === race.name)
+      )
+      const updatedInnateSpells = [...currentInnateSpells, ...innateSpellsToAdd]
+
       return {
         ...prev,
         skills: updatedSkills,
         equipmentProficiencies: updatedEquipmentProfs,
         toolsProficiencies: updatedToolsProfs,
-        speed: newSpeed
+        speed: newSpeed,
+        languages: updatedLanguages,
+        ...(newDarkvisionRange !== null ? { darkvision: newDarkvisionRange } : {}),
+        damageResistances: updatedResistances,
+        damageImmunities: updatedImmunities,
+        conditionImmunities: updatedCondImmunities,
+        innateSpells: updatedInnateSpells,
       }
     })
   }
@@ -1744,6 +1943,46 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundSkillChoices, backgroundToolChoices, backgroundLanguageChoices])
+
+  // Sync editableCharacter ability scores with abilityScoreChoices as a floor minimum.
+  // This fixes edge cases (e.g. Half-Elf +1 choices) where the scores in editableCharacter
+  // can fall below what the race choices require due to stale closures or batched updates.
+  useEffect(() => {
+    if (abilityScoreChoices.length === 0) return
+
+    const fixedAbilityKey = mainRaceData?.ability_score_increases?.type === 'custom' && mainRaceData.ability_score_increases.fixed
+      ? mainRaceData.ability_score_increases.fixed.ability.toLowerCase()
+      : null
+
+    const updates: Partial<CharacterData> = {}
+    let needsUpdate = false
+
+    abilityScoreChoices.forEach(choice => {
+      const key = choice.ability as keyof CharacterData
+      const current = editableCharacter[key] as number ?? POINT_BUY_BASE
+      const minimum = POINT_BUY_BASE + choice.increase
+      if (current < minimum) {
+        updates[key] = minimum as any
+        needsUpdate = true
+      }
+    })
+
+    // Also ensure fixed bonus is reflected
+    if (fixedAbilityKey && mainRaceData?.ability_score_increases?.fixed) {
+      const key = fixedAbilityKey as keyof CharacterData
+      const current = editableCharacter[key] as number ?? POINT_BUY_BASE
+      const minimum = POINT_BUY_BASE + mainRaceData.ability_score_increases.fixed.increase
+      if (current < minimum) {
+        updates[key] = minimum as any
+        needsUpdate = true
+      }
+    }
+
+    if (needsUpdate) {
+      setEditableCharacter(prev => ({ ...prev, ...updates }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abilityScoreChoices])
 
   const handleAbilityScoreIncreases = (asi: any, baseScores: any = null) => {
     // Use provided baseScores, or fall back to POINT_BUY_BASE (never use editableCharacter as it might be stale)
@@ -2383,88 +2622,9 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     }
   }, [editableCharacter.constitution, hpRollResult?.roll, hpRollResult?.classRolls, level, mainRaceData, raceChoiceSelections, halfElfVersatilityChoice])
   
-  const handleASISelection = (featureId: string, type: 'ability_scores' | 'feat') => {
-    const currentChoice = asiChoices.get(featureId)
-    const newChoices = new Map(asiChoices)
-    
-    // If switching from ability_scores to feat, revert ability score changes
-    // IMPORTANT: Preserve race-based bonuses when reverting ASI changes
-    if (currentChoice?.type === 'ability_scores' && type === 'feat' && currentChoice.abilityScores) {
-      const firstAbility = currentChoice.abilityScores.first?.toLowerCase()
-      const secondAbility = currentChoice.abilityScores.second?.toLowerCase()
-      
-      // Revert ability score increases while preserving race bonuses
-      if (firstAbility) {
-        const abilityKey = firstAbility as keyof CharacterData
-        const currentValue = editableCharacter[abilityKey] as number || 10
-        
-        // Calculate base value including race bonuses (but excluding ASI)
-        const raceBonus = abilityScoreChoices.find(c => c.ability === abilityKey)?.increase || 0
-        const baseWithRace = 10 + raceBonus
-        
-        // Calculate how much ASI increased this ability
-        const decrease = secondAbility ? 1 : 2 // If there was a second, first got +1, otherwise +2
-        
-        // Revert to base + race bonus (preserve race bonus, remove ASI)
-        const newValue = currentValue - decrease
-        // Ensure we don't go below base + race bonus
-        updateEditableCharacter({ [abilityKey]: Math.max(baseWithRace, newValue) })
-      }
-      
-      if (secondAbility) {
-        const abilityKey = secondAbility as keyof CharacterData
-        const currentValue = editableCharacter[abilityKey] as number || 10
-        
-        // Calculate base value including race bonuses (but excluding ASI)
-        const raceBonus = abilityScoreChoices.find(c => c.ability === abilityKey)?.increase || 0
-        const baseWithRace = 10 + raceBonus
-        
-        // Revert ASI (+1 for second ability)
-        const newValue = currentValue - 1
-        // Ensure we don't go below base + race bonus
-        updateEditableCharacter({ [abilityKey]: Math.max(baseWithRace, newValue) })
-      }
-    }
-    
-    if (type === 'ability_scores') {
-      newChoices.set(featureId, {
-        type: 'ability_scores',
-        abilityScores: {
-          first: '',
-          second: ''
-        },
-        feat: null
-      })
-    } else {
-      newChoices.set(featureId, {
-        type: 'feat',
-        abilityScores: {
-          first: '',
-          second: ''
-        },
-        feat: null
-      })
-    }
-    setAsiChoices(newChoices)
-  }
-  
-  const handleASIScoreSelection = (featureId: string, which: 'first' | 'second', ability: string) => {
-    const currentChoice = asiChoices.get(featureId)
-    if (!currentChoice?.abilityScores) return
-    
-    // Update the choice first
-    const newChoices = new Map(asiChoices)
-    newChoices.set(featureId, {
-      ...currentChoice,
-      abilityScores: {
-        ...currentChoice.abilityScores,
-        [which]: ability
-      }
-    })
-    setAsiChoices(newChoices)
-    
-    // Recalculate all ability scores from scratch
-    // Start with base scores (8)
+  // Helper: recalculate all ability scores from scratch given an ASI choices map.
+  // Used by both handleASIScoreSelection and handleASISelection (when restoring selections).
+  const recalcAbilityScoresFromChoices = (newChoices: Map<string, any>) => {
     const baseScore = POINT_BUY_BASE
     let updatedCharacter: Partial<CharacterData> = {
       ...editableCharacter,
@@ -2475,12 +2635,10 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       wisdom: baseScore,
       charisma: baseScore,
     }
-    
-    // Apply race bonuses first (including fixed ASI patterns)
+
+    // Apply race bonuses first
     if (mainRaceData?.ability_score_increases) {
       const asi = mainRaceData.ability_score_increases
-      
-      // Handle array format (simple bonuses)
       if (Array.isArray(asi)) {
         asi.forEach((item: any) => {
           const abilityKey = (item.ability || '').toLowerCase() as keyof CharacterData
@@ -2488,35 +2646,27 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
             updatedCharacter[abilityKey] = (baseScore + (item.increase || 0)) as any
           }
         })
-      }
-      // Handle fixed_multi format (Human +1 to all)
-      else if (asi.type === 'fixed_multi' && asi.abilities) {
+      } else if (asi.type === 'fixed_multi' && asi.abilities) {
         Object.entries(asi.abilities).forEach(([ability, increase]: [string, any]) => {
           const abilityKey = ability.toLowerCase() as keyof CharacterData
           if (abilityKey in updatedCharacter && increase > 0) {
             updatedCharacter[abilityKey] = (baseScore + parseInt(increase)) as any
           }
         })
-      }
-      // Handle custom format (Half-Elf fixed +2 CHA, plus user selections)
-      else if (asi.type === 'custom') {
-        // Apply fixed bonus if exists
+      } else if (asi.type === 'custom') {
         if (asi.fixed) {
           const fixedAbility = asi.fixed.ability.toLowerCase() as keyof CharacterData
           if (fixedAbility in updatedCharacter) {
             updatedCharacter[fixedAbility] = (baseScore + asi.fixed.increase) as any
           }
         }
-        // Apply user-selected bonuses from abilityScoreChoices
         abilityScoreChoices.forEach(choice => {
           const abilityKey = choice.ability.toLowerCase() as keyof CharacterData
           if (abilityKey in updatedCharacter) {
             updatedCharacter[abilityKey] = (baseScore + choice.increase) as any
           }
         })
-      }
-      // Handle choice format (user-selected race bonuses stored in abilityScoreChoices)
-      else if (asi.type === 'choice') {
+      } else if (asi.type === 'choice') {
         abilityScoreChoices.forEach(choice => {
           const abilityKey = choice.ability.toLowerCase() as keyof CharacterData
           if (abilityKey in updatedCharacter) {
@@ -2525,15 +2675,11 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         })
       }
     }
-    
-    // Compute total ASI increase per ability from all selected ASI features (do not add on top of previous ASI)
+
+    // Compute and apply ASI increases from all selected 'ability_scores' entries
     const asiIncreasePerAbility: Record<string, number> = {
-      strength: 0,
-      dexterity: 0,
-      constitution: 0,
-      intelligence: 0,
-      wisdom: 0,
-      charisma: 0,
+      strength: 0, dexterity: 0, constitution: 0,
+      intelligence: 0, wisdom: 0, charisma: 0,
     }
     Array.from(newChoices.entries()).forEach(([id, choice]) => {
       if (selectedFeatures.has(id) && choice.type === 'ability_scores' && choice.abilityScores) {
@@ -2548,7 +2694,6 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         }
       }
     })
-    // Apply ASI totals to base+race (recompute from base+race, never on top of existing ASI)
     ;(Object.keys(asiIncreasePerAbility) as (keyof CharacterData)[]).forEach((key) => {
       if (key in updatedCharacter && typeof updatedCharacter[key] === 'number') {
         const basePlusRace = (updatedCharacter[key] as number) || baseScore
@@ -2557,6 +2702,80 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     })
 
     setEditableCharacter(updatedCharacter)
+  }
+
+  const handleASISelection = (featureId: string, type: 'ability_scores' | 'feat') => {
+    const currentChoice = asiChoices.get(featureId)
+    const newChoices = new Map(asiChoices)
+
+    // If switching from ability_scores to feat, revert ability score changes
+    if (currentChoice?.type === 'ability_scores' && type === 'feat' && currentChoice.abilityScores) {
+      const firstAbility = currentChoice.abilityScores.first?.toLowerCase()
+      const secondAbility = currentChoice.abilityScores.second?.toLowerCase()
+
+      if (firstAbility) {
+        const abilityKey = firstAbility as keyof CharacterData
+        const currentValue = editableCharacter[abilityKey] as number || 10
+        const raceBonus = abilityScoreChoices.find(c => c.ability === abilityKey)?.increase || 0
+        const baseWithRace = 10 + raceBonus
+        const decrease = secondAbility ? 1 : 2
+        updateEditableCharacter({ [abilityKey]: Math.max(baseWithRace, currentValue - decrease) })
+      }
+      if (secondAbility) {
+        const abilityKey = secondAbility as keyof CharacterData
+        const currentValue = editableCharacter[abilityKey] as number || 10
+        const raceBonus = abilityScoreChoices.find(c => c.ability === abilityKey)?.increase || 0
+        const baseWithRace = 10 + raceBonus
+        updateEditableCharacter({ [abilityKey]: Math.max(baseWithRace, currentValue - 1) })
+      }
+    }
+
+    // Preserve existing abilityScores when toggling — don't wipe out the user's selections
+    const prevAbilityScores = currentChoice?.abilityScores || { first: '', second: '' }
+    newChoices.set(featureId, {
+      type,
+      abilityScores: prevAbilityScores,
+      feat: null,
+    })
+    setAsiChoices(newChoices)
+
+    // If switching back to ability_scores with preserved selections, re-apply the bonuses
+    if (type === 'ability_scores' && prevAbilityScores.first) {
+      recalcAbilityScoresFromChoices(newChoices)
+    }
+  }
+
+  const handleASIScoreSelection = (featureId: string, which: 'first' | 'second', ability: string) => {
+    const currentChoice = asiChoices.get(featureId)
+    if (!currentChoice?.abilityScores) return
+
+    const newChoices = new Map(asiChoices)
+    newChoices.set(featureId, {
+      ...currentChoice,
+      abilityScores: { ...currentChoice.abilityScores, [which]: ability }
+    })
+    setAsiChoices(newChoices)
+    recalcAbilityScoresFromChoices(newChoices)
+  }
+
+  // Called when a feat is selected via FeatSelectionModal in the ASI context
+  const handleASIFeatSelectedFromDB = (updates: Partial<CharacterData>) => {
+    // Apply all mechanical effects (ability scores, proficiencies, special features)
+    setEditableCharacter(prev => ({ ...prev, ...updates }))
+
+    // Link the newly added feat to the ASI choice for validation
+    if (updates.feats && editingFeatForFeatureId && editingFeatForFeatureId !== 'custom-lineage-feat') {
+      const newFeat = updates.feats[updates.feats.length - 1]
+      const newChoices = new Map(asiChoices)
+      const currentChoice = newChoices.get(editingFeatForFeatureId)
+      if (currentChoice) {
+        newChoices.set(editingFeatForFeatureId, { ...currentChoice, feat: newFeat })
+        setAsiChoices(newChoices)
+      }
+    }
+
+    setFeatSelectionModalForASI(false)
+    setEditingFeatForFeatureId(null)
   }
   
   const getAbilityOptions = () => [
@@ -3122,7 +3341,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
     }
     
     // Calculate equipment proficiencies from classes
-    const classEquipmentProficiencies = characterClasses.length > 0 
+    const classEquipmentProficiencies = characterClasses.length > 0
       ? getMulticlassEquipmentProficiencies(characterClasses)
       : {
           lightArmor: false,
@@ -3138,11 +3357,17 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
           shortswords: false,
           scimitars: false,
           lightCrossbows: false,
+          longbows: false,
+          shortbows: false,
           darts: false,
           slings: false,
           quarterstaffs: false,
+          warhammers: false,
+          battleaxes: false,
+          handaxes: false,
+          lightHammers: false,
         }
-    
+
     // Combine class equipment proficiencies with race equipment proficiencies
     const raceEquipmentProficiencies = editableCharacter.equipmentProficiencies || {
       lightArmor: false,
@@ -3158,9 +3383,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       shortswords: false,
       scimitars: false,
       lightCrossbows: false,
+      longbows: false,
+      shortbows: false,
       darts: false,
       slings: false,
       quarterstaffs: false,
+      warhammers: false,
+      battleaxes: false,
+      handaxes: false,
+      lightHammers: false,
     }
     
     // Merge: class proficiencies take precedence, but race can add additional ones
@@ -3216,6 +3447,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
       equipment: editableCharacter.equipment || "",
       money: editableCharacter.money || { gold: 0, silver: 0, copper: 0 },
       equipmentProficiencies: finalEquipmentProficiencies,
+      armor: selectedArmor.length > 0 ? selectedArmor : undefined,
     })
     onClose()
   }
@@ -3564,14 +3796,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
           </DialogTitle>
           <div className="text-sm text-muted-foreground">
             Step {
-              step === 'basic_info' ? '1' : 
-              step === 'race_selection' ? '2' : 
-              step === 'background_selection' ? '3' : 
-              step === 'class_selection' ? '4' : 
-              step === 'class_features' ? '5' : 
-              step === 'hp_roll' ? '6' : 
-              '7'
-            } of 7
+              step === 'basic_info' ? '1' :
+              step === 'race_selection' ? '2' :
+              step === 'background_selection' ? '3' :
+              step === 'class_selection' ? '4' :
+              step === 'class_features' ? '5' :
+              step === 'hp_roll' ? '6' :
+              step === 'armor_selection' ? '7' :
+              '8'
+            } of 8
           </div>
         </DialogHeader>
 
@@ -5214,6 +5447,16 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                           </div>
                         )}
 
+                        {/* Background Feature */}
+                        {selectedBackgroundData.background_feature && (
+                          <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card">
+                            <Label className="text-sm font-semibold">Feature: {selectedBackgroundData.background_feature.name}</Label>
+                            <div className="text-sm text-muted-foreground">
+                              <RichTextDisplay content={selectedBackgroundData.background_feature.description} />
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex flex-col gap-4 border-t pt-4">
                             <Label className="text-lg font-medium">Proficiencies & Equipment</Label>
                             {/* Skill Proficiencies */}
@@ -5894,12 +6137,18 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                       value={charClass.name || ""}
                                       onValueChange={(value) => {
                                         const selectedClassOption = classes.find(c => c.name === value)
-                                        const updated = characterClasses.map((c, i) => 
-                                          i === index 
-                                            ? { ...c, name: value, class_id: selectedClassOption?.id || "", subclass: undefined }
+                                        const updated = characterClasses.map((c, i) =>
+                                          i === index
+                                            ? { ...c, name: value, class_id: selectedClassOption?.id || "", subclass: undefined, selectedSkillProficiencies: [] }
                                             : c
                                         )
                                         setCharacterClasses(updated)
+                                        // Reset all downstream state derived from class features
+                                        setClassFeatures([])
+                                        setSelectedFeatures(new Set())
+                                        setAsiChoices(new Map())
+                                        setToolProficiencyChoices(new Map())
+                                        setHpRollResult(null)
                                       }}
                                       disabled={loading}
                                     >
@@ -6400,15 +6649,14 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                   ) : (
                                     <Button
                                       onClick={() => {
-                                        setEditingFeatIndex(null)
                                         setEditingFeatForFeatureId(feature.id)
-                                        setFeatEditModalOpen(true)
+                                        setFeatSelectionModalForASI(true)
                                       }}
                                       size="sm"
                                       variant="outline"
                                     >
                                       <Icon icon="lucide:plus" className="w-4 h-4" />
-                                      Add new Feat
+                                      Select a Feat
                                     </Button>
                                   )}
                                 </div>
@@ -6752,7 +7000,294 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
               </div>
             )}
 
-            {/* Step 6: Summary */}
+            {/* Step 7: Armor Selection */}
+            {step === 'armor_selection' && (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-lg font-semibold">Starting Equipment — Armor (Optional)</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Select any armor your character starts with.
+                  </p>
+                </div>
+
+                {/* Light Armor */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Light Armor</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    {PHB_ARMOR_CATALOG.filter(a => a.armorType === 'light').map(armor => {
+                      const isSelected = selectedArmor.some(a => a.id === armor.id)
+                      const acText = armor.addDexModifier && armor.dexCap ? `${armor.baseAC} + DEX (max ${armor.dexCap})` : armor.addDexModifier ? `${armor.baseAC} + DEX` : `${armor.baseAC}`
+                      return (
+                        <label key={armor.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedArmor(prev => [...prev, { ...armor, equipped: true, magicBonus: 0 }])
+                              } else {
+                                setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))
+                              }
+                            }}
+                          />
+                          <span className="text-sm font-medium flex-1">{armor.name}</span>
+                          <span className="text-xs text-muted-foreground">AC {acText}</span>
+                          {armor.stealthDisadvantage && <Badge variant="outline" className="text-xs text-amber-600">Stealth disadv.</Badge>}
+                        </label>
+                      )
+                    })}
+                  </CardContent>
+                </Card>
+
+                {/* Medium Armor */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Medium Armor</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    {PHB_ARMOR_CATALOG.filter(a => a.armorType === 'medium').map(armor => {
+                      const isSelected = selectedArmor.some(a => a.id === armor.id)
+                      const acText = armor.addDexModifier && armor.dexCap ? `${armor.baseAC} + DEX (max ${armor.dexCap})` : armor.addDexModifier ? `${armor.baseAC} + DEX` : `${armor.baseAC}`
+                      return (
+                        <label key={armor.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedArmor(prev => [...prev, { ...armor, equipped: true, magicBonus: 0 }])
+                              } else {
+                                setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))
+                              }
+                            }}
+                          />
+                          <span className="text-sm font-medium flex-1">{armor.name}</span>
+                          <span className="text-xs text-muted-foreground">AC {acText}</span>
+                          {armor.stealthDisadvantage && <Badge variant="outline" className="text-xs text-amber-600">Stealth disadv.</Badge>}
+                          {armor.strengthRequirement && <Badge variant="outline" className="text-xs">Min STR {armor.strengthRequirement}</Badge>}
+                        </label>
+                      )
+                    })}
+                  </CardContent>
+                </Card>
+
+                {/* Heavy Armor */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Heavy Armor</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    {PHB_ARMOR_CATALOG.filter(a => a.armorType === 'heavy').map(armor => {
+                      const isSelected = selectedArmor.some(a => a.id === armor.id)
+                      const acText = `${armor.baseAC}`
+                      return (
+                        <label key={armor.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedArmor(prev => [...prev, { ...armor, equipped: true, magicBonus: 0 }])
+                              } else {
+                                setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))
+                              }
+                            }}
+                          />
+                          <span className="text-sm font-medium flex-1">{armor.name}</span>
+                          <span className="text-xs text-muted-foreground">AC {acText}</span>
+                          {armor.stealthDisadvantage && <Badge variant="outline" className="text-xs text-amber-600">Stealth disadv.</Badge>}
+                          {armor.strengthRequirement && <Badge variant="outline" className="text-xs">Min STR {armor.strengthRequirement}</Badge>}
+                        </label>
+                      )
+                    })}
+                  </CardContent>
+                </Card>
+
+                {/* Shield */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Shield</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    {PHB_ARMOR_CATALOG.filter(a => a.armorType === 'shield').map(armor => {
+                      const isSelected = selectedArmor.some(a => a.id === armor.id)
+                      return (
+                        <label key={armor.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedArmor(prev => [...prev, { ...armor, equipped: true, magicBonus: 0 }])
+                              } else {
+                                setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))
+                              }
+                            }}
+                          />
+                          <span className="text-sm font-medium flex-1">{armor.name}</span>
+                          <span className="text-xs text-muted-foreground">+{armor.baseAC} AC</span>
+                        </label>
+                      )
+                    })}
+                  </CardContent>
+                </Card>
+
+                {/* Custom Armor */}
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCustomArmorForm(!showCustomArmorForm)}
+                    className="w-fit"
+                  >
+                    <Icon icon={showCustomArmorForm ? "lucide:minus" : "lucide:plus"} className="w-4 h-4" />
+                    {showCustomArmorForm ? 'Cancel Custom Armor' : 'Add Custom Armor'}
+                  </Button>
+
+                  {showCustomArmorForm && (
+                    <Card>
+                      <CardContent className="pt-4 flex flex-col gap-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs">Name</Label>
+                            <Input
+                              value={customArmorForm.name}
+                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, name: e.target.value }))}
+                              placeholder="Custom armor name"
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs">Type</Label>
+                            <Select
+                              value={customArmorForm.armorType}
+                              onValueChange={(value) => setCustomArmorForm(prev => ({ ...prev, armorType: value as ArmorType }))}
+                            >
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="light">Light</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="heavy">Heavy</SelectItem>
+                                <SelectItem value="shield">Shield</SelectItem>
+                                <SelectItem value="natural">Natural</SelectItem>
+                                <SelectItem value="custom">Custom</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs">Base AC</Label>
+                            <Input
+                              type="number"
+                              value={customArmorForm.baseAC}
+                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, baseAC: parseInt(e.target.value) || 0 }))}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs">Magic Bonus</Label>
+                            <Input
+                              type="number"
+                              value={customArmorForm.magicBonus}
+                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, magicBonus: parseInt(e.target.value) || 0 }))}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs">DEX Cap (leave empty for unlimited)</Label>
+                            <Input
+                              type="number"
+                              value={customArmorForm.dexCap ?? ''}
+                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, dexCap: e.target.value ? parseInt(e.target.value) : null }))}
+                              placeholder="No cap"
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs">STR Requirement (leave empty for none)</Label>
+                            <Input
+                              type="number"
+                              value={customArmorForm.strengthRequirement ?? ''}
+                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, strengthRequirement: e.target.value ? parseInt(e.target.value) : null }))}
+                              placeholder="None"
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={customArmorForm.addDexModifier}
+                              onCheckedChange={(checked) => setCustomArmorForm(prev => ({ ...prev, addDexModifier: !!checked }))}
+                            />
+                            <span className="text-xs">Add DEX modifier</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={customArmorForm.stealthDisadvantage}
+                              onCheckedChange={(checked) => setCustomArmorForm(prev => ({ ...prev, stealthDisadvantage: !!checked }))}
+                            />
+                            <span className="text-xs">Stealth disadvantage</span>
+                          </label>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="w-fit"
+                          disabled={!customArmorForm.name.trim()}
+                          onClick={() => {
+                            const newArmor: ArmorItem = {
+                              id: crypto.randomUUID(),
+                              name: customArmorForm.name.trim(),
+                              armorType: customArmorForm.armorType,
+                              baseAC: customArmorForm.baseAC,
+                              addDexModifier: customArmorForm.addDexModifier,
+                              dexCap: customArmorForm.dexCap,
+                              magicBonus: customArmorForm.magicBonus,
+                              stealthDisadvantage: customArmorForm.stealthDisadvantage,
+                              strengthRequirement: customArmorForm.strengthRequirement ?? undefined,
+                              equipped: true,
+                            }
+                            setSelectedArmor(prev => [...prev, newArmor])
+                            setCustomArmorForm({ name: '', armorType: 'light', baseAC: 0, addDexModifier: true, dexCap: null, stealthDisadvantage: false, strengthRequirement: null, magicBonus: 0 })
+                            setShowCustomArmorForm(false)
+                          }}
+                        >
+                          <Icon icon="lucide:plus" className="w-4 h-4" />
+                          Add
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Selected custom armor items summary */}
+                {selectedArmor.filter(a => !PHB_ARMOR_CATALOG.some(c => c.id === a.id)).length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Custom Armor Items</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-2">
+                      {selectedArmor.filter(a => !PHB_ARMOR_CATALOG.some(c => c.id === a.id)).map(armor => (
+                        <div key={armor.id} className="flex items-center gap-3 px-2 py-1.5">
+                          <span className="text-sm font-medium flex-1">{armor.name}</span>
+                          <span className="text-xs text-muted-foreground">AC {armor.baseAC}{armor.magicBonus ? ` +${armor.magicBonus}` : ''}</span>
+                          <Badge variant="outline" className="text-xs capitalize">{armor.armorType}</Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))}
+                          >
+                            <Icon icon="lucide:x" className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* Step 8: Summary */}
             {step === 'summary' && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
@@ -7085,8 +7620,10 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                       setStep('class_selection')
                     } else if (step === 'hp_roll') {
                       setStep('class_features')
-                    } else if (step === 'summary') {
+                    } else if (step === 'armor_selection') {
                       setStep('hp_roll')
+                    } else if (step === 'summary') {
+                      setStep('armor_selection')
                     }
                   }}
                 >
@@ -7293,12 +7830,37 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                       return
                     }
                     setError(null)
-                    setStep('summary')
+                    setStep('armor_selection')
                   }}
                 >
-                  Continue to Summary
+                  Continue to Armor Selection
                   <Icon icon="lucide:arrow-right" className="w-4 h-4" />
                 </Button>
+              )}
+
+              {step === 'armor_selection' && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedArmor([])
+                      setError(null)
+                      setStep('summary')
+                    }}
+                  >
+                    Skip
+                    <Icon icon="lucide:arrow-right" className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setError(null)
+                      setStep('summary')
+                    }}
+                  >
+                    Continue to Summary
+                    <Icon icon="lucide:arrow-right" className="w-4 h-4" />
+                  </Button>
+                </div>
               )}
               
               {step === 'summary' && (
@@ -7319,6 +7881,14 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
         character={{ ...editableCharacter, feats: editableCharacter.feats || [] } as CharacterData}
         featIndex={editingFeatIndex}
         onSave={handleFeatSave}
+      />
+
+      {/* Feat Selection Modal (for ASI feat choice) */}
+      <FeatSelectionModal
+        isOpen={featSelectionModalForASI}
+        onClose={() => { setFeatSelectionModalForASI(false); setEditingFeatForFeatureId(null) }}
+        character={{ ...editableCharacter, feats: editableCharacter.feats || [] } as CharacterData}
+        onSave={handleASIFeatSelectedFromDB}
       />
     </Dialog>
   )

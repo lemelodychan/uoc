@@ -47,7 +47,7 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
   }
 
   const addWeapon = () => {
-    setWeapons([...weapons, { name: "", attackBonus: "", damageType: "", weaponProperties: [], maxAmmunition: 0, usedAmmunition: 0 }])
+    setWeapons([...weapons, { name: "", attackBonus: "", damageType: "", weaponProperties: [], maxAmmunition: 0, usedAmmunition: 0, equipped: true }])
   }
 
   const removeWeapon = (index: number) => {
@@ -141,6 +141,16 @@ export function WeaponsModal({ isOpen, onClose, character, onSave }: WeaponsModa
                       placeholder="0 (no tracking)"
                     />
                     <span className="text-xs text-muted-foreground">Set to 0 to disable ammunition tracking</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`weapon-equipped-${index}`}
+                      checked={weapon.equipped !== false}
+                      onCheckedChange={(val) => updateWeapon(index, "equipped", !!val)}
+                    />
+                    <Label htmlFor={`weapon-equipped-${index}`} className="text-xs cursor-pointer">
+                      Equipped
+                    </Label>
                   </div>
                   <div className="col-span-2 flex flex-col gap-2">
                     <Label className="text-xs">Properties</Label>

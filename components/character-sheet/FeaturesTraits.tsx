@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
@@ -53,7 +54,10 @@ export function FeaturesTraits({
   isLoading = false
 }: FeaturesTraitsProps) {
   const [featureOverflowMap, setFeatureOverflowMap] = useState<Record<number, boolean>>({})
+  const [bgFeatureOverflow, setBgFeatureOverflow] = useState(false)
   if (isLoading) return <SectionCardSkeleton contentLines={5} />
+
+  const bgFeature = character.backgroundData?.background_feature
 
   return (
     <Card className="flex flex-col gap-3">
@@ -73,6 +77,47 @@ export function FeaturesTraits({
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-2">
+          {bgFeature?.name && (
+            <div className="p-2 pr-3 border rounded flex flex-col gap-0.5 bg-background">
+              <div className="font-medium flex items-start justify-between">
+                <span className="text-sm flex items-center gap-1.5">
+                  {bgFeature.name}
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">Background</Badge>
+                </span>
+              </div>
+              {bgFeature.description && (
+                <div className="text-xs text-muted-foreground relative">
+                  <div
+                    className="line-clamp-2 max-h-20 overflow-hidden"
+                    ref={(el) => {
+                      if (!el) return
+                      const isOverflowing = el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth
+                      setBgFeatureOverflow((prev) => (prev === isOverflowing ? prev : isOverflowing))
+                    }}
+                  >
+                    <RichTextDisplay content={bgFeature.description} className="text-xs text-muted-foreground" />
+                  </div>
+                  {bgFeatureOverflow && (
+                    <div className="mt-2 flex justify-start">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="px-2 h-7 shadow-sm text-foreground"
+                        onClick={() => {
+                          onOpenFeatureModal({
+                            title: bgFeature.name!,
+                            description: bgFeature.description!,
+                          })
+                        }}
+                      >
+                        Read more
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {(character.features || []).map((feature, index) => (
             <div key={index} className="p-2 pr-3 border rounded flex flex-col gap-0.5 bg-background">
               <div className="font-medium flex items-start justify-between">
@@ -140,7 +185,7 @@ export function FeaturesTraits({
               </div>
             </div>
           ))}
-          {character.features.length === 0 && (
+          {character.features.length === 0 && !bgFeature?.name && (
             <div className="text-sm text-muted-foreground text-center py-4">No features or traits</div>
           )}
         </div>

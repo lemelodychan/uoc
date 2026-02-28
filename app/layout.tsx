@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   title: "🎲 UOC DND 5e",
   description: "Fiches DND 5e du girl gang ✌️",
   icons: {
-    icon: '/favicon.ico',
+    icon: '/favicon.png',
   },
 }
 

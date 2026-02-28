@@ -12,7 +12,7 @@ import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { loadFeatsWithDetails, loadFeatDetails, type FeatData } from "@/lib/database"
 import { ProficiencyCheckboxes, SKILL_OPTIONS } from "@/components/ui/proficiency-checkboxes"
-import type { CharacterData } from "@/lib/character-data"
+import type { CharacterData, FeatSpellSlot, InnateSpell } from "@/lib/character-data"
 import { useToast } from "@/hooks/use-toast"
 import { calculateUsesFromFormula } from "@/lib/class-feature-templates"
 
@@ -21,6 +21,7 @@ interface FeatSelectionModalProps {
   onClose: () => void
   character: CharacterData
   onSave: (updates: Partial<CharacterData>) => void
+  onOpenSpellEditor?: () => void
 }
 
 const ABILITY_OPTIONS = [
@@ -48,38 +49,139 @@ const TOOL_OPTIONS = [
   { value: 'vehicles_water', label: 'Vehicles (Water)' }
 ]
 
-export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatSelectionModalProps) {
+interface Prerequisites {
+  min_level?: number | null
+  ability_scores?: Partial<Record<'strength'|'dexterity'|'constitution'|'intelligence'|'wisdom'|'charisma', number>>
+  spellcasting?: boolean
+  proficiency?: string[]
+  other?: string
+}
+
+interface PrereqCheck {
+  label: string
+  met: boolean | null // null = unknown/gray
+}
+
+function checkPrerequisites(prereqs: Prerequisites, character: CharacterData): PrereqCheck[] {
+  const checks: PrereqCheck[] = []
+
+  if (prereqs.min_level && prereqs.min_level > 0) {
+    const charLevel = character.level || 1
+    checks.push({
+      label: `Lv \u2265 ${prereqs.min_level}`,
+      met: charLevel >= prereqs.min_level
+    })
+  }
+
+  if (prereqs.ability_scores) {
+    const abilityLabels: Record<string, string> = {
+      strength: 'STR', dexterity: 'DEX', constitution: 'CON',
+      intelligence: 'INT', wisdom: 'WIS', charisma: 'CHA'
+    }
+    for (const [ability, minScore] of Object.entries(prereqs.ability_scores)) {
+      if (minScore && minScore > 0) {
+        const charScore = (character as any)[ability] ?? 0
+        checks.push({
+          label: `${abilityLabels[ability] || ability} \u2265 ${minScore}`,
+          met: charScore >= minScore
+        })
+      }
+    }
+  }
+
+  if (prereqs.spellcasting) {
+    const hasSpellcasting = character.classes?.some(
+      (c: any) => c.classData?.spellcasting_ability
+    ) ?? false
+    checks.push({
+      label: 'Spellcasting',
+      met: hasSpellcasting
+    })
+  }
+
+  if (prereqs.proficiency && prereqs.proficiency.length > 0) {
+    const equipProfs = character.equipmentProficiencies || {} as any
+    // Build a lookup of known proficiency keys (lowercase, no spaces)
+    const profLookup = new Map<string, boolean>()
+    for (const [key, val] of Object.entries(equipProfs)) {
+      profLookup.set(key.toLowerCase(), !!val)
+      // Also add human-readable versions: "lightArmor" -> "light armor"
+      const humanKey = key.replace(/([A-Z])/g, ' $1').toLowerCase().trim()
+      profLookup.set(humanKey, !!val)
+    }
+
+    for (const prof of prereqs.proficiency) {
+      const normalizedProf = prof.toLowerCase().trim()
+      // Try exact match, then without spaces
+      const noSpaces = normalizedProf.replace(/\s+/g, '')
+      if (profLookup.has(normalizedProf)) {
+        checks.push({ label: prof, met: profLookup.get(normalizedProf)! })
+      } else if (profLookup.has(noSpaces)) {
+        checks.push({ label: prof, met: profLookup.get(noSpaces)! })
+      } else {
+        checks.push({ label: prof, met: null }) // unknown
+      }
+    }
+  }
+
+  if (prereqs.other) {
+    checks.push({ label: prereqs.other, met: null })
+  }
+
+  return checks
+}
+
+interface SpellLibraryEntry {
+  id: string
+  name: string
+  level: number
+  school: string
+  classes: string[]
+}
+
+// spellChoices key: `${featureIndex}-${spellIndex}` → chosen spell name
+type SpellChoices = Record<string, string>
+
+export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenSpellEditor }: FeatSelectionModalProps) {
   const [feats, setFeats] = useState<FeatData[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedFeatId, setSelectedFeatId] = useState<string | null>(null)
   const [selectedFeatData, setSelectedFeatData] = useState<FeatData | null>(null)
   const [step, setStep] = useState<'select' | 'configure'>('select')
-  
+
   // Choice selections
   const [abilityChoices, setAbilityChoices] = useState<string[]>([])
   const [skillChoices, setSkillChoices] = useState<string[]>([])
   const [toolChoices, setToolChoices] = useState<string[]>([])
   const [languageChoices, setLanguageChoices] = useState<string[]>([])
-  
+
+  // Spell choices for spell_grant features
+  const [spellChoices, setSpellChoices] = useState<SpellChoices>({})
+  const [spellLibrary, setSpellLibrary] = useState<SpellLibraryEntry[]>([])
+  const [spellSearchQuery, setSpellSearchQuery] = useState<Record<string, string>>({})
+
   const { toast } = useToast()
 
-  // Load feats when modal opens
+  // Load feats + spell library when modal opens
   useEffect(() => {
     if (isOpen) {
       setLoading(true)
       loadFeatsWithDetails().then(({ feats, error }) => {
         if (error) {
           console.error("Error loading feats:", error)
-          toast({
-            title: "Error",
-            description: "Failed to load feats",
-            variant: "destructive"
-          })
+          toast({ title: "Error", description: "Failed to load feats", variant: "destructive" })
         } else if (feats) {
           setFeats(feats)
         }
         setLoading(false)
       })
+      // Fetch spell library for spell_grant choices
+      if (spellLibrary.length === 0) {
+        fetch('/api/spells')
+          .then(r => r.json())
+          .then(data => { if (Array.isArray(data)) setSpellLibrary(data) })
+          .catch(() => {})
+      }
     } else {
       // Reset state when modal closes
       setSelectedFeatId(null)
@@ -89,8 +191,10 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
       setSkillChoices([])
       setToolChoices([])
       setLanguageChoices([])
+      setSpellChoices({})
+      setSpellSearchQuery({})
     }
-  }, [isOpen, toast])
+  }, [isOpen, toast]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFeatSelect = async (featId: string) => {
     setLoading(true)
@@ -159,14 +263,12 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
       abilityChoices,
       skillChoices,
       toolChoices,
-      languageChoices
+      languageChoices,
+      spellChoices,
     })
 
     onSave(updates)
-    toast({
-      title: "Success",
-      description: `Feat "${selectedFeatData.name}" added successfully`
-    })
+    toast({ title: "Feat Added", description: `Feat "${selectedFeatData.name}" added successfully` })
     onClose()
   }
 
@@ -250,6 +352,30 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
       }
     }
 
+    // Validate spell choices for spell_grant features
+    if (selectedFeatData.special_features) {
+      for (let fi = 0; fi < selectedFeatData.special_features.length; fi++) {
+        const feature = selectedFeatData.special_features[fi]
+        if (feature.featureType !== 'spell_grant') continue
+        const spells = feature.spells || []
+        for (let si = 0; si < spells.length; si++) {
+          const spell = spells[si]
+          const isChoice = spell.mode === 'choice' || (!spell.mode && spell.fixed === false)
+          if (isChoice) {
+            const key = `${fi}-${si}`
+            if (!spellChoices[key] || spellChoices[key].trim() === '') {
+              toast({
+                title: "Validation Error",
+                description: `Please choose a spell for "${spell.placeholderName || `Spell ${si + 1}`}" in "${feature.title}"`,
+                variant: "destructive"
+              })
+              return false
+            }
+          }
+        }
+      }
+    }
+
     return true
   }
 
@@ -258,6 +384,7 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
     skillChoices: string[]
     toolChoices: string[]
     languageChoices: string[]
+    spellChoices: SpellChoices
   }): Partial<CharacterData> => {
     const updates: Partial<CharacterData> = {}
 
@@ -266,6 +393,7 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
       name: feat.name,
       description: feat.description || '',
       featId: feat.id,
+      passiveBonuses: feat.passive_bonuses ?? null,
       choices: {
         abilityChoices: choices.abilityChoices.length > 0 ? choices.abilityChoices : undefined,
         skillChoices: choices.skillChoices.length > 0 ? choices.skillChoices : undefined,
@@ -476,72 +604,128 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
       const newFeatures: any[] = []
       const newFeatureUsage: any = { ...currentFeatureUsage }
 
-      feat.special_features.forEach((feature: any) => {
-        if (feature.featureType === 'trait') {
+      feat.special_features.forEach((feature: any, featureIndex: number) => {
+        if (feature.featureType === 'spell_grant') {
+          // Each granted spell routes to innateSpells (cantrips) or classFeatureSkillsUsage (limited-use)
+          ;(feature.spells || []).forEach((spell: any, spellIndex: number) => {
+            const isChoice = spell.mode === 'choice' || (!spell.mode && spell.fixed === false)
+            const choiceKey = `${featureIndex}-${spellIndex}`
+            const spellName = isChoice
+              ? (choices.spellChoices[choiceKey] || spell.placeholderName || spell.hint || 'Chosen Spell')
+              : (spell.name || spell.customName || 'Unknown Spell')
+            const spellLevel = spell.level ?? 0
+            const isCantrip = spellLevel === 0
+
+            if (isCantrip) {
+              // Cantrips are at-will — add to innateSpells
+              const baseInnate: InnateSpell[] = (updates as any).innateSpells ?? [...(character.innateSpells ?? [])]
+              ;(updates as any).innateSpells = [
+                ...baseInnate,
+                {
+                  name: spellName,
+                  spellLevel: 0,
+                  usesPerDay: 'at_will' as const,
+                  source: 'feat' as const,
+                  sourceName: feat.name,
+                  castingAbility: feature.castingAbility,
+                },
+              ]
+            } else {
+              // Limited-use spell — add to classFeatureSkillsUsage with isFeatFeature
+              const maxUses = spell.usesPerLongRest ?? feature.usesPerLongRest ?? 1
+              const featureId = `feat-${feat.id}-spell-${featureIndex}-${spellIndex}-${Date.now() + spellIndex}`
+              newFeatureUsage[featureId] = {
+                featureName: spellName,
+                featureType: 'slots',
+                currentUses: maxUses,
+                maxUses,
+                lastReset: new Date().toISOString(),
+                config: {
+                  usesFormula: String(maxUses),
+                },
+                featSource: feat.name,
+                category: 'spell',
+                isFeatFeature: true,
+              }
+            }
+          })
+          return // no entry added to features list for spell_grant
+        } else if (feature.featureType === 'trait') {
           // Simple trait - just add to features
           newFeatures.push({
             name: feature.title,
             description: feature.description || ''
           })
         } else {
-          // Complex feature - add to features and initialize usage tracking
+          // Complex tracked feature — route by category
           const featureId = feature.id || `feat-${feat.id}-${feature.title}-${Date.now()}`
-          
-          // Initialize usage tracking based on feature type
-          let currentUses = 0
-          let usesPerLongRest: number | string | undefined = undefined
-          
-          if (feature.featureType === 'slots') {
-            const usesFormula = feature.config?.usesFormula || '1'
-            const maxUses = calculateUsesFromFormula(usesFormula, character)
-            currentUses = maxUses
-            usesPerLongRest = usesFormula
-            newFeatureUsage[featureId] = {
-              featureName: feature.title,
-              featureType: 'slots',
-              currentUses: maxUses,
-              maxUses: maxUses,
-              lastReset: new Date().toISOString(),
-              // Store full config for reconstruction
-              config: feature.config,
-              description: feature.description,
-              isFeatFeature: true
+          const category = feature.category ?? 'combat'
+
+          if (category === 'trait') {
+            // Render in Features & Traits — add to character.features only
+            let usesPerLongRest: number | string | undefined = undefined
+            let currentUses = 0
+            if (feature.featureType === 'slots') {
+              const usesFormula = feature.config?.usesFormula || '1'
+              usesPerLongRest = usesFormula
+              currentUses = calculateUsesFromFormula(usesFormula, character)
+            } else if (feature.featureType === 'points_pool') {
+              const totalFormula = feature.config?.totalFormula || '1'
+              usesPerLongRest = totalFormula
+              currentUses = calculateUsesFromFormula(totalFormula, character)
+            } else if (feature.featureType === 'availability_toggle') {
+              usesPerLongRest = 1
+              currentUses = feature.config?.defaultAvailable !== false ? 1 : 0
             }
-          } else if (feature.featureType === 'points_pool') {
-            const totalFormula = feature.config?.totalFormula || '1'
-            const maxPoints = calculateUsesFromFormula(totalFormula, character)
-            currentUses = maxPoints
-            usesPerLongRest = totalFormula
-            newFeatureUsage[featureId] = {
-              featureName: feature.title,
-              featureType: 'points_pool',
-              currentPoints: maxPoints,
-              maxPoints: maxPoints,
-              lastReset: new Date().toISOString(),
-              // Store full config for reconstruction
-              config: feature.config,
-              description: feature.description,
-              isFeatFeature: true
-            }
-          } else if (feature.featureType === 'availability_toggle') {
-            newFeatureUsage[featureId] = {
-              featureName: feature.title,
-              featureType: 'availability_toggle',
-              isAvailable: feature.config?.defaultAvailable ?? true,
-              lastReset: new Date().toISOString(),
-              // Store full config for reconstruction
-              config: feature.config,
-              description: feature.description,
-              isFeatFeature: true
+            newFeatures.push({
+              name: feature.title,
+              description: feature.description || '',
+              usesPerLongRest,
+              currentUses,
+            })
+          } else {
+            // Render in Spellcasting (combat or spell section) — add to classFeatureSkillsUsage only
+            if (feature.featureType === 'slots') {
+              const usesFormula = feature.config?.usesFormula || '1'
+              const maxUses = calculateUsesFromFormula(usesFormula, character)
+              newFeatureUsage[featureId] = {
+                featureName: feature.title,
+                featureType: 'slots',
+                currentUses: maxUses,
+                maxUses,
+                lastReset: new Date().toISOString(),
+                config: feature.config,
+                featSource: feat.name,
+                category,
+                isFeatFeature: true,
+              }
+            } else if (feature.featureType === 'points_pool') {
+              const totalFormula = feature.config?.totalFormula || '1'
+              const maxPoints = calculateUsesFromFormula(totalFormula, character)
+              newFeatureUsage[featureId] = {
+                featureName: feature.title,
+                featureType: 'points_pool',
+                currentPoints: maxPoints,
+                maxPoints,
+                lastReset: new Date().toISOString(),
+                config: feature.config,
+                featSource: feat.name,
+                category,
+                isFeatFeature: true,
+              }
+            } else if (feature.featureType === 'availability_toggle') {
+              newFeatureUsage[featureId] = {
+                featureName: feature.title,
+                featureType: 'availability_toggle',
+                isAvailable: feature.config?.defaultAvailable ?? true,
+                lastReset: new Date().toISOString(),
+                config: feature.config,
+                featSource: feat.name,
+                category,
+                isFeatFeature: true,
+              }
             }
           }
-          
-          newFeatures.push({
-            name: feature.title,
-            description: feature.description || '',
-            usesPerLongRest: usesPerLongRest,
-            currentUses: currentUses
-          })
         }
       })
 
@@ -567,7 +751,12 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
               </div>
             ) : (
               <div className="grid gap-3">
-                {feats.map((feat) => (
+                {feats.map((feat) => {
+                  const prereqs = feat.prerequisites as Prerequisites | null | undefined
+                  const prereqChecks = prereqs ? checkPrerequisites(prereqs, character) : []
+                  const hasFailedCheck = prereqChecks.some(c => c.met === false)
+
+                  return (
                   <div
                     key={feat.id}
                     className="p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
@@ -575,10 +764,39 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="font-semibold text-lg mb-1">{feat.name}</div>
+                        <div className="flex items-center gap-2 font-semibold text-lg mb-1">
+                          {feat.name}
+                          {hasFailedCheck && (
+                            <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/30">
+                              <Icon icon="lucide:alert-triangle" className="w-3 h-3 mr-1" />
+                              Check requirements
+                            </Badge>
+                          )}
+                        </div>
                         {feat.description && (
                           <div className="text-sm text-muted-foreground line-clamp-2 mb-2">
                             <RichTextDisplay content={feat.description} />
+                          </div>
+                        )}
+                        {prereqChecks.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {prereqChecks.map((check, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="outline"
+                                className={`text-xs ${
+                                  check.met === true
+                                    ? 'border-green-500 text-green-700 bg-green-50 dark:bg-green-950/30 dark:text-green-400'
+                                    : check.met === false
+                                    ? 'border-red-500 text-red-700 bg-red-50 dark:bg-red-950/30 dark:text-red-400'
+                                    : 'border-gray-400 text-gray-500 bg-gray-50 dark:bg-gray-800/30'
+                                }`}
+                              >
+                                {check.label}
+                                {check.met === true && ' \u2713'}
+                                {check.met === false && ' \u2717'}
+                              </Badge>
+                            ))}
                           </div>
                         )}
                         <div className="flex flex-wrap gap-2 mt-2">
@@ -607,7 +825,8 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
                       <Icon icon="lucide:chevron-right" className="w-5 h-5 text-muted-foreground ml-2" />
                     </div>
                   </div>
-                ))}
+                  )
+                })}
                 {feats.length === 0 && (
                   <div className="text-center text-muted-foreground py-8">
                     No feats available in the library
@@ -790,8 +1009,8 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
           )}
 
           {/* Language Choices */}
-          {selectedFeatData.languages && 
-           typeof selectedFeatData.languages === 'object' && 
+          {selectedFeatData.languages &&
+           typeof selectedFeatData.languages === 'object' &&
            !Array.isArray(selectedFeatData.languages) &&
            (selectedFeatData.languages as any).choice && (
             <div className="space-y-2">
@@ -813,6 +1032,109 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave }: FeatS
                   />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Spell Choices (spell_grant features with player choice spells) */}
+          {(selectedFeatData.special_features ?? []).some(
+            (f: any) => f.featureType === 'spell_grant' &&
+              (f.spells ?? []).some((s: any) => s.mode === 'choice' || (!s.mode && s.fixed === false))
+          ) && (
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Spell Choices</Label>
+              {(selectedFeatData.special_features ?? []).map((feature: any, fi: number) => {
+                if (feature.featureType !== 'spell_grant') return null
+                const choiceSpells = (feature.spells ?? []).filter(
+                  (s: any) => s.mode === 'choice' || (!s.mode && s.fixed === false)
+                )
+                if (choiceSpells.length === 0) return null
+
+                return (
+                  <div key={fi} className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                    <p className="text-sm font-medium">{feature.title}</p>
+                    {(feature.spells ?? []).map((spell: any, si: number) => {
+                      const isChoice = spell.mode === 'choice' || (!spell.mode && spell.fixed === false)
+                      if (!isChoice) return null
+                      const key = `${fi}-${si}`
+                      const criteria = spell.criteria || {}
+                      const label = spell.placeholderName || `Spell ${si + 1}`
+
+                      // Filter spell library by criteria
+                      const filtered = spellLibrary.filter(lib => {
+                        if (criteria.maxLevel !== undefined && lib.level > criteria.maxLevel) return false
+                        if (criteria.school && lib.school.toLowerCase() !== criteria.school.toLowerCase()) return false
+                        if (criteria.classes && criteria.classes.length > 0) {
+                          const hasClass = lib.classes.some((c: string) =>
+                            criteria.classes.some((cc: string) => c.toLowerCase() === cc.toLowerCase())
+                          )
+                          if (!hasClass) return false
+                        }
+                        return true
+                      })
+
+                      const query = spellSearchQuery[key] || ''
+                      const shown = query.length >= 1
+                        ? filtered.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).slice(0, 15)
+                        : []
+
+                      return (
+                        <div key={si} className="space-y-1">
+                          <Label className="text-sm text-muted-foreground">
+                            {label}
+                            {criteria.maxLevel !== undefined && ` (up to level ${criteria.maxLevel})`}
+                            {criteria.school && ` · ${criteria.school}`}
+                            {criteria.classes?.length > 0 && ` · ${criteria.classes.join('/')}`}
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              value={spellChoices[key]
+                                ? spellChoices[key]
+                                : spellSearchQuery[key] || ''}
+                              placeholder={spellChoices[key] ? spellChoices[key] : `Search ${label}…`}
+                              onChange={(e) => {
+                                setSpellChoices(prev => { const n = { ...prev }; delete n[key]; return n })
+                                setSpellSearchQuery(prev => ({ ...prev, [key]: e.target.value }))
+                              }}
+                              className="h-9 text-sm"
+                            />
+                            {!spellChoices[key] && shown.length > 0 && (
+                              <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-md bg-popover shadow-md max-h-48 overflow-y-auto">
+                                {shown.map(s => (
+                                  <div
+                                    key={s.id}
+                                    className="px-3 py-1.5 text-sm hover:bg-accent cursor-pointer flex items-center justify-between"
+                                    onClick={() => {
+                                      setSpellChoices(prev => ({ ...prev, [key]: s.name }))
+                                      setSpellSearchQuery(prev => ({ ...prev, [key]: '' }))
+                                    }}
+                                  >
+                                    <span>{s.name}</span>
+                                    <span className="text-xs text-muted-foreground ml-2">
+                                      Lv {s.level} · {s.school}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {spellChoices[key] && (
+                            <div className="flex items-center gap-1">
+                              <Badge variant="secondary" className="text-xs">{spellChoices[key]}</Badge>
+                              <button
+                                type="button"
+                                onClick={() => setSpellChoices(prev => { const n = { ...prev }; delete n[key]; return n })}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <Icon icon="lucide:x" className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

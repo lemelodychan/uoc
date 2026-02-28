@@ -17,6 +17,9 @@ import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClass
 import { AbilitiesModal } from "@/components/edit-modals/abilities-modal"
 import { CombatModal } from "@/components/edit-modals/combat-modal"
 import { WeaponsModal } from "@/components/edit-modals/weapons-modal"
+import { ArmorModal } from "@/components/edit-modals/armor-modal"
+import { DefensesModal } from "@/components/edit-modals/defenses-modal"
+import { InnateSpellsModal } from "@/components/edit-modals/innate-spells-modal"
 import { InfusionsModal } from "@/components/edit-modals/infusions-modal"
 import { FeaturesModal } from "@/components/edit-modals/features-modal"
 import { EquipmentModal } from "@/components/edit-modals/equipment-modal"
@@ -32,6 +35,7 @@ import { Money } from "@/components/character-sheet/Money"
 import { Languages } from "@/components/character-sheet/Languages"
 import { CombatStats } from "@/components/character-sheet/CombatStats"
 import { Weapons } from "@/components/character-sheet/Weapons"
+import { Armor } from "@/components/character-sheet/Armor"
 import { Spellcasting } from "@/components/character-sheet/Spellcasting"
 import { ToolsProficiencies } from "@/components/character-sheet/ToolsProficiencies"
 import { ClassFeatures } from "@/components/character-sheet/ClassFeatures"
@@ -71,6 +75,7 @@ import {
 } from "@/lib/feature-usage-tracker"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { calculateArmorClass } from "@/lib/passive-bonus-utils"
 import { useToast } from "@/hooks/use-toast"
 import { AppHeader } from "@/components/app-header"
 import { AccessDeniedOverlay } from "@/components/access-denied-overlay"
@@ -86,6 +91,7 @@ import {
   type SpellData,
   type Skill,
   type ToolProficiency,
+  type InnateSpell,
 } from "@/lib/character-data"
 import { saveCharacter, patchCharacter, loadCharacter, loadAllCharacters, loadCharactersProgressive, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, deleteCharacter as deleteCharacterDB, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
@@ -147,6 +153,7 @@ function CharacterSheetContent() {
   const [abilitiesModalOpen, setAbilitiesModalOpen] = useState(false)
   const [combatModalOpen, setCombatModalOpen] = useState(false)
   const [weaponsModalOpen, setWeaponsModalOpen] = useState(false)
+  const [armorModalOpen, setArmorModalOpen] = useState(false)
   const [infusionsModalOpen, setInfusionsModalOpen] = useState(false)
   const [featuresModalOpen, setFeaturesModalOpen] = useState(false)
   const [equipmentModalOpen, setEquipmentModalOpen] = useState(false)
@@ -188,6 +195,8 @@ function CharacterSheetContent() {
   const [eldritchInvocationsModalOpen, setEldritchInvocationsModalOpen] = useState(false)
   const [metamagicModalOpen, setMetamagicModalOpen] = useState(false)
   const [diceRollModalOpen, setDiceRollModalOpen] = useState(false)
+  const [defensesModalOpen, setDefensesModalOpen] = useState(false)
+  const [innateSpellsModalOpen, setInnateSpellsModalOpen] = useState(false)
   const [levelUpModalOpen, setLevelUpModalOpen] = useState(false)
   const [deleteCharacterModalOpen, setDeleteCharacterModalOpen] = useState(false)
   const [campaignManagementModalOpen, setCampaignManagementModalOpen] = useState(false)
@@ -561,7 +570,20 @@ function CharacterSheetContent() {
         maxUses: updates.maxUses,
         currentUses: updates.currentUses
       })
+    } else if (updates.type === 'rename') {
+      updatedUsage = {
+        ...updatedUsage,
+        [featureId]: {
+          ...updatedUsage[featureId],
+          featureName: updates.newName,
+        }
+      }
     } else if (updates.type === 'direct_update') {
+      // Special case: innate spells usage update from Spellcasting component
+      if (featureId === '__innate_spells__' && updates.innateSpells) {
+        updateCharacter({ innateSpells: updates.innateSpells })
+        return
+      }
       updatedUsage = {
         ...updatedUsage,
         [featureId]: {
@@ -1749,6 +1771,13 @@ function CharacterSheetContent() {
             }
           }
 
+          // Reset innate spells uses on long rest (skip short_rest-only spells)
+          const updatedInnateSpells = (character.innateSpells ?? []).map(spell =>
+            spell.usesPerDay !== 'at_will' && spell.resetOn !== 'short_rest'
+              ? { ...spell, currentUses: typeof spell.usesPerDay === 'number' ? spell.usesPerDay : spell.currentUses }
+              : spell
+          )
+
           longRestResults.push({
             characterId: character.id,
             characterName: character.name,
@@ -1770,6 +1799,7 @@ function CharacterSheetContent() {
             spellData: updatedSpellData,
             hitDice: updatedHitDice,
             classFeatureSkillsUsage: updatedClassFeatureSkillsUsage,
+            innateSpells: updatedInnateSpells,
             exhaustion: Math.max(0, (character.exhaustion || 0) - 1), // Reduce exhaustion by 1 (minimum 0)
             deathSaves: { successes: 0, failures: 0 }, // Reset death saves on long rest
           }
@@ -2691,24 +2721,15 @@ function CharacterSheetContent() {
         silver: 0,
         copper: 0,
       },
-      equipmentProficiencies: characterData.equipmentProficiencies || {
-        lightArmor: false,
-        mediumArmor: false,
-        heavyArmor: false,
-        shields: false,
-        simpleWeapons: false,
-        martialWeapons: false,
-        firearms: false,
-        handCrossbows: false,
-        longswords: false,
-        rapiers: false,
-        shortswords: false,
-        scimitars: false,
-        lightCrossbows: false,
-        darts: false,
-        slings: false,
-        quarterstaffs: false,
-      },
+      equipmentProficiencies: {
+        lightArmor: false, mediumArmor: false, heavyArmor: false, shields: false,
+        simpleWeapons: false, martialWeapons: false, firearms: false,
+        handCrossbows: false, longswords: false, rapiers: false, shortswords: false,
+        scimitars: false, lightCrossbows: false, longbows: false, shortbows: false,
+        darts: false, slings: false, quarterstaffs: false,
+        warhammers: false, battleaxes: false, handaxes: false, lightHammers: false,
+        ...(characterData.equipmentProficiencies || {}),
+      } as any,
       personalityTraits: "",
       ideals: "",
       bonds: "",
@@ -2912,6 +2933,18 @@ function CharacterSheetContent() {
     triggerAutoSave()
   }
 
+  const renameFeatSpellSlot = (featIndex: number, newName: string) => {
+    if (!activeCharacter) return
+    const updatedSpellData = {
+      ...activeCharacter.spellData,
+      featSpellSlots: activeCharacter.spellData.featSpellSlots.map((feat, index) =>
+        index === featIndex ? { ...feat, spellName: newName } : feat
+      ),
+    }
+    updateCharacter({ spellData: updatedSpellData })
+    triggerAutoSave()
+  }
+
   const getFeatureUsesPerLongRest = (feature: any): number => {
     if (typeof feature.usesPerLongRest === 'number') {
       return Math.max(0, feature.usesPerLongRest)
@@ -3060,6 +3093,42 @@ function CharacterSheetContent() {
 
     updateCharacter({ weapons: updatedWeapons })
     triggerAutoSave()
+  }
+
+  const toggleWeaponEquipped = (weaponIndex: number) => {
+    if (!activeCharacter?.weapons) return
+    const updatedWeapons = activeCharacter.weapons.map((w, i) =>
+      i === weaponIndex ? { ...w, equipped: w.equipped === false ? true : false } : w
+    )
+    updateCharacter({ weapons: updatedWeapons })
+    triggerAutoSave()
+  }
+
+  const toggleArmorEquipped = (armorIndex: number) => {
+    if (!activeCharacter) return
+    const updatedArmor = (activeCharacter.armor || []).map((item, i) =>
+      i === armorIndex ? { ...item, equipped: !item.equipped } : item
+    )
+    const newAC = calculateArmorClass({ ...activeCharacter, armor: updatedArmor })
+    updateCharacter({ armor: updatedArmor, armorClass: newAC })
+    triggerAutoSave()
+  }
+
+  const handleArmorUpdate = (updates: Partial<CharacterData>) => {
+    if (!activeCharacter) return
+    const updatedArmor = updates.armor ?? activeCharacter.armor ?? []
+    const newAC = calculateArmorClass({ ...activeCharacter, armor: updatedArmor })
+    updateCharacter({ ...updates, armorClass: newAC })
+  }
+
+  const handleDefensesUpdate = (updates: { darkvision?: number | null; damageResistances?: string[]; damageImmunities?: string[]; conditionImmunities?: string[] }) => {
+    if (!activeCharacter) return
+    updateCharacter(updates as Partial<CharacterData>)
+  }
+
+  const handleInnateSpellsUpdate = (innateSpells: InnateSpell[]) => {
+    if (!activeCharacter) return
+    updateCharacter({ innateSpells })
   }
 
   const toggleDeathSave = (type: 'successes' | 'failures', index: number) => {
@@ -3591,6 +3660,7 @@ function CharacterSheetContent() {
               onToggleHitDie={toggleHitDie}
               onToggleDeathSave={toggleDeathSave}
               onUpdateFeatureUsage={updateFeatureUsage}
+              onDefensesEdit={() => setDefensesModalOpen(true)}
               canEdit={canEditActiveCharacter}
               isLoading={isCharacterDataLoading}
             />
@@ -3599,6 +3669,15 @@ function CharacterSheetContent() {
               character={activeCharacter}
               onEdit={() => setWeaponsModalOpen(true)}
               onToggleAmmunition={toggleAmmunition}
+              onToggleEquipped={toggleWeaponEquipped}
+              canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
+            />
+
+            <Armor
+              character={activeCharacter}
+              onEdit={() => setArmorModalOpen(true)}
+              onToggleEquipped={toggleArmorEquipped}
               canEdit={canEditActiveCharacter}
               isLoading={isCharacterDataLoading}
             />
@@ -3625,8 +3704,10 @@ function CharacterSheetContent() {
               onOpenSpellList={() => setSpellListModalOpen(true)}
               onToggleSpellSlot={toggleSpellSlot}
               onToggleFeatSpellSlot={toggleFeatSpellSlot}
+              onRenameFeatSpellSlot={renameFeatSpellSlot}
               hasSpellcastingAbilities={hasSpellcastingAbilities}
               onUpdateFeatureUsage={updateFeatureUsage}
+              onInnateSpellsEdit={() => setInnateSpellsModalOpen(true)}
               canEdit={canEditActiveCharacter}
               isLoading={isCharacterDataLoading}
             />
@@ -3797,6 +3878,18 @@ function CharacterSheetContent() {
         character={activeCharacter}
         onSave={updateCharacter}
       />
+      <ArmorModal
+        isOpen={armorModalOpen}
+        onClose={() => setArmorModalOpen(false)}
+        character={activeCharacter}
+        onSave={handleArmorUpdate}
+      />
+      <DefensesModal
+        isOpen={defensesModalOpen}
+        onClose={() => setDefensesModalOpen(false)}
+        character={activeCharacter}
+        onSave={handleDefensesUpdate}
+      />
       <InfusionsModal
         isOpen={infusionsModalOpen}
         onClose={() => setInfusionsModalOpen(false)}
@@ -3832,12 +3925,14 @@ function CharacterSheetContent() {
         onClose={() => setFeatsModalOpen(false)}
         character={activeCharacter}
         onSave={updateCharacter}
+        onOpenSpellEditor={() => { setFeatsModalOpen(false); setSpellModalOpen(true) }}
       />
       <SpellModal
         isOpen={spellModalOpen}
         onClose={() => setSpellModalOpen(false)}
         character={activeCharacter}
         onSave={updateSpellData}
+        onSaveInnateSpells={handleInnateSpellsUpdate}
       />
       <SpellListModal
         isOpen={spellListModalOpen}

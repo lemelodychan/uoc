@@ -64,9 +64,15 @@ export interface CharacterData {
     ideals?: Array<{ number: number; text: string }>
     bonds?: Array<{ number: number; text: string }>
     flaws?: Array<{ number: number; text: string }>
+    background_feature?: {
+      name?: string
+      description?: string
+      passive_bonuses?: Record<string, any> | null
+    }
   }
   race: string // Legacy field - kept for backward compatibility, use raceIds instead
   raceIds?: Array<{id: string, isMain: boolean}> // Array of up to 2 race objects with main status
+  racesData?: Array<{ id: string; features?: any[] | null }> // Loaded race data for passive bonuses
   alignment: string
   // User ownership and visibility
   userId?: string
@@ -122,6 +128,7 @@ export interface CharacterData {
     weaponProperties?: string[]
     maxAmmunition?: number // Maximum ammunition (0 = no tracking)
     usedAmmunition?: number // Number of ammunition used (0 to maxAmmunition)
+    equipped?: boolean // Whether the weapon is currently equipped (affects passive bonuses)
   }>
   weaponNotes: string
   features: Array<{
@@ -173,6 +180,7 @@ export interface CharacterData {
     name: string
     description: string
     featId?: string // ID of the feat from the library (if selected from library)
+    passiveBonuses?: Record<string, any> | null // passive_bonuses from FeatData, for getPassiveBonuses()
     choices?: {
       abilityChoices?: string[]
       skillChoices?: string[]
@@ -234,6 +242,30 @@ export interface CharacterData {
     enabledAtLevel?: number
     lastUpdated?: string // ISO timestamp
   }>
+
+  // -----------------------------------------------------------------------
+  // Defenses & senses (populated from racial traits, feats, class features)
+  // -----------------------------------------------------------------------
+
+  /** Darkvision range in feet. Undefined / null = no darkvision. */
+  darkvision?: number | null
+  /** Damage types the character is vulnerable to (takes double damage) */
+  damageVulnerabilities?: string[]
+  /** Damage types the character resists (takes half damage) */
+  damageResistances?: string[]
+  /** Damage types the character is immune to */
+  damageImmunities?: string[]
+  /** Conditions the character is immune to */
+  conditionImmunities?: string[]
+  /** Spells granted outside of spell slots (racial, feat, class feature) */
+  innateSpells?: InnateSpell[]
+
+  // -----------------------------------------------------------------------
+  // Armor items (structured list; AC is derived from equipped items)
+  // -----------------------------------------------------------------------
+
+  /** Worn armor pieces. Only items with equipped=true affect AC. */
+  armor?: ArmorItem[]
 }
 
 export type ProficiencyLevel = "none" | "proficient" | "expertise"
@@ -257,22 +289,83 @@ export interface ToolProficiency {
 }
 
 export interface EquipmentProficiencies {
+  // Armor categories
   lightArmor: boolean
   mediumArmor: boolean
   heavyArmor: boolean
   shields: boolean
+  // Weapon categories
   simpleWeapons: boolean
   martialWeapons: boolean
+  // Ranged / exotic
   firearms: boolean
+  // Specific weapons – caster / light builds
   handCrossbows: boolean
+  lightCrossbows: boolean
+  longbows: boolean
+  shortbows: boolean
+  darts: boolean
+  slings: boolean
+  // Specific weapons – finesse / martial builds
   longswords: boolean
   rapiers: boolean
   shortswords: boolean
   scimitars: boolean
-  lightCrossbows: boolean
-  darts: boolean
-  slings: boolean
   quarterstaffs: boolean
+  // Specific weapons – dwarf racial / heavy builds
+  warhammers: boolean
+  battleaxes: boolean
+  handaxes: boolean
+  lightHammers: boolean
+}
+
+// -----------------------------------------------------------------------
+// Armor item (worn equipment that contributes to AC calculation)
+// -----------------------------------------------------------------------
+
+export type ArmorType = 'light' | 'medium' | 'heavy' | 'shield' | 'natural' | 'mage_armor' | 'custom'
+
+export interface ArmorItem {
+  id: string
+  name: string
+  armorType: ArmorType
+  baseAC: number
+  /** Whether the wearer's DEX modifier is added to AC */
+  addDexModifier: boolean
+  /** Maximum DEX bonus applied (null = unlimited). Medium armor = 2, heavy = 0 */
+  dexCap?: number | null
+  /** Enhancement bonus from magic armor (+1, +2, +3) */
+  magicBonus?: number
+  /** True if this armor imposes Stealth disadvantage */
+  stealthDisadvantage?: boolean
+  /** Minimum Strength score required (violation = -10 speed) */
+  strengthRequirement?: number
+  /** Only equipped items are factored into AC calculation */
+  equipped: boolean
+  notes?: string
+}
+
+// -----------------------------------------------------------------------
+// Innate spells (granted by race, feat, or class feature outside spell slots)
+// -----------------------------------------------------------------------
+
+export interface InnateSpell {
+  name: string
+  /** Spell level; 0 = cantrip */
+  spellLevel: number
+  /** Number of uses per day, or 'at_will' for unlimited */
+  usesPerDay: number | 'at_will'
+  /** Current uses remaining (tracked at runtime; not relevant for at_will) */
+  currentUses?: number
+  /** Spellcasting ability override (e.g. 'charisma'). Falls back to class default if omitted */
+  castingAbility?: string
+  /** Origin of the grant */
+  source: 'race' | 'feat' | 'class_feature' | 'other'
+  /** Human-readable name of the granting source (e.g. 'Tiefling', 'Magic Initiate') */
+  sourceName?: string
+  concentration?: boolean
+  /** When limited uses reset: long_rest (default) or short_rest */
+  resetOn?: 'long_rest' | 'short_rest'
 }
 
 export interface EldritchCannon {
@@ -323,6 +416,10 @@ export interface FeatSpellSlot {
   featName: string // e.g., "Fey Touched", "Magic Initiate"
   usesPerLongRest: number
   currentUses: number
+  /** Spellcasting ability override. Falls back to character's class default if omitted */
+  castingAbility?: string
+  /** When this slot refreshes. Defaults to 'long_rest' */
+  resetOn?: 'long_rest' | 'short_rest' | 'dawn' | 'at_will'
 }
 
 export interface Infusion {
@@ -441,17 +538,55 @@ export const checkPassiveBonusFromFeatures = (
   bonusType: string,
   condition: string
 ): boolean => {
-  // Check classFeatureSkillsUsage for features that declare passive bonuses
-  if (!character.classFeatureSkillsUsage) return false
-  for (const [, usage] of Object.entries(character.classFeatureSkillsUsage)) {
-    const passiveBonuses = (usage as any)?.passiveBonuses
-    if (passiveBonuses && passiveBonuses[bonusKey]) {
-      const bonus = passiveBonuses[bonusKey]
-      if (bonus.type === bonusType && bonus.condition === condition) {
-        return true
+  // 1. Check classFeatureSkillsUsage for features that declare passive bonuses
+  if (character.classFeatureSkillsUsage) {
+    for (const [, usage] of Object.entries(character.classFeatureSkillsUsage)) {
+      const passiveBonuses = (usage as any)?.passiveBonuses
+      if (passiveBonuses && passiveBonuses[bonusKey]) {
+        const bonus = passiveBonuses[bonusKey]
+        if (bonus.type === bonusType && bonus.condition === condition) {
+          return true
+        }
       }
     }
   }
+
+  // 2. Check feat passive bonuses
+  if (character.feats) {
+    for (const feat of character.feats) {
+      if (feat.passiveBonuses?.[bonusKey]) {
+        const bonus = feat.passiveBonuses[bonusKey]
+        if (bonus.type === bonusType && bonus.condition === condition) {
+          return true
+        }
+      }
+    }
+  }
+
+  // 3. Check background feature passive bonuses
+  if (character.backgroundData?.background_feature?.passive_bonuses?.[bonusKey]) {
+    const bonus = character.backgroundData.background_feature.passive_bonuses[bonusKey]
+    if (bonus.type === bonusType && bonus.condition === condition) {
+      return true
+    }
+  }
+
+  // 4. Check race feature passive bonuses
+  if (character.racesData) {
+    for (const raceData of character.racesData) {
+      if (raceData.features) {
+        for (const feature of raceData.features) {
+          if (feature?.passive_bonuses?.[bonusKey]) {
+            const bonus = feature.passive_bonuses[bonusKey]
+            if (bonus.type === bonusType && bonus.condition === condition) {
+              return true
+            }
+          }
+        }
+      }
+    }
+  }
+
   return false
 }
 
@@ -1554,6 +1689,49 @@ export const getMulticlassSavingThrowProficiencies = (classes: CharacterClass[])
   return result
 }
 
+/**
+ * Convert the database TEXT[] format (e.g. ['Light Armor', 'Simple Weapons'])
+ * into the EquipmentProficiencies boolean object.
+ */
+export const convertDbEquipmentProfs = (dbProfs: string[]): Partial<EquipmentProficiencies> => {
+  const labelToKey: Record<string, Array<keyof EquipmentProficiencies>> = {
+    'Light Armor':      ['lightArmor'],
+    'Medium Armor':     ['mediumArmor'],
+    'Heavy Armor':      ['heavyArmor'],
+    'All Armor':        ['lightArmor', 'mediumArmor', 'heavyArmor'],
+    'Shields':          ['shields'],
+    'Simple Weapons':   ['simpleWeapons'],
+    'Martial Weapons':  ['martialWeapons'],
+    'Firearms':         ['firearms'],
+    'Hand Crossbows':   ['handCrossbows'],
+    'Light Crossbows':  ['lightCrossbows'],
+    'Longbows':         ['longbows'],
+    'Shortbows':        ['shortbows'],
+    'Darts':            ['darts'],
+    'Slings':           ['slings'],
+    'Quarterstaffs':    ['quarterstaffs'],
+    'Longswords':       ['longswords'],
+    'Rapiers':          ['rapiers'],
+    'Shortswords':      ['shortswords'],
+    'Scimitars':        ['scimitars'],
+    'Warhammers':       ['warhammers'],
+    'Battleaxes':       ['battleaxes'],
+    'Handaxes':         ['handaxes'],
+    'Light Hammers':    ['lightHammers'],
+    // Specific weapons that are subsets of broader categories — map to the closest key
+    'Daggers':          ['simpleWeapons'],
+    'Heavy Crossbows':  ['martialWeapons'],
+  }
+  const result: Partial<EquipmentProficiencies> = {}
+  for (const entry of dbProfs) {
+    const keys = labelToKey[entry]
+    if (keys) {
+      for (const key of keys) result[key] = true
+    }
+  }
+  return result
+}
+
 // Get equipment proficiencies from all classes
 export const getMulticlassEquipmentProficiencies = (classes: CharacterClass[]): EquipmentProficiencies => {
   // Hardcoded fallback map
@@ -1661,28 +1839,34 @@ export const getMulticlassEquipmentProficiencies = (classes: CharacterClass[]): 
     shortswords: false,
     scimitars: false,
     lightCrossbows: false,
+    longbows: false,
+    shortbows: false,
     darts: false,
     slings: false,
-    quarterstaffs: false
+    quarterstaffs: false,
+    warhammers: false,
+    battleaxes: false,
+    handaxes: false,
+    lightHammers: false
   }
 
   // Combine proficiencies from all classes
   for (const charClass of classes) {
+    let classProficiencies: Partial<EquipmentProficiencies>
     // Data-driven: read from classData.equipment_proficiencies if available
     if (charClass.classData?.equipment_proficiencies) {
+      // DB returns TEXT[] — convert to boolean object
       const dbProfs = charClass.classData.equipment_proficiencies
-      for (const [key, value] of Object.entries(dbProfs)) {
-        if (value && key in proficiencies) {
-          (proficiencies as any)[key] = true
-        }
-      }
+      classProficiencies = Array.isArray(dbProfs)
+        ? convertDbEquipmentProfs(dbProfs as string[])
+        : dbProfs as Partial<EquipmentProficiencies>
     } else {
       // Hardcoded fallback
-      const classProficiencies = classEquipment[charClass.name.toLowerCase()] || {}
-      for (const [key, value] of Object.entries(classProficiencies)) {
-        if (value && key in proficiencies) {
-          (proficiencies as any)[key] = true
-        }
+      classProficiencies = classEquipment[charClass.name.toLowerCase()] || {}
+    }
+    for (const [key, value] of Object.entries(classProficiencies)) {
+      if (value && key in proficiencies) {
+        (proficiencies as any)[key] = true
       }
     }
   }

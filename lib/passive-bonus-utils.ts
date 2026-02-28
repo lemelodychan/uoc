@@ -14,18 +14,44 @@ import { calculateModifier, calculateProficiencyBonus } from './character-data'
 import type { PassiveBonuses, ACCalculationBonus, SkillPassiveBonus, ToolPassiveBonus } from './class-feature-types'
 
 /**
- * Collect all passive bonuses from a character's loaded class feature skills.
+ * Collect all passive bonuses from a character's loaded class feature skills,
+ * equipped feats, and background feature.
  * Returns an array of { featureId, bonuses } for all features that have passive_bonuses.
  */
 export function getPassiveBonuses(character: CharacterData): Array<{ featureId: string; bonuses: PassiveBonuses }> {
   const result: Array<{ featureId: string; bonuses: PassiveBonuses }> = []
 
-  if (!character.classFeatureSkillsUsage) return result
+  // Class feature passive bonuses (from classFeatureSkillsUsage)
+  if (character.classFeatureSkillsUsage) {
+    for (const [featureId, usage] of Object.entries(character.classFeatureSkillsUsage)) {
+      const passiveBonuses = (usage as any)?.passiveBonuses
+      if (passiveBonuses && typeof passiveBonuses === 'object') {
+        result.push({ featureId, bonuses: passiveBonuses as PassiveBonuses })
+      }
+    }
+  }
 
-  for (const [featureId, usage] of Object.entries(character.classFeatureSkillsUsage)) {
-    const passiveBonuses = (usage as any)?.passiveBonuses
-    if (passiveBonuses && typeof passiveBonuses === 'object') {
-      result.push({ featureId, bonuses: passiveBonuses as PassiveBonuses })
+  // Feat passive bonuses (stored on each feat entry when applied)
+  for (const feat of character.feats || []) {
+    if (feat.passiveBonuses && typeof feat.passiveBonuses === 'object') {
+      const id = `feat_${feat.featId ?? feat.name.toLowerCase().replace(/\s+/g, '_')}`
+      result.push({ featureId: id, bonuses: feat.passiveBonuses as PassiveBonuses })
+    }
+  }
+
+  // Background feature passive bonuses
+  const bgFeature = character.backgroundData?.background_feature
+  if (bgFeature?.passive_bonuses && typeof bgFeature.passive_bonuses === 'object') {
+    result.push({ featureId: `background_feature_${character.backgroundId ?? 'bg'}`, bonuses: bgFeature.passive_bonuses as PassiveBonuses })
+  }
+
+  // Race feature passive bonuses
+  for (const raceData of character.racesData || []) {
+    for (const feature of raceData.features || []) {
+      if (feature?.passive_bonuses && typeof feature.passive_bonuses === 'object') {
+        const slug = (feature.name ?? 'unknown').toLowerCase().replace(/\s+/g, '_')
+        result.push({ featureId: `race_feature_${raceData.id}_${slug}`, bonuses: feature.passive_bonuses as PassiveBonuses })
+      }
     }
   }
 
@@ -113,6 +139,62 @@ function evaluateACFormula(formula: string, character: CharacterData): number {
   }
 
   return result
+}
+
+/**
+ * Calculate the total Armor Class for a character.
+ * Considers equipped armor items, shields (including magic bonus), and class feature
+ * AC formulas (e.g., Monk / Barbarian Unarmored Defense).
+ */
+export function calculateArmorClass(character: CharacterData): number {
+  const dexMod = calculateModifier(character.dexterity)
+  const armor = character.armor || []
+  const equippedNonShield = armor.filter(a => a.equipped && a.armorType !== 'shield')
+  const equippedShield = armor.find(a => a.equipped && a.armorType === 'shield')
+  const shieldBonus = equippedShield ? 2 + (equippedShield.magicBonus || 0) : 0
+  const hasArmor = equippedNonShield.length > 0
+  const hasShield = !!equippedShield
+
+  // Compute armor-based AC
+  let armorBasedAC: number
+  if (hasArmor) {
+    armorBasedAC =
+      Math.max(
+        ...equippedNonShield.map(a => {
+          let ac = a.baseAC + (a.magicBonus || 0)
+          if (a.addDexModifier) {
+            const cap = a.dexCap !== null && a.dexCap !== undefined ? a.dexCap : Infinity
+            ac += Math.min(dexMod, cap)
+          }
+          return ac
+        })
+      ) + shieldBonus
+  } else {
+    armorBasedAC = 10 + dexMod + shieldBonus
+  }
+
+  // Check class feature AC bonuses (Monk, Barbarian Unarmored Defense, etc.)
+  const allBonuses = getPassiveBonuses(character)
+  const acBonuses = allBonuses
+    .filter(b => b.bonuses.ac_calculation)
+    .map(b => b.bonuses.ac_calculation!)
+
+  if (acBonuses.length === 0) return armorBasedAC
+
+  let bestAC = armorBasedAC
+  for (const acBonus of acBonuses) {
+    if (acBonus.condition === 'no_armor' && hasArmor) continue
+    if (acBonus.condition === 'no_armor_no_shield' && (hasArmor || hasShield)) continue
+
+    const calculatedAC = evaluateACFormula(acBonus.formula, character)
+    let totalAC = calculatedAC
+    if (acBonus.allows_shield && hasShield) {
+      totalAC += 2 + (equippedShield?.magicBonus || 0)
+    }
+    if (totalAC > bestAC) bestAC = totalAC
+  }
+
+  return bestAC
 }
 
 /**

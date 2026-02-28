@@ -7,7 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Icon } from "@iconify/react"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { PassiveBonusesEditor } from "@/components/ui/passive-bonuses-editor"
+import { PrerequisitesEditor } from "@/components/ui/prerequisites-editor"
 import type { FeatData } from "@/lib/database"
+import type { PassiveBonuses } from "@/lib/class-feature-types"
 import { useToast } from "@/hooks/use-toast"
 import { ProficiencyCheckboxes, SKILL_OPTIONS, EQUIPMENT_OPTIONS } from "@/components/ui/proficiency-checkboxes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -79,6 +82,290 @@ const WEAPON_OPTIONS = [
   { value: 'quarterstaffs', label: 'Quarterstaffs', category: 'weapon' }
 ]
 
+// ── Spell Grant ────────────────────────────────────────────────────────────
+
+const SPELL_SCHOOLS = [
+  'Abjuration', 'Conjuration', 'Divination', 'Enchantment',
+  'Evocation', 'Illusion', 'Necromancy', 'Transmutation',
+]
+const SPELL_CLASSES = [
+  'Artificer', 'Bard', 'Cleric', 'Druid', 'Paladin',
+  'Ranger', 'Sorcerer', 'Warlock', 'Wizard',
+]
+
+interface SpellLibraryEntry {
+  id: string
+  name: string
+  level: number
+  school: string
+  classes: string[]
+}
+
+interface GrantedSpell {
+  id: string
+  mode: 'library' | 'choice' | 'custom'
+  // library
+  spellId?: string
+  name?: string
+  spellLevel?: number
+  // choice
+  criteria?: { maxLevel?: number; school?: string; classes?: string[] }
+  placeholderName?: string
+  // custom
+  customName?: string
+  customLevel?: number
+  // per-spell casting config
+  usesPerLongRest: number
+  resetOn: 'long_rest' | 'short_rest' | 'dawn' | 'at_will'
+}
+
+interface SpellGrantEntryProps {
+  spell: GrantedSpell
+  spellLibrary: SpellLibraryEntry[]
+  canEdit: boolean
+  onUpdate: (updated: GrantedSpell) => void
+  onRemove: () => void
+}
+
+function SpellGrantEntry({ spell, spellLibrary, canEdit, onUpdate, onRemove }: SpellGrantEntryProps) {
+  const [search, setSearch] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  const filtered = search.length >= 2
+    ? spellLibrary.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).slice(0, 12)
+    : []
+
+  return (
+    <div className="p-3 border rounded-lg bg-background space-y-2">
+      <div className="flex items-start gap-2">
+        <div className="flex-1 space-y-2">
+          {/* Row 1: mode + uses + reset */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">Spell Mode</Label>
+              <Select
+                value={spell.mode || 'library'}
+                onValueChange={v => onUpdate({ ...spell, mode: v as GrantedSpell['mode'] })}
+                disabled={!canEdit}
+              >
+                <SelectTrigger className="text-xs h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="library">Library Spell</SelectItem>
+                  <SelectItem value="choice">Player's Choice</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">Uses</Label>
+              <Input
+                type="number"
+                value={spell.usesPerLongRest ?? 1}
+                onChange={e => onUpdate({ ...spell, usesPerLongRest: Math.max(0, parseInt(e.target.value) || 1) })}
+                className="text-xs h-8"
+                min="0"
+                disabled={!canEdit}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">Resets On</Label>
+              <Select
+                value={spell.resetOn || 'long_rest'}
+                onValueChange={v => onUpdate({ ...spell, resetOn: v as GrantedSpell['resetOn'] })}
+                disabled={!canEdit}
+              >
+                <SelectTrigger className="text-xs h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="long_rest">Long Rest</SelectItem>
+                  <SelectItem value="short_rest">Short Rest</SelectItem>
+                  <SelectItem value="dawn">Dawn</SelectItem>
+                  <SelectItem value="at_will">At Will</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Row 2: spell-specific fields */}
+          {spell.mode === 'library' && (
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">Spell from Library</Label>
+              <div className="relative">
+                <Input
+                  value={search || (spell.name ? '' : '')}
+                  placeholder={spell.name ? spell.name : 'Search spell library…'}
+                  onChange={e => { setSearch(e.target.value); setShowDropdown(true) }}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                  className="text-xs h-8"
+                  disabled={!canEdit}
+                />
+                {showDropdown && filtered.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-md bg-popover shadow-md max-h-48 overflow-y-auto">
+                    {filtered.map(s => (
+                      <div
+                        key={s.id}
+                        className="px-3 py-1.5 text-xs hover:bg-accent cursor-pointer flex items-center justify-between"
+                        onMouseDown={() => {
+                          onUpdate({ ...spell, name: s.name, spellId: s.id, spellLevel: s.level })
+                          setSearch('')
+                          setShowDropdown(false)
+                        }}
+                      >
+                        <span>{s.name}</span>
+                        <span className="text-muted-foreground ml-2">Lv {s.level} · {s.school}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {spell.name && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Badge variant="secondary" className="text-xs">
+                    {spell.name}
+                    {spell.spellLevel !== undefined && ` (Lv ${spell.spellLevel})`}
+                  </Badge>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdate({ ...spell, name: undefined, spellId: undefined, spellLevel: undefined })}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Icon icon="lucide:x" className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {spell.mode === 'choice' && (
+            <div className="space-y-2 p-2 border rounded bg-muted/30">
+              <Label className="text-xs font-medium">Player Choice Criteria</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Max Spell Level</Label>
+                  <Input
+                    type="number"
+                    value={spell.criteria?.maxLevel ?? ''}
+                    onChange={e => {
+                      const val = parseInt(e.target.value)
+                      onUpdate({ ...spell, criteria: { ...(spell.criteria || {}), maxLevel: isNaN(val) ? undefined : val } })
+                    }}
+                    placeholder="Any"
+                    className="text-xs h-7"
+                    min="0"
+                    max="9"
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">School</Label>
+                  <Select
+                    value={spell.criteria?.school || 'any'}
+                    onValueChange={v => onUpdate({ ...spell, criteria: { ...(spell.criteria || {}), school: v === 'any' ? undefined : v } })}
+                    disabled={!canEdit}
+                  >
+                    <SelectTrigger className="text-xs h-7">
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any School</SelectItem>
+                      {SPELL_SCHOOLS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Display Name</Label>
+                  <Input
+                    value={spell.placeholderName || ''}
+                    onChange={e => onUpdate({ ...spell, placeholderName: e.target.value })}
+                    placeholder="e.g. 1st-level spell"
+                    className="text-xs h-7"
+                    disabled={!canEdit}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-muted-foreground">Limit to Classes (optional)</Label>
+                <div className="flex flex-wrap gap-1">
+                  {SPELL_CLASSES.map(cls => {
+                    const selected = (spell.criteria?.classes || []).includes(cls)
+                    return (
+                      <button
+                        key={cls}
+                        type="button"
+                        onClick={() => {
+                          if (!canEdit) return
+                          const current = spell.criteria?.classes || []
+                          const updated = selected
+                            ? current.filter((c: string) => c !== cls)
+                            : [...current, cls]
+                          onUpdate({ ...spell, criteria: { ...(spell.criteria || {}), classes: updated.length > 0 ? updated : undefined } })
+                        }}
+                        className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+                          selected
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'border-border hover:bg-accent'
+                        } ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        {cls}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {spell.mode === 'custom' && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Spell Name</Label>
+                <Input
+                  value={spell.customName || ''}
+                  onChange={e => onUpdate({ ...spell, customName: e.target.value, name: e.target.value })}
+                  placeholder="e.g. Silvery Barbs"
+                  className="text-xs h-8"
+                  disabled={!canEdit}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Spell Level</Label>
+                <Input
+                  type="number"
+                  value={spell.customLevel ?? 0}
+                  onChange={e => onUpdate({ ...spell, customLevel: parseInt(e.target.value) || 0 })}
+                  className="text-xs h-8"
+                  min="0"
+                  max="9"
+                  disabled={!canEdit}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRemove}
+            className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 self-start mt-5"
+          >
+            <Icon icon="lucide:trash-2" className="w-3.5 h-3.5" />
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+
 export function FeatEditorPage({
   featData,
   canEdit = true,
@@ -88,12 +375,21 @@ export function FeatEditorPage({
 }: FeatEditorPageProps) {
   const [editingFeat, setEditingFeat] = useState<FeatData>(featData)
   const [isSaving, setIsSaving] = useState(false)
+  const [spellLibrary, setSpellLibrary] = useState<SpellLibraryEntry[]>([])
   const { toast } = useToast()
 
   // Update local state when featData prop changes
   useEffect(() => {
     setEditingFeat(featData)
   }, [featData])
+
+  // Load spell library once for the spell_grant feature editor
+  useEffect(() => {
+    fetch('/api/spells')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setSpellLibrary(data) })
+      .catch(() => {})
+  }, [])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -1235,10 +1531,20 @@ export function FeatEditorPage({
                         value={feature.featureType || 'trait'}
                         onValueChange={(value) => {
                           const updated = [...(editingFeat.special_features || [])]
-                          updated[index] = { 
-                            ...updated[index], 
-                            featureType: value,
-                            config: value === 'trait' ? undefined : getDefaultConfigForType(value)
+                          if (value === 'spell_grant') {
+                            updated[index] = {
+                              ...updated[index],
+                              featureType: 'spell_grant',
+                              config: undefined,
+                              spells: updated[index].spells ?? [],
+                              castingAbility: updated[index].castingAbility,
+                            }
+                          } else {
+                            updated[index] = {
+                              ...updated[index],
+                              featureType: value,
+                              config: value === 'trait' ? undefined : getDefaultConfigForType(value),
+                            }
                           }
                           setEditingFeat(prev => ({ ...prev, special_features: updated }))
                         }}
@@ -1249,6 +1555,7 @@ export function FeatEditorPage({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="trait">Trait (Simple)</SelectItem>
+                          <SelectItem value="spell_grant">Spell Grant</SelectItem>
                           <SelectItem value="slots">Slots (Usage Tracking)</SelectItem>
                           <SelectItem value="points_pool">Points Pool</SelectItem>
                           <SelectItem value="options_list">Options List</SelectItem>
@@ -1258,8 +1565,31 @@ export function FeatEditorPage({
                         </SelectContent>
                       </Select>
                     </div>
+                    {['slots', 'points_pool', 'availability_toggle'].includes(feature.featureType) && (
+                      <div className="flex flex-col gap-2">
+                        <Label>Display in</Label>
+                        <Select
+                          value={feature.category || 'combat'}
+                          onValueChange={(value) => {
+                            const updated = [...(editingFeat.special_features || [])]
+                            updated[index] = { ...updated[index], category: value }
+                            setEditingFeat(prev => ({ ...prev, special_features: updated }))
+                          }}
+                          disabled={!canEdit}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="combat">Combat Feat Skills</SelectItem>
+                            <SelectItem value="spell">Feat Spells</SelectItem>
+                            <SelectItem value="trait">Traits</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
-                  
+
                   <div className="flex flex-col gap-2">
                     <Label>Description</Label>
                     <RichTextEditor
@@ -1381,8 +1711,8 @@ export function FeatEditorPage({
                           checked={feature.config?.defaultAvailable ?? true}
                           onCheckedChange={(checked) => {
                             const updated = [...(editingFeat.special_features || [])]
-                            updated[index] = { 
-                              ...updated[index], 
+                            updated[index] = {
+                              ...updated[index],
                               config: { ...updated[index].config, defaultAvailable: checked as boolean }
                             }
                             setEditingFeat(prev => ({ ...prev, special_features: updated }))
@@ -1390,6 +1720,92 @@ export function FeatEditorPage({
                           disabled={!canEdit}
                         />
                         <Label className="text-xs">Default Available</Label>
+                      </div>
+                    </div>
+                  )}
+
+                  {feature.featureType === 'spell_grant' && (
+                    <div className="p-3 border rounded-lg bg-muted/50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Spell Grant Configuration</Label>
+                      </div>
+
+                      {/* Feature-level casting ability */}
+                      <div className="flex items-center gap-3">
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Default Casting Ability:</Label>
+                        <Select
+                          value={feature.castingAbility || 'default'}
+                          onValueChange={(value) => {
+                            const updated = [...(editingFeat.special_features || [])]
+                            updated[index] = { ...updated[index], castingAbility: value === 'default' ? undefined : value }
+                            setEditingFeat(prev => ({ ...prev, special_features: updated }))
+                          }}
+                          disabled={!canEdit}
+                        >
+                          <SelectTrigger className="text-xs h-8 w-48">
+                            <SelectValue placeholder="Character default" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">Character Default</SelectItem>
+                            <SelectItem value="intelligence">Intelligence</SelectItem>
+                            <SelectItem value="wisdom">Wisdom</SelectItem>
+                            <SelectItem value="charisma">Charisma</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Spells list */}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium">Granted Spells</Label>
+                        {(feature.spells || []).length === 0 && (
+                          <p className="text-xs text-muted-foreground">No spells added yet. Click "Add Spell" below.</p>
+                        )}
+                        {(feature.spells || []).map((spell: GrantedSpell, spellIndex: number) => (
+                          <SpellGrantEntry
+                            key={spell.id || spellIndex}
+                            spell={spell}
+                            spellLibrary={spellLibrary}
+                            canEdit={canEdit}
+                            onUpdate={(updated) => {
+                              const updatedFeatures = [...(editingFeat.special_features || [])]
+                              const updatedSpells = [...(updatedFeatures[index].spells || [])]
+                              updatedSpells[spellIndex] = updated
+                              updatedFeatures[index] = { ...updatedFeatures[index], spells: updatedSpells }
+                              setEditingFeat(prev => ({ ...prev, special_features: updatedFeatures }))
+                            }}
+                            onRemove={() => {
+                              const updatedFeatures = [...(editingFeat.special_features || [])]
+                              const updatedSpells = (updatedFeatures[index].spells || [])
+                                .filter((_: GrantedSpell, si: number) => si !== spellIndex)
+                              updatedFeatures[index] = { ...updatedFeatures[index], spells: updatedSpells }
+                              setEditingFeat(prev => ({ ...prev, special_features: updatedFeatures }))
+                            }}
+                          />
+                        ))}
+                        {canEdit && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const updatedFeatures = [...(editingFeat.special_features || [])]
+                              const newSpell: GrantedSpell = {
+                                id: crypto.randomUUID(),
+                                mode: 'library',
+                                usesPerLongRest: 1,
+                                resetOn: 'long_rest',
+                              }
+                              updatedFeatures[index] = {
+                                ...updatedFeatures[index],
+                                spells: [...(updatedFeatures[index].spells || []), newSpell],
+                              }
+                              setEditingFeat(prev => ({ ...prev, special_features: updatedFeatures }))
+                            }}
+                            className="text-xs"
+                          >
+                            <Icon icon="lucide:plus" className="w-3 h-3" />
+                            Add Spell
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1403,7 +1819,7 @@ export function FeatEditorPage({
               variant="outline"
               onClick={() => {
                 const newFeature = {
-                  id: globalThis.crypto.randomUUID(),
+                  id: crypto.randomUUID(),
                   title: '',
                   description: '',
                   featureType: 'trait' as const
@@ -1419,6 +1835,40 @@ export function FeatEditorPage({
               Add Special Feature
             </Button>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Passive Bonuses */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Passive Bonuses</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Mechanical effects automatically applied when this feat is equipped (AC formulas, skill bonuses, tool bonuses).
+          </p>
+        </CardHeader>
+        <CardContent>
+          <PassiveBonusesEditor
+            value={editingFeat.passive_bonuses as PassiveBonuses | null}
+            onChange={(val) => setEditingFeat(prev => ({ ...prev, passive_bonuses: val }))}
+            disabled={!canEdit}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Prerequisites */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Prerequisites</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Requirements that should be met before taking this feat. These are soft warnings — feats remain selectable regardless.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <PrerequisitesEditor
+            value={editingFeat.prerequisites ?? null}
+            onChange={(val) => setEditingFeat(prev => ({ ...prev, prerequisites: val }))}
+            disabled={!canEdit}
+          />
         </CardContent>
       </Card>
     </div>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ export function ToolsProficiencies({
   canEdit = true,
   isLoading = false
 }: ToolsProficienciesProps) {
+  const [showAllWeapons, setShowAllWeapons] = useState(false)
   if (isLoading) return <SectionCardSkeleton contentLines={6} />
   return (
     <Card className="flex flex-col gap-3">
@@ -54,75 +56,93 @@ export function ToolsProficiencies({
       <CardContent className="flex flex-col">
         <div className="flex flex-col gap-1">
           <div className="text-sm font-medium mb-2">Equipment Proficiencies</div>
-          <div className="grid grid-cols-2 gap-2">
-            {/* Column 1 */}
-            <div className="flex flex-col gap-2">
-              {[
-                { key: "lightArmor", label: "Light armour" },
-                { key: "mediumArmor", label: "Medium armour" },
-                { key: "heavyArmor", label: "Heavy armour" },
-                { key: "shields", label: "Shields" },
-              ].map((item) => (
-                <label key={item.key} className="flex items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(character.equipmentProficiencies?.[item.key as keyof typeof character.equipmentProficiencies])}
-                    onChange={(e) => {
-                      if (!canEdit) return
-                      const value = e.target.checked
-                      onUpdateEquipmentProficiencies({
-                        lightArmor: character.equipmentProficiencies?.lightArmor ?? false,
-                        mediumArmor: character.equipmentProficiencies?.mediumArmor ?? false,
-                        heavyArmor: character.equipmentProficiencies?.heavyArmor ?? false,
-                        shields: character.equipmentProficiencies?.shields ?? false,
-                        simpleWeapons: character.equipmentProficiencies?.simpleWeapons ?? false,
-                        martialWeapons: character.equipmentProficiencies?.martialWeapons ?? false,
-                        firearms: character.equipmentProficiencies?.firearms ?? false,
-                        [item.key]: value,
-                      })
-                      onTriggerAutoSave()
-                    }}
-                    disabled={!canEdit}
-                    className="w-3 h-3 rounded border-border"
-                  />
-                  {item.label}
-                </label>
-              ))}
-            </div>
-            {/* Column 2 */}
-            <div className="flex flex-col gap-2">
-              {[
-                { key: "simpleWeapons", label: "Simple weapons" },
-                { key: "martialWeapons", label: "Martial weapons" },
-                { key: "firearms", label: "Firearms" },
-              ].map((item) => (
-                <label key={item.key} className="flex items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(character.equipmentProficiencies?.[item.key as keyof typeof character.equipmentProficiencies])}
-                    onChange={(e) => {
-                      if (!canEdit) return
-                      const value = e.target.checked
-                      onUpdateEquipmentProficiencies({
-                        lightArmor: character.equipmentProficiencies?.lightArmor ?? false,
-                        mediumArmor: character.equipmentProficiencies?.mediumArmor ?? false,
-                        heavyArmor: character.equipmentProficiencies?.heavyArmor ?? false,
-                        shields: character.equipmentProficiencies?.shields ?? false,
-                        simpleWeapons: character.equipmentProficiencies?.simpleWeapons ?? false,
-                        martialWeapons: character.equipmentProficiencies?.martialWeapons ?? false,
-                        firearms: character.equipmentProficiencies?.firearms ?? false,
-                        [item.key]: value,
-                      })
-                      onTriggerAutoSave()
-                    }}
-                    disabled={!canEdit}
-                    className="w-3 h-3 rounded border-border"
-                  />
-                  {item.label}
-                </label>
-              ))}
-            </div>
-          </div>
+          {(() => {
+            const profs = character.equipmentProficiencies
+            const toggle = (key: string, value: boolean) => {
+              if (!canEdit) return
+              onUpdateEquipmentProficiencies({ ...profs, [key]: value })
+              onTriggerAutoSave()
+            }
+            const row = (key: string, label: string) => (
+              <label key={key} className="flex items-center gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(profs?.[key as keyof typeof profs])}
+                  onChange={(e) => toggle(key, e.target.checked)}
+                  disabled={!canEdit}
+                  className="w-3 h-3 rounded border-border"
+                />
+                {label}
+              </label>
+            )
+            const armorRows = [
+              row("lightArmor", "Light armour"),
+              row("mediumArmor", "Medium armour"),
+              row("heavyArmor", "Heavy armour"),
+              row("shields", "Shields"),
+            ]
+            const weaponCategoryRows = [
+              row("simpleWeapons", "Simple weapons"),
+              row("martialWeapons", "Martial weapons"),
+              row("firearms", "Firearms"),
+            ]
+            const specificWeaponRows = [
+              row("handCrossbows", "Hand crossbows"),
+              row("lightCrossbows", "Light crossbows"),
+              row("longbows", "Longbows"),
+              row("shortbows", "Shortbows"),
+              row("darts", "Darts"),
+              row("slings", "Slings"),
+              row("quarterstaffs", "Quarterstaffs"),
+              row("longswords", "Longswords"),
+              row("rapiers", "Rapiers"),
+              row("shortswords", "Shortswords"),
+              row("scimitars", "Scimitars"),
+              row("warhammers", "Warhammers"),
+              row("battleaxes", "Battleaxes"),
+              row("handaxes", "Handaxes"),
+              row("lightHammers", "Light hammers"),
+            ]
+            const hasSpecific = specificWeaponRows.some((_, i) => {
+              const keys = ["handCrossbows","lightCrossbows","longbows","shortbows","darts","slings","quarterstaffs","longswords","rapiers","shortswords","scimitars","warhammers","battleaxes","handaxes","lightHammers"]
+              return Boolean(profs?.[keys[i] as keyof typeof profs])
+            })
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-2">{armorRows}</div>
+                  <div className="flex flex-col gap-2">{weaponCategoryRows}</div>
+                </div>
+                {(hasSpecific || canEdit) && (
+                  <div className="mt-2 pt-2 border-t">
+                    <div className="text-xs text-muted-foreground mb-2">Specific weapons</div>
+                    {(() => {
+                      const VISIBLE = 6
+                      const visible = showAllWeapons ? specificWeaponRows : specificWeaponRows.slice(0, VISIBLE)
+                      const half = Math.ceil(visible.length / 2)
+                      const hidden = specificWeaponRows.length - VISIBLE
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="flex flex-col gap-2">{visible.slice(0, half)}</div>
+                            <div className="flex flex-col gap-2">{visible.slice(half)}</div>
+                          </div>
+                          {specificWeaponRows.length > VISIBLE && (
+                            <button
+                              onClick={() => setShowAllWeapons(v => !v)}
+                              className="text-xs text-muted-foreground hover:text-foreground mt-2 block w-fit"
+                            >
+                              {showAllWeapons ? 'Show less' : `Show ${hidden} more`}
+                            </button>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                )}
+              </>
+            )
+          })()}
           
           {/* Tools Proficiencies */}
           {character.toolsProficiencies.length > 0 && (
@@ -263,7 +283,8 @@ export function ToolsProficiencies({
           <div className="text-sm font-medium">Equipment Inventory</div>
           <RichTextDisplay
             content={character.equipment || "No equipment listed"}
-            className={!character.equipment ? "text-muted-foreground text-center py-2" : ""}
+            className={!character.equipment ? "text-muted-foreground text-center py-2" : "text-muted-foreground"}
+            maxLines={5}
           />
         </div>
         )}

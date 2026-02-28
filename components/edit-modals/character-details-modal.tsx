@@ -8,6 +8,7 @@ import { WysiwygEditor } from "@/components/ui/wysiwyg-editor"
 import { Separator } from "@/components/ui/separator"
 import type { CharacterData } from "@/lib/character-data"
 import { loadBackgroundDetails } from "@/lib/database"
+import { RichTextDisplay } from "@/components/ui/rich-text-display"
 
 interface CharacterDetailsModalProps {
   isOpen: boolean
@@ -35,6 +36,7 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
   } | null>(null)
   const [backgroundName, setBackgroundName] = useState<string>("")
   const [definingEventsTitle, setDefiningEventsTitle] = useState<string>("Background Setup")
+  const [backgroundFeature, setBackgroundFeature] = useState<{ name: string; description: string } | null>(null)
 
   // Sync local state with character prop when it changes
   useEffect(() => {
@@ -55,8 +57,11 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
         if (background && !error) {
           setBackgroundName(background.name)
           setDefiningEventsTitle(background.defining_events_title || "Background Setup")
+          setBackgroundFeature(background.background_feature || null)
         }
       })
+    } else {
+      setBackgroundFeature(null)
     }
     // Load background_data from character if it exists
     if (character.backgroundData) {
@@ -79,11 +84,20 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
         </DialogHeader>
         <div className="grid gap-6 p-4 max-h-[50vh] overflow-y-auto">
           {/* Background Data Section */}
-          {backgroundData && (backgroundData.defining_events || backgroundData.personality_traits || backgroundData.ideals || backgroundData.bonds || backgroundData.flaws) && (
+          {(backgroundFeature || (backgroundData && (backgroundData.defining_events || backgroundData.personality_traits || backgroundData.ideals || backgroundData.bonds || backgroundData.flaws))) && (
             <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
               <Label className="text-base font-semibold">Background: {backgroundName}</Label>
-              
-              {backgroundData.defining_events && backgroundData.defining_events.length > 0 && (
+
+              {backgroundFeature && (
+                <div className="flex flex-col gap-1">
+                  <Label className="text-sm font-medium">{backgroundFeature.name}</Label>
+                  <div className="text-sm text-muted-foreground">
+                    <RichTextDisplay content={backgroundFeature.description} />
+                  </div>
+                </div>
+              )}
+
+              {backgroundData && backgroundData.defining_events && backgroundData.defining_events.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">{definingEventsTitle}</Label>
                   {backgroundData.defining_events.map((event, idx) => (
@@ -94,7 +108,7 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
                 </div>
               )}
               
-              {backgroundData.personality_traits && backgroundData.personality_traits.length > 0 && (
+              {backgroundData?.personality_traits && backgroundData.personality_traits.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">Personality Traits</Label>
                   {backgroundData.personality_traits.map((trait, idx) => (
@@ -104,8 +118,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
                   ))}
                 </div>
               )}
-              
-              {backgroundData.ideals && backgroundData.ideals.length > 0 && (
+
+              {backgroundData?.ideals && backgroundData.ideals.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">Ideals</Label>
                   {backgroundData.ideals.map((ideal, idx) => (
@@ -115,8 +129,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
                   ))}
                 </div>
               )}
-              
-              {backgroundData.bonds && backgroundData.bonds.length > 0 && (
+
+              {backgroundData?.bonds && backgroundData.bonds.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">Bonds</Label>
                   {backgroundData.bonds.map((bond, idx) => (
@@ -126,8 +140,8 @@ export function CharacterDetailsModal({ isOpen, onClose, character, onSave, canE
                   ))}
                 </div>
               )}
-              
-              {backgroundData.flaws && backgroundData.flaws.length > 0 && (
+
+              {backgroundData?.flaws && backgroundData.flaws.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium">Flaws</Label>
                     {backgroundData.flaws.map((flaw, idx) => (

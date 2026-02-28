@@ -11,10 +11,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import { SKILL_OPTIONS, EQUIPMENT_OPTIONS } from "@/components/ui/proficiency-checkboxes"
+import { PassiveBonusesEditor } from "@/components/ui/passive-bonuses-editor"
+import type { PassiveBonuses } from "@/lib/class-feature-types"
 
 /**
  * Race Feature Interface
- * 
+ *
  * For choice-type features, the options array should contain objects with:
  * - type: 'trait' | 'darkvision' | 'skill_proficiency' | 'weapon_proficiency' | 'spell'
  * - name: string (used as selection value in character creation)
@@ -23,13 +25,14 @@ import { SKILL_OPTIONS, EQUIPMENT_OPTIONS } from "@/components/ui/proficiency-ch
  *   - trait/darkvision: speed_bonus (optional number)
  *   - skill_proficiency: skill_choice ('fixed' | 'any'), skill_count (if 'any')
  *   - weapon_proficiency: weapons (string[])
- * 
+ *
  * See docs/race-choice-feature-structure.md for complete documentation
  */
 interface RaceFeature {
   name?: string
   description?: string
   feature_type?: 'skill_proficiency' | 'weapon_proficiency' | 'tool_proficiency' | 'trait' | 'spell' | 'choice' | 'feat'
+    | 'darkvision' | 'damage_resistance' | 'damage_immunity' | 'condition_immunity' | 'language_proficiency' | 'innate_spellcasting'
   feature_skill_type?: string | 'choice'
   skill_options?: string[]
   max_selections?: number
@@ -42,6 +45,21 @@ interface RaceFeature {
   refueling_die?: string
   refuelingDie?: string
   hp_bonus_per_level?: boolean // If true, adds character level to max HP (e.g., Dwarven Toughness)
+  passive_bonuses?: Record<string, any> | null
+  // Darkvision
+  darkvision_range?: number
+  // Damage resistance / immunity
+  damage_types?: string[]
+  // Condition immunity
+  condition_types?: string[]
+  // Language proficiency
+  languages?: string[]
+  // Innate spellcasting
+  spell_name?: string
+  spell_level?: number
+  uses_per_day?: number | 'at_will'
+  casting_ability?: string
+  concentration?: boolean
   options?: Array<{
     type: 'trait' | 'darkvision' | 'skill_proficiency' | 'weapon_proficiency' | 'spell'
     name: string
@@ -89,6 +107,23 @@ const COMMON_TOOLS = [
   "Thieves' Tools"
 ]
 
+const DAMAGE_TYPES = [
+  'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic',
+  'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder'
+]
+
+const CONDITION_TYPES = [
+  'blinded', 'charmed', 'deafened', 'exhaustion', 'frightened',
+  'grappled', 'incapacitated', 'invisible', 'paralyzed', 'petrified',
+  'poisoned', 'prone', 'restrained', 'stunned', 'unconscious'
+]
+
+const COMMON_LANGUAGES = [
+  'Common', 'Dwarvish', 'Elvish', 'Giant', 'Gnomish', 'Goblin', 'Halfling',
+  'Orc', 'Abyssal', 'Celestial', 'Deep Speech', 'Draconic', 'Infernal',
+  'Primordial', 'Sylvan', 'Undercommon'
+]
+
 export function RaceFeatureEditModal({ 
   isOpen, 
   onClose, 
@@ -96,7 +131,7 @@ export function RaceFeatureEditModal({
   featureIndex, 
   onSave 
 }: RaceFeatureEditModalProps) {
-  const [featureType, setFeatureType] = useState<'skill_proficiency' | 'weapon_proficiency' | 'tool_proficiency' | 'trait' | 'spell' | 'choice' | 'feat' | 'custom_proficiency'>('trait')
+  const [featureType, setFeatureType] = useState<'skill_proficiency' | 'weapon_proficiency' | 'tool_proficiency' | 'trait' | 'spell' | 'choice' | 'feat' | 'custom_proficiency' | 'darkvision' | 'damage_resistance' | 'damage_immunity' | 'condition_immunity' | 'language_proficiency' | 'innate_spellcasting'>('trait')
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   
@@ -119,6 +154,28 @@ export function RaceFeatureEditModal({
   const [usesPerLongRest, setUsesPerLongRest] = useState<number | string>(0)
   const [refuelingDie, setRefuelingDie] = useState("")
   const [hpBonusPerLevel, setHpBonusPerLevel] = useState(false)
+
+  // Darkvision
+  const [darkvisionRange, setDarkvisionRange] = useState<number>(60)
+  // Damage resistance / immunity
+  const [selectedDamageTypes, setSelectedDamageTypes] = useState<string[]>([])
+  // Condition immunity
+  const [selectedConditionTypes, setSelectedConditionTypes] = useState<string[]>([])
+  // Language proficiency
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([])
+  const [customLanguage, setCustomLanguage] = useState("")
+  // Innate spellcasting
+  const [innateSpellName, setInnateSpellName] = useState("")
+  const [innateSpellLevel, setInnateSpellLevel] = useState<number>(0)
+  const [innateSpellUses, setInnateSpellUses] = useState<number | 'at_will'>('at_will')
+  const [innateSpellCastingAbility, setInnateSpellCastingAbility] = useState("")
+  const [innateSpellConcentration, setInnateSpellConcentration] = useState(false)
+  // Passive bonuses
+  const [passiveBonuses, setPassiveBonuses] = useState<PassiveBonuses | null>(null)
+
+  // JSON fallback
+  const [showJsonFallback, setShowJsonFallback] = useState(false)
+  const [jsonFallbackValue, setJsonFallbackValue] = useState("")
   
   // Choice feature options
   // Structure must match character creation flow expectations:
@@ -188,6 +245,34 @@ export function RaceFeatureEditModal({
       if (feature.feature_type === 'choice') {
         setChoiceOptions(feature.options || [])
       }
+
+      // Darkvision
+      if (feature.feature_type === 'darkvision') {
+        setDarkvisionRange(feature.darkvision_range || 60)
+      }
+      // Damage resistance / immunity
+      if (feature.feature_type === 'damage_resistance' || feature.feature_type === 'damage_immunity') {
+        setSelectedDamageTypes(feature.damage_types || [])
+      }
+      // Condition immunity
+      if (feature.feature_type === 'condition_immunity') {
+        setSelectedConditionTypes(feature.condition_types || [])
+      }
+      // Language proficiency
+      if (feature.feature_type === 'language_proficiency') {
+        setSelectedLanguages(feature.languages || [])
+      }
+      // Innate spellcasting
+      if (feature.feature_type === 'innate_spellcasting') {
+        setInnateSpellName(feature.spell_name || "")
+        setInnateSpellLevel(feature.spell_level ?? 0)
+        setInnateSpellUses(feature.uses_per_day ?? 'at_will')
+        setInnateSpellCastingAbility(feature.casting_ability || "")
+        setInnateSpellConcentration(feature.concentration || false)
+      }
+      setPassiveBonuses((feature.passive_bonuses as PassiveBonuses) ?? null)
+      setShowJsonFallback(false)
+      setJsonFallbackValue("")
     } else if (isOpen && !feature) {
       // New feature - reset all
       setFeatureType('trait')
@@ -208,17 +293,43 @@ export function RaceFeatureEditModal({
       setCustomProficiencyName("")
       setEditingOptionIndex(null)
       setEditingOption(null)
+      setDarkvisionRange(60)
+      setSelectedDamageTypes([])
+      setSelectedConditionTypes([])
+      setSelectedLanguages([])
+      setCustomLanguage("")
+      setInnateSpellName("")
+      setInnateSpellLevel(0)
+      setInnateSpellUses('at_will')
+      setInnateSpellCastingAbility("")
+      setInnateSpellConcentration(false)
+      setPassiveBonuses(null)
+      setShowJsonFallback(false)
+      setJsonFallbackValue("")
     }
   }, [isOpen, feature])
 
   const handleSave = () => {
+    // JSON fallback mode: parse and save directly
+    if (showJsonFallback) {
+      try {
+        const parsed = JSON.parse(jsonFallbackValue)
+        onSave(parsed)
+        return
+      } catch {
+        alert("Invalid JSON. Please fix the JSON before saving.")
+        return
+      }
+    }
+
     const savedFeature: RaceFeature = {
       name,
       description,
       feature_type: featureType === 'custom_proficiency' ? 'tool_proficiency' : featureType,
       uses_per_long_rest: usesPerLongRest || undefined,
       refueling_die: refuelingDie || undefined,
-      hp_bonus_per_level: hpBonusPerLevel || undefined
+      hp_bonus_per_level: hpBonusPerLevel || undefined,
+      passive_bonuses: passiveBonuses || undefined,
     }
 
     if (featureType === 'skill_proficiency') {
@@ -227,7 +338,6 @@ export function RaceFeatureEditModal({
         savedFeature.skill_options = selectedSkills
         savedFeature.max_selections = maxSelections
       } else {
-        // Fixed skill proficiencies: allow multiple selections
         savedFeature.skill_options = selectedSkills
       }
     } else if (featureType === 'weapon_proficiency') {
@@ -247,9 +357,55 @@ export function RaceFeatureEditModal({
       }
     } else if (featureType === 'choice') {
       savedFeature.options = choiceOptions
+    } else if (featureType === 'darkvision') {
+      savedFeature.darkvision_range = darkvisionRange
+    } else if (featureType === 'damage_resistance') {
+      savedFeature.damage_types = selectedDamageTypes
+    } else if (featureType === 'damage_immunity') {
+      savedFeature.damage_types = selectedDamageTypes
+    } else if (featureType === 'condition_immunity') {
+      savedFeature.condition_types = selectedConditionTypes
+    } else if (featureType === 'language_proficiency') {
+      savedFeature.languages = selectedLanguages
+    } else if (featureType === 'innate_spellcasting') {
+      savedFeature.spell_name = innateSpellName
+      savedFeature.spell_level = innateSpellLevel
+      savedFeature.uses_per_day = innateSpellUses
+      if (innateSpellCastingAbility) savedFeature.casting_ability = innateSpellCastingAbility
+      if (innateSpellConcentration) savedFeature.concentration = true
     }
 
     onSave(savedFeature)
+  }
+
+  const buildCurrentFeatureJson = (): string => {
+    const obj: RaceFeature = { name, description, feature_type: featureType as any }
+    if (featureType === 'darkvision') obj.darkvision_range = darkvisionRange
+    else if (featureType === 'damage_resistance' || featureType === 'damage_immunity') obj.damage_types = selectedDamageTypes
+    else if (featureType === 'condition_immunity') obj.condition_types = selectedConditionTypes
+    else if (featureType === 'language_proficiency') obj.languages = selectedLanguages
+    else if (featureType === 'innate_spellcasting') {
+      obj.spell_name = innateSpellName
+      obj.spell_level = innateSpellLevel
+      obj.uses_per_day = innateSpellUses
+      if (innateSpellCastingAbility) obj.casting_ability = innateSpellCastingAbility
+      if (innateSpellConcentration) obj.concentration = true
+    } else if (featureType === 'skill_proficiency') {
+      obj.feature_skill_type = skillType
+      obj.skill_options = selectedSkills
+      if (skillType === 'choice') obj.max_selections = maxSelections
+    } else if (featureType === 'weapon_proficiency') {
+      obj.weapons = selectedWeapons
+    } else if (featureType === 'tool_proficiency') {
+      if (toolType === 'choice') { obj.tool_choice_type = 'choice'; obj.tool_options = selectedTools; obj.max_selections = toolMaxSelections }
+      else obj.tools = selectedTools
+    } else if (featureType === 'choice') {
+      obj.options = choiceOptions
+    }
+    if (usesPerLongRest) obj.uses_per_long_rest = usesPerLongRest
+    if (refuelingDie) obj.refueling_die = refuelingDie
+    if (hpBonusPerLevel) obj.hp_bonus_per_level = true
+    return JSON.stringify(obj, null, 2)
   }
   
   const handleAddOption = () => {
@@ -381,8 +537,24 @@ export function RaceFeatureEditModal({
         </DialogHeader>
         <div className="grid gap-4 p-4 max-h-[60vh] overflow-y-auto">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="feature-type">Feature Type *</Label>
-            <Select value={featureType} onValueChange={(value: any) => setFeatureType(value)}>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="feature-type">Feature Type *</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground h-6 px-2"
+                onClick={() => {
+                  if (!showJsonFallback) {
+                    setJsonFallbackValue(buildCurrentFeatureJson())
+                  }
+                  setShowJsonFallback(prev => !prev)
+                }}
+              >
+                <Icon icon={showJsonFallback ? "lucide:form-input" : "lucide:code-2"} className="w-3 h-3 mr-1" />
+                {showJsonFallback ? "Back to form" : "JSON (advanced)"}
+              </Button>
+            </div>
+            <Select value={featureType} onValueChange={(value: any) => setFeatureType(value)} disabled={showJsonFallback}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -395,11 +567,31 @@ export function RaceFeatureEditModal({
                 <SelectItem value="choice">Choice</SelectItem>
                 <SelectItem value="feat">Feat</SelectItem>
                 <SelectItem value="custom_proficiency">Custom Proficiency (Tools section)</SelectItem>
+                <SelectItem value="darkvision">Darkvision</SelectItem>
+                <SelectItem value="damage_resistance">Damage Resistance</SelectItem>
+                <SelectItem value="damage_immunity">Damage Immunity</SelectItem>
+                <SelectItem value="condition_immunity">Condition Immunity</SelectItem>
+                <SelectItem value="language_proficiency">Language Proficiency</SelectItem>
+                <SelectItem value="innate_spellcasting">Innate Spellcasting</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {/* JSON Fallback Mode */}
+          {showJsonFallback && (
+            <div className="flex flex-col gap-2 p-3 border rounded-lg bg-muted/30">
+              <Label className="text-sm font-medium text-muted-foreground">Raw JSON — edit directly for advanced configurations</Label>
+              <textarea
+                className="w-full min-h-[200px] p-2 font-mono text-xs bg-background border rounded resize-y"
+                value={jsonFallbackValue}
+                onChange={(e) => setJsonFallbackValue(e.target.value)}
+                spellCheck={false}
+              />
+              <p className="text-xs text-muted-foreground">The JSON will be saved as-is. Make sure it is valid JSON with a <code>feature_type</code> field.</p>
+            </div>
+          )}
           {/* Custom Proficiency (Tools section) */}
-          {featureType === 'custom_proficiency' && (
+          {featureType === 'custom_proficiency' && !showJsonFallback && (
             <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
               <Label className="text-md font-medium">Custom Proficiency</Label>
               <div className="flex flex-col gap-2">
@@ -414,28 +606,32 @@ export function RaceFeatureEditModal({
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="feature-name">Name *</Label>
-            <Input
-              id="feature-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Feature name"
-            />
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="feature-description">Description</Label>
-            <RichTextEditor
-              value={description}
-              onChange={setDescription}
-              placeholder="Feature description"
-              rows={4}
-            />
-          </div>
+          {!showJsonFallback && (
+            <>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="feature-name">Name *</Label>
+                <Input
+                  id="feature-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Feature name"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="feature-description">Description</Label>
+                <RichTextEditor
+                  value={description}
+                  onChange={setDescription}
+                  placeholder="Feature description"
+                  rows={4}
+                />
+              </div>
+            </>
+          )}
 
           {/* Skill Proficiency Configuration */}
-          {featureType === 'skill_proficiency' && (
+          {featureType === 'skill_proficiency' && !showJsonFallback && (
             <div className="flex flex-col gap-4 p-4 border rounded-lg bg-card">
               <Label className="text-md font-medium">Skill Proficiency Configuration</Label>
               
@@ -510,7 +706,7 @@ export function RaceFeatureEditModal({
           )}
 
           {/* Weapon Proficiency Configuration */}
-          {featureType === 'weapon_proficiency' && (
+          {featureType === 'weapon_proficiency' && !showJsonFallback && (
             <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
               <Label className="text-md font-medium">Weapon Proficiency Configuration</Label>
               <div className="flex flex-col gap-3">
@@ -601,7 +797,7 @@ export function RaceFeatureEditModal({
           )}
 
           {/* Tool Proficiency Configuration */}
-          {featureType === 'tool_proficiency' && (
+          {featureType === 'tool_proficiency' && !showJsonFallback && (
             <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
               <Label className="text-md font-medium">Tool Proficiency Configuration</Label>
               
@@ -729,7 +925,7 @@ export function RaceFeatureEditModal({
           )}
 
           {/* Choice Feature Options */}
-          {featureType === 'choice' && (
+          {featureType === 'choice' && !showJsonFallback && (
             <div className="flex flex-col gap-3 p-3 bg-card border rounded-lg">
               <div className="flex items-start justify-between">
                 <Label className="text-md font-medium">Choice Options</Label>
@@ -1378,8 +1574,249 @@ export function RaceFeatureEditModal({
             </div>
           )}
 
+          {/* Darkvision Configuration */}
+          {featureType === 'darkvision' && !showJsonFallback && (
+            <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
+              <Label className="text-md font-medium">Darkvision Configuration</Label>
+              <div className="flex flex-col gap-2">
+                <Label>Range (feet)</Label>
+                <Input
+                  type="number"
+                  value={darkvisionRange}
+                  onChange={(e) => setDarkvisionRange(parseInt(e.target.value) || 60)}
+                  min="5"
+                  step="5"
+                  className="w-32"
+                  placeholder="60"
+                />
+                <p className="text-xs text-muted-foreground">Standard darkvision ranges: 60 ft (most races), 120 ft (Drow).</p>
+              </div>
+            </div>
+          )}
+
+          {/* Damage Resistance / Immunity Configuration */}
+          {(featureType === 'damage_resistance' || featureType === 'damage_immunity') && !showJsonFallback && (
+            <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
+              <Label className="text-md font-medium">
+                {featureType === 'damage_resistance' ? 'Damage Resistance' : 'Damage Immunity'} Configuration
+              </Label>
+              <Label className="text-sm">Select damage types:</Label>
+              <div className="grid grid-cols-3 gap-2 p-3 bg-background border rounded">
+                {DAMAGE_TYPES.map(type => (
+                  <div key={type} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`dmg-${type}`}
+                      checked={selectedDamageTypes.includes(type)}
+                      onCheckedChange={(checked) => {
+                        setSelectedDamageTypes(prev =>
+                          checked ? [...prev, type] : prev.filter(t => t !== type)
+                        )
+                      }}
+                    />
+                    <Label htmlFor={`dmg-${type}`} className="text-sm font-normal cursor-pointer capitalize">
+                      {type}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              {selectedDamageTypes.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedDamageTypes.map(t => (
+                    <Badge key={t} variant="secondary" className="capitalize">{t}</Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Condition Immunity Configuration */}
+          {featureType === 'condition_immunity' && !showJsonFallback && (
+            <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
+              <Label className="text-md font-medium">Condition Immunity Configuration</Label>
+              <Label className="text-sm">Select conditions:</Label>
+              <div className="grid grid-cols-3 gap-2 p-3 bg-background border rounded">
+                {CONDITION_TYPES.map(cond => (
+                  <div key={cond} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`cond-${cond}`}
+                      checked={selectedConditionTypes.includes(cond)}
+                      onCheckedChange={(checked) => {
+                        setSelectedConditionTypes(prev =>
+                          checked ? [...prev, cond] : prev.filter(c => c !== cond)
+                        )
+                      }}
+                    />
+                    <Label htmlFor={`cond-${cond}`} className="text-sm font-normal cursor-pointer capitalize">
+                      {cond}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              {selectedConditionTypes.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedConditionTypes.map(c => (
+                    <Badge key={c} variant="secondary" className="capitalize">{c}</Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Language Proficiency Configuration */}
+          {featureType === 'language_proficiency' && !showJsonFallback && (
+            <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
+              <Label className="text-md font-medium">Language Proficiency Configuration</Label>
+              <div className="grid grid-cols-3 gap-2 p-3 bg-background border rounded">
+                {COMMON_LANGUAGES.map(lang => (
+                  <div key={lang} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`lang-${lang}`}
+                      checked={selectedLanguages.includes(lang)}
+                      onCheckedChange={(checked) => {
+                        setSelectedLanguages(prev =>
+                          checked ? [...prev, lang] : prev.filter(l => l !== lang)
+                        )
+                      }}
+                    />
+                    <Label htmlFor={`lang-${lang}`} className="text-sm font-normal cursor-pointer">
+                      {lang}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Custom language"
+                  value={customLanguage}
+                  onChange={(e) => setCustomLanguage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const trimmed = customLanguage.trim()
+                      if (trimmed && !selectedLanguages.includes(trimmed)) {
+                        setSelectedLanguages(prev => [...prev, trimmed])
+                        setCustomLanguage("")
+                      }
+                    }
+                  }}
+                />
+                <Button variant="outline" onClick={() => {
+                  const trimmed = customLanguage.trim()
+                  if (trimmed && !selectedLanguages.includes(trimmed)) {
+                    setSelectedLanguages(prev => [...prev, trimmed])
+                    setCustomLanguage("")
+                  }
+                }}>
+                  <Icon icon="lucide:plus" className="w-4 h-4" />
+                  Add
+                </Button>
+              </div>
+              {selectedLanguages.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedLanguages.map(l => (
+                    <Badge key={l} variant="secondary" className="flex items-center gap-1">
+                      {l}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0"
+                        onClick={() => setSelectedLanguages(prev => prev.filter(x => x !== l))}
+                      >
+                        <Icon icon="lucide:x" className="w-3 h-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Innate Spellcasting Configuration */}
+          {featureType === 'innate_spellcasting' && !showJsonFallback && (
+            <div className="flex flex-col gap-4 p-3 border rounded-lg bg-card">
+              <Label className="text-md font-medium">Innate Spellcasting Configuration</Label>
+              <div className="flex flex-col gap-2">
+                <Label>Spell Name *</Label>
+                <Input
+                  value={innateSpellName}
+                  onChange={(e) => setInnateSpellName(e.target.value)}
+                  placeholder="e.g., Thaumaturgy, Hellish Rebuke"
+                />
+              </div>
+              <div className="flex flex-row gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label>Spell Level</Label>
+                  <Select
+                    value={innateSpellLevel.toString()}
+                    onValueChange={(v) => setInnateSpellLevel(parseInt(v))}
+                  >
+                    <SelectTrigger className="w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Cantrip (0)</SelectItem>
+                      <SelectItem value="1">1st level</SelectItem>
+                      <SelectItem value="2">2nd level</SelectItem>
+                      <SelectItem value="3">3rd level</SelectItem>
+                      <SelectItem value="4">4th level</SelectItem>
+                      <SelectItem value="5">5th level</SelectItem>
+                      <SelectItem value="6">6th level</SelectItem>
+                      <SelectItem value="7">7th level</SelectItem>
+                      <SelectItem value="8">8th level</SelectItem>
+                      <SelectItem value="9">9th level</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>Uses Per Day</Label>
+                  <Select
+                    value={innateSpellUses.toString()}
+                    onValueChange={(v) => setInnateSpellUses(v === 'at_will' ? 'at_will' : parseInt(v))}
+                  >
+                    <SelectTrigger className="w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="at_will">At will</SelectItem>
+                      <SelectItem value="1">1 / day</SelectItem>
+                      <SelectItem value="2">2 / day</SelectItem>
+                      <SelectItem value="3">3 / day</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>Casting Ability</Label>
+                  <Select
+                    value={innateSpellCastingAbility || "none"}
+                    onValueChange={(v) => setInnateSpellCastingAbility(v === 'none' ? '' : v)}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Class default" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Class default</SelectItem>
+                      <SelectItem value="intelligence">Intelligence</SelectItem>
+                      <SelectItem value="wisdom">Wisdom</SelectItem>
+                      <SelectItem value="charisma">Charisma</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="innate-concentration"
+                  checked={innateSpellConcentration}
+                  onCheckedChange={(checked) => setInnateSpellConcentration(checked as boolean)}
+                />
+                <Label htmlFor="innate-concentration" className="text-sm font-normal cursor-pointer">
+                  Requires concentration
+                </Label>
+              </div>
+            </div>
+          )}
+
           {/* Regular feature fields (for trait, spell, feat) */}
-          {(featureType === 'trait' || featureType === 'spell' || featureType === 'feat') && (
+          {(featureType === 'trait' || featureType === 'spell' || featureType === 'feat') && !showJsonFallback && (
             <div className="flex flex-row gap-4">
               <div className="flex w-full flex-col gap-2">
                 <Label>Max uses per long rest</Label>
@@ -1433,7 +1870,7 @@ export function RaceFeatureEditModal({
           )}
           
           {/* HP Bonus Per Level (for trait, spell, feat) */}
-          {(featureType === 'trait') && (
+          {(featureType === 'trait') && !showJsonFallback && (
             <div className="flex items-center w-full">
               <Checkbox
                 id="hp-bonus-per-level"
@@ -1443,6 +1880,17 @@ export function RaceFeatureEditModal({
               <Label htmlFor="hp-bonus-per-level" className="text-sm font-normal cursor-pointer">
                 HP Bonus Per Level (e.g., Dwarven Toughness - adds character level to max HP)
               </Label>
+            </div>
+          )}
+
+          {/* Passive Bonuses */}
+          {!showJsonFallback && (
+            <div className="flex flex-col gap-2 pt-2 border-t">
+              <Label className="text-sm font-semibold">Passive Bonuses</Label>
+              <p className="text-xs text-muted-foreground">
+                AC calculation formulas or skill/tool bonus modifiers applied automatically (e.g., Unarmored Defense, Half-Proficiency).
+              </p>
+              <PassiveBonusesEditor value={passiveBonuses} onChange={setPassiveBonuses} />
             </div>
           )}
         </div>

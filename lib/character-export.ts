@@ -89,6 +89,21 @@ export interface CharacterExportSummary {
   equipment: string
   money?: { gold: number; silver: number; copper: number }
   magicItems?: Array<{ name: string; description: string }>
+  armor?: Array<{
+    name: string
+    armorType: string
+    baseAC: number
+    equipped: boolean
+    magicBonus?: number
+  }>
+  equipmentProficiencies?: Record<string, boolean>
+  defenses?: {
+    darkvision: number | null
+    damageVulnerabilities: string[]
+    damageResistances: string[]
+    damageImmunities: string[]
+    conditionImmunities: string[]
+  }
 }
 
 function truncateDescription(text: string, maxLen: number = 200): string {
@@ -226,6 +241,21 @@ export function buildCharacterExportSummary(
       name: m.name,
       description: truncateDescription(m.description ?? ""),
     })),
+    armor: (character.armor ?? []).map(a => ({
+      name: a.name,
+      armorType: a.armorType,
+      baseAC: a.baseAC,
+      equipped: a.equipped,
+      ...(a.magicBonus ? { magicBonus: a.magicBonus } : {}),
+    })),
+    equipmentProficiencies: character.equipmentProficiencies,
+    defenses: {
+      darkvision: character.darkvision ?? null,
+      damageVulnerabilities: character.damageVulnerabilities ?? [],
+      damageResistances: character.damageResistances ?? [],
+      damageImmunities: character.damageImmunities ?? [],
+      conditionImmunities: character.conditionImmunities ?? [],
+    },
   }
 }
 
@@ -421,6 +451,44 @@ export function exportCharacterAsCsv(character: CharacterData): string {
       ])
     )
     lines.push("")
+  }
+
+  if (summary.armor && summary.armor.length > 0) {
+    lines.push("# Armor")
+    lines.push(csvRow(["Name", "Type", "Base AC", "Magic Bonus", "Equipped"]))
+    for (const a of summary.armor) {
+      lines.push(csvRow([a.name, a.armorType, a.baseAC, a.magicBonus ?? "", a.equipped]))
+    }
+    lines.push("")
+  }
+
+  if (summary.defenses) {
+    const d = summary.defenses
+    const hasAny =
+      d.darkvision != null ||
+      d.damageVulnerabilities.length > 0 ||
+      d.damageResistances.length > 0 ||
+      d.damageImmunities.length > 0 ||
+      d.conditionImmunities.length > 0
+    if (hasAny) {
+      lines.push("# Defenses")
+      lines.push(
+        csvRow(["Darkvision", d.darkvision != null ? `${d.darkvision} ft` : "None"])
+      )
+      lines.push(
+        csvRow(["Damage Vulnerabilities", d.damageVulnerabilities.length > 0 ? d.damageVulnerabilities.join(", ") : "None"])
+      )
+      lines.push(
+        csvRow(["Damage Resistances", d.damageResistances.length > 0 ? d.damageResistances.join(", ") : "None"])
+      )
+      lines.push(
+        csvRow(["Damage Immunities", d.damageImmunities.length > 0 ? d.damageImmunities.join(", ") : "None"])
+      )
+      lines.push(
+        csvRow(["Condition Immunities", d.conditionImmunities.length > 0 ? d.conditionImmunities.join(", ") : "None"])
+      )
+      lines.push("")
+    }
   }
 
   return lines.join("\r\n")

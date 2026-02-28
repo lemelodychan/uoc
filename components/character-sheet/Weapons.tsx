@@ -13,11 +13,12 @@ interface WeaponsProps {
   character: CharacterData
   onEdit: () => void
   onToggleAmmunition?: (weaponIndex: number, ammoIndex: number) => void
+  onToggleEquipped?: (weaponIndex: number) => void
   canEdit?: boolean
   isLoading?: boolean
 }
 
-export function Weapons({ character, onEdit, onToggleAmmunition, canEdit = true, isLoading = false }: WeaponsProps) {
+export function Weapons({ character, onEdit, onToggleAmmunition, onToggleEquipped, canEdit = true, isLoading = false }: WeaponsProps) {
   if (isLoading) return <SectionCardSkeleton contentLines={4} />
   return (
     <Card className="flex flex-col gap-3">
@@ -41,12 +42,27 @@ export function Weapons({ character, onEdit, onToggleAmmunition, canEdit = true,
             const maxAmmo = weapon.maxAmmunition ?? 0
             const usedAmmo = weapon.usedAmmunition ?? 0
             const hasAmmunition = maxAmmo > 0
-            
+            const isEquipped = weapon.equipped !== false // default true when undefined
+
             return (
-              <div key={index} className="p-2 border text-sm font-medium rounded flex flex-col gap-2 bg-background">
+              <div key={index} className={`p-2 border text-sm font-medium rounded flex flex-col gap-2 bg-background transition-opacity ${!isEquipped ? 'opacity-50' : ''}`}>
                 <div className="flex flex-row gap-2">
                   <div className="w-full flex flex-col gap-1">
-                    <span>{weapon.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{weapon.name}</span>
+                      <button
+                        onClick={() => onToggleEquipped?.(index)}
+                        disabled={!canEdit}
+                        title={isEquipped ? "Equipped — click to unequip" : "Unequipped — click to equip"}
+                        className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
+                          isEquipped
+                            ? 'border-primary/50 text-primary bg-primary/10 hover:bg-primary/20'
+                            : 'border-muted text-muted-foreground bg-muted/40 hover:bg-muted/60'
+                        } ${!canEdit ? 'cursor-default' : 'cursor-pointer'}`}
+                      >
+                        {isEquipped ? 'Equipped' : 'Stowed'}
+                      </button>
+                    </div>
                     {weapon.weaponProperties && weapon.weaponProperties.length > 0 && (
                       <div className="flex flex-wrap gap-0 mb-1">
                         <span className="text-xs font-normal text-muted-foreground">
@@ -112,7 +128,8 @@ export function Weapons({ character, onEdit, onToggleAmmunition, canEdit = true,
             </div>
             <RichTextDisplay
               content={character.weaponNotes}
-              className="text-sm"
+              className="text-sm text-muted-foreground"
+              maxLines={5}
             />
           </div>
         )}

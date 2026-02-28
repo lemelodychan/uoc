@@ -12,8 +12,9 @@ import { Separator } from "@/components/ui/separator"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { FeatEditModal } from "./feat-edit-modal"
+import { FeatSelectionModal } from "./feat-selection-modal"
 import type { CharacterData, CharacterClass } from "@/lib/character-data"
-import { calculateModifier, calculateProficiencyBonus, calculateSkillBonus, getHitDiceByClass, calculateTotalLevel } from "@/lib/character-data"
+import { calculateModifier, calculateProficiencyBonus, calculateSkillBonus, getHitDiceByClass, calculateTotalLevel, convertDbEquipmentProfs, type EquipmentProficiencies } from "@/lib/character-data"
 import { loadClassFeatures, loadClassesWithDetails, loadRaceDetails, type RaceData } from "@/lib/database"
 import type { ClassData } from "@/lib/class-utils"
 
@@ -70,7 +71,6 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
 
   const [selectedClass, setSelectedClass] = useState<CharacterClass | null>(null)
   const [newLevel, setNewLevel] = useState(calculateTotalLevel(character.classes) + 1)
-  const [hpRoll, setHpRoll] = useState<number | null>(null)
   const [hpRollResult, setHpRollResult] = useState<{
     roll: number
     constitutionModifier: number
@@ -85,8 +85,7 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   const [selectedSubclassInLevelUp, setSelectedSubclassInLevelUp] = useState<string>('')
   const [isLoadingSubclassCheck, setIsLoadingSubclassCheck] = useState(false)
   const [editableCharacter, setEditableCharacter] = useState<CharacterData>(character)
-  const [customFeatName, setCustomFeatName] = useState('')
-  const [customFeatDescription, setCustomFeatDescription] = useState('')
+  const [featSelectionModalOpen, setFeatSelectionModalOpen] = useState(false)
   const [featEditModalOpen, setFeatEditModalOpen] = useState(false)
   const [editingFeatIndex, setEditingFeatIndex] = useState<number | null>(null)
   const [availableClasses, setAvailableClasses] = useState<ClassData[]>([])
@@ -98,24 +97,16 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   // Always uses character's current active level + 1 as the starting point
   const resetAllState = () => {
     const totalLevel = calculateTotalLevel(character.classes)
-    console.log('Resetting level up modal state:', {
-      characterLevel: character.level,
-      totalLevelFromClasses: totalLevel,
-      characterClasses: character.classes?.map(c => ({ name: c.name, level: c.level })),
-      newLevel: totalLevel + 1
-    })
-    
+
     setSelectedClass(null)
     setNewLevel(totalLevel + 1) // Always start from character's total level + 1
-    setHpRoll(null)
     setHpRollResult(null)
     setNewFeatures([])
     setAsiChoice(null)
     setIsLoadingFeatures(false)
     setStep('class_selection')
     setEditableCharacter(character)
-    setCustomFeatName('')
-    setCustomFeatDescription('')
+    setFeatSelectionModalOpen(false)
     setFeatEditModalOpen(false)
     setEditingFeatIndex(null)
     setAvailableClasses([])
@@ -337,45 +328,34 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     }
   }
 
+  const getHitDieSize = (): number => {
+    if (newClassSelection) return newClassSelection.classData.hit_die || 8
+    // Try data-driven value first
+    const classData = character.classes?.find(c => c.name === selectedClass?.name)?.classData
+    if (classData?.hit_die) return classData.hit_die
+    // Hardcoded fallback
+    const hitDieTypes: Record<string, number> = {
+      'barbarian': 12, 'fighter': 10, 'paladin': 10, 'ranger': 10,
+      'artificer': 8, 'bard': 8, 'cleric': 8, 'druid': 8, 'monk': 8,
+      'rogue': 8, 'warlock': 8, 'wizard': 6, 'sorcerer': 6
+    }
+    return hitDieTypes[selectedClass?.name.toLowerCase() ?? ''] || 8
+  }
+
   const rollHitDie = () => {
     if (!selectedClass) return
-
-    let dieSize: number
-
-    // Check if this is a new class (multiclassing)
-    if (newClassSelection) {
-      // Use the new class's hit die from the class data
-      dieSize = newClassSelection.classData.hit_die || 8
-    } else {
-      // Use the existing class's hit die
-      const hitDieTypes: Record<string, number> = {
-        'barbarian': 12,
-        'fighter': 10,
-        'paladin': 10,
-        'ranger': 10,
-        'artificer': 8,
-        'bard': 8,
-        'cleric': 8,
-        'druid': 8,
-        'monk': 8,
-        'rogue': 8,
-        'warlock': 8,
-        'wizard': 6,
-        'sorcerer': 6
-      }
-      dieSize = hitDieTypes[selectedClass.name.toLowerCase()] || 8
-    }
-
+    const dieSize = getHitDieSize()
     const roll = Math.floor(Math.random() * dieSize) + 1
     const constitutionModifier = calculateModifier(editableCharacter.constitution)
-    const total = Math.max(1, roll + constitutionModifier) // Minimum 1 HP gain
+    setHpRollResult({ roll, constitutionModifier, total: Math.max(1, roll + constitutionModifier) })
+  }
 
-    setHpRoll(roll)
-    setHpRollResult({
-      roll,
-      constitutionModifier,
-      total
-    })
+  const takeAverageHitDie = () => {
+    if (!selectedClass) return
+    const dieSize = getHitDieSize()
+    const avgRoll = Math.floor(dieSize / 2) + 1 // D&D average: floor(die/2) + 1
+    const constitutionModifier = calculateModifier(editableCharacter.constitution)
+    setHpRollResult({ roll: avgRoll, constitutionModifier, total: Math.max(1, avgRoll + constitutionModifier) })
   }
 
   const handleContinueFromHpRoll = async () => {
@@ -433,28 +413,12 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
       // When leveling an existing class, we're gaining (classToUse.level + 1) → show that level's features.
       const selectedClassNewLevel = newClassSelection ? 1 : (classToUse.level + 1)
 
-      console.log('Level up debug:', {
-        characterLevel: character.level,
-        totalLevelFromClasses: calculateTotalLevel(character.classes),
-        newLevel: newLevel,
-        selectedClassName: classToUse.name,
-        selectedClassCurrentLevel: classToUse.level,
-        selectedClassNewLevel: selectedClassNewLevel,
-        isNewClass: !!newClassSelection,
-        subclass: classToUse.subclass
-      })
-
       // Load features for the selected class's new level only (subclass affects which features are returned)
       // includeHidden = true to include ASI features during level up
       const { features } = await loadClassFeatures(classToUse.class_id || '', selectedClassNewLevel, classToUse.subclass, true)
       if (features) {
         // Filter to only show features that are exactly at the selected class's new level
         const newLevelFeatures = features.filter(feature => feature.level === selectedClassNewLevel)
-        console.log('Features loaded:', {
-          totalFeatures: features.length,
-          newLevelFeatures: newLevelFeatures.length,
-          newLevelFeaturesList: newLevelFeatures.map(f => ({ name: f.name, level: f.level }))
-        })
         setNewFeatures(newLevelFeatures)
       }
       // Automatically proceed to features step after loading
@@ -481,30 +445,25 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   }
 
   const handleASISelection = (type: 'ability_scores' | 'feat') => {
+    // Preserve existing abilityScores when toggling — the useEffect handles re-applying/reverting
+    const prevAbilityScores = asiChoice?.abilityScores || { first: '', second: '' }
+
     if (type === 'ability_scores') {
-      // Clear feat selection and any new feats when switching to ability scores
       setAsiChoice({
         type: 'ability_scores',
-        abilityScores: {
-          first: '',
-          second: ''
-        },
-        feat: null
+        abilityScores: prevAbilityScores,
+        feat: null,
       })
-      // Remove any new feats that were added
+      // Remove any feats that were added via FeatSelectionModal when switching away from feat
       if (editableCharacter.feats.length > character.feats.length) {
         const originalFeats = editableCharacter.feats.slice(0, character.feats.length)
         updateEditableCharacter({ feats: originalFeats })
       }
     } else {
-      // Clear ability score selection when switching to feat
       setAsiChoice({
         type: 'feat',
-        abilityScores: {
-          first: '',
-          second: ''
-        },
-        feat: null
+        abilityScores: prevAbilityScores,
+        feat: null,
       })
     }
   }
@@ -521,26 +480,16 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     })
   }
 
-  const handleFeatSelection = (feat: { name: string; description: string }) => {
-    setAsiChoice({
-      type: 'feat',
-      feat
-    })
-  }
-
-  const handleCustomFeatCreation = () => {
-    if (customFeatName.trim() && customFeatDescription.trim()) {
-      const customFeat = {
-        name: customFeatName.trim(),
-        description: customFeatDescription.trim()
-      }
-      setAsiChoice({
-        type: 'feat',
-        feat: customFeat
-      })
-      setCustomFeatName('')
-      setCustomFeatDescription('')
+  // Called when a feat is selected via FeatSelectionModal in the ASI context
+  const handleASIFeatSelectedFromDB = (updates: Partial<CharacterData>) => {
+    // Apply all mechanical effects (ability scores, proficiencies, special features, etc.)
+    updateEditableCharacter(updates)
+    // Extract the newly added feat and register it as the ASI choice
+    if (updates.feats && updates.feats.length > 0) {
+      const newFeat = updates.feats[updates.feats.length - 1]
+      setAsiChoice(prev => prev ? { ...prev, feat: newFeat } : { type: 'feat', feat: newFeat })
     }
+    setFeatSelectionModalOpen(false)
   }
 
   const handleAddFeat = () => {
@@ -714,11 +663,23 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
           [secondAbility]: (character[secondAbility] as number) + 1
         }
       }
-    } else if (asiChoice?.type === 'feat' && asiChoice.feat) {
-      // Add feat
-      updatedCharacter = {
-        ...updatedCharacter,
-        feats: [...editableCharacter.feats, asiChoice.feat]
+    } else if (asiChoice?.type === 'feat') {
+      // Feat was already applied to editableCharacter via FeatSelectionModal.onSave
+      // (ability scores, proficiencies, special features, and the feat entry itself).
+      // updatedCharacter already inherits editableCharacter.feats from the initial spread.
+    }
+
+    // Merge new class equipment proficiencies when multiclassing
+    if (isNewClass && newClassSelection) {
+      const dbProfs = newClassSelection.classData.equipment_proficiencies
+      if (dbProfs) {
+        const newProfs: Partial<EquipmentProficiencies> = Array.isArray(dbProfs)
+          ? convertDbEquipmentProfs(dbProfs as string[])
+          : (dbProfs as Partial<EquipmentProficiencies>)
+        updatedCharacter.equipmentProficiencies = {
+          ...(updatedCharacter.equipmentProficiencies || {}),
+          ...newProfs
+        } as EquipmentProficiencies
       }
     }
 
@@ -735,21 +696,6 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
     { value: 'charisma', label: 'Charisma' }
   ]
 
-  const getSampleFeats = () => [
-    {
-      name: 'Alert',
-      description: 'You gain a +5 bonus to initiative. You can\'t be surprised while you are conscious. Other creatures don\'t gain advantage on attack rolls against you as a result of being hidden from you.'
-    },
-    {
-      name: 'Lucky',
-      description: 'You have 3 luck points. Whenever you make an attack roll, an ability check, or a saving throw, you can spend one luck point to roll an additional d20. You can choose to spend one of your luck points after you roll the die, but before the outcome is determined.'
-    },
-    {
-      name: 'Sharpshooter',
-      description: 'You have mastered ranged weapons and can make shots that others find impossible. You gain the following benefits: Attacking at long range doesn\'t impose disadvantage on your ranged weapon attack rolls. Your ranged weapon attacks ignore half cover and three-quarters cover. Before you make an attack with a ranged weapon that you are proficient with, you can choose to take a -5 penalty to the attack roll. If the attack hits, you add +10 to the attack\'s damage roll.'
-    }
-  ]
-
   const updateEditableCharacter = useCallback((updates: Partial<CharacterData>) => {
     setEditableCharacter(prev => ({ ...prev, ...updates }))
   }, [])
@@ -757,7 +703,6 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
   // Function to reset choices when going back to class selection
   const resetChoices = () => {
     setSelectedClass(null)
-    setHpRoll(null)
     setHpRollResult(null)
     setNewFeatures([])
     setAsiChoice(null)
@@ -1268,31 +1213,32 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
               </div>
 
               <Card>
-                <CardContent className="px-4 py-0 flex flex-col gap-4 relative">
+                <CardContent className="px-4 py-0 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col gap-0">
                       <h4 className="font-medium">{selectedClass.name} Hit Die</h4>
                       <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Badge variant="outline">d{newClassSelection ? newClassSelection.classData.hit_die : (() => {
-                          const hitDieTypes: Record<string, number> = {
-                            'barbarian': 12, 'fighter': 10, 'paladin': 10, 'ranger': 10,
-                            'artificer': 8, 'bard': 8, 'cleric': 8, 'druid': 8, 'monk': 8,
-                            'rogue': 8, 'warlock': 8, 'wizard': 6, 'sorcerer': 6
-                          }
-                          return hitDieTypes[selectedClass.name.toLowerCase()] || 8
-                        })()}</Badge>
+                        <Badge variant="outline">d{getHitDieSize()}</Badge>
                         <Badge variant="outline">{formatModifier(calculateModifier(editableCharacter.constitution))}</Badge>
-                        Constitution                      
+                        Constitution
                       </p>
                     </div>
-                    <Button
-                      onClick={rollHitDie}
-                      disabled={hpRollResult !== null}
-                      className="min-w-[120px] absolute top-0 right-4"
-                    >
-                      <Icon icon="lucide:dice-6" className="w-4 h-4" />
-                      Roll Hit Die
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={takeAverageHitDie}
+                        disabled={hpRollResult !== null}
+                      >
+                        Take Average ({Math.floor(getHitDieSize() / 2) + 1})
+                      </Button>
+                      <Button
+                        onClick={rollHitDie}
+                        disabled={hpRollResult !== null}
+                      >
+                        <Icon icon="lucide:dice-6" className="w-4 h-4" />
+                        Roll Hit Die
+                      </Button>
+                    </div>
                   </div>
 
                   {hpRollResult && (
@@ -1583,15 +1529,15 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                               })}
                             </div>
                           )}
-                          {/* Add New Feat */}
+                          {/* Select Feat from Database */}
                           {(!editableCharacter.feats || editableCharacter.feats.length === character.feats.length) && (
                             <Button
-                              onClick={handleAddFeat}
+                              onClick={() => setFeatSelectionModalOpen(true)}
                               size="sm"
                               variant="outline"
                             >
                               <Icon icon="lucide:plus" className="w-4 h-4" />
-                              Add new Feat
+                              Select a Feat
                             </Button>
                           )}
                         </div>
@@ -1701,13 +1647,31 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                      </div>
                     )}
 
+                  {/* Proficiency bonus change */}
+                  {(() => {
+                    const oldProf = calculateProficiencyBonus(character.level)
+                    const newProf = calculateProficiencyBonus(newLevel)
+                    if (newProf <= oldProf) return null
+                    return (
+                      <div className="flex flex-row gap-4 items-center justify-start pt-4 border-t mt-4">
+                        <h5 className="text-base font-display font-bold w-[240px]">Proficiency Bonus</h5>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Badge variant="secondary">+{oldProf}</Badge>
+                          <Icon icon="lucide:arrow-right" className="w-3 h-3" />
+                          <Badge variant="default">+{newProf}</Badge>
+                          <span className="text-muted-foreground">Your proficiency bonus increased!</span>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
                 </Card>
 
               </div>
             </div>
           )}
           </div>
-          
+
           {/* Character Sidebar */}
           {CharacterSidebar}
         </div>
@@ -1743,7 +1707,11 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
                     } else if (step === 'asi_choice') {
                       setStep('features')
                     } else if (step === 'summary') {
-                      setStep('asi_choice')
+                      const hasASI = newFeatures.some(f =>
+                        f.name.toLowerCase().includes('ability score improvement') ||
+                        f.name.toLowerCase().includes('asi')
+                      )
+                      setStep(hasASI ? 'asi_choice' : 'features')
                     }
                   }}
                 >
@@ -1840,13 +1808,21 @@ export function LevelUpModal({ isOpen, onClose, character, onSave }: LevelUpModa
         </DialogFooter>
       </DialogContent>
       
-      {/* Feat Edit Modal */}
+      {/* Feat Edit Modal (for editing existing feats) */}
       <FeatEditModal
         isOpen={featEditModalOpen}
         onClose={handleFeatEditClose}
         character={editableCharacter}
         featIndex={editingFeatIndex}
         onSave={handleFeatSave}
+      />
+
+      {/* Feat Selection Modal (for ASI feat choice from database) */}
+      <FeatSelectionModal
+        isOpen={featSelectionModalOpen}
+        onClose={() => setFeatSelectionModalOpen(false)}
+        character={editableCharacter}
+        onSave={handleASIFeatSelectedFromDB}
       />
     </Dialog>
   )

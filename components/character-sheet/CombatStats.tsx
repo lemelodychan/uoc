@@ -8,7 +8,7 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
 import { getClassLevel } from "@/lib/character-data"
 import { getFeatureUsage, getFeatureCustomDescription } from "@/lib/feature-usage-tracker"
-import { getCombatColor, getClassFeatureColors } from "@/lib/color-mapping"
+import { getCombatColor, getClassFeatureColors, DEFENSE_COLORS } from "@/lib/color-mapping"
 import { loadClassFeatureSkills } from "@/lib/database"
 import { calculateUsesFromFormula, resolveDescriptionSegments } from "@/lib/class-feature-templates"
 import type { DescriptionSegment } from "@/lib/class-feature-templates"
@@ -23,6 +23,7 @@ interface CombatStatsProps {
   onToggleHitDie: (classIndex: number, dieIndex: number) => void
   onToggleDeathSave?: (type: 'successes' | 'failures', index: number) => void
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
+  onDefensesEdit?: () => void
   canEdit?: boolean
   isLoading?: boolean
 }
@@ -31,7 +32,7 @@ const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
-export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSave, onUpdateFeatureUsage, canEdit = true, isLoading = false }: CombatStatsProps) {
+export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSave, onUpdateFeatureUsage, onDefensesEdit, canEdit = true, isLoading = false }: CombatStatsProps) {
   const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
 
@@ -338,274 +339,321 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 grid grid-cols-2 gap-4 items-start">
-        <div className="flex items-center gap-3 col-span-1 mb-0">
-          <Icon icon="lucide:shield" className={`w-5 h-5 ${getCombatColor('armorClass')}`} />
-          <div className="flex flex-col gap-1">
-            <div className="text-sm text-muted-foreground">Armor Class</div>
-            <div className="text-xl font-bold font-mono">{character.armorClass}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 col-span-1 mb-0">
-          <Icon icon="lucide:zap" className={`w-5 h-5 ${getCombatColor('initiative')}`} />
-          <div className="flex flex-col gap-1">
-            <div className="text-sm text-muted-foreground">Initiative</div>
-            <div className="text-xl font-bold font-mono">{formatModifier(character.initiative)}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 col-span-1 mb-0">
-          <Icon icon="lucide:footprints" className={`w-5 h-5 ${getCombatColor('speed')}`} />
-          <div className="flex flex-col gap-1">
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              Speed
-              {(() => {
-                const exhaustion = character.exhaustion || 0
-                if (exhaustion >= 2) {
-                  return <Badge variant="outline" className="bg-[#ce6565] text-white text-xs border-0 px-1 py-1 rounded-full"><Icon icon="lucide:skull" className="w-4 h-4" /></Badge>
-                }
-                return null
-              })()}
-            </div>
-            <div className={`text-xl font-bold font-mono ${(() => {
-              const exhaustion = character.exhaustion || 0
-              return exhaustion >= 2 ? "text-[#ce6565]" : ""
-            })()}`}>
-              {(() => {
-                const exhaustion = character.exhaustion || 0
-                if (exhaustion >= 5) return "0 ft"
-                if (exhaustion >= 2) return `${Math.floor(character.speed / 2)} ft`
-                return `${character.speed} ft`
-              })()}
-            </div>
-          </div>
-        </div>
+      <CardContent className="flex flex-col gap-4">
 
-        <div className="flex items-center gap-3 col-span-1 mb-0">
-          <Icon icon="lucide:heart" className={`w-5 h-5 ${getCombatColor('hitPoints')}`} />
-          <div className="flex flex-col gap-1">
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              Hit Points
-              {(() => {
-                const exhaustion = character.exhaustion || 0
-                if (exhaustion >= 4) {
-                  return <Badge variant="outline" className="bg-[#ce6565] text-white text-xs px-1 py-1 border-0 rounded-full"><Icon icon="lucide:skull" className="w-4 h-4" /></Badge>
-                }
-                return null
-              })()}
-            </div>
-            <div className={`text-xl font-bold font-mono flex items-center gap-2 ${(() => {
-              const exhaustion = character.exhaustion || 0
-              return exhaustion >= 4 ? "text-[#ce6565]" : ""
-            })()}`}>
-              {(() => {
-                const exhaustion = character.exhaustion || 0
-                const tempMaxHP = character.tempMaxHP ?? 0
-                const baseMax = character.maxHitPoints + tempMaxHP
-                const effectiveMaxHP = exhaustion >= 4 ? Math.floor(baseMax / 2) : baseMax
-                const tempHP = (character.temporaryHitPoints ?? 0) > 0 ? character.temporaryHitPoints as number : 0
-                return (
-                  <>
-                    {character.currentHitPoints}/
-                    {effectiveMaxHP + tempHP}
-                    {tempMaxHP !== 0 && (
-                      <span className={`${tempMaxHP > 0 ? getCombatColor('tempHP') : 'text-[#ce6565]'} text-xs font-medium`}>({tempMaxHP > 0 ? '+' : ''}{tempMaxHP})</span>
-                    )}
-                    {tempHP > 0 && (
-                      <span className={`${getCombatColor('tempHP')} text-xs font-medium`}>(+{tempHP} temp)</span>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-          </div>
-        </div>
-        {/* Death Saves - show when HP is 0 */}
-        {character.currentHitPoints === 0 && (
-          <div className="flex items-start gap-3 col-span-2 mb-0">
-            <Icon icon="lucide:skull" className="w-5 h-10 py-2.5 text-[#ce6565]" />
-            <div className="flex w-full flex-col gap-2">
-              <div className="text-sm text-muted-foreground">Death Saves</div>
-              <div className="flex flex-row flex-wrap justify-start gap-x-2 gap-y-1.5">
-                <div className="w-fit flex items-center justify-start gap-4 border-[#6ab08b] border rounded-md px-2 py-1.5">
-                  <span className="text-xs font-medium w-12 text-[#6ab08b]">Success</span>
-                  <div className="flex gap-1">
-                    {Array.from({ length: 3 }, (_, i) => {
-                      const isChecked = i < (character.deathSaves?.successes ?? 0)
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            if (!canEdit || !onToggleDeathSave) return
-                            onToggleDeathSave('successes', i)
-                          }}
-                          disabled={!canEdit}
-                          className={`w-3 h-3 rounded-md border-2 transition-colors ${
-                            isChecked
-                              ? `bg-[#6ab08b] border-[#6ab08b] ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
-                              : `bg-card border-border ${canEdit ? 'cursor-pointer hover:border-[#6ab08b]' : 'cursor-not-allowed opacity-50'}`
-                          }`}
-                          title={isChecked ? "Success" : "Not yet"}
-                        />
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="w-fit flex items-center justify-start gap-4 border-[#ce6565] border rounded-md px-2 py-1.5">
-                  <span className="text-xs font-medium w-12 text-[#ce6565]">Fails</span>
-                  <div className="flex gap-1">
-                    {Array.from({ length: 3 }, (_, i) => {
-                      const isChecked = i < (character.deathSaves?.failures ?? 0)
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            if (!canEdit || !onToggleDeathSave) return
-                            onToggleDeathSave('failures', i)
-                          }}
-                          disabled={!canEdit}
-                          className={`w-3 h-3 rounded-md border-2 transition-colors ${
-                            isChecked
-                              ? `bg-[#ce6565] border-[#ce6565] ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
-                              : `bg-card border-border ${canEdit ? 'cursor-pointer hover:border-[#ce6565]' : 'cursor-not-allowed opacity-50'}`
-                          }`}
-                          title={isChecked ? "Failure" : "Not yet"}
-                        />
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Exhaustion - only show if > 0 */}
-        {(character.exhaustion ?? 0) > 0 && (
-          <div className="flex items-center gap-3 col-span-2 mb-0">
-            <Icon icon="lucide:skull" className="w-[20px] min-w-[20px] h-[20px] min-h-[20px] text-[#ce6565]" />
+        {/* Combat Stats */}
+        <div className="space-y-4 grid grid-cols-2 gap-4 items-start">
+          <div className="flex items-center gap-3 col-span-1 mb-0">
+            <Icon icon="lucide:shield" className={`w-5 h-5 ${getCombatColor('armorClass')}`} />
             <div className="flex flex-col gap-1">
-              <div className="text-sm text-muted-foreground">Exhaustion</div>
-              <div className="text-xl font-bold font-mono text-[#ce6565]">
-                Level {character.exhaustion}
-              </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-sm text-muted-foreground">Armor Class</div>
+              <div className="text-xl font-bold font-mono">{character.armorClass}</div>
+              {(() => {
+                const equipped = (character.armor || []).filter(a => a.equipped && a.armorType !== 'shield')
+                const shield = (character.armor || []).find(a => a.equipped && a.armorType === 'shield')
+                const parts = equipped.map(a => a.name).filter(Boolean)
+                if (shield?.name) parts.push(shield.name)
+                return parts.length > 0 ? (
+                  <div className="text-xs text-muted-foreground truncate max-w-[100px]" title={parts.join(", ")}>
+                    {parts.join(", ")}
+                  </div>
+                ) : null
+              })()}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 col-span-1 mb-0">
+            <Icon icon="lucide:zap" className={`w-5 h-5 ${getCombatColor('initiative')}`} />
+            <div className="flex flex-col gap-1">
+              <div className="text-sm text-muted-foreground">Initiative</div>
+              <div className="text-xl font-bold font-mono">{formatModifier(character.initiative)}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 col-span-1 mb-0">
+            <Icon icon="lucide:footprints" className={`w-5 h-5 ${getCombatColor('speed')}`} />
+            <div className="flex flex-col gap-1">
+              <div className="text-sm text-muted-foreground flex items-center gap-1">
+                Speed
                 {(() => {
                   const exhaustion = character.exhaustion || 0
-                  const effects = []
-                  if (exhaustion >= 1) effects.push("Disadvantage on ability checks")
-                  if (exhaustion >= 2) effects.push("Speed halved")
-                  if (exhaustion >= 3) effects.push("Disadvantage on attack rolls & saves")
-                  if (exhaustion >= 4) effects.push("Hit point maximum halved")
-                  if (exhaustion >= 5) effects.push("Speed reduced to 0")
-                  if (exhaustion >= 6) effects.push("Death")
-                  return effects.join(", ")
+                  if (exhaustion >= 2) {
+                    return <Badge variant="outline" className="bg-[#ce6565] text-white text-xs border-0 px-1 py-1 rounded-full"><Icon icon="lucide:skull" className="w-4 h-4" /></Badge>
+                  }
+                  return null
+                })()}
+              </div>
+              <div className={`text-xl font-bold font-mono ${(() => {
+                const exhaustion = character.exhaustion || 0
+                return exhaustion >= 2 ? "text-[#ce6565]" : ""
+              })()}`}>
+                {(() => {
+                  const exhaustion = character.exhaustion || 0
+                  if (exhaustion >= 5) return "0 ft"
+                  if (exhaustion >= 2) return `${Math.floor(character.speed / 2)} ft`
+                  return `${character.speed} ft`
                 })()}
               </div>
             </div>
           </div>
-        )}
 
-        {/* Hit Dice */}
-        {character.hitDiceByClass && character.hitDiceByClass.length > 0 ? (
-          <div className="flex items-start gap-3 col-span-2 mb-0">
-            <Icon icon="lucide:dice-5" className={`w-5 h-10 py-2.5 ${getCombatColor('hitDice')}`} />
+          <div className="flex items-center gap-3 col-span-1 mb-0">
+            <Icon icon="lucide:heart" className={`w-5 h-5 ${getCombatColor('hitPoints')}`} />
             <div className="flex flex-col gap-1">
-              <div className="text-sm text-muted-foreground">Hit Dice</div>
-              <div className="flex flex-row gap-5">
-                {character.hitDiceByClass.map((hitDie, classIndex) => (
-                  <div key={classIndex} className="flex flex-col gap-1">
-                    <span className="text-md font-bold font-mono">
-                      {hitDie.total - hitDie.used}/{hitDie.total}{hitDie.dieType}
-                    </span>
+              <div className="text-sm text-muted-foreground flex items-center gap-1">
+                Hit Points
+                {(() => {
+                  const exhaustion = character.exhaustion || 0
+                  if (exhaustion >= 4) {
+                    return <Badge variant="outline" className="bg-[#ce6565] text-white text-xs px-1 py-1 border-0 rounded-full"><Icon icon="lucide:skull" className="w-4 h-4" /></Badge>
+                  }
+                  return null
+                })()}
+              </div>
+              <div className={`text-xl font-bold font-mono flex items-center gap-2 ${(() => {
+                const exhaustion = character.exhaustion || 0
+                return exhaustion >= 4 ? "text-[#ce6565]" : ""
+              })()}`}>
+                {(() => {
+                  const exhaustion = character.exhaustion || 0
+                  const tempMaxHP = character.tempMaxHP ?? 0
+                  const baseMax = character.maxHitPoints + tempMaxHP
+                  const effectiveMaxHP = exhaustion >= 4 ? Math.floor(baseMax / 2) : baseMax
+                  const tempHP = (character.temporaryHitPoints ?? 0) > 0 ? character.temporaryHitPoints as number : 0
+                  return (
+                    <>
+                      {character.currentHitPoints}/
+                      {effectiveMaxHP + tempHP}
+                      {tempMaxHP !== 0 && (
+                        <span className={`${tempMaxHP > 0 ? getCombatColor('tempHP') : 'text-[#ce6565]'} text-xs font-medium`}>({tempMaxHP > 0 ? '+' : ''}{tempMaxHP})</span>
+                      )}
+                      {tempHP > 0 && (
+                        <span className={`${getCombatColor('tempHP')} text-xs font-medium`}>(+{tempHP} temp)</span>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+          </div>
+          {/* Death Saves - show when HP is 0 */}
+          {character.currentHitPoints === 0 && (
+            <div className="flex items-start gap-3 col-span-2 mb-0">
+              <Icon icon="lucide:skull" className="w-5 h-10 py-2.5 text-[#ce6565]" />
+              <div className="flex w-full flex-col gap-2">
+                <div className="text-sm text-muted-foreground">Death Saves</div>
+                <div className="flex flex-row flex-wrap justify-start gap-x-2 gap-y-1.5">
+                  <div className="w-fit flex items-center justify-start gap-4 border-[#6ab08b] border rounded-md px-2 py-1.5">
+                    <span className="text-xs font-medium w-12 text-[#6ab08b]">Success</span>
                     <div className="flex gap-1">
-                      {Array.from({ length: hitDie.total }, (_, dieIndex) => {
-                        const isAvailable = dieIndex < (hitDie.total - hitDie.used)
+                      {Array.from({ length: 3 }, (_, i) => {
+                        const isChecked = i < (character.deathSaves?.successes ?? 0)
                         return (
                           <button
-                            key={dieIndex}
+                            key={i}
                             onClick={() => {
-                              if (!canEdit) return
-                              onToggleHitDie(classIndex, dieIndex)
+                              if (!canEdit || !onToggleDeathSave) return
+                              onToggleDeathSave('successes', i)
                             }}
                             disabled={!canEdit}
-                            className={`w-3 h-3 rounded border transition-colors ${
-                              isAvailable
-                                ? `${getCombatColor('hitDieAvailable')} ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
-                                : `${getCombatColor('hitDieUsed')} ${canEdit ? 'cursor-pointer hover:border-border/80' : 'cursor-not-allowed opacity-50'}`
+                            className={`w-3 h-3 rounded-md border-2 transition-colors ${
+                              isChecked
+                                ? `bg-[#6ab08b] border-[#6ab08b] ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
+                                : `bg-card border-border ${canEdit ? 'cursor-pointer hover:border-[#6ab08b]' : 'cursor-not-allowed opacity-50'}`
                             }`}
-                            title={isAvailable ? "Available" : "Used"}
+                            title={isChecked ? "Success" : "Not yet"}
                           />
                         )
                       })}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : character.hitDice && (
-          <div className="flex items-center gap-3 col-span-1 mb-0">
-            <Icon icon="lucide:dice-5" className={`w-5 h-5 ${getCombatColor('hitDice')}`} />
-            <div className="flex flex-col gap-1">
-              <div className="text-sm text-muted-foreground">Hit Dice</div>
-              <div className="text-xl font-bold font-mono">
-                {character.hitDice.total - character.hitDice.used}/{character.hitDice.total}{character.hitDice.dieType}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Rogue Sneak Attack dice (slot-based display) */}
-        {(() => {
-          // Determine whether to show: either has Rogue levels or explicit usage exists
-          const usage = getFeatureUsage(character, 'sneak-attack')
-          const rogueLevel = getClassLevel(character.classes || [], 'Rogue') || (character.class?.toLowerCase() === 'rogue' ? character.level : 0)
-          const hasSneakAttack = (usage?.featureType === 'slots') || rogueLevel > 0
-          if (!hasSneakAttack) return null
-
-          // Dice scaling anchored to Rogue level for multiclassing
-          // Base 1d6 at 1st, +1d6 at 3,5,7,...,19 → floor((rogueLevel+1)/2)
-          const rulesDice = Math.floor((rogueLevel + 1) / 2)
-
-          // If unified usage exists for sneak-attack as slots, prefer it
-          const maxDice = usage?.featureType === 'slots' && typeof usage.maxUses === 'number' ? usage.maxUses : rulesDice
-          const currentDice = usage?.featureType === 'slots' && typeof usage.currentUses === 'number' ? usage.currentUses : maxDice
-          const show = maxDice > 0
-          if (!show) return null
-
-          return (
-            <div className="flex items-start gap-3 col-span-2 mb-0">
-              <Icon icon="lucide:crosshair" className={`w-5 h-10 py-2.5 ${getCombatColor('featureAvailable')}`} />
-              <div className="flex flex-col gap-1">
-                <div className="text-sm text-muted-foreground">Sneak Attack</div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold font-mono">{maxDice}d6</span>
+                  <div className="w-fit flex items-center justify-start gap-4 border-[#ce6565] border rounded-md px-2 py-1.5">
+                    <span className="text-xs font-medium w-12 text-[#ce6565]">Fails</span>
+                    <div className="flex gap-1">
+                      {Array.from({ length: 3 }, (_, i) => {
+                        const isChecked = i < (character.deathSaves?.failures ?? 0)
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              if (!canEdit || !onToggleDeathSave) return
+                              onToggleDeathSave('failures', i)
+                            }}
+                            disabled={!canEdit}
+                            className={`w-3 h-3 rounded-md border-2 transition-colors ${
+                              isChecked
+                                ? `bg-[#ce6565] border-[#ce6565] ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
+                                : `bg-card border-border ${canEdit ? 'cursor-pointer hover:border-[#ce6565]' : 'cursor-not-allowed opacity-50'}`
+                            }`}
+                            title={isChecked ? "Failure" : "Not yet"}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          )
-        })()}
+          )}
 
-        {/* Class Features for Combat */}
-        {combatFeatures.length > 0 && (
-          <div className="col-span-2 pt-4 border-t">
-            <div className="text-sm font-medium mb-2">Class Features</div>
-            <div className="flex flex-col gap-2">
-              {Array.from(featuresByClass.entries()).map(([className, features]) => (
-                <div key={className} className="flex flex-col gap-2">
-                  {featuresByClass.size > 1 && (
-                    <div className="text-sm font-medium text-muted-foreground">{className} Features</div>
-                  )}
-                  {features.map((skill, index) => (
-                    <div key={skill.id || `${className}-${index}`}>
-                      {renderFeatureSkill(skill, className)}
+          {/* Exhaustion - only show if > 0 */}
+          {(character.exhaustion ?? 0) > 0 && (
+            <div className="flex items-center gap-3 col-span-2 mb-0">
+              <Icon icon="lucide:skull" className="w-[20px] min-w-[20px] h-[20px] min-h-[20px] text-[#ce6565]" />
+              <div className="flex flex-col gap-1">
+                <div className="text-sm text-muted-foreground">Exhaustion</div>
+                <div className="text-xl font-bold font-mono text-[#ce6565]">
+                  Level {character.exhaustion}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {(() => {
+                    const exhaustion = character.exhaustion || 0
+                    const effects = []
+                    if (exhaustion >= 1) effects.push("Disadvantage on ability checks")
+                    if (exhaustion >= 2) effects.push("Speed halved")
+                    if (exhaustion >= 3) effects.push("Disadvantage on attack rolls & saves")
+                    if (exhaustion >= 4) effects.push("Hit point maximum halved")
+                    if (exhaustion >= 5) effects.push("Speed reduced to 0")
+                    if (exhaustion >= 6) effects.push("Death")
+                    return effects.join(", ")
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Hit Dice */}
+          {character.hitDiceByClass && character.hitDiceByClass.length > 0 ? (
+            <div className="flex items-start gap-3 col-span-2 mb-0">
+              <Icon icon="lucide:dice-5" className={`w-5 h-10 py-2.5 ${getCombatColor('hitDice')}`} />
+              <div className="flex flex-col gap-1">
+                <div className="text-sm text-muted-foreground">Hit Dice</div>
+                <div className="flex flex-row gap-5">
+                  {character.hitDiceByClass.map((hitDie, classIndex) => (
+                    <div key={classIndex} className="flex flex-col gap-1">
+                      <span className="text-md font-bold font-mono">
+                        {hitDie.total - hitDie.used}/{hitDie.total}{hitDie.dieType}
+                      </span>
+                      <div className="flex gap-1">
+                        {Array.from({ length: hitDie.total }, (_, dieIndex) => {
+                          const isAvailable = dieIndex < (hitDie.total - hitDie.used)
+                          return (
+                            <button
+                              key={dieIndex}
+                              onClick={() => {
+                                if (!canEdit) return
+                                onToggleHitDie(classIndex, dieIndex)
+                              }}
+                              disabled={!canEdit}
+                              className={`w-3 h-3 rounded border transition-colors ${
+                                isAvailable
+                                  ? `${getCombatColor('hitDieAvailable')} ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`
+                                  : `${getCombatColor('hitDieUsed')} ${canEdit ? 'cursor-pointer hover:border-border/80' : 'cursor-not-allowed opacity-50'}`
+                              }`}
+                              title={isAvailable ? "Available" : "Used"}
+                            />
+                          )
+                        })}
+                      </div>
                     </div>
                   ))}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        )}
+          ) : character.hitDice && (
+            <div className="flex items-center gap-3 col-span-1 mb-0">
+              <Icon icon="lucide:dice-5" className={`w-5 h-5 ${getCombatColor('hitDice')}`} />
+              <div className="flex flex-col gap-1">
+                <div className="text-sm text-muted-foreground">Hit Dice</div>
+                <div className="text-xl font-bold font-mono">
+                  {character.hitDice.total - character.hitDice.used}/{character.hitDice.total}{character.hitDice.dieType}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rogue Sneak Attack dice (slot-based display) */}
+          {(() => {
+            // Determine whether to show: either has Rogue levels or explicit usage exists
+            const usage = getFeatureUsage(character, 'sneak-attack')
+            const rogueLevel = getClassLevel(character.classes || [], 'Rogue') || (character.class?.toLowerCase() === 'rogue' ? character.level : 0)
+            const hasSneakAttack = (usage?.featureType === 'slots') || rogueLevel > 0
+            if (!hasSneakAttack) return null
+
+            // Dice scaling anchored to Rogue level for multiclassing
+            // Base 1d6 at 1st, +1d6 at 3,5,7,...,19 → floor((rogueLevel+1)/2)
+            const rulesDice = Math.floor((rogueLevel + 1) / 2)
+
+            // If unified usage exists for sneak-attack as slots, prefer it
+            const maxDice = usage?.featureType === 'slots' && typeof usage.maxUses === 'number' ? usage.maxUses : rulesDice
+            const currentDice = usage?.featureType === 'slots' && typeof usage.currentUses === 'number' ? usage.currentUses : maxDice
+            const show = maxDice > 0
+            if (!show) return null
+
+            return (
+              <div className="flex items-start gap-3 col-span-2 mb-0">
+                <Icon icon="lucide:crosshair" className={`w-5 h-10 py-2.5 ${getCombatColor('featureAvailable')}`} />
+                <div className="flex flex-col gap-1">
+                  <div className="text-sm text-muted-foreground">Sneak Attack</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold font-mono">{maxDice}d6</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Combat Features and Feat-based Skills */}
+        {(() => {
+          const featCombatEntries = Object.entries(character.classFeatureSkillsUsage || {})
+            .filter(([, u]: [string, any]) => u?.isFeatFeature && u?.category === 'combat')
+          if (combatFeatures.length === 0 && featCombatEntries.length === 0) return null
+          return (
+            <div className="col-span-2 pt-4 border-t flex flex-col gap-4">
+              {/* Class Features for Combat */}
+              {combatFeatures.length > 0 && (
+                <div className="flex flex-col gap-4">
+                  <div className="text-sm font-medium">Class Features</div>
+
+                  <div className="flex flex-col gap-2">
+                    {Array.from(featuresByClass.entries()).map(([className, features]) => (
+                      <div key={className} className="flex flex-col gap-2">
+                        <div className="text-sm font-medium text-muted-foreground">{className} Features</div>
+                        {features.map((skill, index) => (
+                          <div key={skill.id || `${className}-${index}`}>
+                            {renderFeatureSkill(skill, className)}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Feat Skills for Combat */}
+              {featCombatEntries.length > 0 && (
+                <div>
+                  <div className="text-sm font-medium mb-2">Feat Skills</div>
+                  <div className="flex flex-col gap-2">
+                    {featCombatEntries.map(([featureId, usageData]: [string, any]) => {
+                      const featSkill: ClassFeatureSkill = {
+                        id: featureId,
+                        version: 1,
+                        title: usageData.featureName || 'Unknown',
+                        subtitle: usageData.featSource ? `From ${usageData.featSource}` : '',
+                        featureType: usageData.featureType || 'trait',
+                        enabledAtLevel: 1,
+                        enabledBySubclass: null,
+                        className: 'Feats',
+                        config: usageData.config || {},
+                      }
+                      return <div key={featureId}>{renderFeatureSkill(featSkill, undefined)}</div>
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Combat Notes - Only show if notes exist */}
         {character.otherTools && character.otherTools.trim() !== "" && (
@@ -613,8 +661,53 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
             <div className="text-sm font-medium mb-2">Combat Notes</div>
             <RichTextDisplay
               content={character.otherTools}
-              className="text-sm"
+              className="text-sm text-muted-foreground"
             />
+          </div>
+        )}
+
+        {/* Defenses & Senses */}
+        {(character.darkvision || character.damageVulnerabilities?.length || character.damageResistances?.length || character.damageImmunities?.length || character.conditionImmunities?.length || canEdit) && (
+          <div className="col-span-2 pt-4 border-t">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">Defenses & Senses</div>
+              {canEdit && onDefensesEdit && (
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onDefensesEdit}>
+                  <Icon icon="lucide:pencil" className="w-3.5 h-3.5" />
+                </Button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {character.darkvision != null && character.darkvision > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  <Icon icon="lucide:eye" className="w-3 h-3 mr-1" />
+                  Darkvision {character.darkvision} ft
+                </Badge>
+              )}
+              {character.damageVulnerabilities?.map(r => (
+                <Badge key={`vuln-${r}`} variant="outline" className={`text-xs capitalize ${DEFENSE_COLORS.vulnerability}`}>
+                  Vuln: {r}
+                </Badge>
+              ))}
+              {character.damageResistances?.map(r => (
+                <Badge key={`resist-${r}`} variant="outline" className={`text-xs capitalize ${DEFENSE_COLORS.resistance}`}>
+                  Resist: {r}
+                </Badge>
+              ))}
+              {character.damageImmunities?.map(r => (
+                <Badge key={`immune-${r}`} variant="outline" className={`text-xs capitalize ${DEFENSE_COLORS.immunity}`}>
+                  Immune: {r}
+                </Badge>
+              ))}
+              {character.conditionImmunities?.map(r => (
+                <Badge key={`cond-${r}`} variant="outline" className={`text-xs capitalize ${DEFENSE_COLORS.conditionImmunity}`}>
+                  Immune: {r}
+                </Badge>
+              ))}
+              {!character.darkvision && !character.damageVulnerabilities?.length && !character.damageResistances?.length && !character.damageImmunities?.length && !character.conditionImmunities?.length && canEdit && (
+                <span className="text-xs text-muted-foreground">No defenses set</span>
+              )}
+            </div>
           </div>
         )}
       </CardContent>

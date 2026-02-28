@@ -1,14 +1,44 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 interface RichTextDisplayProps {
   content: string
   className?: string
   fontSize?: 'xs' | 'sm' | 'base' | 'md' | 'lg' | 'xl' | '2xl'
+  maxLines?: number
 }
 
-export function RichTextDisplay({ content, className = "", fontSize }: RichTextDisplayProps) {
+export function RichTextDisplay({ content, className = "", fontSize, maxLines }: RichTextDisplayProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isTruncated, setIsTruncated] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const looksLikeHtml = content ? /<\w+[^>]*>/.test(content) : false
+
+  // Spoiler click handler (HTML only)
+  useEffect(() => {
+    if (!containerRef.current || !looksLikeHtml) return
+    const handleSpoilerClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'SPOILER' || target.closest('spoiler')) {
+        const spoiler = target.tagName === 'SPOILER' ? target : target.closest('spoiler')
+        if (spoiler && !spoiler.classList.contains('revealed')) {
+          spoiler.classList.add('revealed')
+        }
+      }
+    }
+    const container = containerRef.current
+    container.addEventListener('click', handleSpoilerClick)
+    return () => { container.removeEventListener('click', handleSpoilerClick) }
+  }, [content, looksLikeHtml])
+
+  // Detect whether content actually overflows when clamped
+  useEffect(() => {
+    if (!maxLines || !containerRef.current || isExpanded) return
+    setIsTruncated(containerRef.current.scrollHeight > containerRef.current.clientHeight + 2)
+  }, [content, maxLines, isExpanded])
+
   if (!content) return null
 
   // Map fontSize to Tailwind text size classes
@@ -18,17 +48,16 @@ export function RichTextDisplay({ content, className = "", fontSize }: RichTextD
         'xs': 'text-xs',
         'sm': 'text-sm',
         'base': 'text-base',
-        'md': 'text-base', // md maps to base
+        'md': 'text-base',
         'lg': 'text-lg',
         'xl': 'text-xl',
         '2xl': 'text-2xl'
       }
       return textSizeMap[fontSize] || 'text-sm'
     }
-    return 'text-sm' // default
+    return 'text-sm'
   }
-  
-  // Get prose modifier class if available (for Tailwind Typography plugin)
+
   const getProseModifier = () => {
     if (fontSize) {
       const proseMap: Record<string, string> = {
@@ -45,60 +74,52 @@ export function RichTextDisplay({ content, className = "", fontSize }: RichTextD
     return 'prose-sm'
   }
 
-  // Extract font size from className if fontSize prop not provided
   const extractFontSizeFromClassName = (className: string): string | null => {
     const sizeMatch = className.match(/\btext-(xs|sm|base|md|lg|xl|2xl)\b/)
     return sizeMatch ? sizeMatch[1] : null
   }
 
-  // Determine final font size
   const finalFontSize = fontSize || extractFontSizeFromClassName(className) || 'sm'
   const fontSizeClasses = getFontSizeClasses()
   const proseModifier = getProseModifier()
-  
-  // Remove text size classes from className to avoid conflicts
   const cleanedClassName = className.replace(/\btext-(xs|sm|base|md|lg|xl|2xl)\b/g, '').trim()
 
-  // If content appears to be HTML (from TipTap), render as-is inside prose container
-  const looksLikeHtml = /<\w+[^>]*>/.test(content)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const clampStyle: React.CSSProperties = maxLines && !isExpanded ? {
+    overflow: 'hidden',
+    display: '-webkit-box',
+    WebkitLineClamp: maxLines,
+    WebkitBoxOrient: 'vertical',
+  } : {}
 
-  // Add click handler for spoiler reveals
-  useEffect(() => {
-    if (!containerRef.current || !looksLikeHtml) return
-
-    const handleSpoilerClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (target.tagName === 'SPOILER' || target.closest('spoiler')) {
-        const spoiler = target.tagName === 'SPOILER' ? target : target.closest('spoiler')
-        if (spoiler && !spoiler.classList.contains('revealed')) {
-          spoiler.classList.add('revealed')
-        }
-      }
-    }
-
-    const container = containerRef.current
-    container.addEventListener('click', handleSpoilerClick)
-
-    return () => {
-      container.removeEventListener('click', handleSpoilerClick)
-    }
-  }, [content, looksLikeHtml])
+  const toggleButton = maxLines && isTruncated ? (
+    <button
+      onClick={() => setIsExpanded(e => !e)}
+      className="text-xs text-muted-foreground hover:text-foreground mt-1 block w-fit"
+    >
+      {isExpanded ? 'Show less' : 'Read more'}
+    </button>
+  ) : null
 
   if (looksLikeHtml) {
-    // Use prose modifier if fontSize is specified, otherwise use default prose
     const proseClass = fontSize ? `prose ${proseModifier}` : 'prose'
+    const processedContent = content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+
     return (
-      <div 
-        ref={containerRef}
-        className={`${proseClass} ${fontSizeClasses} ${cleanedClassName}`}
-        style={fontSize ? { fontSize: 'inherit' } : undefined}
-        dangerouslySetInnerHTML={{ __html: content }} 
-      />
+      <>
+        <div
+          ref={containerRef}
+          className={`${proseClass} ${fontSizeClasses} ${cleanedClassName}`}
+          style={{ ...clampStyle, ...(fontSize ? { fontSize: 'inherit' } : {}) }}
+          dangerouslySetInnerHTML={{ __html: processedContent }}
+        />
+        {toggleButton}
+      </>
     )
   }
 
-  // Fallback: convert simple markdown-like formatting to HTML
+  // Fallback: plain text with markdown-like formatting
   const formatText = (text: string) => {
     return text
       .split("\n")
@@ -114,39 +135,40 @@ export function RichTextDisplay({ content, className = "", fontSize }: RichTextD
 
   const formattedContent = formatText(content)
   const lines = formattedContent.split("\n")
-
-  // For plain text, use the fontSize directly
   const textSizeClass = fontSize ? `text-${fontSize}` : (extractFontSizeFromClassName(className) ? `text-${extractFontSizeFromClassName(className)}` : 'text-sm')
 
   return (
-    <div className={`${textSizeClass} whitespace-pre-wrap ${cleanedClassName}`}>
-      {lines.map((line, index) => {
-        if (line.startsWith("<li>")) {
-          const listItems = [] as string[]
-          let currentIndex = index
-          while (currentIndex < lines.length && lines[currentIndex].startsWith("<li>")) {
-            listItems.push(lines[currentIndex])
-            currentIndex++
+    <>
+      <div ref={containerRef} className={`${textSizeClass} whitespace-pre-wrap ${cleanedClassName}`} style={clampStyle}>
+        {lines.map((line, index) => {
+          if (line.startsWith("<li>")) {
+            const listItems = [] as string[]
+            let currentIndex = index
+            while (currentIndex < lines.length && lines[currentIndex].startsWith("<li>")) {
+              listItems.push(lines[currentIndex])
+              currentIndex++
+            }
+            if (index === 0 || !lines[index - 1].startsWith("<li>")) {
+              return (
+                <ul key={index} className="list-disc list-inside space-y-1 my-2 pl-1">
+                  {listItems.map((item, itemIndex) => (
+                    <li key={itemIndex} dangerouslySetInnerHTML={{ __html: item.replace(/^<li>|<\/li>$/g, '') }} />
+                  ))}
+                </ul>
+              )
+            }
+            return null
           }
-          if (index === 0 || !lines[index - 1].startsWith("<li>")) {
-            return (
-              <ul key={index} className="list-disc list-inside space-y-1 my-2 pl-1">
-                {listItems.map((item, itemIndex) => (
-                  <li key={itemIndex} dangerouslySetInnerHTML={{ __html: item.replace(/^<li>|<\/li>$/g, '') }} />
-                ))}
-              </ul>
-            )
-          }
-          return null
-        }
-        return (
-          <div
-            key={index}
-            dangerouslySetInnerHTML={{ __html: line || "<br>" }}
-            className={line.trim() === "" ? "h-4" : ""}
-          />
-        )
-      })}
-    </div>
+          return (
+            <div
+              key={index}
+              dangerouslySetInnerHTML={{ __html: line || "<br>" }}
+              className={line.trim() === "" ? "h-4" : ""}
+            />
+          )
+        })}
+      </div>
+      {toggleButton}
+    </>
   )
 }

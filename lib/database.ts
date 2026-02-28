@@ -692,6 +692,14 @@ export const saveCharacter = async (
       backstory: character.backstory || "",
       notes: character.notes || "",
       campaign_id: character.campaignId || null,
+      // Defenses & senses
+      darkvision: character.darkvision ?? null,
+      damage_resistances: character.damageResistances ?? [],
+      damage_immunities: character.damageImmunities ?? [],
+      condition_immunities: character.conditionImmunities ?? [],
+      innate_spells: character.innateSpells ?? [],
+      // Armor
+      armor: character.armor ?? [],
       updated_at: new Date().toISOString(),
     }
 
@@ -836,6 +844,14 @@ const CHARACTER_TO_DB_COLUMNS: Record<string, string> = {
   backstory: 'backstory',
   notes: 'notes',
   campaignId: 'campaign_id',
+  // Defenses & senses
+  darkvision: 'darkvision',
+  damageResistances: 'damage_resistances',
+  damageImmunities: 'damage_immunities',
+  conditionImmunities: 'condition_immunities',
+  innateSpells: 'innate_spells',
+  // Armor
+  armor: 'armor',
 }
 
 /**
@@ -1040,6 +1056,14 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       partyStatus: 'active', // Default to 'active' for single character load (will be updated separately if needed)
       campaignId: data.campaign_id || undefined,
       classFeatureSkillsUsage: data.class_features_skills_usage || {},
+      // Defenses & senses
+      darkvision: data.darkvision ?? null,
+      damageResistances: data.damage_resistances ?? [],
+      damageImmunities: data.damage_immunities ?? [],
+      conditionImmunities: data.condition_immunities ?? [],
+      innateSpells: data.innate_spells ?? [],
+      // Armor
+      armor: data.armor ?? [],
     }
 
     // Hydrate classData cache for each class entry
@@ -1256,6 +1280,18 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
     const recalculatedUsage = recalculateAllFeatureMaxUses(character)
     if (Object.keys(recalculatedUsage).length > 0) {
       character.classFeatureSkillsUsage = recalculatedUsage
+    }
+
+    // Load race feature data for passive bonuses
+    if (character.raceIds && character.raceIds.length > 0) {
+      try {
+        const raceResults = await Promise.all(character.raceIds.map(r => loadRaceDetails(r.id)))
+        character.racesData = raceResults
+          .filter(r => r.race)
+          .map(r => ({ id: r.race!.id, features: r.race!.features ?? null }))
+      } catch {
+        // Silently continue - racesData is optional
+      }
     }
 
     return { character }
@@ -1507,6 +1543,14 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           partyStatus: row.party_status?.status || 'active', // Default to 'active' if no status found
           campaignId: row.campaign_id || undefined,
           classFeatureSkillsUsage: row.class_features_skills_usage || {},
+          // Defenses & senses
+          darkvision: row.darkvision ?? null,
+          damageResistances: row.damage_resistances ?? [],
+          damageImmunities: row.damage_immunities ?? [],
+          conditionImmunities: row.condition_immunities ?? [],
+          innateSpells: row.innate_spells ?? [],
+          // Armor
+          armor: row.armor ?? [],
         }
 
         // Initialize features automatically based on what's available for the character
@@ -2493,6 +2537,7 @@ export interface BackgroundData {
   equipment?: string | null
   money?: { gold: number; silver: number; copper: number } | null
   description?: string | null
+  background_feature?: { name: string; description: string; passive_bonuses?: any } | null
   defining_events?: Array<{ number: number; text: string }> | null
   defining_events_title?: string | null
   personality_traits?: Array<{ number: number; text: string }> | null
@@ -2569,6 +2614,7 @@ export const upsertBackground = async (background: Partial<BackgroundData> & { i
       equipment: background.equipment || null,
       money: background.money || { gold: 0, silver: 0, copper: 0 },
       description: background.description || null,
+      background_feature: background.background_feature || null,
       defining_events: background.defining_events || null,
       defining_events_title: background.defining_events_title || null,
       personality_traits: background.personality_traits || null,
@@ -2660,6 +2706,17 @@ export interface FeatData {
   weapon_proficiencies?: string[] | null
   languages?: string[] | { fixed?: string[]; choice?: { count: number } } | null
   special_features?: any[] | null
+  /**
+   * Mechanical effects evaluated by the formula engine.
+   * Same schema as class_features.passive_bonuses.
+   * Examples: ability_score bonuses, skill bonuses, hp_bonus, ac_bonus.
+   */
+  passive_bonuses?: any | null
+  /**
+   * Structured prerequisites for feat selection.
+   * { min_level?, ability_scores?: {str?,dex?,...}, spellcasting?, proficiency?, race?, other? }
+   */
+  prerequisites?: any | null
   created_at?: string
   updated_at?: string
   created_by?: string | null
@@ -2734,6 +2791,8 @@ export const upsertFeat = async (feat: Partial<FeatData> & { id?: string }): Pro
       weapon_proficiencies: feat.weapon_proficiencies || null,
       languages: feat.languages || null,
       special_features: feat.special_features || null,
+      passive_bonuses: feat.passive_bonuses || null,
+      prerequisites: feat.prerequisites || null,
     }
 
     if (feat.id) {

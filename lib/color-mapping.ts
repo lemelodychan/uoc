@@ -230,6 +230,18 @@ export function getClassFeatureColors(className: string | undefined | null): { a
   }
 }
 
+// Defense badge colors — mapped to ability score palette
+export const DEFENSE_COLORS = {
+  // Vulnerability → STR red
+  vulnerability: 'border-[#ce6565]/50 text-[#ce6565]',
+  // Resistance → CON gold
+  resistance: 'border-[#b0986a]/50 text-[#b0986a]',
+  // Damage immunity → WIS purple
+  immunity: 'border-[#8b6ac0]/50 text-[#8b6ac0]',
+  // Condition immunity → WIS purple (same semantic)
+  conditionImmunity: 'border-[#8b6ac0]/50 text-[#8b6ac0]',
+} as const
+
 // Common class combinations for consistent styling
 export const COMMON_CLASSES = {
   // Interactive elements
