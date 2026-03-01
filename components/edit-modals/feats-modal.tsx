@@ -68,7 +68,7 @@ export function FeatsModal({ isOpen, onClose, character, onSave, onOpenSpellEdit
             <Icon icon="lucide:pencil" className="w-4 h-4" />
             Add Custom
           </Button>
-          <Button onClick={() => setFeatSelectionModalOpen(true)}>
+          <Button variant="default" size="sm" onClick={() => setFeatSelectionModalOpen(true)}>
             <Icon icon="lucide:book-open" className="w-4 h-4" />
             Pick from Library
           </Button>

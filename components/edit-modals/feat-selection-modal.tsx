@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
-import { loadFeatsWithDetails, loadFeatDetails, type FeatData } from "@/lib/database"
+import { loadFeatsWithDetails, loadFeatDetails, loadAllRaces, type FeatData } from "@/lib/database"
 import { ProficiencyCheckboxes, SKILL_OPTIONS } from "@/components/ui/proficiency-checkboxes"
 import type { CharacterData, FeatSpellSlot, InnateSpell } from "@/lib/character-data"
 import { useToast } from "@/hooks/use-toast"
@@ -49,11 +49,41 @@ const TOOL_OPTIONS = [
   { value: 'vehicles_water', label: 'Vehicles (Water)' }
 ]
 
+// Race families: first member is the parent race (bare name).
+// When the parent race is in the prereq array, all family members get
+// collapsed into the plural label for display purposes only.
+const RACE_FAMILIES = [
+  { plural: 'Elves',     members: ['elf', 'high elf', 'wood elf', 'drow', 'dark elf', 'eladrin'] },
+  { plural: 'Dwarves',   members: ['dwarf', 'hill dwarf', 'mountain dwarf'] },
+  { plural: 'Gnomes',    members: ['gnome', 'forest gnome', 'rock gnome', 'deep gnome'] },
+  { plural: 'Halflings', members: ['halfling', 'lightfoot halfling', 'stout halfling'] },
+  { plural: 'Humans',    members: ['human', 'variant human'] },
+]
+
+function formatRacePrereq(races: string[]): string {
+  const lower = races.map(r => r.toLowerCase())
+  const usedIndices = new Set<number>()
+  const parts: string[] = []
+
+  for (const family of RACE_FAMILIES) {
+    const parentIdx = lower.indexOf(family.members[0])
+    if (parentIdx !== -1) {
+      // Parent race present — collapse all matching family members
+      lower.forEach((r, i) => { if (family.members.includes(r)) usedIndices.add(i) })
+      parts.push(family.plural)
+    }
+  }
+
+  races.forEach((r, i) => { if (!usedIndices.has(i)) parts.push(r) })
+  return parts.join(' or ')
+}
+
 interface Prerequisites {
   min_level?: number | null
   ability_scores?: Partial<Record<'strength'|'dexterity'|'constitution'|'intelligence'|'wisdom'|'charisma', number>>
   spellcasting?: boolean
   proficiency?: string[]
+  race?: string[]
   other?: string
 }
 
@@ -62,7 +92,7 @@ interface PrereqCheck {
   met: boolean | null // null = unknown/gray
 }
 
-function checkPrerequisites(prereqs: Prerequisites, character: CharacterData): PrereqCheck[] {
+function checkPrerequisites(prereqs: Prerequisites, character: CharacterData, mainRaceName?: string): PrereqCheck[] {
   const checks: PrereqCheck[] = []
 
   if (prereqs.min_level && prereqs.min_level > 0) {
@@ -124,6 +154,14 @@ function checkPrerequisites(prereqs: Prerequisites, character: CharacterData): P
     }
   }
 
+  if (prereqs.race && prereqs.race.length > 0) {
+    const raceName = mainRaceName || ''
+    const met = raceName
+      ? prereqs.race.some(r => r.toLowerCase() === raceName.toLowerCase())
+      : null
+    checks.push({ label: `Race: ${formatRacePrereq(prereqs.race)}`, met })
+  }
+
   if (prereqs.other) {
     checks.push({ label: prereqs.other, met: null })
   }
@@ -159,6 +197,8 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
   const [spellChoices, setSpellChoices] = useState<SpellChoices>({})
   const [spellLibrary, setSpellLibrary] = useState<SpellLibraryEntry[]>([])
   const [spellSearchQuery, setSpellSearchQuery] = useState<Record<string, string>>({})
+  const [featSearchQuery, setFeatSearchQuery] = useState('')
+  const [racesMap, setRacesMap] = useState<Record<string, string>>({}) // id -> name
 
   const { toast } = useToast()
 
@@ -182,6 +222,16 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
           .then(data => { if (Array.isArray(data)) setSpellLibrary(data) })
           .catch(() => {})
       }
+      // Fetch races for prerequisite name resolution
+      if (Object.keys(racesMap).length === 0) {
+        loadAllRaces().then(({ races }) => {
+          if (races) {
+            const map: Record<string, string> = {}
+            races.forEach(r => { map[r.id] = r.name })
+            setRacesMap(map)
+          }
+        })
+      }
     } else {
       // Reset state when modal closes
       setSelectedFeatId(null)
@@ -193,6 +243,7 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
       setLanguageChoices([])
       setSpellChoices({})
       setSpellSearchQuery({})
+      setFeatSearchQuery('')
     }
   }, [isOpen, toast]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -534,7 +585,7 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
 
     // 5. Apply equipment proficiencies
     if (feat.equipment_proficiencies && feat.equipment_proficiencies.length > 0) {
-      const currentEquipment = character.equipmentProficiencies || {}
+      const currentEquipment = character.equipmentProficiencies || {} as any
       const updatedEquipment = { ...currentEquipment }
       
       feat.equipment_proficiencies.forEach(prof => {
@@ -549,7 +600,7 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
 
     // 6. Apply weapon proficiencies
     if (feat.weapon_proficiencies && feat.weapon_proficiencies.length > 0) {
-      const currentEquipment = updates.equipmentProficiencies || character.equipmentProficiencies || {}
+      const currentEquipment = updates.equipmentProficiencies || character.equipmentProficiencies || {} as any
       const updatedEquipment = { ...currentEquipment }
       
       feat.weapon_proficiencies.forEach(weapon => {
@@ -737,11 +788,27 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
   }
 
   if (step === 'select') {
+    const hasAbilityModifiers = (val: any) => val && (!Array.isArray(val) || val.length > 0)
+    const displayedFeats = feats.filter(feat =>
+      !featSearchQuery || feat.name.toLowerCase().includes(featSearchQuery.toLowerCase())
+    )
+    const mainRaceId = character.raceIds?.find(r => r.isMain)?.id ?? character.raceIds?.[0]?.id
+    const mainRaceName = mainRaceId ? (racesMap[mainRaceId] ?? character.race) : character.race
+
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[700px] max-h-[80vh] p-0 gap-0">
           <DialogHeader className="p-4 border-b">
             <DialogTitle>Select Feat from Library</DialogTitle>
+            <div className="relative mt-2">
+              <Icon icon="lucide:search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search feats..."
+                value={featSearchQuery}
+                onChange={(e) => setFeatSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
           </DialogHeader>
           <div className="p-4 max-h-[60vh] overflow-y-auto">
             {loading ? (
@@ -751,82 +818,104 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
               </div>
             ) : (
               <div className="grid gap-3">
-                {feats.map((feat) => {
+                {displayedFeats.map((feat) => {
                   const prereqs = feat.prerequisites as Prerequisites | null | undefined
-                  const prereqChecks = prereqs ? checkPrerequisites(prereqs, character) : []
+                  const prereqChecks = prereqs ? checkPrerequisites(prereqs, character, mainRaceName) : []
                   const hasFailedCheck = prereqChecks.some(c => c.met === false)
+                  const alreadyOwned = (character.feats || []).some(
+                    (f: any) => f.featId === feat.id || f.name === feat.name
+                  )
+                  const isDisabled = hasFailedCheck || alreadyOwned
+                  const hasBadges =
+                    alreadyOwned ||
+                    prereqChecks.length > 0 ||
+                    hasAbilityModifiers(feat.ability_modifiers) ||
+                    hasAbilityModifiers(feat.skill_proficiencies) ||
+                    hasAbilityModifiers(feat.tool_proficiencies) ||
+                    (feat.special_features && feat.special_features.length > 0)
 
                   return (
                   <div
                     key={feat.id}
-                    className="p-4 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
-                    onClick={() => handleFeatSelect(feat.id)}
+                    className={`p-3 border rounded-lg transition-colors relative ${
+                      isDisabled
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'cursor-pointer hover:bg-card'
+                    }`}
+                    onClick={() => !isDisabled && handleFeatSelect(feat.id)}
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 font-semibold text-lg mb-1">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 font-semibold text-lg">
                           {feat.name}
-                          {hasFailedCheck && (
-                            <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/30">
-                              <Icon icon="lucide:alert-triangle" className="w-3 h-3 mr-1" />
-                              Check requirements
-                            </Badge>
-                          )}
                         </div>
                         {feat.description && (
-                          <div className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                          <div className="text-sm text-muted-foreground line-clamp-2">
                             <RichTextDisplay content={feat.description} />
                           </div>
                         )}
-                        {prereqChecks.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {prereqChecks.map((check, idx) => (
-                              <Badge
-                                key={idx}
-                                variant="outline"
-                                className={`text-xs ${
-                                  check.met === true
-                                    ? 'border-green-500 text-green-700 bg-green-50 dark:bg-green-950/30 dark:text-green-400'
-                                    : check.met === false
-                                    ? 'border-red-500 text-red-700 bg-red-50 dark:bg-red-950/30 dark:text-red-400'
-                                    : 'border-gray-400 text-gray-500 bg-gray-50 dark:bg-gray-800/30'
-                                }`}
-                              >
-                                {check.label}
-                                {check.met === true && ' \u2713'}
-                                {check.met === false && ' \u2717'}
+                        {hasBadges && (
+                          <div className="flex flex-wrap gap-2 pt-3 border-t">
+                            {alreadyOwned && (
+                              <Badge variant="outline" size="xs" className="bg-transparent text-[#6a8bc0] border-[#6a8bc0]">
+                                Achieved
                               </Badge>
-                            ))}
+                            )}
+                            {prereqChecks.length > 0 && (
+                              <>
+                                {prereqChecks.map((check, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    size="xs"
+                                    className={`bg-transparent ${
+                                      check.met === true
+                                        ? 'text-[#6ab08b] border-[#6ab08b]'
+                                        : check.met === false
+                                        ? 'text-[#ce6565] border-[#ce6565]'
+                                        : 'text-[#b0986a] border-[#b0986a]'
+                                    }`}
+                                  >
+                                    {check.label}
+                                    {check.met === true && ' \u2713'}
+                                    {check.met === false && ' \u2717'}
+                                  </Badge>
+                                ))}
+                              </>
+                            )}
+                            {hasAbilityModifiers(feat.ability_modifiers) && (
+                              <Badge variant="outline" size="xs" className="text-xs">
+                                Ability Modifiers
+                              </Badge>
+                            )}
+                            {hasAbilityModifiers(feat.skill_proficiencies) && (
+                              <Badge variant="outline" size="xs" className="text-xs">
+                                Skills
+                              </Badge>
+                            )}
+                            {hasAbilityModifiers(feat.tool_proficiencies) && (
+                              <Badge variant="outline" size="xs" className="text-xs">
+                                Tools
+                              </Badge>
+                            )}
+                            {feat.special_features && feat.special_features.length > 0 && (
+                              <Badge variant="outline" size="xs" className="text-xs">
+                                {feat.special_features.length} Feature(s)
+                              </Badge>
+                            )}
                           </div>
                         )}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {feat.ability_modifiers && (
-                            <Badge variant="outline" className="text-xs">
-                              Ability Modifiers
-                            </Badge>
-                          )}
-                          {feat.skill_proficiencies && (
-                            <Badge variant="outline" className="text-xs">
-                              Skills
-                            </Badge>
-                          )}
-                          {feat.tool_proficiencies && (
-                            <Badge variant="outline" className="text-xs">
-                              Tools
-                            </Badge>
-                          )}
-                          {feat.special_features && feat.special_features.length > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              {feat.special_features.length} Feature(s)
-                            </Badge>
-                          )}
-                        </div>
                       </div>
-                      <Icon icon="lucide:chevron-right" className="w-5 h-5 text-muted-foreground ml-2" />
+                      <Icon icon="lucide:chevron-right" className="w-5 h-5 absolute right-3 top-3" />
                     </div>
                   </div>
                   )
                 })}
+                {displayedFeats.length === 0 && feats.length > 0 && (
+                  <div className="text-center text-muted-foreground py-8">
+                    No feats match your search
+                  </div>
+                )}
                 {feats.length === 0 && (
                   <div className="text-center text-muted-foreground py-8">
                     No feats available in the library
