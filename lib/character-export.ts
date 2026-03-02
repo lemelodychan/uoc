@@ -103,6 +103,8 @@ export interface CharacterExportSummary {
     damageResistances: string[]
     damageImmunities: string[]
     conditionImmunities: string[]
+    conditionAdvantages: string[]
+    conditionDisadvantages: string[]
   }
 }
 
@@ -255,6 +257,8 @@ export function buildCharacterExportSummary(
       damageResistances: character.damageResistances ?? [],
       damageImmunities: character.damageImmunities ?? [],
       conditionImmunities: character.conditionImmunities ?? [],
+      conditionAdvantages: character.conditionAdvantages ?? [],
+      conditionDisadvantages: character.conditionDisadvantages ?? [],
     },
   }
 }
@@ -469,7 +473,9 @@ export function exportCharacterAsCsv(character: CharacterData): string {
       d.damageVulnerabilities.length > 0 ||
       d.damageResistances.length > 0 ||
       d.damageImmunities.length > 0 ||
-      d.conditionImmunities.length > 0
+      d.conditionImmunities.length > 0 ||
+      d.conditionAdvantages.length > 0 ||
+      d.conditionDisadvantages.length > 0
     if (hasAny) {
       lines.push("# Defenses")
       lines.push(
@@ -486,6 +492,12 @@ export function exportCharacterAsCsv(character: CharacterData): string {
       )
       lines.push(
         csvRow(["Condition Immunities", d.conditionImmunities.length > 0 ? d.conditionImmunities.join(", ") : "None"])
+      )
+      lines.push(
+        csvRow(["Condition Saving Throw Advantages", d.conditionAdvantages.length > 0 ? d.conditionAdvantages.join(", ") : "None"])
+      )
+      lines.push(
+        csvRow(["Condition Saving Throw Disadvantages", d.conditionDisadvantages.length > 0 ? d.conditionDisadvantages.join(", ") : "None"])
       )
       lines.push("")
     }

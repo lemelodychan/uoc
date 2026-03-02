@@ -697,6 +697,8 @@ export const saveCharacter = async (
       damage_resistances: character.damageResistances ?? [],
       damage_immunities: character.damageImmunities ?? [],
       condition_immunities: character.conditionImmunities ?? [],
+      condition_advantages: character.conditionAdvantages ?? [],
+      condition_disadvantages: character.conditionDisadvantages ?? [],
       innate_spells: character.innateSpells ?? [],
       // Armor
       armor: character.armor ?? [],
@@ -849,6 +851,8 @@ const CHARACTER_TO_DB_COLUMNS: Record<string, string> = {
   damageResistances: 'damage_resistances',
   damageImmunities: 'damage_immunities',
   conditionImmunities: 'condition_immunities',
+  conditionAdvantages: 'condition_advantages',
+  conditionDisadvantages: 'condition_disadvantages',
   innateSpells: 'innate_spells',
   // Armor
   armor: 'armor',
@@ -1061,6 +1065,8 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       damageResistances: data.damage_resistances ?? [],
       damageImmunities: data.damage_immunities ?? [],
       conditionImmunities: data.condition_immunities ?? [],
+      conditionAdvantages: data.condition_advantages ?? [],
+      conditionDisadvantages: data.condition_disadvantages ?? [],
       innateSpells: data.innate_spells ?? [],
       // Armor
       armor: data.armor ?? [],
@@ -1548,6 +1554,8 @@ export const loadAllCharacters = async (): Promise<{ characters?: CharacterData[
           damageResistances: row.damage_resistances ?? [],
           damageImmunities: row.damage_immunities ?? [],
           conditionImmunities: row.condition_immunities ?? [],
+          conditionAdvantages: row.condition_advantages ?? [],
+          conditionDisadvantages: row.condition_disadvantages ?? [],
           innateSpells: row.innate_spells ?? [],
           // Armor
           armor: row.armor ?? [],

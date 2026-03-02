@@ -668,7 +668,7 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
         )}
 
         {/* Defenses & Senses */}
-        {(character.darkvision || character.damageVulnerabilities?.length || character.damageResistances?.length || character.damageImmunities?.length || character.conditionImmunities?.length || canEdit) && (
+        {(character.darkvision || character.damageVulnerabilities?.length || character.damageResistances?.length || character.damageImmunities?.length || character.conditionImmunities?.length || character.conditionAdvantages?.length || character.conditionDisadvantages?.length || canEdit) && (
           <div className="col-span-2 pt-4 border-t">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium">Defenses & Senses</div>
@@ -705,7 +705,17 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
                   Immune: {r}
                 </Badge>
               ))}
-              {!character.darkvision && !character.damageVulnerabilities?.length && !character.damageResistances?.length && !character.damageImmunities?.length && !character.conditionImmunities?.length && canEdit && (
+              {character.conditionAdvantages?.map(r => (
+                <Badge key={`condadv-${r}`} variant="outline" className={`text-xs capitalize ${DEFENSE_COLORS.conditionAdvantage}`}>
+                  Adv: {r}
+                </Badge>
+              ))}
+              {character.conditionDisadvantages?.map(r => (
+                <Badge key={`conddisadv-${r}`} variant="outline" className={`text-xs capitalize ${DEFENSE_COLORS.conditionDisadvantage}`}>
+                  Disadv: {r}
+                </Badge>
+              ))}
+              {!character.darkvision && !character.damageVulnerabilities?.length && !character.damageResistances?.length && !character.damageImmunities?.length && !character.conditionImmunities?.length && !character.conditionAdvantages?.length && !character.conditionDisadvantages?.length && canEdit && (
                 <span className="text-xs text-muted-foreground">No defenses set</span>
               )}
             </div>

@@ -19,6 +19,8 @@ interface DefensesModalProps {
     damageResistances?: string[]
     damageImmunities?: string[]
     conditionImmunities?: string[]
+    conditionAdvantages?: string[]
+    conditionDisadvantages?: string[]
   }) => void
 }
 
@@ -31,6 +33,8 @@ export function DefensesModal({ isOpen, onClose, character, onSave }: DefensesMo
   const [damageResistances, setDamageResistances] = useState<string[]>([])
   const [damageImmunities, setDamageImmunities] = useState<string[]>([])
   const [conditionImmunities, setConditionImmunities] = useState<string[]>([])
+  const [conditionAdvantages, setConditionAdvantages] = useState<string[]>([])
+  const [conditionDisadvantages, setConditionDisadvantages] = useState<string[]>([])
   const [customVulnerability, setCustomVulnerability] = useState("")
   const [customResistance, setCustomResistance] = useState("")
   const [customImmunity, setCustomImmunity] = useState("")
@@ -41,10 +45,12 @@ export function DefensesModal({ isOpen, onClose, character, onSave }: DefensesMo
     setDamageResistances(character.damageResistances ?? [])
     setDamageImmunities(character.damageImmunities ?? [])
     setConditionImmunities(character.conditionImmunities ?? [])
+    setConditionAdvantages(character.conditionAdvantages ?? [])
+    setConditionDisadvantages(character.conditionDisadvantages ?? [])
     setCustomVulnerability("")
     setCustomResistance("")
     setCustomImmunity("")
-  }, [character.darkvision, character.damageVulnerabilities, character.damageResistances, character.damageImmunities, character.conditionImmunities])
+  }, [character.darkvision, character.damageVulnerabilities, character.damageResistances, character.damageImmunities, character.conditionImmunities, character.conditionAdvantages, character.conditionDisadvantages])
 
   const toggleItem = (list: string[], setList: (v: string[]) => void, item: string) => {
     setList(list.includes(item) ? list.filter(i => i !== item) : [...list, item])
@@ -65,17 +71,19 @@ export function DefensesModal({ isOpen, onClose, character, onSave }: DefensesMo
       damageResistances,
       damageImmunities,
       conditionImmunities,
+      conditionAdvantages,
+      conditionDisadvantages,
     })
     onClose()
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
-        <DialogHeader className="p-4 border-b">
+      <DialogContent className="sm:max-w-[600px] max-h-[85vh] p-0 gap-0 flex flex-col">
+        <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle>Edit Defenses & Senses</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-5 p-4 max-h-[50vh] overflow-y-auto">
+        <div className="flex flex-col gap-5 p-4 flex-1 overflow-y-auto min-h-0">
           {/* Darkvision */}
           <div className="flex flex-col gap-2">
             <Label className="text-sm font-medium">Darkvision (ft)</Label>
@@ -254,8 +262,44 @@ export function DefensesModal({ isOpen, onClose, character, onSave }: DefensesMo
               ))}
             </div>
           </div>
+
+          {/* Condition Advantages */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium">Condition Saving Throw Advantages</Label>
+            <p className="text-xs text-muted-foreground">Conditions the character has advantage on saving throws against</p>
+            <div className="flex flex-wrap gap-1.5">
+              {CONDITION_TYPES.map(type => (
+                <Badge
+                  key={type}
+                  variant={conditionAdvantages.includes(type) ? "default" : "outline"}
+                  className="cursor-pointer capitalize"
+                  onClick={() => toggleItem(conditionAdvantages, setConditionAdvantages, type)}
+                >
+                  {type}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          {/* Condition Disadvantages */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium">Condition Saving Throw Disadvantages</Label>
+            <p className="text-xs text-muted-foreground">Conditions the character has disadvantage on saving throws against</p>
+            <div className="flex flex-wrap gap-1.5">
+              {CONDITION_TYPES.map(type => (
+                <Badge
+                  key={type}
+                  variant={conditionDisadvantages.includes(type) ? "default" : "outline"}
+                  className="cursor-pointer capitalize"
+                  onClick={() => toggleItem(conditionDisadvantages, setConditionDisadvantages, type)}
+                >
+                  {type}
+                </Badge>
+              ))}
+            </div>
+          </div>
         </div>
-        <DialogFooter className="p-4 border-t">
+        <DialogFooter className="p-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSave}>Save Changes</Button>
         </DialogFooter>

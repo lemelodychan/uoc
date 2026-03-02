@@ -240,6 +240,10 @@ export const DEFENSE_COLORS = {
   immunity: 'border-[#8b6ac0]/50 text-[#8b6ac0]',
   // Condition immunity → WIS purple (same semantic)
   conditionImmunity: 'border-[#8b6ac0]/50 text-[#8b6ac0]',
+  // Condition advantage → DEX green
+  conditionAdvantage: 'border-[#6ab08b]/50 text-[#6ab08b]',
+  // Condition disadvantage → STR red
+  conditionDisadvantage: 'border-[#ce6565]/50 text-[#ce6565]',
 } as const
 
 // Common class combinations for consistent styling

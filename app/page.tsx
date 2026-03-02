@@ -2939,18 +2939,6 @@ function CharacterSheetContent() {
     triggerAutoSave()
   }
 
-  const renameFeatSpellSlot = (featIndex: number, newName: string) => {
-    if (!activeCharacter) return
-    const updatedSpellData = {
-      ...activeCharacter.spellData,
-      featSpellSlots: activeCharacter.spellData.featSpellSlots.map((feat, index) =>
-        index === featIndex ? { ...feat, spellName: newName } : feat
-      ),
-    }
-    updateCharacter({ spellData: updatedSpellData })
-    triggerAutoSave()
-  }
-
   const getFeatureUsesPerLongRest = (feature: any): number => {
     if (typeof feature.usesPerLongRest === 'number') {
       return Math.max(0, feature.usesPerLongRest)
@@ -3127,7 +3115,7 @@ function CharacterSheetContent() {
     updateCharacter({ ...updates, armorClass: newAC })
   }
 
-  const handleDefensesUpdate = (updates: { darkvision?: number | null; damageResistances?: string[]; damageImmunities?: string[]; conditionImmunities?: string[] }) => {
+  const handleDefensesUpdate = (updates: { darkvision?: number | null; damageVulnerabilities?: string[]; damageResistances?: string[]; damageImmunities?: string[]; conditionImmunities?: string[]; conditionAdvantages?: string[]; conditionDisadvantages?: string[] }) => {
     if (!activeCharacter) return
     updateCharacter(updates as Partial<CharacterData>)
   }
@@ -3710,7 +3698,6 @@ function CharacterSheetContent() {
               onOpenSpellList={() => setSpellListModalOpen(true)}
               onToggleSpellSlot={toggleSpellSlot}
               onToggleFeatSpellSlot={toggleFeatSpellSlot}
-              onRenameFeatSpellSlot={renameFeatSpellSlot}
               hasSpellcastingAbilities={hasSpellcastingAbilities}
               onUpdateFeatureUsage={updateFeatureUsage}
               onInnateSpellsEdit={() => setInnateSpellsModalOpen(true)}
@@ -3937,6 +3924,7 @@ function CharacterSheetContent() {
         character={activeCharacter}
         onSave={updateSpellData}
         onSaveInnateSpells={handleInnateSpellsUpdate}
+        onSaveFeatureUsage={(usage) => { updateCharacter({ classFeatureSkillsUsage: usage }); triggerAutoSave() }}
       />
       <SpellListModal
         isOpen={spellListModalOpen}

@@ -257,6 +257,10 @@ export interface CharacterData {
   damageImmunities?: string[]
   /** Conditions the character is immune to */
   conditionImmunities?: string[]
+  /** Conditions the character has advantage on saving throws against */
+  conditionAdvantages?: string[]
+  /** Conditions the character has disadvantage on saving throws against */
+  conditionDisadvantages?: string[]
   /** Spells granted outside of spell slots (racial, feat, class feature) */
   innateSpells?: InnateSpell[]
 

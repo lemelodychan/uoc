@@ -33,7 +33,6 @@ interface SpellcastingProps {
   hasSpellcastingAbilities: (character: CharacterData) => boolean
   onUpdateFeatureUsage?: (featureId: string, updates: any) => void
   onInnateSpellsEdit?: () => void
-  onRenameFeatSpellSlot?: (index: number, newName: string) => void
   canEdit?: boolean
   isLoading?: boolean
 }
@@ -117,7 +116,6 @@ export function Spellcasting({
   hasSpellcastingAbilities,
   onUpdateFeatureUsage,
   onInnateSpellsEdit,
-  onRenameFeatSpellSlot,
   isLoading = false
 }: SpellcastingProps) {
   const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
@@ -132,20 +130,6 @@ export function Spellcasting({
   }>({ total: 0, breakdown: "0", byClass: [] })
   const [spellsKnownByClass, setSpellsKnownByClass] = useState<{ className: string; value: number }[]>([])
   const [isLoadingCounts, setIsLoadingCounts] = useState(false)
-  // Inline rename state for feat spell features
-  const [renamingFeatureId, setRenamingFeatureId] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
-  const [renamingInnateIdx, setRenamingInnateIdx] = useState<number | null>(null)
-  const [innateRenameValue, setInnateRenameValue] = useState('')
-  const [renamingFeatSlotIdx, setRenamingFeatSlotIdx] = useState<number | null>(null)
-  const [featSlotRenameValue, setFeatSlotRenameValue] = useState('')
-  // "Other Spells" inline add form state
-  const [showAddOtherSpell, setShowAddOtherSpell] = useState(false)
-  const [newOtherSpellName, setNewOtherSpellName] = useState('')
-  const [newOtherSpellLevel, setNewOtherSpellLevel] = useState(0)
-  const [newOtherSpellAtWill, setNewOtherSpellAtWill] = useState(true)
-  const [newOtherSpellUses, setNewOtherSpellUses] = useState(1)
-
   // Partition innate spells by source so each section filters correctly
   const INNATE_LEVEL_LABELS = ['Cantrip', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th']
   const allInnate = (character.innateSpells || []).map((spell, origIdx) => ({ spell, origIdx }))
@@ -651,33 +635,9 @@ export function Spellcasting({
       <div key={`innate-${origIdx}`} className="p-2 border rounded bg-background pr-3 flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-grow">
-            {renamingInnateIdx === origIdx ? (
-              <input
-                autoFocus
-                className="flex-grow text-sm font-medium bg-transparent border-b border-primary outline-none"
-                value={innateRenameValue}
-                onChange={e => setInnateRenameValue(e.target.value)}
-                onBlur={() => {
-                  if (innateRenameValue.trim()) {
-                    const updated = (character.innateSpells ?? []).map((s, i) =>
-                      i === origIdx ? { ...s, name: innateRenameValue.trim() } : s
-                    )
-                    onUpdateFeatureUsage?.('__innate_spells__', { type: 'direct_update', innateSpells: updated })
-                  }
-                  setRenamingInnateIdx(null)
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                  if (e.key === 'Escape') setRenamingInnateIdx(null)
-                }}
-              />
-            ) : (
-              <>
-                <span className={`text-sm font-medium ${isPlaceholder ? 'text-primary' : ''}`}>
-                  {spell.name}
-                </span>
-              </>
-            )}
+            <span className={`text-sm font-medium ${isPlaceholder ? 'text-primary' : ''}`}>
+              {spell.name}
+            </span>
             <Badge variant="secondary" className="text-xs shrink-0">
               {INNATE_LEVEL_LABELS[spell.spellLevel ?? (spell as any).level ?? 0] ?? 'Cantrip'}
             </Badge>
@@ -722,18 +682,6 @@ export function Spellcasting({
                 </span>
               </>
             )}
-            {spell.source === 'other' && canEdit && (
-              <button
-                onClick={() => {
-                  const updated = (character.innateSpells ?? []).filter((_, i) => i !== origIdx)
-                  onUpdateFeatureUsage?.('__innate_spells__', { type: 'direct_update', innateSpells: updated })
-                }}
-                className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
-                title="Remove spell"
-              >
-                <Icon icon="lucide:x" className="w-3 h-3" />
-              </button>
-            )}
           </div>
         </div>
         {showSourceLabel && spell.sourceName && (
@@ -743,13 +691,12 @@ export function Spellcasting({
     )
   }
 
-  // Render feat spell entries (isFeatFeature + category spell/unset + legacy featSpellSlots + feat innate spells)
+  // Render feat spell entries (automated isFeatFeature entries + feat innate spells)
   const renderFeatFeatures = () => {
     const featEntries = Object.entries(character.classFeatureSkillsUsage || {})
       .filter(([, usageData]: [string, any]) => usageData?.isFeatFeature && usageData?.category !== 'combat' && usageData?.category !== 'trait')
-    const featSlots = character.spellData?.featSpellSlots || []
 
-    if (featEntries.length === 0 && featSlots.length === 0 && featInnateSpells.length === 0) return null
+    if (featEntries.length === 0 && featInnateSpells.length === 0) return null
 
     return (
       <div className="flex flex-col gap-2 mt-4">
@@ -760,78 +707,6 @@ export function Spellcasting({
           return (
             <div key={featureId}>
               {renderFeatureSkill(featureSkill, undefined)}
-            </div>
-          )
-        })}
-        {featSlots.map((featSlot, featIndex) => {
-          const isPlaceholder = /^\d+(?:st|nd|rd|th)-level spell$/i.test(featSlot.spellName?.trim() ?? '')
-          return (
-            <div key={`feat-slot-${featIndex}`} className="p-2 border rounded bg-background pr-3 flex flex-col gap-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-grow">
-                  {renamingFeatSlotIdx === featIndex ? (
-                    <input
-                      autoFocus
-                      className="flex-grow text-sm font-medium bg-transparent border-b border-primary outline-none"
-                      value={featSlotRenameValue}
-                      onChange={e => setFeatSlotRenameValue(e.target.value)}
-                      onBlur={() => {
-                        if (featSlotRenameValue.trim()) {
-                          onRenameFeatSpellSlot?.(featIndex, featSlotRenameValue.trim())
-                        }
-                        setRenamingFeatSlotIdx(null)
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                        if (e.key === 'Escape') setRenamingFeatSlotIdx(null)
-                      }}
-                    />
-                  ) : (
-                    <>
-                      <span className={`text-sm font-medium ${isPlaceholder ? 'text-primary' : ''}`}>
-                        {featSlot.spellName || `Feat ${featIndex + 1}`}
-                      </span>
-                      {canEdit && (
-                        <button
-                          onClick={() => { setRenamingFeatSlotIdx(featIndex); setFeatSlotRenameValue(featSlot.spellName || '') }}
-                          className={`shrink-0 text-xs border rounded px-1.5 py-0.5 transition-colors ${
-                            isPlaceholder
-                              ? 'text-primary border-primary/50 hover:bg-primary/10'
-                              : 'text-muted-foreground border-border/50 hover:bg-accent'
-                          }`}
-                        >
-                          {isPlaceholder ? 'Pick spell' : 'Edit'}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: featSlot.usesPerLongRest }, (_, i) => {
-                    const isAvailable = i < (featSlot.usesPerLongRest - featSlot.currentUses)
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          if (!canEdit) return
-                          onToggleFeatSpellSlot(featIndex, i)
-                        }}
-                        disabled={!canEdit}
-                        className={`w-4 h-4 rounded border-2 transition-colors ${
-                          isAvailable
-                            ? `${getCombatColor('featSpellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
-                            : `${getCombatColor('featSpellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
-                        }`}
-                        title={isAvailable ? "Available" : "Used"}
-                      />
-                    )
-                  })}
-                  <span className="text-xs text-muted-foreground ml-2 font-mono">
-                    {featSlot.usesPerLongRest - featSlot.currentUses}/{featSlot.usesPerLongRest}
-                  </span>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground">From {featSlot.featName}</div>
             </div>
           )
         })}
@@ -956,48 +831,12 @@ export function Spellcasting({
       used: getCombatColor('spellSlotUsed')
     }
 
-    const isFeatSlot = !!(character.classFeatureSkillsUsage?.[skill.id ?? ''] as any)?.isFeatFeature
-    const isPlaceholderTitle = isFeatSlot && /^\d+(?:st|nd|rd|th)-level spell$/i.test(skill.title?.trim() ?? '')
-
     return (
       <div className="flex flex-col items-start justify-between gap-1 p-2 pr-3 border rounded gap-1 bg-background">
         <div className="w-full flex gap-2 items-center justify-between">
-          {isFeatSlot && renamingFeatureId === skill.id ? (
-            <input
-              autoFocus
-              className="flex-grow text-sm px-1 font-medium text-xs h-5.5 bg-transparent border border-primary outline-none rounded-md"
-              value={renameValue}
-              onChange={e => setRenameValue(e.target.value)}
-              onBlur={() => {
-                if (renameValue.trim() && skill.id) {
-                  onUpdateFeatureUsage?.(skill.id, { type: 'rename', newName: renameValue.trim() })
-                }
-                setRenamingFeatureId(null)
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                if (e.key === 'Escape') { setRenamingFeatureId(null) }
-              }}
-            />
-          ) : (
-            <div className="flex items-center gap-2 flex-grow min-w-0">
-              <span className={`text-sm font-medium ${isPlaceholderTitle ? 'text-primary' : ''}`}>
-                {skill.title}
-              </span>
-              {isFeatSlot && canEdit && (
-                <button
-                  onClick={() => { setRenamingFeatureId(skill.id!); setRenameValue(skill.title) }}
-                  className={`shrink-0 text-xs border rounded px-1.5 py-0.5 transition-colors ${
-                    isPlaceholderTitle
-                      ? 'text-primary border-primary/50 hover:bg-primary/10'
-                      : 'text-muted-foreground border-border/50 hover:border-primary/50 hover:text-primary'
-                  }`}
-                >
-                  {isPlaceholderTitle ? 'Pick spell' : 'Edit'}
-                </button>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2 flex-grow min-w-0">
+            <span className="text-sm font-medium">{skill.title}</span>
+          </div>
           <div className="flex items-center gap-1">
             {Array.from({ length: maxUses }, (_, i) => {
               const isAvailable = i < currentUses
@@ -1478,91 +1317,44 @@ export function Spellcasting({
         {/* Feat Spells — spells from feats (isFeatFeature + featSpellSlots + feat innate) */}
         {renderFeatFeatures()}
 
-        {/* Other Spells — fully manual, editable list */}
-        {(otherInnateSpells.length > 0) && (
+        {/* Other Spells — items/custom spells (featSpellSlots + source='other' innate) */}
+        {(otherInnateSpells.length > 0 || (character.spellData?.featSpellSlots?.length ?? 0) > 0) && (
           <div className="flex flex-col gap-2 mt-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">Other Spells</div>
-            </div>
+            <div className="text-sm font-medium">Other Spells</div>
             <div className="flex flex-col gap-2">
-              {otherInnateSpells.map(({ spell, origIdx }) =>
-                renderInnateSpellRow(spell, origIdx, false)
-              )}
-              {otherInnateSpells.length === 0 && !showAddOtherSpell && (
-                <div className="text-xs text-muted-foreground text-center py-2">No additional spells</div>
-              )}
-              {showAddOtherSpell && (
-                <div className="p-2 border rounded bg-background flex flex-col gap-2">
-                  <input
-                    autoFocus
-                    placeholder="Spell name"
-                    className="text-sm bg-transparent border-b border-border outline-none pb-0.5"
-                    value={newOtherSpellName}
-                    onChange={e => setNewOtherSpellName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Escape') { setShowAddOtherSpell(false); setNewOtherSpellName('') } }}
-                  />
-                  <div className="flex items-center gap-2">
-                    <select
-                      className="text-xs bg-background border border-border rounded px-1.5 py-0.5"
-                      value={newOtherSpellLevel}
-                      onChange={e => setNewOtherSpellLevel(Number(e.target.value))}
-                    >
-                      {INNATE_LEVEL_LABELS.map((label, i) => (
-                        <option key={i} value={i}>{label}</option>
-                      ))}
-                    </select>
-                    <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newOtherSpellAtWill}
-                        onChange={e => setNewOtherSpellAtWill(e.target.checked)}
-                        className="w-3 h-3"
-                      />
-                      At will
-                    </label>
-                    {!newOtherSpellAtWill && (
-                      <input
-                        type="number"
-                        min={1}
-                        max={9}
-                        className="w-12 text-xs bg-background border border-border rounded px-1.5 py-0.5"
-                        value={newOtherSpellUses}
-                        onChange={e => setNewOtherSpellUses(Math.max(1, Number(e.target.value)))}
-                      />
-                    )}
-                    <span className="text-xs text-muted-foreground">uses/day</span>
+              {(character.spellData?.featSpellSlots ?? []).map((featSlot, featIndex) => (
+                <div key={`feat-slot-${featIndex}`} className="p-2 border rounded bg-background pr-3 flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {featSlot.spellName || `Spell ${featIndex + 1}`}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: featSlot.usesPerLongRest }, (_, i) => {
+                        const isAvailable = i < (featSlot.usesPerLongRest - featSlot.currentUses)
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => { if (!canEdit) return; onToggleFeatSpellSlot(featIndex, i) }}
+                            disabled={!canEdit}
+                            className={`w-4 h-4 rounded border-2 transition-colors ${
+                              isAvailable
+                                ? `${getCombatColor('featSpellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                                : `${getCombatColor('featSpellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                            }`}
+                            title={isAvailable ? "Available" : "Used"}
+                          />
+                        )
+                      })}
+                      <span className="text-xs text-muted-foreground ml-2 font-mono">
+                        {featSlot.usesPerLongRest - featSlot.currentUses}/{featSlot.usesPerLongRest}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => {
-                        if (!newOtherSpellName.trim()) return
-                        const newSpell: InnateSpell = {
-                          name: newOtherSpellName.trim(),
-                          spellLevel: newOtherSpellLevel,
-                          usesPerDay: newOtherSpellAtWill ? 'at_will' : newOtherSpellUses,
-                          source: 'other',
-                          currentUses: newOtherSpellAtWill ? undefined : newOtherSpellUses,
-                        }
-                        const updated = [...(character.innateSpells ?? []), newSpell]
-                        onUpdateFeatureUsage?.('__innate_spells__', { type: 'direct_update', innateSpells: updated })
-                        setNewOtherSpellName('')
-                        setNewOtherSpellLevel(0)
-                        setNewOtherSpellAtWill(true)
-                        setNewOtherSpellUses(1)
-                        setShowAddOtherSpell(false)
-                      }}
-                      className="text-xs px-2 py-0.5 rounded border border-primary/50 text-primary hover:bg-primary/10 transition-colors"
-                    >
-                      Add
-                    </button>
-                    <button
-                      onClick={() => { setShowAddOtherSpell(false); setNewOtherSpellName('') }}
-                      className="text-xs px-2 py-0.5 rounded border border-border text-muted-foreground hover:bg-accent transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  <div className="text-xs text-muted-foreground">From {featSlot.featName}</div>
                 </div>
+              ))}
+              {otherInnateSpells.map(({ spell, origIdx }) =>
+                renderInnateSpellRow(spell, origIdx, true)
               )}
             </div>
           </div>
