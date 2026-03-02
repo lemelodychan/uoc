@@ -369,11 +369,17 @@ function CharacterSheetContent() {
   const isCharacterDataLoading = !!(activeCharacter && (!activeCharacter.skills || activeCharacter.skills.length === 0))
   
   // Access control checks
+  // Find the campaign that owns the active character (may differ from currentCampaign)
+  const characterCampaign = activeCharacter?.campaignId
+    ? campaigns.find(c => c.id === activeCharacter.campaignId)
+    : undefined
+  const isDMOfCharacterCampaign = characterCampaign?.dungeonMasterId === currentUser?.id
+
   const canViewActiveCharacter = activeCharacter ? (
     // Owner can always view
     activeCharacter.userId === currentUser?.id ||
-    // Superadmin with override can view
-    (isUserSuperadmin && superadminOverride) ||
+    // Superadmin or DM of this character's campaign can view with override
+    ((isUserSuperadmin || isDMOfCharacterCampaign) && superadminOverride) ||
     // Public characters can be viewed by anyone (no overlay for anyone)
     activeCharacter.visibility === 'public'
   ) : false
@@ -3791,7 +3797,7 @@ function CharacterSheetContent() {
               resources={resources}
               links={links}
               onSelectCharacter={(id) => {
-                setActiveCharacterId(id)
+                setActiveCharacterIdWithStorage(id)
                 setCurrentView('character')
                 // Scroll to top when opening a character sheet
                 scrollToTop()
@@ -3828,11 +3834,9 @@ function CharacterSheetContent() {
             })()}
             currentUserProfile={currentUserProfile}
             character={activeCharacter}
+            isDM={isDMOfCharacterCampaign}
             onSuperadminAccess={() => {
               setSuperadminOverride(true)
-              // Force a re-render to see the state change
-              setTimeout(() => {
-              }, 100)
             }}
           />
 

@@ -662,6 +662,7 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
             <RichTextDisplay
               content={character.otherTools}
               className="text-sm text-muted-foreground"
+              maxLines={5}
             />
           </div>
         )}

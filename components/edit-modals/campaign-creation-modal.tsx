@@ -257,20 +257,20 @@ export function CampaignCreationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] p-0 gap-0">
-        <DialogHeader className="p-4 border-b">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] p-0 gap-0 flex flex-col">
+        <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle>
             {editingCampaign ? 'Edit Campaign' : 'Create New Campaign'}
           </DialogTitle>
           <DialogDescription>
-            {editingCampaign 
+            {editingCampaign
               ? 'Update your campaign details and manage characters below.'
               : 'Create a new campaign to organize your characters and adventures.'
             }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-0 max-h-[75vh]">
+        <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
           <div className="flex-shrink-0 flex flex-col gap-4 p-4 bg-background">
 
             <div className="flex flex-row gap-4">
@@ -490,7 +490,7 @@ export function CampaignCreationModal({
 
           {/* Character Management Section - Only show when editing existing campaign */}
           {editingCampaign && onAssignCharacterToCampaign && onRemoveCharacterFromCampaign && (
-            <div className="flex-1 overflow-y-auto space-y-4 border-t p-4 bg-background">
+            <div className="space-y-4 border-t p-4 bg-background">
               {/* Characters in Campaign */}
               {getCharactersInCampaign(editingCampaign.id).length > 0 ? (
                 <div className="space-y-2">
@@ -613,7 +613,7 @@ export function CampaignCreationModal({
           )}
         </div>
 
-        <DialogFooter className="p-4 border-t">
+        <DialogFooter className="p-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>

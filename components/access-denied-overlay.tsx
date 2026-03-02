@@ -12,12 +12,14 @@ interface AccessDeniedOverlayProps {
   currentUserProfile?: UserProfile | null
   character?: CharacterData | null
   onSuperadminAccess?: () => void
+  isDM?: boolean
 }
 
-export function AccessDeniedOverlay({ isVisible, currentUserProfile, character, onSuperadminAccess }: AccessDeniedOverlayProps) {
+export function AccessDeniedOverlay({ isVisible, currentUserProfile, character, onSuperadminAccess, isDM }: AccessDeniedOverlayProps) {
   if (!isVisible) return null
 
   const isUserSuperadmin = isSuperadmin(currentUserProfile?.permissionLevel)
+  const canOverride = isUserSuperadmin || isDM
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -37,15 +39,15 @@ export function AccessDeniedOverlay({ isVisible, currentUserProfile, character, 
                   : "This character sheet belongs to another user."
                 }
               </p>
-              {isUserSuperadmin && onSuperadminAccess && (
-                <Button 
+              {canOverride && onSuperadminAccess && (
+                <Button
                   onClick={onSuperadminAccess}
                   variant="outline"
                   size="sm"
                   className="flex items-center gap-2"
                 >
                   <Icon icon="lucide:lock-open" className="w-4 h-4" />
-                  Access Character Sheet
+                  View Character Sheet
                 </Button>
               )}
             </div>

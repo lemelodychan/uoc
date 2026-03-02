@@ -1143,6 +1143,10 @@ export const getAdditionalSpellsFromFeats = (character: CharacterData): number =
     else if (featName.includes("telepathic")) {
       additionalSpells += 1
     }
+    // Fey Teleportation grants 1 spell (Misty Step, 1/short rest)
+    else if (featName.includes("fey teleportation")) {
+      additionalSpells += 1
+    }
   })
   
   return additionalSpells

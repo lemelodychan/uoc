@@ -93,15 +93,15 @@ export function AppHeader({
       // Default campaign always comes first
       if (a.isDefault && !b.isDefault) return -1
       if (!a.isDefault && b.isDefault) return 1
-      // Then sort alphabetically
-      return a.name.localeCompare(b.name)
+      // Then sort by creation date (oldest first)
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
     const inactive = campaigns.filter(c => !c.isActive).sort((a, b) => {
       // Default campaign always comes first (even if inactive)
       if (a.isDefault && !b.isDefault) return -1
       if (!a.isDefault && b.isDefault) return 1
-      // Then sort alphabetically
-      return a.name.localeCompare(b.name)
+      // Then sort by creation date (oldest first)
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
     return { activeCampaigns: active, inactiveCampaigns: inactive }
   }, [campaigns])
