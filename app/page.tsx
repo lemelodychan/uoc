@@ -374,7 +374,7 @@ function CharacterSheetContent() {
     ? campaigns.find(c => c.id === activeCharacter.campaignId)
     : undefined
   const isDMOfCharacterCampaign = characterCampaign?.dungeonMasterId === currentUser?.id
-  const isUserAdmin = currentUserProfile?.permissionLevel === 'editor'
+  const isUserAdmin = currentUserProfile?.permissionLevel === 'admin'
 
   const canViewActiveCharacter = activeCharacter ? (
     // Owner can always view

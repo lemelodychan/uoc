@@ -2416,7 +2416,9 @@ function UserManagement({
                   <code className="text-xs break-all">{u.userId}</code>
                 </div>
                 <div className="col-span-2">
-                  <Badge variant="secondary" className="text-xs">{u.permissionLevel}</Badge>
+                  <Badge variant="secondary" className="text-xs capitalize">
+                    {u.permissionLevel}
+                  </Badge>
                 </div>
                 <div className="col-span-1 text-xs text-muted-foreground">
                   {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}
@@ -2471,9 +2473,10 @@ function UserManagement({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="viewer">viewer</SelectItem>
-                  <SelectItem value="editor">editor</SelectItem>
-                  <SelectItem value="superadmin">superadmin</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="editor">Editor</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="superadmin">Superadmin</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -4,19 +4,20 @@ export interface UserProfile {
   id: number
   userId: string
   displayName?: string
-  permissionLevel: 'superadmin' | 'editor' | 'viewer'
+  permissionLevel: 'superadmin' | 'admin' | 'editor' | 'viewer'
   createdAt: string
   updatedAt: string
   lastLogin?: string
 }
 
-export type PermissionLevel = 'superadmin' | 'editor' | 'viewer'
+export type PermissionLevel = 'superadmin' | 'admin' | 'editor' | 'viewer'
 
 // Permission level hierarchy
 export const PERMISSION_LEVELS: Record<PermissionLevel, number> = {
   viewer: 0,
   editor: 1,
-  superadmin: 2
+  admin: 2,
+  superadmin: 3
 }
 
 /**
@@ -37,8 +38,15 @@ export function isSuperadmin(permissionLevel?: PermissionLevel): boolean {
 }
 
 /**
- * Check if a user is an editor or higher
+ * Check if a user is an admin or higher (admin or superadmin)
+ */
+export function isAdmin(permissionLevel?: PermissionLevel): boolean {
+  return permissionLevel === 'admin' || permissionLevel === 'superadmin'
+}
+
+/**
+ * Check if a user is an editor or higher (editor, admin, or superadmin)
  */
 export function isEditor(permissionLevel?: PermissionLevel): boolean {
-  return permissionLevel === 'editor' || permissionLevel === 'superadmin'
+  return permissionLevel === 'editor' || permissionLevel === 'admin' || permissionLevel === 'superadmin'
 }

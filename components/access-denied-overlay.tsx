@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
-import { isSuperadmin, isEditor } from "@/lib/user-profiles"
+import { isSuperadmin, isAdmin } from "@/lib/user-profiles"
 import type { UserProfile } from "@/lib/user-profiles"
 import type { CharacterData } from "@/lib/character-data"
 
@@ -19,7 +19,7 @@ export function AccessDeniedOverlay({ isVisible, currentUserProfile, character, 
   if (!isVisible) return null
 
   const isUserSuperadmin = isSuperadmin(currentUserProfile?.permissionLevel)
-  const isUserAdmin = isEditor(currentUserProfile?.permissionLevel)
+  const isUserAdmin = isAdmin(currentUserProfile?.permissionLevel)
   const canOverride = isUserSuperadmin || isDM || isUserAdmin
 
   return (

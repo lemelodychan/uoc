@@ -47,7 +47,7 @@ export function canAccessPrivateSheet(characterUserId?: string, currentUserId?: 
  * Superadmins can edit any character, owners can edit their own
  * Viewers cannot edit anything
  */
-export function canEditCharacter(characterUserId?: string, currentUserId?: string, permissionLevel?: 'superadmin' | 'editor' | 'viewer'): boolean {
+export function canEditCharacter(characterUserId?: string, currentUserId?: string, permissionLevel?: 'superadmin' | 'admin' | 'editor' | 'viewer'): boolean {
   if (!characterUserId || !currentUserId) return false
   // Viewers cannot edit anything
   if (permissionLevel === 'viewer') return false
@@ -65,7 +65,7 @@ export function canEditCharacterInCampaign(
   campaignDmId?: string,
   characterCampaignId?: string,
   currentCampaignId?: string,
-  permissionLevel?: 'superadmin' | 'editor' | 'viewer'
+  permissionLevel?: 'superadmin' | 'admin' | 'editor' | 'viewer'
 ): boolean {
   // Viewers cannot edit anything
   if (permissionLevel === 'viewer') return false

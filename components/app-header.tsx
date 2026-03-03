@@ -51,7 +51,7 @@ export function AppHeader({
   const { toast } = useToast()
   const { resolvedTheme } = useTheme()
   const { isSuperadmin, userProfile } = useUser()
-  const isAdmin = isSuperadmin || userProfile?.permissionLevel === 'editor'
+  const isAdmin = isSuperadmin || userProfile?.permissionLevel === 'admin'
   const supabase = createClient()
 
   // Load campaigns when menu opens if not provided as prop
