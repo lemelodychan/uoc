@@ -50,7 +50,8 @@ export function AppHeader({
   const menuRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   const { resolvedTheme } = useTheme()
-  const { isSuperadmin } = useUser()
+  const { isSuperadmin, userProfile } = useUser()
+  const isAdmin = isSuperadmin || userProfile?.permissionLevel === 'editor'
   const supabase = createClient()
 
   // Load campaigns when menu opens if not provided as prop
@@ -317,7 +318,7 @@ export function AppHeader({
                 Beta
               </Badge>
             </Button>
-            {isSuperadmin && (
+            {isAdmin && (
               <Button
                 variant={currentView === 'management' ? 'default' : 'ghost'}
                 size="sm"

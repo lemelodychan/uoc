@@ -782,7 +782,7 @@ export function CampaignHomepage({
               </Button>
             )}
             {canEdit && (
-              (isSuperadmin || isDungeonMaster) && onImportCharacterJson ? (
+              onImportCharacterJson ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="default" size="sm" className="flex items-center gap-2">
@@ -859,7 +859,7 @@ export function CampaignHomepage({
                 <Icon icon="lucide:trending-up" className="w-4 h-4" />
                 {levelUpModeEnabled ? "Disable Level Up" : "Enable Level Up"}
               </Button>
-              {(isSuperadmin || isDungeonMaster) && onImportCharacterJson ? (
+              {onImportCharacterJson ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="flex items-center gap-2 text-foreground">

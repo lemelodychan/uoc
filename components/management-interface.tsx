@@ -66,7 +66,7 @@ export function ManagementInterface({
   const [selectedClassForFeatures, setSelectedClassForFeatures] = useState<ClassData | null>(null)
   const { toast } = useToast()
   const [localUsers, setLocalUsers] = useState<UserProfile[]>(users)
-  const { userProfile } = useUser()
+  const { userProfile, isSuperadmin } = useUser()
   const canEdit = userProfile?.permissionLevel !== 'viewer'
   
   // Race management state
@@ -451,16 +451,18 @@ export function ManagementInterface({
               Beta
             </Badge>
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => setActiveTab('users')}
-            className={`rounded-none border-0 w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
-              activeTab === 'users' ? 'text-primary' : ''
-            }`}
-          >
-            <Icon icon="lucide:id-card" className="w-4 h-4" />
-            Users
-          </Button>
+          {isSuperadmin && (
+            <Button
+              variant="outline"
+              onClick={() => setActiveTab('users')}
+              className={`rounded-none border-0 w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
+                activeTab === 'users' ? 'text-primary' : ''
+              }`}
+            >
+              <Icon icon="lucide:id-card" className="w-4 h-4" />
+              Users
+            </Button>
+          )}
         </nav>
       </div>
 
@@ -1010,7 +1012,7 @@ export function ManagementInterface({
           </div>
         )}
 
-        {activeTab === 'users' && (
+        {activeTab === 'users' && isSuperadmin && (
           <div className="flex-1 min-h-0 flex flex-col gap-0">
             <UserManagement
               users={localUsers}

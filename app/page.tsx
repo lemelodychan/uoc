@@ -374,12 +374,13 @@ function CharacterSheetContent() {
     ? campaigns.find(c => c.id === activeCharacter.campaignId)
     : undefined
   const isDMOfCharacterCampaign = characterCampaign?.dungeonMasterId === currentUser?.id
+  const isUserAdmin = currentUserProfile?.permissionLevel === 'editor'
 
   const canViewActiveCharacter = activeCharacter ? (
     // Owner can always view
     activeCharacter.userId === currentUser?.id ||
-    // Superadmin or DM of this character's campaign can view with override
-    ((isUserSuperadmin || isDMOfCharacterCampaign) && superadminOverride) ||
+    // Superadmin, DM of this character's campaign, or admin can view with override
+    ((isUserSuperadmin || isDMOfCharacterCampaign || isUserAdmin) && superadminOverride) ||
     // Public characters can be viewed by anyone (no overlay for anyone)
     activeCharacter.visibility === 'public'
   ) : false
@@ -3470,7 +3471,7 @@ function CharacterSheetContent() {
                     {activeCharacter.isNPC ? `NPC: ${activeCharacter.name}` : `Character: ${activeCharacter.name}`}
                   </span>
                 </div>
-                {((isUserSuperadmin || currentCampaign?.dungeonMasterId === currentUser?.id) && activeCharacter) && (
+                {(activeCharacter && canViewActiveCharacter) && (
                   <div className="flex items-center gap-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -3796,7 +3797,7 @@ function CharacterSheetContent() {
               }}
               onEditCampaign={handleEditCampaign}
               onCreateCharacter={createNewCharacter}
-              onImportCharacterJson={(isUserSuperadmin || currentCampaign?.dungeonMasterId === currentUser?.id) ? triggerImportCharacterJson : undefined}
+              onImportCharacterJson={triggerImportCharacterJson}
               currentUserId={currentUser?.id}
               onStartLongRest={handleStartLongRest}
               onToggleLevelUpMode={handleToggleLevelUpMode}
