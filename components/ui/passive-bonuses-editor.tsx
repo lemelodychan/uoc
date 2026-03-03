@@ -8,6 +8,15 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { PassiveBonuses } from "@/lib/class-feature-types"
 
+const ABILITY_OPTIONS = [
+  { value: 'dexterity', label: 'Dexterity' },
+  { value: 'strength', label: 'Strength' },
+  { value: 'constitution', label: 'Constitution' },
+  { value: 'intelligence', label: 'Intelligence' },
+  { value: 'wisdom', label: 'Wisdom' },
+  { value: 'charisma', label: 'Charisma' },
+]
+
 interface PassiveBonusesEditorProps {
   value: PassiveBonuses | null | undefined
   onChange: (value: PassiveBonuses | null) => void
@@ -29,7 +38,7 @@ export function PassiveBonusesEditor({ value, onChange, disabled = false }: Pass
   const update = (patch: Partial<PassiveBonuses>) => {
     const next = { ...profs, ...patch }
     // If all sections are null/undefined, return null
-    const hasAny = next.ac_calculation || next.skill_bonus || next.tool_bonus
+    const hasAny = next.ac_calculation || next.skill_bonus || next.tool_bonus || next.initiative_bonus
     onChange(hasAny ? next : null)
   }
 
@@ -37,7 +46,7 @@ export function PassiveBonusesEditor({ value, onChange, disabled = false }: Pass
     if (profs[key]) {
       const next = { ...profs }
       delete next[key]
-      const hasAny = next.ac_calculation || next.skill_bonus || next.tool_bonus
+      const hasAny = next.ac_calculation || next.skill_bonus || next.tool_bonus || next.initiative_bonus
       onChange(hasAny ? next : null)
     } else {
       update({ [key]: defaultValue })
@@ -298,6 +307,90 @@ export function PassiveBonusesEditor({ value, onChange, disabled = false }: Pass
                 placeholder="all_tools or specific tool name"
                 disabled={disabled}
               />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Initiative Bonus ────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-3 p-3 border rounded-lg">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold">Initiative Bonus</Label>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={!!profs.initiative_bonus}
+              onCheckedChange={() =>
+                toggleSection("initiative_bonus", { type: "flat", flat_value: 1 })
+              }
+              disabled={disabled}
+            />
+            <span className="text-xs text-muted-foreground">Enable</span>
+          </div>
+        </div>
+        {profs.initiative_bonus && (
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-4 flex-wrap">
+              <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
+                <Label className="text-xs">Type</Label>
+                <Select
+                  value={profs.initiative_bonus.type}
+                  onValueChange={(v: any) =>
+                    update({
+                      initiative_bonus: {
+                        ...profs.initiative_bonus!,
+                        type: v,
+                        ability: v === 'ability_modifier' ? (profs.initiative_bonus!.ability ?? 'dexterity') : undefined,
+                        flat_value: v === 'flat' ? (profs.initiative_bonus!.flat_value ?? 1) : undefined,
+                      },
+                    })
+                  }
+                  disabled={disabled}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="proficiency">Full proficiency bonus</SelectItem>
+                    <SelectItem value="half_proficiency">Half proficiency bonus</SelectItem>
+                    <SelectItem value="ability_modifier">Ability score modifier</SelectItem>
+                    <SelectItem value="flat">Flat bonus</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {profs.initiative_bonus.type === 'ability_modifier' && (
+                <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
+                  <Label className="text-xs">Ability</Label>
+                  <Select
+                    value={profs.initiative_bonus.ability ?? 'dexterity'}
+                    onValueChange={(v) =>
+                      update({ initiative_bonus: { ...profs.initiative_bonus!, ability: v } })
+                    }
+                    disabled={disabled}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ABILITY_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {profs.initiative_bonus.type === 'flat' && (
+                <div className="flex flex-col gap-1 w-24">
+                  <Label className="text-xs">Flat Value</Label>
+                  <Input
+                    type="number"
+                    value={profs.initiative_bonus.flat_value ?? 1}
+                    onChange={(e) =>
+                      update({ initiative_bonus: { ...profs.initiative_bonus!, flat_value: parseInt(e.target.value) || 0 } })
+                    }
+                    disabled={disabled}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}

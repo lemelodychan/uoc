@@ -13,9 +13,9 @@ import { Icon } from "@iconify/react"
 import { useUser } from "@/lib/user-context"
 import { useToast } from "@/hooks/use-toast"
 import { SpellCreationModal } from "@/components/edit-modals/spell-creation-modal"
-import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, loadRacesWithDetails, loadBackgroundsWithDetails } from "@/lib/database"
+import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, loadRacesWithDetails, loadBackgroundsWithDetails, loadFeatsWithDetails } from "@/lib/database"
 import type { ClassData } from "@/lib/class-utils"
-import type { RaceData, BackgroundData } from "@/lib/database"
+import type { RaceData, BackgroundData, FeatData } from "@/lib/database"
 import type { Spell, CharacterData } from "@/lib/character-data"
 import { SPELL_SCHOOL_COLORS, getCastingTimeColor } from "@/lib/color-mapping"
 import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
@@ -74,11 +74,13 @@ export function WikiPage() {
   const [classes, setClasses] = useState<ClassData[]>([])
   const [races, setRaces] = useState<RaceData[]>([])
   const [backgrounds, setBackgrounds] = useState<BackgroundData[]>([])
+  const [feats, setFeats] = useState<FeatData[]>([])
   const [spells, setSpells] = useState<LibrarySpell[]>([])
   const [filteredSpells, setFilteredSpells] = useState<LibrarySpell[]>([])
   const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>({})
   const [expandedRaces, setExpandedRaces] = useState<Record<string, boolean>>({})
   const [expandedBackgrounds, setExpandedBackgrounds] = useState<Record<string, boolean>>({})
+  const [expandedFeats, setExpandedFeats] = useState<Record<string, boolean>>({})
   const [expandedSpells, setExpandedSpells] = useState<Record<string, boolean>>({})
   const [classFeatures, setClassFeatures] = useState<Record<string, any[]>>({})
   const [loading, setLoading] = useState(false)
@@ -95,6 +97,7 @@ export function WikiPage() {
   const [classSearchTerm, setClassSearchTerm] = useState("")
   const [raceSearchTerm, setRaceSearchTerm] = useState("")
   const [backgroundSearchTerm, setBackgroundSearchTerm] = useState("")
+  const [featSearchTerm, setFeatSearchTerm] = useState("")
   
   // Spell editing states
   const [spellCreationModalOpen, setSpellCreationModalOpen] = useState(false)
@@ -109,6 +112,7 @@ export function WikiPage() {
     loadClasses()
     loadRaces()
     loadBackgrounds()
+    loadFeats()
     loadSpells()
   }, [])
 
@@ -259,6 +263,26 @@ export function WikiPage() {
       }
     } catch (error) {
       console.error('Error loading backgrounds:', error)
+    }
+  }
+
+  const loadFeats = async () => {
+    try {
+      // Check cache first
+      const cached = wikiCache.getFeats()
+      if (cached) {
+        setFeats(cached)
+        return
+      }
+
+      // Load from database
+      const result = await loadFeatsWithDetails()
+      if (result.feats) {
+        setFeats(result.feats)
+        wikiCache.setFeats(result.feats)
+      }
+    } catch (error) {
+      console.error('Error loading feats:', error)
     }
   }
 
@@ -439,13 +463,15 @@ export function WikiPage() {
     setSpellCreationModalOpen(false)
   }
 
-  const toggleExpanded = (key: string, type: 'classes' | 'races' | 'backgrounds' | 'spells') => {
+  const toggleExpanded = (key: string, type: 'classes' | 'races' | 'backgrounds' | 'feats' | 'spells') => {
     if (type === 'classes') {
       setExpandedClasses(prev => ({ ...prev, [key]: !prev[key] }))
     } else if (type === 'races') {
       setExpandedRaces(prev => ({ ...prev, [key]: !prev[key] }))
     } else if (type === 'backgrounds') {
       setExpandedBackgrounds(prev => ({ ...prev, [key]: !prev[key] }))
+    } else if (type === 'feats') {
+      setExpandedFeats(prev => ({ ...prev, [key]: !prev[key] }))
     } else if (type === 'spells') {
       setExpandedSpells(prev => ({ ...prev, [key]: !prev[key] }))
     }
@@ -454,13 +480,36 @@ export function WikiPage() {
   const getAbilityShort = (ability: string) => {
     const abilityMap: Record<string, string> = {
       "Strength": "STR",
-      "Dexterity": "DEX", 
+      "Dexterity": "DEX",
       "Constitution": "CON",
       "Intelligence": "INT",
       "Wisdom": "WIS",
       "Charisma": "CHA"
     }
     return abilityMap[ability] || ability
+  }
+
+  const RACE_FAMILIES = [
+    { plural: 'Elves',     members: ['elf', 'high elf', 'wood elf', 'drow', 'dark elf', 'eladrin'] },
+    { plural: 'Dwarves',   members: ['dwarf', 'hill dwarf', 'mountain dwarf'] },
+    { plural: 'Gnomes',    members: ['gnome', 'forest gnome', 'rock gnome', 'deep gnome'] },
+    { plural: 'Halflings', members: ['halfling', 'lightfoot halfling', 'stout halfling'] },
+    { plural: 'Humans',    members: ['human', 'variant human'] },
+  ]
+
+  const formatRacePrereq = (races: string[]): string => {
+    const lower = races.map(r => r.toLowerCase())
+    const usedIndices = new Set<number>()
+    const parts: string[] = []
+    for (const family of RACE_FAMILIES) {
+      const parentIdx = lower.indexOf(family.members[0])
+      if (parentIdx !== -1) {
+        lower.forEach((r, i) => { if (family.members.includes(r)) usedIndices.add(i) })
+        parts.push(family.plural)
+      }
+    }
+    races.forEach((r, i) => { if (!usedIndices.has(i)) parts.push(r) })
+    return parts.join(' or ')
   }
 
   const getSchoolColor = (school: string) => {
@@ -527,6 +576,19 @@ export function WikiPage() {
             <Badge variant="secondary" className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto">
                 Beta
               </Badge>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setActiveTab('feats')}
+            className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
+              activeTab === 'feats' ? 'text-primary' : ''
+            }`}
+          >
+            <Icon icon="lucide:star" className="w-4 h-4" />
+            Feats
+            <Badge variant="secondary" className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto">
+              Beta
+            </Badge>
           </Button>
           <Button
             variant="outline"
@@ -1309,6 +1371,307 @@ export function WikiPage() {
                                 <li key={idx}>{flaw.text || flaw}</li>
                               ))}
                             </ul>
+                          </div>
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+          </>
+        )}
+
+        {activeTab === 'feats' && (
+          <>
+          <div className="flex flex-col gap-3 p-6 bg-card border-b w-full">
+            <h1 className="text-3xl font-display font-semibold">Feats</h1>
+            <p className="text-sm text-muted-foreground">Browse feats that grant special abilities and expand your character's capabilities.</p>
+            <div className="flex items-center gap-4 relative mt-2">
+              <Icon icon="lucide:search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+              <Input
+                placeholder="Search feats by name..."
+                value={featSearchTerm}
+                onChange={(e) => setFeatSearchTerm(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {featSearchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFeatSearchTerm("")}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-transparent"
+                >
+                  <Icon icon="lucide:x" className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col gap-6 p-6 !overflow-auto h-[calc(100vh-173px-64px)]">
+            <div className="flex flex-col gap-4">
+              {feats
+                .filter(feat =>
+                  !featSearchTerm ||
+                  feat.name.toLowerCase().includes(featSearchTerm.toLowerCase())
+                )
+                .map(feat => {
+                const isExpanded = expandedFeats[feat.id]
+
+                // Build individual prerequisite badges
+                const prereqBadges: string[] = []
+                if (feat.prerequisites) {
+                  const prereq = feat.prerequisites as any
+                  if (prereq.min_level) prereqBadges.push(`Level ${prereq.min_level}+`)
+                  if (prereq.ability_scores) {
+                    Object.entries(prereq.ability_scores).forEach(([ability, score]) => {
+                      prereqBadges.push(`${getAbilityShort(ability.charAt(0).toUpperCase() + ability.slice(1))} ${score}+`)
+                    })
+                  }
+                  if (prereq.spellcasting) prereqBadges.push('Spellcasting')
+                  if (prereq.proficiency) {
+                    const profs: string[] = Array.isArray(prereq.proficiency) ? prereq.proficiency : [prereq.proficiency]
+                    profs.forEach(p => prereqBadges.push(p))
+                  }
+                  if (prereq.race) {
+                    const races: string[] = Array.isArray(prereq.race) ? prereq.race : [prereq.race]
+                    prereqBadges.push(`Race: ${formatRacePrereq(races)}`)
+                  }
+                  if (prereq.other) prereqBadges.push(prereq.other)
+                  if (typeof prereq === 'string') prereqBadges.push(prereq)
+                }
+
+                // Build summary grant badges for collapsed view
+                const grantBadges: string[] = []
+                if (feat.ability_modifiers) grantBadges.push('Ability Score')
+                if (feat.skill_proficiencies) grantBadges.push('Skills')
+                if (feat.tool_proficiencies) grantBadges.push('Tools')
+                if (feat.weapon_proficiencies?.length) grantBadges.push('Weapons')
+                if (feat.equipment_proficiencies?.length) grantBadges.push('Armor/Equipment')
+                if (feat.languages) grantBadges.push('Languages')
+                if (feat.passive_bonuses) grantBadges.push('Passive Bonus')
+                if (feat.special_features?.length) grantBadges.push(`${feat.special_features.length} Feature${feat.special_features.length !== 1 ? 's' : ''}`)
+
+                return (
+                  <Card key={feat.id}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col gap-2">
+                          <span className="text-lg font-semibold">{feat.name}</span>
+                          {(prereqBadges.length > 0 || grantBadges.length > 0) && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {prereqBadges.map((label, i) => (
+                                <Badge key={`req-${i}`} variant="outline" size="xs" className="bg-transparent text-[#b0986a] border-[#b0986a] font-normal">
+                                  {label}
+                                </Badge>
+                              ))}
+                              {grantBadges.map((label, i) => (
+                                <Badge key={`grant-${i}`} variant="outline" size="xs" className="font-normal">
+                                  {label}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleExpanded(feat.id, 'feats')}
+                          className="shrink-0"
+                        >
+                          <Icon icon={isExpanded ? "lucide:chevron-up" : "lucide:chevron-down"} className="w-4 h-4" />
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    {isExpanded && (
+                      <CardContent className="flex flex-col gap-4 pt-0">
+                        {feat.description && (
+                          <RichTextDisplay content={feat.description} className="text-sm text-muted-foreground" />
+                        )}
+
+                        {/* Grants section */}
+                        {(feat.ability_modifiers || feat.skill_proficiencies || feat.tool_proficiencies ||
+                          (feat.weapon_proficiencies?.length ?? 0) > 0 || (feat.equipment_proficiencies?.length ?? 0) > 0 ||
+                          feat.languages || feat.passive_bonuses) && (
+                          <div className="flex flex-col gap-2">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Grants</h4>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+
+                              {/* Ability Score Modifiers */}
+                              {feat.ability_modifiers && (() => {
+                                const mods = feat.ability_modifiers as any
+                                let label = ''
+                                if (mods.type === 'choice' && mods.choices) {
+                                  const count = mods.choices.count || 1
+                                  const inc = mods.choices.increase || 1
+                                  label = `+${inc} to ${count > 1 ? `${count} abilities` : 'any ability'}`
+                                } else if (mods.choice) {
+                                  label = `+${mods.amount || 1} to chosen ability`
+                                } else if (typeof mods === 'object') {
+                                  const entries = Object.entries(mods)
+                                    .filter(([k]) => !['type', 'choice', 'amount', 'choices'].includes(k))
+                                    .map(([k, v]) => `+${v} ${getAbilityShort(k.charAt(0).toUpperCase() + k.slice(1))}`)
+                                  label = entries.join(', ')
+                                }
+                                return label ? (
+                                  <div className="flex items-center gap-1">
+                                    <Icon icon="lucide:arrow-up-circle" className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">Ability:</span>
+                                    <Badge variant="outline" size="xs">{label}</Badge>
+                                  </div>
+                                ) : null
+                              })()}
+
+                              {/* Skill Proficiencies */}
+                              {feat.skill_proficiencies && (() => {
+                                let label = ''
+                                if (Array.isArray(feat.skill_proficiencies)) {
+                                  label = feat.skill_proficiencies.join(', ')
+                                } else if (typeof feat.skill_proficiencies === 'object') {
+                                  const obj = feat.skill_proficiencies as any
+                                  const fixed: string[] = obj.fixed || []
+                                  const available: string[] = obj.available || []
+                                  const choice = obj.choice
+                                  if (fixed.length > 0 && choice) label = `${fixed.join(', ')} + Choose ${choice.count || 1}`
+                                  else if (fixed.length > 0) label = fixed.join(', ')
+                                  else if (available.length > 0 && choice) label = `Choose ${choice.count || 1} from ${available.length} skills`
+                                  else if (choice) label = `Choose ${choice.count || 1}`
+                                }
+                                return label ? (
+                                  <div className="flex items-center gap-1">
+                                    <Icon icon="lucide:brain" className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">Skills:</span>
+                                    <Badge variant="outline" size="xs">{label}</Badge>
+                                  </div>
+                                ) : null
+                              })()}
+
+                              {/* Tool Proficiencies */}
+                              {feat.tool_proficiencies && (() => {
+                                let label = ''
+                                if (Array.isArray(feat.tool_proficiencies)) {
+                                  label = feat.tool_proficiencies.join(', ')
+                                } else if (typeof feat.tool_proficiencies === 'object') {
+                                  const obj = feat.tool_proficiencies as any
+                                  const fixed: string[] = obj.fixed || []
+                                  const choice = obj.choice
+                                  if (fixed.length > 0 && choice) label = `${fixed.join(', ')} + Choose ${choice.count || 1}`
+                                  else if (fixed.length > 0) label = fixed.join(', ')
+                                  else if (choice) label = `Choose ${choice.count || 1}`
+                                }
+                                return label ? (
+                                  <div className="flex items-center gap-1">
+                                    <Icon icon="lucide:wrench" className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">Tools:</span>
+                                    <Badge variant="outline" size="xs">{label}</Badge>
+                                  </div>
+                                ) : null
+                              })()}
+
+                              {/* Weapon Proficiencies */}
+                              {feat.weapon_proficiencies && feat.weapon_proficiencies.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <Icon icon="lucide:sword" className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">Weapons:</span>
+                                  <Badge variant="outline" size="xs">{feat.weapon_proficiencies.join(', ')}</Badge>
+                                </div>
+                              )}
+
+                              {/* Equipment/Armor Proficiencies */}
+                              {feat.equipment_proficiencies && feat.equipment_proficiencies.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <Icon icon="lucide:shield" className="w-3.5 h-3.5 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">Equipment:</span>
+                                  <Badge variant="outline" size="xs">{feat.equipment_proficiencies.join(', ')}</Badge>
+                                </div>
+                              )}
+
+                              {/* Languages */}
+                              {feat.languages && (() => {
+                                let label = ''
+                                if (Array.isArray(feat.languages)) {
+                                  label = feat.languages.join(', ')
+                                } else if (typeof feat.languages === 'object') {
+                                  const obj = feat.languages as any
+                                  const fixed: string[] = obj.fixed || []
+                                  const choice = obj.choice
+                                  if (fixed.length > 0 && choice) label = `${fixed.join(', ')} + Choose ${choice.count || 1}`
+                                  else if (fixed.length > 0) label = fixed.join(', ')
+                                  else if (choice) label = `Choose ${choice.count || 1}`
+                                }
+                                return label ? (
+                                  <div className="flex items-center gap-1">
+                                    <Icon icon="lucide:languages" className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">Languages:</span>
+                                    <Badge variant="outline" size="xs">{label}</Badge>
+                                  </div>
+                                ) : null
+                              })()}
+
+                              {/* Passive Bonuses */}
+                              {feat.passive_bonuses && (() => {
+                                const pb = feat.passive_bonuses as any
+                                const bonusItems: { icon: string; label: string }[] = []
+                                if (pb.initiative_bonus) {
+                                  const ib = pb.initiative_bonus
+                                  let label = 'Initiative Bonus'
+                                  if (ib.type === 'flat' && ib.flat_value) label = `+${ib.flat_value} to Initiative`
+                                  else if (ib.type === 'proficiency') label = '+Prof to Initiative'
+                                  else if (ib.type === 'half_proficiency') label = '+½ Prof to Initiative'
+                                  bonusItems.push({ icon: 'lucide:zap', label })
+                                }
+                                if (pb.skill_bonus) {
+                                  const sb = pb.skill_bonus
+                                  let label = 'Skill Bonus'
+                                  if (sb.type === 'half_proficiency' && sb.condition === 'not_proficient') label = '½ Prof to non-proficient skills'
+                                  else if (sb.type === 'double_proficiency') label = 'Skill Expertise'
+                                  bonusItems.push({ icon: 'lucide:trending-up', label })
+                                }
+                                if (pb.tool_bonus) {
+                                  const tb = pb.tool_bonus
+                                  const label = tb.type === 'double_proficiency' ? 'Tool Expertise' : 'Tool Bonus'
+                                  bonusItems.push({ icon: 'lucide:wrench', label })
+                                }
+                                if (pb.ac_calculation) {
+                                  bonusItems.push({ icon: 'lucide:shield', label: 'Unarmored Defense' })
+                                }
+                                return bonusItems.length > 0 ? (
+                                  <>
+                                    {bonusItems.map((item, i) => (
+                                      <div key={i} className="flex items-center gap-1">
+                                        <Icon icon={item.icon} className="w-3.5 h-3.5 text-muted-foreground" />
+                                        <Badge variant="outline" size="xs">{item.label}</Badge>
+                                      </div>
+                                    ))}
+                                  </>
+                                ) : null
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Special Features */}
+                        {feat.special_features && Array.isArray(feat.special_features) && feat.special_features.length > 0 && (
+                          <div className="flex flex-col gap-3">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Features</h4>
+                            {feat.special_features.map((feature: any, idx: number) => (
+                              <div key={idx} className="flex flex-col gap-1 pl-3 border-l-2 border-border">
+                                <div className="flex items-center gap-2">
+                                  {feature.title && (
+                                    <span className="text-sm font-medium">{feature.title}</span>
+                                  )}
+                                  {feature.featureType && (
+                                    <Badge variant="outline" size="xs" className="font-normal">{(feature.featureType as string).replace(/_/g, ' ')}</Badge>
+                                  )}
+                                </div>
+                                {feature.description && (
+                                  <RichTextDisplay content={feature.description} className="text-sm text-muted-foreground" />
+                                )}
+                                {typeof feature === 'string' && (
+                                  <RichTextDisplay content={feature} className="text-sm text-muted-foreground" />
+                                )}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </CardContent>

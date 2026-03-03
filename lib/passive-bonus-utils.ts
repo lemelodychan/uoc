@@ -11,7 +11,7 @@
 
 import type { CharacterData } from './character-data'
 import { calculateModifier, calculateProficiencyBonus } from './character-data'
-import type { PassiveBonuses, ACCalculationBonus, SkillPassiveBonus, ToolPassiveBonus } from './class-feature-types'
+import type { PassiveBonuses, ACCalculationBonus, SkillPassiveBonus, ToolPassiveBonus, InitiativeBonus } from './class-feature-types'
 
 /**
  * Collect all passive bonuses from a character's loaded class feature skills,
@@ -267,6 +267,46 @@ export function getToolPassiveBonus(
         totalBonus = 1 // Flag value: caller handles the doubling
         break
       case 'flat':
+        break
+    }
+  }
+
+  return totalBonus
+}
+
+/**
+ * Calculate total initiative bonus from passive bonuses (feats, class features, etc.).
+ * Returns the bonus to add on top of character.initiative (which is base DEX mod).
+ */
+export function getInitiativeBonus(
+  character: CharacterData,
+  proficiencyBonus?: number
+): number {
+  const profBonus = proficiencyBonus ?? calculateProficiencyBonus(character.level || 1)
+  const allBonuses = getPassiveBonuses(character)
+  let totalBonus = 0
+
+  for (const { bonuses } of allBonuses) {
+    if (!bonuses.initiative_bonus) continue
+    const ib = bonuses.initiative_bonus
+
+    switch (ib.type) {
+      case 'proficiency':
+        totalBonus += profBonus
+        break
+      case 'half_proficiency':
+        totalBonus += Math.floor(profBonus / 2)
+        break
+      case 'ability_modifier': {
+        const ability = ib.ability ?? 'dexterity'
+        const score = (character as any)[ability] as number | undefined
+        if (score !== undefined) {
+          totalBonus += calculateModifier(score)
+        }
+        break
+      }
+      case 'flat':
+        totalBonus += ib.flat_value || 0
         break
     }
   }

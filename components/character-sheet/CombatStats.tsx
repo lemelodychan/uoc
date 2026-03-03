@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
-import { getClassLevel } from "@/lib/character-data"
+import { getClassLevel, calculateProficiencyBonus } from "@/lib/character-data"
+import { getInitiativeBonus } from "@/lib/passive-bonus-utils"
 import { getFeatureUsage, getFeatureCustomDescription } from "@/lib/feature-usage-tracker"
 import { getCombatColor, getClassFeatureColors, DEFENSE_COLORS } from "@/lib/color-mapping"
 import { loadClassFeatureSkills } from "@/lib/database"
@@ -365,7 +366,7 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
             <Icon icon="lucide:zap" className={`w-5 h-5 ${getCombatColor('initiative')}`} />
             <div className="flex flex-col gap-1">
               <div className="text-sm text-muted-foreground">Initiative</div>
-              <div className="text-xl font-bold font-mono">{formatModifier(character.initiative)}</div>
+              <div className="text-xl font-bold font-mono">{formatModifier(character.initiative + getInitiativeBonus(character, calculateProficiencyBonus(character.level || 1)))}</div>
             </div>
           </div>
           <div className="flex items-center gap-3 col-span-1 mb-0">

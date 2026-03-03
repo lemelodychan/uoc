@@ -13,6 +13,7 @@ class WikiCache {
   private classesCache: CachedWikiData<any> | null = null
   private racesCache: CachedWikiData<any> | null = null
   private backgroundsCache: CachedWikiData<any> | null = null
+  private featsCache: CachedWikiData<any> | null = null
   private classFeaturesCache: Map<string, CachedWikiData<any[]>> = new Map()
   
   // Cache duration: 5 minutes (300000ms)
@@ -105,6 +106,26 @@ class WikiCache {
     this.backgroundsCache = null
   }
 
+  // Feats cache
+  getFeats(): any[] | null {
+    if (this.isValid(this.featsCache)) {
+      return this.featsCache!.data
+    }
+    this.featsCache = null
+    return null
+  }
+
+  setFeats(feats: any[]): void {
+    this.featsCache = {
+      data: feats,
+      timestamp: Date.now()
+    }
+  }
+
+  invalidateFeats(): void {
+    this.featsCache = null
+  }
+
   invalidateClassFeatures(baseClassId?: string): void {
     if (baseClassId) {
       this.classFeaturesCache.delete(baseClassId)
@@ -118,6 +139,7 @@ class WikiCache {
     this.classesCache = null
     this.racesCache = null
     this.backgroundsCache = null
+    this.featsCache = null
     this.classFeaturesCache.clear()
   }
 }

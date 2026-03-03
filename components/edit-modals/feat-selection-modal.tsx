@@ -850,9 +850,7 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
                           {feat.name}
                         </div>
                         {feat.description && (
-                          <div className="text-sm text-muted-foreground line-clamp-2">
-                            <RichTextDisplay content={feat.description} />
-                          </div>
+                          <RichTextDisplay content={feat.description} className="text-sm text-muted-foreground" maxLines={2} />
                         )}
                         {hasBadges && (
                           <div className="flex flex-wrap gap-2 pt-3 border-t">

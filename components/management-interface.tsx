@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
+import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { ClassDuplicationModal } from "./edit-modals/class-duplication-modal"
 import { ClassFeatureSkillModal } from "./edit-modals/class-feature-skill-modal"
 import { CampaignCreationModal } from "./edit-modals/campaign-creation-modal"
@@ -2078,10 +2079,7 @@ function FeatManagement({
             <CardContent>
               {/* Description */}
               {feat.description && (
-                <p className="text-muted-foreground mb-4 line-clamp-2 text-sm">
-                  {feat.description.replace(/<[^>]*>/g, '').substring(0, 400)}
-                  {feat.description.length > 400 ? '...' : ''}
-                </p>
+                <RichTextDisplay content={feat.description} className="text-sm text-muted-foreground mb-4" maxLines={2} />
               )}
               
               <div className="flex flex-col gap-2">

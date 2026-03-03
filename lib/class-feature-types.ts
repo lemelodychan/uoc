@@ -161,12 +161,22 @@ export interface ToolPassiveBonus {
 }
 
 /**
+ * Initiative bonus from feats (e.g., Alert, Weapon Master)
+ */
+export interface InitiativeBonus {
+  type: 'proficiency' | 'half_proficiency' | 'ability_modifier' | 'flat'
+  ability?: string  // e.g., 'dexterity' — when type === 'ability_modifier'
+  flat_value?: number  // when type === 'flat'
+}
+
+/**
  * Combined passive bonuses structure stored in class_features.passive_bonuses JSONB
  */
 export interface PassiveBonuses {
   ac_calculation?: ACCalculationBonus
   skill_bonus?: SkillPassiveBonus
   tool_bonus?: ToolPassiveBonus
+  initiative_bonus?: InitiativeBonus
 }
 
 /**
