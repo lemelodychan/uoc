@@ -670,8 +670,8 @@ export function Spellcasting({
                       disabled={!canEdit}
                       className={`w-4 h-4 rounded border-2 transition-colors ${
                         isAvailable
-                          ? `${getCombatColor('featSpellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
-                          : `${getCombatColor('featSpellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                          ? `${getCombatColor('featSpellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`
+                          : `${getCombatColor('featSpellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-default'}`
                       }`}
                       title={isAvailable ? 'Available' : 'Used'}
                     />
@@ -855,8 +855,8 @@ export function Spellcasting({
                   disabled={!canEdit}
                   className={`w-4 h-4 rounded border-2 transition-colors ${
                     isAvailable
-                      ? `${classColors.available} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
-                      : `${classColors.used} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                      ? `${classColors.available} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`
+                      : `${classColors.used} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-default'}`
                   }`}
                   title={isAvailable ? "Available" : "Used"}
                 />
@@ -985,7 +985,7 @@ export function Spellcasting({
 
     return (
       <div 
-        className={`p-2 border flex flex-col gap-1 rounded transition-colors bg-background ${canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed opacity-50'}`}
+        className={`p-2 border flex flex-col gap-1 rounded transition-colors bg-background ${canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default'}`}
         onClick={() => {
           if (!canEdit) return
           if (onUpdateFeatureUsage && skill.id) {
@@ -1268,8 +1268,8 @@ export function Spellcasting({
                           disabled={!canEdit}
                           className={`w-4 h-4 rounded border-2 transition-colors ${
                             isAvailable
-                              ? `${getCombatColor('spellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
-                              : `${getCombatColor('spellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                              ? `${getCombatColor('spellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`
+                              : `${getCombatColor('spellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-default'}`
                           }`}
                           title={isAvailable ? "Available" : "Used"}
                         />
@@ -1338,8 +1338,8 @@ export function Spellcasting({
                             disabled={!canEdit}
                             className={`w-4 h-4 rounded border-2 transition-colors ${
                               isAvailable
-                                ? `${getCombatColor('featSpellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`
-                                : `${getCombatColor('featSpellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-not-allowed opacity-50'}`
+                                ? `${getCombatColor('featSpellSlotAvailable')} ${canEdit ? 'cursor-pointer' : 'cursor-default'}`
+                                : `${getCombatColor('featSpellSlotUsed')} ${canEdit ? 'hover:border-border/80 cursor-pointer' : 'cursor-default'}`
                             }`}
                             title={isAvailable ? "Available" : "Used"}
                           />

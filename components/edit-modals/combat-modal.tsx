@@ -113,7 +113,7 @@ export function CombatModal({ isOpen, onClose, character, onSave }: CombatModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[500px] max-h-[calc(100vh-32px)] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Combat Stats</DialogTitle>
         </DialogHeader>

@@ -12,6 +12,7 @@ import { Icon } from "@iconify/react"
 import { useToast } from "@/hooks/use-toast"
 import type { CharacterData, Spell, Campaign } from "@/lib/character-data"
 import { SPELL_SCHOOL_COLORS, getCastingTimeColor } from "@/lib/color-mapping"
+import { RichTextDisplay } from "@/components/ui/rich-text-display"
 
 interface SpellLibraryModalProps {
   isOpen: boolean
@@ -573,13 +574,12 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                         )}
                                       </div>
                                       {spell.description && (
-                                        <div className="text-sm text-muted-foreground">
-                                          {spell.description}
-                                        </div>
+                                        <RichTextDisplay content={spell.description} className="text-sm text-muted-foreground" />
                                       )}
                                       {spell.higher_levels && (
                                         <div className="text-xs text-muted-foreground italic mt-2">
-                                          Using a Higher-Level Spell Slot: {spell.higher_levels}
+                                          <span className="font-medium not-italic">Using a Higher-Level Spell Slot: </span>
+                                          <RichTextDisplay content={spell.higher_levels} className="inline" />
                                         </div>
                                       )}
                                       <div className="text-xs text-muted-foreground flex items-center gap-2">

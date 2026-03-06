@@ -57,6 +57,7 @@ interface CampaignHomepageProps {
   onDeleteResource?: (id: string) => void
   onCreateLink?: (link: Omit<CampaignLink, 'id' | 'created_at' | 'updated_at'>) => void
   onDeleteLink?: (id: string) => void
+  isReadOnly?: boolean
 }
 
 export function CampaignHomepage({ 
@@ -82,7 +83,8 @@ export function CampaignHomepage({
   onUpdateResource,
   onDeleteResource,
   onCreateLink,
-  onDeleteLink
+  onDeleteLink,
+  isReadOnly = false
 }: CampaignHomepageProps) {
   const [noteModalOpen, setNoteModalOpen] = useState(false)
   const [editingNote, setEditingNote] = useState<CampaignNote | null>(null)
@@ -770,7 +772,7 @@ export function CampaignHomepage({
             </div>
           </div>
           <div className="flex self-start justify-start content-start gap-2">
-            {canEdit && (
+            {canEdit && !isReadOnly && (
               <Button
                 variant="outline"
                 size="sm"
@@ -781,7 +783,7 @@ export function CampaignHomepage({
                 Edit Campaign
               </Button>
             )}
-            {canEdit && (
+            {(canEdit && !isReadOnly || (isReadOnly && onCreateCharacter)) && (
               onImportCharacterJson ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -818,8 +820,16 @@ export function CampaignHomepage({
         </div>
       </div>
 
+      {/* Guest banner */}
+      {isReadOnly && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border text-sm text-muted-foreground">
+          <Icon icon="lucide:eye" className="w-4 h-4 shrink-0" />
+          You&apos;re viewing as a guest. Sign in to contribute.
+        </div>
+      )}
+
       {/* Dungeon Master Controls */}
-      {(isDungeonMaster || isSuperadmin) && (
+      {(isDungeonMaster || isSuperadmin) && !isReadOnly && (
         <Card className="bg-card border-primary/50 border-1 gap-2">
           <CardHeader className="w-full flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1370,7 +1380,7 @@ export function CampaignHomepage({
                     />
                     {sortOrder === 'asc' ? 'Oldest' : 'Latest'}
                   </Button>
-                  {canEdit && (
+                  {canEdit && !isReadOnly && (
                     <Button onClick={handleCreateNote} size="sm" className="flex items-center gap-2">
                       <Icon icon="lucide:plus" className="w-4 h-4" />
                       New Note
@@ -1399,7 +1409,7 @@ export function CampaignHomepage({
                   <p className="text-muted-foreground mb-4">
                     Start documenting your campaign sessions with notes.
                   </p>
-                  {canEdit && (
+                  {canEdit && !isReadOnly && (
                     <Button onClick={handleCreateNote}>
                       <Icon icon="lucide:plus" className="w-4 h-4" />
                       Create First Note
@@ -1439,7 +1449,7 @@ export function CampaignHomepage({
                                 </div>
                               </div>
                             </div>
-                            {canEdit && (
+                            {canEdit && !isReadOnly && (
                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                 <Button
                                   variant="outline"
@@ -1478,7 +1488,7 @@ export function CampaignHomepage({
             <CardHeader className="p-0">
               <div className="flex items-center justify-between h-[32px]">
                 <CardTitle>Resources</CardTitle>
-                {canEdit && (
+                {canEdit && !isReadOnly && (
                   <div className="flex items-center gap-2">
                     <Button size="sm" onClick={handleOpenAddLink} className="flex items-center gap-2" variant="outline">
                       <Icon icon="lucide:plus" className="w-4 h-4" />
@@ -1508,7 +1518,7 @@ export function CampaignHomepage({
                     >
                       <Icon icon="lucide:link" className="w-3 h-3" />
                       <span className="truncate max-w-[200px]">{link.title}</span>
-                      {canEdit && (
+                      {canEdit && !isReadOnly && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1527,7 +1537,7 @@ export function CampaignHomepage({
                   <Icon icon="lucide:library" className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-semibold mb-2">No Documents Yet</h3>
                   <p className="text-muted-foreground mb-4">Add documents for campaign lore, rules, and information.</p>
-                  {canEdit && (
+                  {canEdit && !isReadOnly && (
                     <Button onClick={handleCreateResource}>
                       <Icon icon="lucide:plus" className="w-4 h-4" />
                       Create First Document

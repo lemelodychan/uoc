@@ -54,7 +54,7 @@ export function AbilitiesModal({ isOpen, onClose, character, onSave }: Abilities
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[70vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[500px] max-h-[calc(100vh-32px)] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Ability Scores</DialogTitle>
         </DialogHeader>

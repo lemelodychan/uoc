@@ -79,7 +79,7 @@ export function DefensesModal({ isOpen, onClose, character, onSave }: DefensesMo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[85vh] p-0 gap-0 flex flex-col">
+      <DialogContent className="sm:max-w-[600px] max-h-[calc(100vh-32px)] p-0 gap-0 flex flex-col">
         <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle>Edit Defenses & Senses</DialogTitle>
         </DialogHeader>

@@ -795,6 +795,131 @@ export const saveCharacter = async (
   }
 }
 
+/**
+ * Save a character created by a guest (unauthenticated) user.
+ * Requires the target campaign to have is_public=true AND allow_guest_characters=true.
+ * Sets user_id=null on the created record.
+ */
+export const saveCharacterAsGuest = async (
+  character: CharacterData,
+  campaignId: string,
+): Promise<{ success: boolean; error?: string; characterId?: string }> => {
+  try {
+    // Validate campaign allows guest characters
+    const { data: campaignData, error: campaignError } = await supabase
+      .from("campaigns")
+      .select("is_public, allow_guest_characters")
+      .eq("id", campaignId)
+      .maybeSingle()
+
+    if (campaignError || !campaignData) {
+      return { success: false, error: "Campaign not found" }
+    }
+    if (!campaignData.is_public || !campaignData.allow_guest_characters) {
+      return { success: false, error: "This campaign does not allow guest characters" }
+    }
+
+    let characterId = character.id
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(characterId)) {
+      characterId = globalThis.crypto.randomUUID()
+    }
+
+    const saveData: any = {
+      id: characterId,
+      name: character.name,
+      class_name: character.class,
+      class_id: character.class_id,
+      subclass: character.subclass,
+      level: character.level,
+      classes: character.classes || null,
+      hit_dice_by_class: character.hitDiceByClass || null,
+      background: character.background,
+      background_id: character.backgroundId || null,
+      background_data: character.backgroundData || null,
+      race: character.raceIds && character.raceIds.length > 0 ? character.raceIds : [],
+      alignment: character.alignment,
+      image_url: character.imageUrl || null,
+      user_id: null, // Guest — no user_id
+      visibility: 'public',
+      is_npc: character.isNPC || false,
+      strength: character.strength,
+      dexterity: character.dexterity,
+      constitution: character.constitution,
+      intelligence: character.intelligence,
+      wisdom: character.wisdom,
+      charisma: character.charisma,
+      armor_class: character.armorClass,
+      initiative: character.initiative ?? 0,
+      hit_points: character.currentHitPoints,
+      max_hit_points: character.maxHitPoints,
+      temporary_hit_points: character.temporaryHitPoints ?? 0,
+      temp_max_hp: character.tempMaxHP ?? 0,
+      death_saves: character.deathSaves ?? { successes: 0, failures: 0 },
+      exhaustion: character.exhaustion ?? 0,
+      hit_dice_total: character.hitDice?.total ?? 0,
+      hit_dice_used: character.hitDice?.used ?? 0,
+      hit_dice_type: character.hitDice?.dieType ?? "d8",
+      speed: character.speed,
+      skills: character.skills,
+      weapons: character.weapons,
+      weapons_notes: character.weaponNotes || "",
+      features: character.features,
+      spell_attack_bonus: character.spellData?.spellAttackBonus || 0,
+      spell_save_dc: character.spellData?.spellSaveDC || 8,
+      cantrips_known: character.spellData?.cantripsKnown || 0,
+      spells_known: character.spellData?.spellsKnown || 0,
+      feat_spell_slots: character.spellData?.featSpellSlots || [],
+      spell_notes: character.spellData?.spellNotes || "",
+      spells: character.spellData?.spells || [],
+      class_features_skills_usage: character.classFeatureSkillsUsage || {},
+      tools: character.toolsProficiencies,
+      feats: character.feats,
+      saving_throw_proficiencies: character.savingThrowProficiencies || [],
+      equipment: character.equipment || "",
+      magic_items: character.magicItems || [],
+      languages: character.languages || "",
+      other_tools: character.otherTools || "",
+      money: character.money || null,
+      equipment_proficiencies: character.equipmentProficiencies || null,
+      feature_custom_descriptions: character.featureNotes || null,
+      personality_traits: character.personalityTraits || "",
+      backstory: character.backstory || "",
+      notes: character.notes || "",
+      campaign_id: campaignId,
+      darkvision: character.darkvision ?? null,
+      damage_resistances: character.damageResistances ?? [],
+      damage_immunities: character.damageImmunities ?? [],
+      condition_immunities: character.conditionImmunities ?? [],
+      condition_advantages: character.conditionAdvantages ?? [],
+      condition_disadvantages: character.conditionDisadvantages ?? [],
+      innate_spells: character.innateSpells ?? [],
+      armor: character.armor ?? [],
+      updated_at: new Date().toISOString(),
+    }
+
+    // Spell slot usage
+    const getUsed = (lvl: number) => {
+      const s = character.spellData?.spellSlots?.find((x) => x.level === lvl)
+      return s ? s.used : 0
+    }
+    for (let i = 1; i <= 9; i++) {
+      saveData[`spell_slots_${i}_used`] = getUsed(i)
+    }
+
+    const { error } = await supabase.from("characters").upsert(saveData, { onConflict: "id" })
+    if (error) {
+      console.error("[guest] Database save error:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, characterId }
+  } catch (error) {
+    console.error("Error saving guest character:", error)
+    return { success: false, error: "Failed to save character" }
+  }
+}
+
 /** Map CharacterData (camelCase) keys to database column names. Only keys that can be patched. */
 const CHARACTER_TO_DB_COLUMNS: Record<string, string> = {
   name: 'name',
@@ -916,7 +1041,8 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         backgrounds:background_id (
           id,
           name
-        )
+        ),
+        party_status!left(status)
       `)
       .eq("id", characterId).maybeSingle()
 
@@ -1057,7 +1183,7 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       notes: data.notes || "",
       feats: data.feats,
       savingThrowProficiencies: savingThrowProficiencies,
-      partyStatus: 'active', // Default to 'active' for single character load (will be updated separately if needed)
+      partyStatus: (data.party_status as any)?.status || 'active',
       campaignId: data.campaign_id || undefined,
       classFeatureSkillsUsage: data.class_features_skills_usage || {},
       // Defenses & senses
@@ -3599,7 +3725,9 @@ export const createCampaign = async (campaign: Campaign): Promise<{ success: boo
         discord_reminder_sent: campaign.discordReminderSent || false,
         logo_light_url: campaign.logoLightUrl || null,
         logo_dark_url: campaign.logoDarkUrl || null,
-        is_default: campaign.isDefault || false
+        is_default: campaign.isDefault || false,
+        is_public: campaign.isPublic || false,
+        allow_guest_characters: campaign.allowGuestCharacters || false,
       }])
 
     if (error) {
@@ -3614,21 +3742,28 @@ export const createCampaign = async (campaign: Campaign): Promise<{ success: boo
   }
 }
 
-export const loadAllCampaigns = async (useServiceRole = false): Promise<{ campaigns?: Campaign[]; error?: string }> => {
+export const loadAllCampaigns = async (useServiceRole = false, guestMode = false): Promise<{ campaigns?: Campaign[]; error?: string }> => {
   try {
     // Use service role client if requested (for API routes that need to bypass RLS)
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
-    const client = useServiceRole && serviceRoleKey 
+    const client = useServiceRole && serviceRoleKey
       ? createSupabaseClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           serviceRoleKey
         )
       : supabase
 
-    const { data, error } = await client
+    let query = client
       .from("campaigns")
       .select("*")
       .order("created_at", { ascending: false })
+
+    // Guests only see public campaigns
+    if (guestMode) {
+      query = query.eq("is_public", true)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error("Error loading campaigns:", error)
@@ -3654,7 +3789,9 @@ export const loadAllCampaigns = async (useServiceRole = false): Promise<{ campai
       discordReminderSent: row.discord_reminder_sent || false,
       logoLightUrl: row.logo_light_url || undefined,
       logoDarkUrl: row.logo_dark_url || undefined,
-      isDefault: row.is_default || false
+      isDefault: row.is_default || false,
+      isPublic: row.is_public || false,
+      allowGuestCharacters: row.allow_guest_characters || false,
     }))
 
     return { campaigns }
@@ -3696,7 +3833,9 @@ export const updateCampaign = async (campaign: Campaign): Promise<{ success: boo
       discord_reminder_sent: campaign.discordReminderSent || false,
       logo_light_url: campaign.logoLightUrl || null,
       logo_dark_url: campaign.logoDarkUrl || null,
-      is_default: campaign.isDefault || false
+      is_default: campaign.isDefault || false,
+      is_public: campaign.isPublic || false,
+      allow_guest_characters: campaign.allowGuestCharacters || false,
     }
     
     // Explicitly set discord_webhook_url - use null for empty/undefined, or the actual value

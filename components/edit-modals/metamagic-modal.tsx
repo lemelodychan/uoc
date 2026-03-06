@@ -90,7 +90,7 @@ export function MetamagicModal({ isOpen, onClose, character, onSave }: Metamagic
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[70vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[800px] max-h-[calc(100vh-32px)] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             Metamagic
@@ -130,7 +130,7 @@ export function MetamagicModal({ isOpen, onClose, character, onSave }: Metamagic
       </DialogContent>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogContent className="sm:max-w-[600px] max-h-[calc(100vh-32px)] p-0 gap-0">
           <DialogHeader className="p-4 border-b">
             <DialogTitle>{editingIndex !== null ? 'Edit Metamagic' : 'Add Metamagic'}</DialogTitle>
           </DialogHeader>

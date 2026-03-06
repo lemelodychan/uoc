@@ -3788,7 +3788,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[1200px] max-h-[80vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[1200px] max-h-[calc(100vh-32px)] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:user-plus" className="w-5 h-5" />

@@ -174,7 +174,7 @@ export function SubclassManagementModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="!w-[70vw] !max-w-[70vw] h-[90vh] max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
+      <DialogContent className="!w-[70vw] !max-w-[70vw] h-[calc(100vh-32px)] max-h-[calc(100vh-32px)] flex flex-col overflow-hidden p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:layers" className="w-5 h-5" />
@@ -261,7 +261,7 @@ export function SubclassManagementModal({
 
       {/* Subclass Edit Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="!w-[60vw] !max-w-[90vw] h-[90vh] !max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogContent className="!w-[60vw] !max-w-[90vw] h-[calc(100vh-32px)] !max-h-[calc(100vh-32px)] flex flex-col overflow-hidden p-0 gap-0">
           <DialogHeader className="border-b p-4">
             <DialogTitle>
               {isCreating ? 'Create New Subclass' : `Edit ${editingSubclass?.subclass}`}

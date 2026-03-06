@@ -17,6 +17,8 @@ import { Badge } from "./ui/badge"
 import type { Campaign } from "@/lib/character-data"
 import { loadAllCampaigns } from "@/lib/database"
 import { cn, getCampaignLogoUrl } from "@/lib/utils"
+import { LoginModal } from "@/components/login-modal"
+import { useRouter } from "next/navigation"
 
 interface AppHeaderProps {
   currentView?: 'campaign' | 'wiki' | 'management'
@@ -46,7 +48,9 @@ export function AppHeader({
   const [campaigns, setCampaigns] = useState<Campaign[]>(campaignsProp || [])
   const [isCampaignsMenuOpen, setIsCampaignsMenuOpen] = useState(false)
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
+  const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   const { resolvedTheme } = useTheme()
@@ -271,71 +275,86 @@ export function AppHeader({
     }
   }
 
-  if (!user) return null
+  const headerContent = (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-6">
+        <div
+          onClick={() => {
+            setIsCampaignsMenuOpen(false)
+            if (selectedCampaignId && selectedCampaignId !== "all" && selectedCampaignId !== "no-campaign") {
+              onCampaignSelect?.(selectedCampaignId)
+              onViewChange?.('campaign')
+            }
+          }}
+          className="cursor-pointer"
+        >
+          <LogoSVG width={120} height={77} className="h-12 w-auto" />
+        </div>
 
-  return (
-    <>
-      <header ref={headerRef} className="bg-card border-b border-border px-6 py-2 relative z-50">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <div
+        {/* Navigation Menu */}
+        <nav className="flex items-center gap-4">
+          <Button
+            variant={currentView === 'campaign' || isCampaignsMenuOpen ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setIsCampaignsMenuOpen(!isCampaignsMenuOpen)}
+            className="flex items-center gap-2"
+          >
+            <Icon icon="iconoir:hexagon-dice" className="w-4 h-4" />
+            Campaigns
+            <Icon icon="lucide:chevron-down" className="w-4 h-4" />
+          </Button>
+          <Button
+            variant={currentView === 'wiki' ? 'default' : 'ghost'}
+            size="sm"
             onClick={() => {
               setIsCampaignsMenuOpen(false)
-              if (selectedCampaignId && selectedCampaignId !== "all" && selectedCampaignId !== "no-campaign") {
-                onCampaignSelect?.(selectedCampaignId)
-                onViewChange?.('campaign')
-              }
+              onViewChange?.('wiki')
             }}
-            className="cursor-pointer"
+            className="flex items-center gap-2"
           >
-          <LogoSVG width={120} height={77} className="h-12 w-auto" />
-          </div>
-          
-          {/* Navigation Menu */}
-          <nav className="flex items-center gap-4">
+            <Icon icon="lucide:book-open-text" className="w-4 h-4" />
+            Wiki
+            <Badge variant="secondary" className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto">
+              Beta
+            </Badge>
+          </Button>
+          {isAdmin && (
             <Button
-              variant={currentView === 'campaign' || isCampaignsMenuOpen ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setIsCampaignsMenuOpen(!isCampaignsMenuOpen)}
-              className="flex items-center gap-2"
-            >
-              <Icon icon="iconoir:hexagon-dice" className="w-4 h-4" />
-              Campaigns
-              <Icon icon="lucide:chevron-down" className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={currentView === 'wiki' ? 'default' : 'ghost'}
+              variant={currentView === 'management' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => {
                 setIsCampaignsMenuOpen(false)
-                onViewChange?.('wiki')
+                onViewChange?.('management')
               }}
               className="flex items-center gap-2"
             >
-              <Icon icon="lucide:book-open-text" className="w-4 h-4" />
-              Wiki
-              <Badge variant="secondary" className="text-xs text-accent-foreground border-accent/50 bg-accent/70 py-0 px-1 ml-auto">
-                Beta
-              </Badge>
+              <Icon icon="lucide:settings" className="w-4 h-4" />
+              Settings
             </Button>
-            {isAdmin && (
-              <Button
-                variant={currentView === 'management' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => {
-                  setIsCampaignsMenuOpen(false)
-                  onViewChange?.('management')
-                }}
-                className="flex items-center gap-2"
-              >
-                <Icon icon="lucide:settings" className="w-4 h-4" />
-                Settings
-              </Button>
-            )}
-          </nav>
-        </div>
-        
-        <div className="flex items-center gap-2">
+          )}
+        </nav>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {!user ? (
+          <>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                setIsCampaignsMenuOpen(false)
+                setLoginModalOpen(true)
+              }}
+            >
+              <Icon icon="lucide:log-in" className="w-4 h-4" />
+              Sign In
+            </Button>
+            <div onClick={() => setIsCampaignsMenuOpen(false)}>
+              <ThemeToggleSimple />
+            </div>
+          </>
+        ) : (
+          <>
           <span className="text-sm text-muted-foreground">
             Welcome, {displayName}
           </span>
@@ -487,10 +506,19 @@ export function AppHeader({
           <div onClick={() => setIsCampaignsMenuOpen(false)}>
           <ThemeToggleSimple />
           </div>
+          </>
+        )}
         </div>
       </div>
-    </header>
-    
+  )
+
+  return (
+    <>
+      <header ref={headerRef} className="bg-card border-b border-border px-6 py-2 relative z-50">
+        {headerContent}
+      </header>
+      <LoginModal open={loginModalOpen} onOpenChange={setLoginModalOpen} onSuccess={() => router.refresh()} />
+
     {/* Mega Menu Drawer */}
     {isCampaignsMenuOpen && (
       <>

@@ -797,7 +797,7 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
 
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[700px] max-h-[80vh] p-0 gap-0">
+        <DialogContent className="sm:max-w-[700px] max-h-[calc(100vh-32px)] p-0 gap-0">
           <DialogHeader className="p-4 border-b">
             <DialogTitle>Select Feat from Library</DialogTitle>
             <div className="relative mt-2">
@@ -937,7 +937,7 @@ export function FeatSelectionModal({ isOpen, onClose, character, onSave, onOpenS
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[800px] max-h-[calc(100vh-32px)] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Button

@@ -47,6 +47,8 @@ export function CampaignCreationModal({
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState(editingCampaign?.discordWebhookUrl || "")
   const [isActive, setIsActive] = useState(editingCampaign?.isActive || false)
   const [isDefault, setIsDefault] = useState(editingCampaign?.isDefault || false)
+  const [isPublic, setIsPublic] = useState(editingCampaign?.isPublic || false)
+  const [allowGuestCharacters, setAllowGuestCharacters] = useState(editingCampaign?.allowGuestCharacters || false)
   const [logoLightUrl, setLogoLightUrl] = useState(editingCampaign?.logoLightUrl || "")
   const [logoDarkUrl, setLogoDarkUrl] = useState(editingCampaign?.logoDarkUrl || "")
   const [uploadingLightLogo, setUploadingLightLogo] = useState(false)
@@ -67,6 +69,8 @@ export function CampaignCreationModal({
       setDiscordWebhookUrl(editingCampaign.discordWebhookUrl || "")
       setIsActive(editingCampaign.isActive || false)
       setIsDefault(editingCampaign.isDefault || false)
+      setIsPublic(editingCampaign.isPublic || false)
+      setAllowGuestCharacters(editingCampaign.allowGuestCharacters || false)
       setLogoLightUrl(editingCampaign.logoLightUrl || "")
       setLogoDarkUrl(editingCampaign.logoDarkUrl || "")
     } else {
@@ -76,6 +80,8 @@ export function CampaignCreationModal({
       setDiscordWebhookUrl("")
       setIsActive(false)
       setIsDefault(false)
+      setIsPublic(false)
+      setAllowGuestCharacters(false)
       setLogoLightUrl("")
       setLogoDarkUrl("")
     }
@@ -131,7 +137,10 @@ export function CampaignCreationModal({
               logoLightUrl: logoLightUrl || undefined,
               logoDarkUrl: logoDarkUrl || undefined,
               // Default campaign (superadmin only)
-              isDefault: isSuperadmin ? isDefault : false
+              isDefault: isSuperadmin ? isDefault : false,
+              // Guest access
+              isPublic,
+              allowGuestCharacters: isPublic ? allowGuestCharacters : false,
             }
 
     onSave(campaign)
@@ -257,7 +266,7 @@ export function CampaignCreationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] p-0 gap-0 flex flex-col">
+      <DialogContent className="sm:max-w-[700px] max-h-[calc(100vh-32px)] p-0 gap-0 flex flex-col">
         <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle>
             {editingCampaign ? 'Edit Campaign' : 'Create New Campaign'}
@@ -481,6 +490,45 @@ export function CampaignCreationModal({
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       Set this campaign as the default to show on app load. Only one campaign can be the default.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Guest Access */}
+              <div className="flex items-start gap-4 justify-start p-3 border rounded-lg bg-card">
+                <div className="h-[20px] w-fit">
+                  <Switch
+                    id="campaign-public"
+                    checked={isPublic}
+                    onCheckedChange={setIsPublic}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="campaign-public" className="text-sm font-medium h-[20px]">
+                    Make campaign public
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Unauthenticated guests can see this campaign on the homepage.
+                  </p>
+                </div>
+              </div>
+
+              {isPublic && (
+                <div className="flex items-start gap-4 justify-start p-3 border rounded-lg bg-card ml-4">
+                  <div className="h-[20px] w-fit">
+                    <Switch
+                      id="campaign-guest-chars"
+                      checked={allowGuestCharacters}
+                      onCheckedChange={setAllowGuestCharacters}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="campaign-guest-chars" className="text-sm font-medium h-[20px]">
+                      Allow guest characters
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Guests can create and save characters to this campaign without an account.
                     </p>
                   </div>
                 </div>

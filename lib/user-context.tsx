@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { UserProfile } from './user-profiles'
-import { getCurrentUser, getCurrentUserProfile, createUserProfile, syncCurrentUserProfileFromAuth } from './database'
+import { getCurrentUser, getCurrentUserProfile, createUserProfile, syncCurrentUserProfileFromAuth, updateLastLogin } from './database'
 import { isSuperadmin as isSuperadminLegacy } from './user-roles'
 import { isSuperadmin } from './user-profiles'
 
@@ -30,8 +30,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
         // Get current user
         const { user: currentUser, error: userError } = await getCurrentUser()
-        if (userError || !currentUser) {
-          setError(userError || "No authenticated user")
+        if (!currentUser) {
+          // Guest — unauthenticated, not an error
+          return
+        }
+        if (userError) {
+          setError(userError)
           return
         }
         setUser(currentUser)

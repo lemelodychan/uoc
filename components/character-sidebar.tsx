@@ -28,6 +28,7 @@ interface CharacterSidebarProps {
   currentView?: 'character' | 'campaign' | 'management'
   onViewChange?: (view: 'character' | 'campaign' | 'management') => void
   canEdit?: boolean
+  isReadOnly?: boolean
 }
 
 export function CharacterSidebar({
@@ -46,6 +47,7 @@ export function CharacterSidebar({
   currentView = 'character',
   onViewChange,
   canEdit = true,
+  isReadOnly = false,
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -442,17 +444,19 @@ export function CharacterSidebar({
           <Icon icon="lucide:dice-5" className="w-4 h-4" />
           {!isCollapsed && <span>Dice Roll</span>}
         </Button>
-        <Button
-          onClick={onStartLongRest}
-          variant="secondary"
-          disabled={!canEdit}
-          className={`w-full ${
-            isCollapsed ? "px-2" : ""
-          }`}
-        >
-          <Icon icon="lucide:moon" className="w-4 h-4" />
-          {!isCollapsed && <span>Start Long Rest</span>}
-        </Button>
+        {!isReadOnly && (
+          <Button
+            onClick={onStartLongRest}
+            variant="secondary"
+            disabled={!canEdit}
+            className={`w-full ${
+              isCollapsed ? "px-2" : ""
+            }`}
+          >
+            <Icon icon="lucide:moon" className="w-4 h-4" />
+            {!isCollapsed && <span>Start Long Rest</span>}
+          </Button>
+        )}
       </div>
     </div>
   )

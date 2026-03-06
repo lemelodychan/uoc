@@ -784,7 +784,7 @@ function ClassManagement() {
 
       {/* Class Editor */}
       <Dialog open={!!editingClass} onOpenChange={() => setEditingClass(null)}>
-        <DialogContent className="sm:max-w-[90vw] h-[90vh] max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <DialogContent className="sm:max-w-[90vw] h-[calc(100vh-32px)] max-h-[calc(100vh-32px)] flex flex-col overflow-hidden p-0">
           <DialogHeader className="sticky top-0 z-10 bg-background px-4 pt-4 pb-2 border-b shrink-0">
             <DialogTitle>{editingClass?.id ? "Edit Class" : "New Class"}</DialogTitle>
           </DialogHeader>
@@ -970,7 +970,7 @@ function ClassManagement() {
 
       {/* Class Details Modal */}
       <Dialog open={detailsOpen} onOpenChange={(v) => setDetailsOpen(!!v)}>
-        <DialogContent className="sm:max-w-[720px] h-[80vh] max-h-[80vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogContent className="sm:max-w-[720px] h-[calc(100vh-32px)] max-h-[calc(100vh-32px)] flex flex-col overflow-hidden p-0 gap-0">
           <DialogHeader className="p-4 pb-0">
             <DialogTitle>{detailsClassName} — Details</DialogTitle>
           </DialogHeader>

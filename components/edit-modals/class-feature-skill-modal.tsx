@@ -192,7 +192,7 @@ export function ClassFeatureSkillModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleCancel}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[calc(100vh-32px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingFeature ? "Edit Feature Skill" : "Add Feature Skill"}

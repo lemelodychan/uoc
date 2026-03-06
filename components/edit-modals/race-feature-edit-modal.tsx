@@ -529,7 +529,7 @@ export function RaceFeatureEditModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[700px] max-h-[calc(100vh-32px)] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>
             {isEditing ? `Edit Feature: ${feature?.name || "Unknown"}` : "Add New Feature"}

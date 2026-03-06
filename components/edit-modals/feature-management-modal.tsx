@@ -540,7 +540,7 @@ export function FeatureManagementModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="!w-[70vw] !max-w-[70vw] h-[90vh] max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
+      <DialogContent className="!w-[70vw] !max-w-[70vw] h-[calc(100vh-32px)] max-h-[calc(100vh-32px)] flex flex-col overflow-hidden p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:star" className="w-5 h-5" />
@@ -682,7 +682,7 @@ export function FeatureManagementModal({
 
       {/* Feature Edit Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="!w-[50vw] !max-w-[50vw] max-h-[80vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogContent className="!w-[50vw] !max-w-[50vw] max-h-[calc(100vh-32px)] flex flex-col overflow-hidden p-0 gap-0">
           <DialogHeader className="p-4 border-b">
             <DialogTitle>
               {isCreating ? 'Create New Feature' : `Edit Feature`}

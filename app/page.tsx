@@ -93,13 +93,14 @@ import {
   type ToolProficiency,
   type InnateSpell,
 } from "@/lib/character-data"
-import { saveCharacter, patchCharacter, loadCharacter, loadAllCharacters, loadCharactersProgressive, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, deleteCharacter as deleteCharacterDB, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
+import { saveCharacter, saveCharacterAsGuest, patchCharacter, loadCharacter, loadAllCharacters, loadCharactersProgressive, testConnection, loadClassData, loadClassFeatures, updatePartyStatus, createCampaign as createCampaignDB, loadAllCampaigns, updateCampaign as updateCampaignDB, deleteCampaign, deleteCharacter as deleteCharacterDB, assignCharacterToCampaign, removeCharacterFromCampaign, setActiveCampaign, getCurrentUser, canViewCharacter, canEditCharacter, canEditCharacterWithCampaign, getAllUsers, createCampaignNote, updateCampaignNote, deleteCampaignNote, type CampaignNote, getCampaignResources, createCampaignResource, updateCampaignResource, deleteCampaignResource, type CampaignResource, getCampaignLinks, createCampaignLink, deleteCampaignLink, type CampaignLink } from "@/lib/database"
 import type { UserProfile } from "@/lib/user-profiles"
 import { useClassFeaturesPreloader } from "@/hooks/use-class-features"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { CampaignHomepage } from "@/components/campaign-homepage"
+import { GuestHomepage } from "@/components/guest-homepage"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -147,8 +148,9 @@ function CharacterSheetContent() {
   
   // Get user data from global context
   const { user: currentUser, userProfile: currentUserProfile, isSuperadmin: isUserSuperadmin, isLoading: userLoading } = useUser()
+  const isReadOnly = !currentUser
 
-  
+
   const [basicInfoModalOpen, setBasicInfoModalOpen] = useState(false)
   const [abilitiesModalOpen, setAbilitiesModalOpen] = useState(false)
   const [combatModalOpen, setCombatModalOpen] = useState(false)
@@ -377,6 +379,8 @@ function CharacterSheetContent() {
   const isUserAdmin = currentUserProfile?.permissionLevel === 'admin'
 
   const canViewActiveCharacter = activeCharacter ? (
+    // Guests can view any character in a public campaign (campaign access was already verified)
+    isReadOnly ||
     // Owner can always view
     activeCharacter.userId === currentUser?.id ||
     // Superadmin, DM of this character's campaign, or admin can view with override
@@ -701,18 +705,24 @@ function CharacterSheetContent() {
     setIsInitialLoading(true)
 
     // Step 1: Load campaigns first (needed to determine active campaign for progressive loading)
+    // Guests use getAllUsers() directly (anon Supabase client, RLS-filtered to public campaign users).
+    // Authenticated users use the /api/users/list endpoint (service-role, returns all profiles).
+    const usersLoader = currentUser
+      ? fetch('/api/users/list').then(async (res) => {
+          if (res.ok) {
+            const data = await res.json()
+            return { users: data.users, error: undefined }
+          } else {
+            const errorData = await res.json().catch(() => ({}))
+            return { users: undefined, error: errorData.error || 'Failed to load users' }
+          }
+        }).catch((e: any) => ({ users: undefined, error: e?.message || 'Failed to load users' }))
+      : getAllUsers()
+
     const [connectionTest, campaignsPromise, usersPromise] = await Promise.allSettled([
       testConnection(),
-      loadAllCampaigns(),
-      fetch('/api/users/list').then(async (res) => {
-        if (res.ok) {
-          const data = await res.json()
-          return { users: data.users, error: undefined }
-        } else {
-          const errorData = await res.json().catch(() => ({}))
-          return { users: undefined, error: errorData.error || 'Failed to load users' }
-        }
-      }).catch((e: any) => ({ users: undefined, error: e?.message || 'Failed to load users' }))
+      loadAllCampaigns(false, !currentUser),
+      usersLoader,
     ])
 
     // Handle connection test result
@@ -746,12 +756,18 @@ function CharacterSheetContent() {
 
     // Process results
     if (loadError || !dbCharacters || dbCharacters.length === 0) {
+      if (!currentUser) {
+        // Guest with no characters — just show the guest homepage
+        setCharacters([])
+        setIsInitialLoading(false)
+        return
+      }
       console.error("Failed to load characters:", loadError)
       setCharacters(sampleCharacters)
       setActiveCharacterId("1")
       toast({
         title: loadError ? "Database Error" : "No Characters Found",
-        description: loadError 
+        description: loadError
           ? "Failed to load characters from database. Using sample data."
           : "No characters found in database. Starting with sample data.",
         variant: "destructive",
@@ -760,9 +776,9 @@ function CharacterSheetContent() {
       return
     }
 
-    // Set campaign by default
+    // Set campaign by default — guests always start at the landing page
     let selectedCampaignId = "all"
-    if (activeCampaign) {
+    if (activeCampaign && currentUser) {
       selectedCampaignId = activeCampaign.id
       setSelectedCampaignId(activeCampaign.id)
     }
@@ -2828,7 +2844,9 @@ function CharacterSheetContent() {
     
     // Save character to database
     try {
-      const { success, error, characterId } = await saveCharacter(newCharacter)
+      const { success, error, characterId } = isReadOnly && characterData.campaignId
+        ? await saveCharacterAsGuest(newCharacter, characterData.campaignId)
+        : await saveCharacter(newCharacter)
       if (success) {
         const finalCharacterId = characterId || newId
         
@@ -3364,15 +3382,27 @@ function CharacterSheetContent() {
   }
 
 
-  if (isInitialLoading || userLoading || !activeCharacter) {
+  if (userLoading || isInitialLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Icon icon="lucide:refresh-cw" className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-lg font-medium">Loading...</p>
+          <p className="text-sm text-muted-foreground">
+            {userLoading ? "Loading user permissions..." : "Connecting to database..."}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!activeCharacter && !isReadOnly) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Icon icon="lucide:refresh-cw" className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-lg font-medium">Loading character data...</p>
-          <p className="text-sm text-muted-foreground">
-            {userLoading ? "Loading user permissions..." : isInitialLoading ? "Connecting to database..." : "No characters available"}
-          </p>
+          <p className="text-sm text-muted-foreground">No characters available</p>
         </div>
       </div>
     )
@@ -3406,7 +3436,7 @@ function CharacterSheetContent() {
         }}
       />
       <div className="flex flex-1 overflow-hidden">
-        {appView === 'campaign' && (
+        {appView === 'campaign' && !(isReadOnly && selectedCampaignId === 'all') && (
           <CharacterSidebar
             characters={characters}
             campaigns={campaigns}
@@ -3436,12 +3466,22 @@ function CharacterSheetContent() {
             currentUserId={currentUser?.id}
             currentView={currentView}
             onViewChange={setCurrentView}
-            canEdit={currentUserProfile?.permissionLevel !== 'viewer'}
+            canEdit={!isReadOnly && currentUserProfile?.permissionLevel !== 'viewer'}
+            isReadOnly={isReadOnly}
           />
         )}
 
-        <main ref={mainRef} className={`flex-1 ${appView !== 'management' && appView !== 'wiki' ? 'p-6' : ''} relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
-          {appView === 'wiki' ? (
+        <main ref={mainRef} className={`flex-1 ${appView !== 'management' && appView !== 'wiki' && !(isReadOnly && selectedCampaignId === 'all') ? 'p-6' : ''} relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
+          {isReadOnly && selectedCampaignId === 'all' ? (
+            <GuestHomepage
+              campaigns={campaigns}
+              onSelectCampaign={(campaignId) => {
+                setSelectedCampaignId(campaignId)
+                setCurrentView('campaign')
+              }}
+              onViewWiki={() => setAppView('wiki')}
+            />
+          ) : appView === 'wiki' ? (
             <WikiPage />
           ) : appView === 'management' ? (
             <ManagementInterface
@@ -3468,10 +3508,10 @@ function CharacterSheetContent() {
                   </button>
                   <Icon icon="lucide:chevron-right" className="w-4 h-4" />
                   <span className="text-muted-foreground">
-                    {activeCharacter.isNPC ? `NPC: ${activeCharacter.name}` : `Character: ${activeCharacter.name}`}
+                    {activeCharacter ? (activeCharacter.isNPC ? `NPC: ${activeCharacter.name}` : `Character: ${activeCharacter.name}`) : 'Character'}
                   </span>
                 </div>
-                {(activeCharacter && canViewActiveCharacter) && (
+                {(activeCharacter && canViewActiveCharacter && (!isReadOnly || currentCampaign?.allowGuestCharacters)) && (
                   <div className="flex items-center gap-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -3796,8 +3836,8 @@ function CharacterSheetContent() {
                 scrollToTop()
               }}
               onEditCampaign={handleEditCampaign}
-              onCreateCharacter={createNewCharacter}
-              onImportCharacterJson={triggerImportCharacterJson}
+              onCreateCharacter={isReadOnly && !currentCampaign?.allowGuestCharacters ? undefined : createNewCharacter}
+              onImportCharacterJson={isReadOnly ? undefined : triggerImportCharacterJson}
               currentUserId={currentUser?.id}
               onStartLongRest={handleStartLongRest}
               onToggleLevelUpMode={handleToggleLevelUpMode}
@@ -3811,6 +3851,7 @@ function CharacterSheetContent() {
               onDeleteResource={handleDeleteResource}
               onCreateLink={handleCreateLink}
               onDeleteLink={handleDeleteLink}
+              isReadOnly={isReadOnly}
             />
           )}
 
@@ -3830,8 +3871,8 @@ function CharacterSheetContent() {
 
       </main>
 
-      {/* Edit Modals */}
-      <BasicInfoModal
+      {/* Edit Modals — only render when a character is active */}
+      {activeCharacter && <><BasicInfoModal
         isOpen={basicInfoModalOpen}
         onClose={() => setBasicInfoModalOpen(false)}
         character={activeCharacter}
@@ -4282,7 +4323,7 @@ function CharacterSheetContent() {
         isSuperadmin={isUserSuperadmin}
         onAddSpell={handleAddSpell}
         onCreateNewSpell={() => setSpellCreationModalOpen(true)}
-        canEdit={currentUserProfile?.permissionLevel !== 'viewer'}
+        canEdit={!isReadOnly && currentUserProfile?.permissionLevel !== 'viewer'}
       />
 
       {/* Spell Creation Modal */}
@@ -4413,7 +4454,7 @@ function CharacterSheetContent() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog></>}
       </div>
     </div>
   )

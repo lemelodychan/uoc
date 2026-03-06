@@ -43,6 +43,9 @@ export interface Campaign {
   logoDarkUrl?: string // Logo for dark mode (SVG supported)
   // Default campaign setting (superadmin only)
   isDefault?: boolean // Whether this is the default campaign to show on app load
+  // Guest access
+  isPublic?: boolean // Visible to unauthenticated guests on the homepage
+  allowGuestCharacters?: boolean // Guests can create/edit characters in this campaign
 }
 
 export interface CharacterData {

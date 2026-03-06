@@ -289,7 +289,7 @@ export function SpellModal({ isOpen, onClose, character, onSave, onSaveInnateSpe
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] p-0 gap-0 flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[calc(100vh-32px)] p-0 gap-0 flex flex-col">
         <DialogHeader className="p-4 border-b shrink-0">
           <DialogTitle className="mb-2">Edit Spell Data</DialogTitle>
           <DialogDescription className="mb-2">

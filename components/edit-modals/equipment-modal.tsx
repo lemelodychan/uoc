@@ -122,7 +122,7 @@ export function EquipmentModal({ isOpen, onClose, character, onSave }: Equipment
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[600px] max-h-[calc(100vh-32px)] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Edit Equipment & Tools</DialogTitle>
         </DialogHeader>

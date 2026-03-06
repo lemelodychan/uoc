@@ -62,7 +62,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
   if (!results || results.length === 0) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px] max-h-[70vh] p-0 gap-0">
+        <DialogContent className="sm:max-w-[600px] max-h-[calc(100vh-32px)] p-0 gap-0">
           <DialogHeader className="p-4 border-b">
             <DialogTitle>Long Rest Results</DialogTitle>
           </DialogHeader>
@@ -79,7 +79,7 @@ export const LongRestResultsModal = ({ isOpen, onClose, results }: LongRestResul
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[70vh] p-0 gap-0">
+      <DialogContent className="sm:max-w-[700px] max-h-[calc(100vh-32px)] p-0 gap-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="lucide:heart" className="w-5 h-5 text-red-500 dark:text-red-400" />
