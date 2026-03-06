@@ -6718,12 +6718,19 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       {(() => {
-                        const recommendedAbilities = new Set(
-                          characterClasses.flatMap(charClass => classDataMap.get(charClass.name)?.primary_ability ?? [])
-                            .map(a => a.toLowerCase())
-                        )
+                        const totalLevels = characterClasses.reduce((sum, c) => sum + c.level, 0) || 1
+                        const abilityWeightMap = new Map<string, number>()
+                        characterClasses.forEach(charClass => {
+                          classDataMap.get(charClass.name)?.primary_ability?.forEach(pa => {
+                            const key = pa.toLowerCase()
+                            abilityWeightMap.set(key, (abilityWeightMap.get(key) || 0) + charClass.level)
+                          })
+                        })
+                        const maxAbilityWeight = Math.max(0, ...Array.from(abilityWeightMap.values()))
                         return ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'].map((ability) => {
-                        const isRecommended = recommendedAbilities.has(ability)
+                        const abilityWeight = abilityWeightMap.get(ability) || 0
+                        const isRecommended = abilityWeight > 0
+                        const isTopRecommendation = isRecommended && abilityWeight === maxAbilityWeight
                         const value = editableCharacter[ability as keyof CharacterData] as number || POINT_BUY_BASE
                         const modifier = calculateModifier(value)
                         
@@ -6776,7 +6783,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                         const maxValue = Math.min(ABILITY_SCORE_DISPLAY_MAX, POINT_BUY_MAX + raceBonus + asiBonus)
                         
                         return (
-                          <div key={ability} className={`relative flex flex-col gap-2 p-3 border rounded-lg overflow-hidden ${hasAnyModification ? 'bg-primary/5 border-primary/50' : ''}`}>
+                          <div key={ability} className={`relative flex flex-col gap-2 p-3 border rounded-lg overflow-hidden ${isTopRecommendation ? 'bg-primary/10 border-primary/60' : isRecommended ? 'bg-primary/5 border-primary/30' : ''}`}>
                             <div className="flex flex-row gap-2 items-start justify-between">
                               <div className="flex flex-col gap-0.5">
                                 <Label htmlFor={`ability-${ability}`} className="text-md font-medium capitalize">
@@ -6814,12 +6821,12 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                     
                                     updateEditableCharacter({ [ability]: newValue })
                                   }}
-                                  className={`w-14 h-6 px-1 py-2 text-center ${hasAnyModification ? 'border-primary border-2' : ''}`}
+                                  className="w-14 h-6 px-1 py-2 text-center"
                                   min={minValue}
                                   max={maxValue}
                                 />
-                                <Badge 
-                                  variant={hasAnyModification ? "default" : "secondary"} 
+                                <Badge
+                                  variant="secondary"
                                   className={`text-xs border-0 ${getAbilityModifierColor(ability.toUpperCase().slice(0, 3))}`}
                                 >
                                   {formatModifier(modifier)}
@@ -6827,18 +6834,21 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                               </div>
                             </div>
                             {hasAnyModification && (
-                              <div className="text-xs text-primary flex flex-row gap-2">
+                              <div className="text-xs text-muted-foreground flex flex-row gap-2">
                                 {hasRaceModification && (
-                                  <span className="font-medium">+{raceBonus} from race</span>
+                                  <span>+{raceBonus} from race</span>
                                 )}
                                 {hasASIModification && (
-                                  <span className="font-medium">+{asiBonus} from ASI</span>
+                                  <span>+{asiBonus} from ASI</span>
                                 )}
                               </div>
                             )}
                             {isRecommended && (
-                              <Badge variant="default" className="text-xs font-text font-bold w-fit bg-primary text-white self-end absolute bottom-0 right-0 rounded-none rounded-tl-md">
-                                Recommended
+                              <Badge
+                                variant="outline"
+                                className={`text-xs font-text font-bold w-fit absolute bottom-0 right-0 rounded-none rounded-tl-md ${isTopRecommendation ? 'bg-primary border-primary text-primary-foreground border-b-0 border-r-0' : 'bg-primary/20 border-primary/40 text-primary border-b-0 border-r-0'}`}
+                              >
+                                {isTopRecommendation ? 'Recommended' : 'Good to have'}
                               </Badge>
                             )}
                           </div>

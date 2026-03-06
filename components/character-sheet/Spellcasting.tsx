@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData, InnateSpell } from "@/lib/character-data"
+import { getSpellcastingAbility, getSpellcastingClasses, calculateModifier } from "@/lib/character-data"
 import { getCombatColor, getClassFeatureColors } from "@/lib/color-mapping"
 import { hasClassFeature, getClassLevel } from "@/lib/class-feature-utils"
 import { getFeatureUsage, getFeatureCustomDescription, getFeatureMaxUses } from "@/lib/feature-usage-tracker"
@@ -1129,18 +1130,89 @@ export function Spellcasting({
           <>
             <div className="flex flex-col gap-2">
               {/* Spell Attack and Spell Save DC always on same row */}
-              <div className="grid grid-cols-2 gap-2 items-start">
-                <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
-                  <div className="text-sm text-muted-foreground">Spell Attack</div>
-                  <div className="text-xl font-bold font-mono">
-                    {formatModifier(character.spellData.spellAttackBonus)}
+              {(() => {
+                const isMulticlass = character.classes && character.classes.length > 1
+                const spellcastingClasses = isMulticlass
+                  ? getSpellcastingClasses(character.classes!)
+                  : character.classes?.length
+                    ? [character.classes[0]]
+                    : [{ name: character.class, classData: undefined } as any]
+
+                const classBreakdowns = spellcastingClasses.map(cls => {
+                  const ability = getSpellcastingAbility(cls.name, cls.classData)
+                  const abilityMod = calculateModifier((character as any)[ability] ?? 10)
+                  const abilityShort = ability.charAt(0).toUpperCase() + ability.slice(1, 3).toUpperCase()
+                  return { name: cls.name, ability, abilityShort, abilityMod }
+                })
+
+                // For multiclass, the highest modifier is used
+                const usedMod = isMulticlass
+                  ? Math.max(...classBreakdowns.map(c => c.abilityMod))
+                  : (classBreakdowns[0]?.abilityMod ?? 0)
+
+                const attackFormula = classBreakdowns.length > 1
+                  ? classBreakdowns.map(c => `${c.name}: ${c.abilityShort} (${c.abilityMod >= 0 ? '+' : ''}${c.abilityMod})`).join('\n') + `\n→ uses highest: ${usedMod >= 0 ? '+' : ''}${usedMod}`
+                  : null
+
+                const singleClass = classBreakdowns[0]
+
+                return (
+                  <div className="grid grid-cols-2 gap-2 items-start">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background cursor-default">
+                          <div className="text-sm text-muted-foreground">Spell Attack</div>
+                          <div className="text-xl font-bold font-mono">
+                            {formatModifier(character.spellData.spellAttackBonus)}
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs flex flex-col gap-1 items-center text-center">
+                        <div className="font-medium">Spell Attack Bonus</div>
+                        <div className="text-[11px] opacity-80 flex flex-col gap-0.5 items-center">
+                          {attackFormula ? (
+                            <>
+                              {classBreakdowns.map(c => (
+                                <span key={c.name} className="capitalize">{c.name}: {c.abilityShort} ({c.abilityMod >= 0 ? '+' : ''}{c.abilityMod})</span>
+                              ))}
+                              <span className="opacity-60">uses highest modifier</span>
+                            </>
+                          ) : singleClass ? (
+                            <span className="capitalize">{singleClass.name} ({singleClass.ability})</span>
+                          ) : null}
+                          <span>Prof ({proficiencyBonus >= 0 ? '+' : ''}{proficiencyBonus}) + {isMulticlass ? 'Best Mod' : (singleClass?.abilityShort ?? 'Mod')} ({usedMod >= 0 ? '+' : ''}{usedMod})</span>
+                          <span>= {formatModifier(character.spellData.spellAttackBonus)}</span>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background cursor-default">
+                          <div className="text-sm text-muted-foreground">Spell Save DC</div>
+                          <div className="text-xl font-bold font-mono">{character.spellData.spellSaveDC}</div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs flex flex-col gap-1 items-center text-center">
+                        <div className="font-medium">Spell Save DC</div>
+                        <div className="text-[11px] opacity-80 flex flex-col gap-0.5 items-center">
+                          {attackFormula ? (
+                            <>
+                              {classBreakdowns.map(c => (
+                                <span key={c.name} className="capitalize">{c.name}: {c.abilityShort} ({c.abilityMod >= 0 ? '+' : ''}{c.abilityMod})</span>
+                              ))}
+                              <span className="opacity-60">uses highest modifier</span>
+                            </>
+                          ) : singleClass ? (
+                            <span className="capitalize">{singleClass.name} ({singleClass.ability})</span>
+                          ) : null}
+                          <span>8 + Prof ({proficiencyBonus >= 0 ? '+' : ''}{proficiencyBonus}) + {isMulticlass ? 'Best Mod' : (singleClass?.abilityShort ?? 'Mod')} ({usedMod >= 0 ? '+' : ''}{usedMod})</span>
+                          <span>= {character.spellData.spellSaveDC}</span>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                </div>
-                <div className="text-center border p-2 rounded-lg mb-0 flex flex-col items-center gap-1 bg-background">
-                  <div className="text-sm text-muted-foreground">Spell Save DC</div>
-                  <div className="text-xl font-bold font-mono">{character.spellData.spellSaveDC}</div>
-                </div>
-              </div>
+                )
+              })()}
               
               {/* Cantrips and Spells row: Cantrips | Spells Known (per class) | Spells Prepared (per class) - equal-width grid */}
               {hasSpellsRow && (() => {

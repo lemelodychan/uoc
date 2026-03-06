@@ -390,14 +390,17 @@ function CharacterSheetContent() {
   ) : false
 
   
+  // Guests can edit guest-created characters (userId undefined = null in DB) in allowGuestCharacters campaigns
+  const canEditAsGuest = isReadOnly && !!currentCampaign?.allowGuestCharacters && !activeCharacter?.userId
+
   // Get current campaign DM for campaign-aware editing
-  const canEditActiveCharacter = activeCharacter ? canEditCharacterWithCampaign(
-    activeCharacter, 
-    currentUser?.id, 
+  const canEditActiveCharacter = canEditAsGuest || (activeCharacter ? canEditCharacterWithCampaign(
+    activeCharacter,
+    currentUser?.id,
     currentCampaign?.dungeonMasterId,
     selectedCampaignId,
     currentUserProfile?.permissionLevel
-  ) : false
+  ) : false)
 
   
   // Reset superadmin override when switching to a different character
@@ -3986,8 +3989,8 @@ function CharacterSheetContent() {
         onClose={() => setSpellListModalOpen(false)}
         character={activeCharacter}
         onSave={updateSpellData}
-        canEdit={canEditActiveCharacter}
-        canAddToSheet={canEditActiveCharacter || (isReadOnly && !!currentCampaign?.allowGuestCharacters)}
+        canEdit={!isReadOnly && canEditActiveCharacter}
+        canAddToSheet={canEditActiveCharacter}
       />
       <CharacterCreationModal
         isOpen={characterCreationModalOpen}
@@ -4338,7 +4341,7 @@ function CharacterSheetContent() {
         onAddSpell={handleAddSpell}
         onCreateNewSpell={() => setSpellCreationModalOpen(true)}
         canEdit={!isReadOnly && currentUserProfile?.permissionLevel !== 'viewer'}
-        canAddToSheet={isReadOnly ? !!currentCampaign?.allowGuestCharacters : currentUserProfile?.permissionLevel !== 'viewer'}
+        canAddToSheet={canEditActiveCharacter}
       />
 
       {/* Spell Creation Modal */}

@@ -509,9 +509,9 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
                                     </div>
                                     <div className="flex items-center gap-2">
                                       {spell.level > 0 && (
-                                        <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => canEdit && togglePrepared(spell)} variant="outline" size="sm" disabled={!canEdit}>{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
+                                        <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => canAddToSheet && togglePrepared(spell)} variant="outline" size="sm" disabled={!canAddToSheet}>{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
                                       )}
-                                      {canEdit && (
+                                      {canAddToSheet && (
                                         <>
                                           <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
                                           <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
@@ -594,15 +594,15 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
                                         <Toggle
                                           aria-label="Prepared"
                                           pressed={!!spell.isPrepared}
-                                          onPressedChange={() => canEdit && togglePrepared(spell)}
+                                          onPressedChange={() => canAddToSheet && togglePrepared(spell)}
                                           variant="outline"
                                           size="sm"
-                                          disabled={!canEdit}
+                                          disabled={!canAddToSheet}
                                         >
                                           {spell.isPrepared ? "Prepared" : "Prepare"}
                                         </Toggle>
                                       )}
-                                      {canEdit && (
+                                      {canAddToSheet && (
                                         <>
                                           <Button
                                             variant="outline"
@@ -731,9 +731,9 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
                                       </div>
                                       <div className="flex items-center gap-2">
                                         {spell.level > 0 && (
-                                          <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => canEdit && togglePrepared(spell)} variant="outline" size="sm" disabled={!canEdit}>{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
+                                          <Toggle aria-label="Prepared" pressed={!!spell.isPrepared} onPressedChange={() => canAddToSheet && togglePrepared(spell)} variant="outline" size="sm" disabled={!canAddToSheet}>{spell.isPrepared ? 'Prepared' : 'Prepare'}</Toggle>
                                         )}
-                                        {canEdit && (
+                                        {canAddToSheet && (
                                           <>
                                             <Button variant="outline" size="sm" onClick={() => { setEditIndex(globalIndex); setNewSpell(spell); setNewSpellModalOpen(true) }}>Edit</Button>
                                             <Button variant="outline" size="sm" onClick={() => removeSpell(globalIndex)} className="text-[#ce6565] hover:bg-[#ce6565] hover:text-white w-8 h-8"><Icon icon="lucide:trash-2" className="w-4 h-4" /></Button>
