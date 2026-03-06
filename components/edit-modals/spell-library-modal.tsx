@@ -27,6 +27,7 @@ interface SpellLibraryModalProps {
   onCreateNewSpell: () => void
   onEditSpell?: (spell: LibrarySpell) => void
   canEdit?: boolean
+  canAddToSheet?: boolean
 }
 
 export interface SpellLibraryModalRef {
@@ -91,9 +92,10 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
   currentUserId,
   isSuperadmin = false,
   onAddSpell, 
-  onCreateNewSpell, 
+  onCreateNewSpell,
   onEditSpell,
-  canEdit = true
+  canEdit = true,
+  canAddToSheet = canEdit
 }, ref) => {
   const { toast } = useToast()
   const [spells, setSpells] = useState<LibrarySpell[]>([])
@@ -475,7 +477,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                           <Icon icon="lucide:trash-2" className="w-4 h-4" />
                                         </Button>
                                       )}
-                                      {canEdit && availableCharacters.length === 1 ? (
+                                      {canAddToSheet && availableCharacters.length === 1 ? (
                                         <Button
                                           size="sm"
                                           className="h-8"
@@ -489,7 +491,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
                                             <><Icon icon="lucide:plus" className="w-4 h-4" />Add to spell list</>
                                           )}
                                         </Button>
-                                      ) : canEdit && (
+                                      ) : canAddToSheet && (
                                         <div className="relative">
                                           <Button
                                             size="sm"

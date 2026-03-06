@@ -120,7 +120,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
   const { isSuperadmin } = useUser()
   
   // Step management
-  const [step, setStep] = useState<'basic_info' | 'race_selection' | 'background_selection' | 'class_selection' | 'class_features' | 'hp_roll' | 'armor_selection' | 'summary'>('basic_info')
+  const [step, setStep] = useState<'basic_info' | 'race_selection' | 'background_selection' | 'class_selection' | 'class_features' | 'hp_roll' | 'summary'>('basic_info')
   
   // Point buy system constants (defined early so they're accessible throughout)
   const POINT_BUY_TOTAL = 27
@@ -3802,9 +3802,8 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
               step === 'class_selection' ? '4' :
               step === 'class_features' ? '5' :
               step === 'hp_roll' ? '6' :
-              step === 'armor_selection' ? '7' :
-              '8'
-            } of 8
+              '7'
+            } of 7
           </div>
         </DialogHeader>
 
@@ -6705,8 +6704,8 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                   <CardHeader className="gap-2">
                     <CardTitle className="text-base font-text">Ability Scores Point Buy</CardTitle>
                     <p className="text-xs text-muted-foreground">
-                      All abilities start at 8. You have {POINT_BUY_TOTAL} points to distribute. 
-                      Each ability can be between 8-15 (before race/ASI bonuses). 
+                      All abilities start at 8. You have {POINT_BUY_TOTAL} points to distribute.
+                      Each ability can be between 8-15 (before race/ASI bonuses).
                       Costs: 1 point per point for scores 8-13, then 2 points per point for 14-15.
                     </p>
                   </CardHeader>
@@ -6718,7 +6717,13 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                       </Badge>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'].map((ability) => {
+                      {(() => {
+                        const recommendedAbilities = new Set(
+                          characterClasses.flatMap(charClass => classDataMap.get(charClass.name)?.primary_ability ?? [])
+                            .map(a => a.toLowerCase())
+                        )
+                        return ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'].map((ability) => {
+                        const isRecommended = recommendedAbilities.has(ability)
                         const value = editableCharacter[ability as keyof CharacterData] as number || POINT_BUY_BASE
                         const modifier = calculateModifier(value)
                         
@@ -6771,9 +6776,9 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                         const maxValue = Math.min(ABILITY_SCORE_DISPLAY_MAX, POINT_BUY_MAX + raceBonus + asiBonus)
                         
                         return (
-                          <div key={ability} className={`flex flex-col gap-2 p-3 border rounded-lg ${hasAnyModification ? 'bg-primary/5 border-primary/50' : ''}`}>
+                          <div key={ability} className={`relative flex flex-col gap-2 p-3 border rounded-lg overflow-hidden ${hasAnyModification ? 'bg-primary/5 border-primary/50' : ''}`}>
                             <div className="flex flex-row gap-2 items-start justify-between">
-                              <div className="flex flex-col gap-0">
+                              <div className="flex flex-col gap-0.5">
                                 <Label htmlFor={`ability-${ability}`} className="text-md font-medium capitalize">
                                   {ability}
                                 </Label>
@@ -6831,9 +6836,15 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                                 )}
                               </div>
                             )}
+                            {isRecommended && (
+                              <Badge variant="default" className="text-xs font-text font-bold w-fit bg-primary text-white self-end absolute bottom-0 right-0 rounded-none rounded-tl-md">
+                                Recommended
+                              </Badge>
+                            )}
                           </div>
                         )
-                      })}
+                      })
+                    })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -6999,295 +7010,7 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                 </Card>
               </div>
             )}
-
-            {/* Step 7: Armor Selection */}
-            {step === 'armor_selection' && (
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                  <h3 className="text-lg font-semibold">Starting Equipment — Armor (Optional)</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Select any armor your character starts with.
-                  </p>
-                </div>
-
-                {/* Light Armor */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">Light Armor</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-2">
-                    {PHB_ARMOR_CATALOG.filter(a => a.armorType === 'light').map(armor => {
-                      const isSelected = selectedArmor.some(a => a.id === armor.id)
-                      const acText = armor.addDexModifier && armor.dexCap ? `${armor.baseAC} + DEX (max ${armor.dexCap})` : armor.addDexModifier ? `${armor.baseAC} + DEX` : `${armor.baseAC}`
-                      return (
-                        <label key={armor.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedArmor(prev => [...prev, { ...armor, equipped: true, magicBonus: 0 }])
-                              } else {
-                                setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))
-                              }
-                            }}
-                          />
-                          <span className="text-sm font-medium flex-1">{armor.name}</span>
-                          <span className="text-xs text-muted-foreground">AC {acText}</span>
-                          {armor.stealthDisadvantage && <Badge variant="outline" className="text-xs text-amber-600">Stealth disadv.</Badge>}
-                        </label>
-                      )
-                    })}
-                  </CardContent>
-                </Card>
-
-                {/* Medium Armor */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">Medium Armor</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-2">
-                    {PHB_ARMOR_CATALOG.filter(a => a.armorType === 'medium').map(armor => {
-                      const isSelected = selectedArmor.some(a => a.id === armor.id)
-                      const acText = armor.addDexModifier && armor.dexCap ? `${armor.baseAC} + DEX (max ${armor.dexCap})` : armor.addDexModifier ? `${armor.baseAC} + DEX` : `${armor.baseAC}`
-                      return (
-                        <label key={armor.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedArmor(prev => [...prev, { ...armor, equipped: true, magicBonus: 0 }])
-                              } else {
-                                setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))
-                              }
-                            }}
-                          />
-                          <span className="text-sm font-medium flex-1">{armor.name}</span>
-                          <span className="text-xs text-muted-foreground">AC {acText}</span>
-                          {armor.stealthDisadvantage && <Badge variant="outline" className="text-xs text-amber-600">Stealth disadv.</Badge>}
-                          {armor.strengthRequirement && <Badge variant="outline" className="text-xs">Min STR {armor.strengthRequirement}</Badge>}
-                        </label>
-                      )
-                    })}
-                  </CardContent>
-                </Card>
-
-                {/* Heavy Armor */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">Heavy Armor</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-2">
-                    {PHB_ARMOR_CATALOG.filter(a => a.armorType === 'heavy').map(armor => {
-                      const isSelected = selectedArmor.some(a => a.id === armor.id)
-                      const acText = `${armor.baseAC}`
-                      return (
-                        <label key={armor.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedArmor(prev => [...prev, { ...armor, equipped: true, magicBonus: 0 }])
-                              } else {
-                                setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))
-                              }
-                            }}
-                          />
-                          <span className="text-sm font-medium flex-1">{armor.name}</span>
-                          <span className="text-xs text-muted-foreground">AC {acText}</span>
-                          {armor.stealthDisadvantage && <Badge variant="outline" className="text-xs text-amber-600">Stealth disadv.</Badge>}
-                          {armor.strengthRequirement && <Badge variant="outline" className="text-xs">Min STR {armor.strengthRequirement}</Badge>}
-                        </label>
-                      )
-                    })}
-                  </CardContent>
-                </Card>
-
-                {/* Shield */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">Shield</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-2">
-                    {PHB_ARMOR_CATALOG.filter(a => a.armorType === 'shield').map(armor => {
-                      const isSelected = selectedArmor.some(a => a.id === armor.id)
-                      return (
-                        <label key={armor.id} className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedArmor(prev => [...prev, { ...armor, equipped: true, magicBonus: 0 }])
-                              } else {
-                                setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))
-                              }
-                            }}
-                          />
-                          <span className="text-sm font-medium flex-1">{armor.name}</span>
-                          <span className="text-xs text-muted-foreground">+{armor.baseAC} AC</span>
-                        </label>
-                      )
-                    })}
-                  </CardContent>
-                </Card>
-
-                {/* Custom Armor */}
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCustomArmorForm(!showCustomArmorForm)}
-                    className="w-fit"
-                  >
-                    <Icon icon={showCustomArmorForm ? "lucide:minus" : "lucide:plus"} className="w-4 h-4" />
-                    {showCustomArmorForm ? 'Cancel Custom Armor' : 'Add Custom Armor'}
-                  </Button>
-
-                  {showCustomArmorForm && (
-                    <Card>
-                      <CardContent className="pt-4 flex flex-col gap-3">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs">Name</Label>
-                            <Input
-                              value={customArmorForm.name}
-                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, name: e.target.value }))}
-                              placeholder="Custom armor name"
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs">Type</Label>
-                            <Select
-                              value={customArmorForm.armorType}
-                              onValueChange={(value) => setCustomArmorForm(prev => ({ ...prev, armorType: value as ArmorType }))}
-                            >
-                              <SelectTrigger className="h-8 text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="light">Light</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="heavy">Heavy</SelectItem>
-                                <SelectItem value="shield">Shield</SelectItem>
-                                <SelectItem value="natural">Natural</SelectItem>
-                                <SelectItem value="custom">Custom</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs">Base AC</Label>
-                            <Input
-                              type="number"
-                              value={customArmorForm.baseAC}
-                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, baseAC: parseInt(e.target.value) || 0 }))}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs">Magic Bonus</Label>
-                            <Input
-                              type="number"
-                              value={customArmorForm.magicBonus}
-                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, magicBonus: parseInt(e.target.value) || 0 }))}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs">DEX Cap (leave empty for unlimited)</Label>
-                            <Input
-                              type="number"
-                              value={customArmorForm.dexCap ?? ''}
-                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, dexCap: e.target.value ? parseInt(e.target.value) : null }))}
-                              placeholder="No cap"
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Label className="text-xs">STR Requirement (leave empty for none)</Label>
-                            <Input
-                              type="number"
-                              value={customArmorForm.strengthRequirement ?? ''}
-                              onChange={(e) => setCustomArmorForm(prev => ({ ...prev, strengthRequirement: e.target.value ? parseInt(e.target.value) : null }))}
-                              placeholder="None"
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <Checkbox
-                              checked={customArmorForm.addDexModifier}
-                              onCheckedChange={(checked) => setCustomArmorForm(prev => ({ ...prev, addDexModifier: !!checked }))}
-                            />
-                            <span className="text-xs">Add DEX modifier</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <Checkbox
-                              checked={customArmorForm.stealthDisadvantage}
-                              onCheckedChange={(checked) => setCustomArmorForm(prev => ({ ...prev, stealthDisadvantage: !!checked }))}
-                            />
-                            <span className="text-xs">Stealth disadvantage</span>
-                          </label>
-                        </div>
-                        <Button
-                          size="sm"
-                          className="w-fit"
-                          disabled={!customArmorForm.name.trim()}
-                          onClick={() => {
-                            const newArmor: ArmorItem = {
-                              id: crypto.randomUUID(),
-                              name: customArmorForm.name.trim(),
-                              armorType: customArmorForm.armorType,
-                              baseAC: customArmorForm.baseAC,
-                              addDexModifier: customArmorForm.addDexModifier,
-                              dexCap: customArmorForm.dexCap,
-                              magicBonus: customArmorForm.magicBonus,
-                              stealthDisadvantage: customArmorForm.stealthDisadvantage,
-                              strengthRequirement: customArmorForm.strengthRequirement ?? undefined,
-                              equipped: true,
-                            }
-                            setSelectedArmor(prev => [...prev, newArmor])
-                            setCustomArmorForm({ name: '', armorType: 'light', baseAC: 0, addDexModifier: true, dexCap: null, stealthDisadvantage: false, strengthRequirement: null, magicBonus: 0 })
-                            setShowCustomArmorForm(false)
-                          }}
-                        >
-                          <Icon icon="lucide:plus" className="w-4 h-4" />
-                          Add
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Selected custom armor items summary */}
-                {selectedArmor.filter(a => !PHB_ARMOR_CATALOG.some(c => c.id === a.id)).length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold">Custom Armor Items</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-2">
-                      {selectedArmor.filter(a => !PHB_ARMOR_CATALOG.some(c => c.id === a.id)).map(armor => (
-                        <div key={armor.id} className="flex items-center gap-3 px-2 py-1.5">
-                          <span className="text-sm font-medium flex-1">{armor.name}</span>
-                          <span className="text-xs text-muted-foreground">AC {armor.baseAC}{armor.magicBonus ? ` +${armor.magicBonus}` : ''}</span>
-                          <Badge variant="outline" className="text-xs capitalize">{armor.armorType}</Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => setSelectedArmor(prev => prev.filter(a => a.id !== armor.id))}
-                          >
-                            <Icon icon="lucide:x" className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-
-            {/* Step 8: Summary */}
+            {/* Step 7: Summary */}
             {step === 'summary' && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
@@ -7620,10 +7343,8 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                       setStep('class_selection')
                     } else if (step === 'hp_roll') {
                       setStep('class_features')
-                    } else if (step === 'armor_selection') {
-                      setStep('hp_roll')
                     } else if (step === 'summary') {
-                      setStep('armor_selection')
+                      setStep('hp_roll')
                     }
                   }}
                 >
@@ -7830,38 +7551,14 @@ export function CharacterCreationModal({ isOpen, onClose, onCreateCharacter, cur
                       return
                     }
                     setError(null)
-                    setStep('armor_selection')
+                    setStep('summary')
                   }}
                 >
-                  Continue to Armor Selection
+                  Continue to Summary
                   <Icon icon="lucide:arrow-right" className="w-4 h-4" />
                 </Button>
               )}
 
-              {step === 'armor_selection' && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedArmor([])
-                      setError(null)
-                      setStep('summary')
-                    }}
-                  >
-                    Skip
-                    <Icon icon="lucide:arrow-right" className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setError(null)
-                      setStep('summary')
-                    }}
-                  >
-                    Continue to Summary
-                    <Icon icon="lucide:arrow-right" className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
               
               {step === 'summary' && (
                 <Button onClick={handleCreate}>

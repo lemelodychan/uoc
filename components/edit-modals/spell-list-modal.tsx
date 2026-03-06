@@ -26,6 +26,7 @@ interface SpellListModalProps {
   character: CharacterData
   onSave: (updates: Partial<SpellData>) => void
   canEdit?: boolean
+  canAddToSheet?: boolean
 }
 
 const spellSchools = [
@@ -42,7 +43,7 @@ const spellSchools = [
 const castingTimeOptions = ["1 Action", "1 Bonus Action", "1 Reaction"]
 const ritualCastingTimes = ["1 Minute", "10 Minutes", "1 Hour", "8 Hours", "12 Hours", "24 Hours"]
 
-export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = true }: SpellListModalProps) {
+export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = true, canAddToSheet = canEdit }: SpellListModalProps) {
   const { toast } = useToast()
   const spellLibraryRef = useRef<SpellLibraryModalRef>(null)
   const [spells, setSpells] = useState<Spell[]>(character.spellData.spells || [])
@@ -1041,6 +1042,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
       }}
       onEditSpell={handleEditLibrarySpell}
       canEdit={canEdit}
+      canAddToSheet={canAddToSheet}
     />
 
     {/* Spell Creation Modal */}

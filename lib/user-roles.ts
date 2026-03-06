@@ -60,13 +60,17 @@ export function canEditCharacter(characterUserId?: string, currentUserId?: strin
  * Viewers cannot edit anything
  */
 export function canEditCharacterInCampaign(
-  characterUserId?: string, 
-  currentUserId?: string, 
+  characterUserId?: string,
+  currentUserId?: string,
   campaignDmId?: string,
   characterCampaignId?: string,
   currentCampaignId?: string,
   permissionLevel?: 'superadmin' | 'admin' | 'editor' | 'viewer'
 ): boolean {
+  // Unauthenticated (guest) users cannot edit via the normal auth path.
+  // Guest character saves go through saveCharacterAsGuest instead.
+  if (!currentUserId) return false
+
   // Viewers cannot edit anything
   if (permissionLevel === 'viewer') return false
   

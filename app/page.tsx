@@ -2857,17 +2857,22 @@ function CharacterSheetContent() {
         : await saveCharacter(newCharacter)
       if (success) {
         const finalCharacterId = characterId || newId
-        
-        // Reload character from database to ensure we have the latest data including backgroundData
-        await reloadCharacterFromDatabase(finalCharacterId)
-        
-        // If a new UUID was generated, update the character's ID in local state
+
+        // If the DB assigned a real UUID (different from the temp newId), update the characters
+        // array and activeCharacterId in the same React batch — prevents a render where
+        // activeCharacterId points to an ID that doesn't exist in the array yet (which would
+        // cause the || characters[0] fallback to flash the wrong character).
         if (characterId && characterId !== newId) {
+          setCharacters(prev => prev.map(char => char.id === newId ? { ...char, id: characterId } : char))
           setActiveCharacterId(characterId)
           saveActiveCharacterToLocalStorage(characterId)
         } else {
           saveActiveCharacterToLocalStorage(newId)
         }
+
+        // Reload character from database to get the latest data (backgroundData, etc.)
+        // Done after the ID swap so reloadCharacterFromDatabase can find the record by its real UUID.
+        await reloadCharacterFromDatabase(finalCharacterId)
         
         // Get the campaign name for the toast message
         const addedCampaign = characterData.campaignId 
@@ -3982,6 +3987,7 @@ function CharacterSheetContent() {
         character={activeCharacter}
         onSave={updateSpellData}
         canEdit={canEditActiveCharacter}
+        canAddToSheet={canEditActiveCharacter || (isReadOnly && !!currentCampaign?.allowGuestCharacters)}
       />
       <CharacterCreationModal
         isOpen={characterCreationModalOpen}
@@ -4332,6 +4338,7 @@ function CharacterSheetContent() {
         onAddSpell={handleAddSpell}
         onCreateNewSpell={() => setSpellCreationModalOpen(true)}
         canEdit={!isReadOnly && currentUserProfile?.permissionLevel !== 'viewer'}
+        canAddToSheet={isReadOnly ? !!currentCampaign?.allowGuestCharacters : currentUserProfile?.permissionLevel !== 'viewer'}
       />
 
       {/* Spell Creation Modal */}
