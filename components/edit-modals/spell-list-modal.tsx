@@ -775,7 +775,7 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
             <div className="text-sm text-muted-foreground w-full">
               {spells.length} spell{spells.length !== 1 ? 's' : ''} in your list
             </div>
-            {canEdit && (
+            {canAddToSheet && (
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -1055,8 +1055,8 @@ export function SpellListModal({ isOpen, onClose, character, onSave, canEdit = t
       }}
       character={character}
       onSave={(spell, classes, characterId) => handleCreateNewSpell(spell, classes)}
-      onSaveToLibraryOnly={handleSaveToLibraryOnly}
-      onUpdateLibrarySpell={handleUpdateLibrarySpell}
+      onSaveToLibraryOnly={canEdit ? handleSaveToLibraryOnly : undefined}
+      onUpdateLibrarySpell={canEdit ? handleUpdateLibrarySpell : undefined}
       initialSpellData={newSpell}
       initialClasses={editingSpellClasses}
       editingSpellId={editingSpellId || undefined}
