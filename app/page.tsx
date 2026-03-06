@@ -415,6 +415,11 @@ function CharacterSheetContent() {
       return
     }
 
+    // Guests can only auto-save if the campaign allows guest characters
+    if (isReadOnly && !currentCampaign?.allowGuestCharacters) {
+      return
+    }
+
     // Get fresh character data from state at the time of execution
     let currentCharacter: CharacterData | undefined
     setCharacters(currentCharacters => {
@@ -425,7 +430,7 @@ function CharacterSheetContent() {
     if (!currentCharacter) {
       return
     }
-    
+
     // Create toast outside of state setter
     const savingToast = toast({
       title: "Saving...",
@@ -433,7 +438,10 @@ function CharacterSheetContent() {
     })
 
     try {
-      const { success, error, characterId } = await saveCharacter(currentCharacter)
+      const campaignId = currentCharacter.campaignId || currentCampaign?.id
+      const { success, error, characterId } = (isReadOnly && campaignId)
+        ? await saveCharacterAsGuest(currentCharacter, campaignId)
+        : await saveCharacter(currentCharacter)
       
       if (success) {
         if (characterId && characterId !== currentCharacter.id) {
@@ -470,7 +478,7 @@ function CharacterSheetContent() {
         variant: "destructive",
       })
     }
-  }, [activeCharacterId, dbConnected, toast])
+  }, [activeCharacterId, dbConnected, toast, isReadOnly, currentCampaign])
 
   const triggerAutoSave = useCallback(() => {
     if (autoSaveTimeoutRef.current) {
