@@ -619,7 +619,7 @@ export function CampaignHomepage({
   }
 
   const getOwnerName = (userId?: string) => {
-    if (!userId) return 'Unknown Owner'
+    if (!userId) return 'Guest'
     const owner = users.find(user => user.userId === userId)
     return owner ? owner.displayName || `User ${userId.slice(0, 8)}...` : 'Unknown Owner'
   }

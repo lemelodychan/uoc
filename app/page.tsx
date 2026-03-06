@@ -2569,9 +2569,9 @@ function CharacterSheetContent() {
   }) => {
     const newId = (characters.length + 1).toString()
     
-    // Get current user for ownership
+    // Get current user for ownership (guests have no session — user will be null)
     const { user, error: userError } = await getCurrentUser()
-    if (userError) {
+    if (userError && !isReadOnly) {
       toast({
         title: "Error",
         description: `Failed to get user information: ${userError}`,

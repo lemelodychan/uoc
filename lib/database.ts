@@ -43,6 +43,8 @@ export const getCurrentUser = async (): Promise<{ user?: any; error?: string }> 
   try {
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error) {
+      // AuthSessionMissingError is expected for unauthenticated (guest) users — not a real error
+      if (!user) return { user: undefined }
       console.error("Error getting current user:", error)
       return { error: error.message }
     }
