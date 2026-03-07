@@ -48,6 +48,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
+
+    // Require authenticated editor/admin/superadmin
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+    const { data: profile } = await supabase.from('user_profiles').select('permission_level').eq('user_id', user.id).maybeSingle()
+    if (!profile || profile.permission_level === 'viewer') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { spell, classes } = body
 

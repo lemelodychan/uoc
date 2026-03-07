@@ -1,10 +1,24 @@
 /**
  * Class Feature Templates System
- * 
+ *
  * This file defines the template system for class features with usage tracking.
  * Templates are used to standardize how different types of class features are
  * configured and rendered in the UI.
  */
+
+/**
+ * Safe arithmetic evaluator — replaces eval().
+ * Only allows digits, whitespace, and the operators + - * / ( ).
+ * Throws if the expression contains anything else.
+ */
+function safeArithmeticEval(expression: string): number {
+  if (!/^[\d\s+\-*/().]+$/.test(expression)) {
+    throw new Error(`Unsafe arithmetic expression blocked: ${expression}`)
+  }
+  // Use Function constructor in a new isolated scope (no access to local vars)
+  // The regex above ensures only numeric/operator chars reach this point.
+  return Function(`"use strict"; return (${expression})`)() as number
+}
 
 import type { 
   ClassFeatureSkill, 
@@ -243,7 +257,7 @@ function evaluateFormula(formula: string, context: FormulaContext): number {
     try {
       // Replace level with actual value and evaluate
       const expression = formula.replace(/level/g, context.level.toString())
-      const result = eval(expression)
+      const result = safeArithmeticEval(expression)
       return Math.floor(result)
     } catch (error) {
       console.error(`Invalid formula: ${formula}`, error)
@@ -289,7 +303,7 @@ function evaluateFormula(formula: string, context: FormulaContext): number {
         })
       }
       
-      const result = eval(expression)
+      const result = safeArithmeticEval(expression)
       const finalResult = Math.max(1, Math.floor(result))
       
       if (formula.includes('+') || formula.includes('-') || formula.includes('*') || formula.includes('/')) {

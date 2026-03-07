@@ -372,7 +372,7 @@ export const getAllUsers = async (): Promise<{ users?: UserProfile[]; error?: st
         id: index + 1, // Temporary ID
         userId: userId,
         displayName: `User ${userId.slice(0, 8)}...`,
-        permissionLevel: userId === 'ea6864ba-869e-45af-9342-546e01a07464' ? 'superadmin' : 'editor' as const,
+        permissionLevel: userId === (process.env.SUPERADMIN_USER_ID ?? '') ? 'superadmin' : 'editor' as const,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }))

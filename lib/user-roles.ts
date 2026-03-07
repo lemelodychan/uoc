@@ -9,7 +9,7 @@ export interface UserWithRole {
 }
 
 // Superadmin user ID (legacy - now handled by user_profiles table)
-export const SUPERADMIN_USER_ID = 'ea6864ba-869e-45af-9342-546e01a07464'
+export const SUPERADMIN_USER_ID = process.env.SUPERADMIN_USER_ID ?? ''
 
 /**
  * Get the role for a user (legacy function - use permissionLevel from user_profiles instead)

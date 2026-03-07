@@ -2,13 +2,25 @@ import { NextResponse } from 'next/server'
 import { loadAllCampaigns, updateCampaign } from '@/lib/database'
 import { formatInTimeZone } from 'date-fns-tz'
 import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase-server'
 
 // Test endpoint to manually trigger Discord reminders
 export async function POST(req: Request) {
   const debugLogs: string[] = []
   debugLogs.push('🚀 Test endpoint called!')
-  
+
   try {
+    // Require superadmin — this endpoint uses the service role key and bypasses RLS
+    const supabase = createServerClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+    const { data: profile } = await supabase.from('user_profiles').select('permission_level').eq('user_id', user.id).maybeSingle()
+    if (!profile || profile.permission_level !== 'superadmin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json().catch(() => ({}))
     const { campaignId } = body
     

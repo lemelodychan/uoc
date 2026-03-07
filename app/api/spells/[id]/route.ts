@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 
+async function requireEditor(supabase: ReturnType<typeof createClient>) {
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'Not authenticated', status: 401 }
+  const { data: profile } = await supabase.from('user_profiles').select('permission_level').eq('user_id', user.id).maybeSingle()
+  if (!profile || profile.permission_level === 'viewer') return { error: 'Forbidden', status: 403 }
+  return null
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const supabase = createClient()
+    const authResult = await requireEditor(supabase)
+    if (authResult) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+
     const body = await request.json()
     const { spell, classes } = body
     const spellId = params.id
@@ -83,6 +94,9 @@ export async function DELETE(
 ) {
   try {
     const supabase = createClient()
+    const authResult = await requireEditor(supabase)
+    if (authResult) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+
     const spellId = params.id
 
     // Delete class associations first

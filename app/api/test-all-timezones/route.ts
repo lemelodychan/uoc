@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server'
 import { formatInTimeZone } from 'date-fns-tz'
+import { createClient } from '@/lib/supabase-server'
 
 // Test endpoint to verify timezone conversions work for all timezones
 export async function POST(req: Request) {
   try {
+    // Require authenticated user — this is a debug/test utility
+    const supabase = createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const testTime = '22:00:00' // 10 PM
     const testDate = '2025-10-25'
     
