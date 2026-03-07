@@ -11,12 +11,12 @@ export async function POST(req: Request) {
 
   try {
     // Require superadmin — this endpoint uses the service role key and bypasses RLS
-    const supabase = createServerClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const authClient = createServerClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
-    const { data: profile } = await supabase.from('user_profiles').select('permission_level').eq('user_id', user.id).maybeSingle()
+    const { data: profile } = await authClient.from('user_profiles').select('permission_level').eq('user_id', user.id).maybeSingle()
     if (!profile || profile.permission_level !== 'superadmin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
