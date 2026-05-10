@@ -625,8 +625,27 @@ export const saveCharacter = async (
       }
     }
 
+    // Generate slug for new characters (those without an existing DB record)
+    let characterSlug: string | undefined = character.slug
+    if (!existingCharacterData && !characterSlug) {
+      try {
+        const { generateCharacterSlug, resolveUniqueSlug } = await import('./slug-utils')
+        const isNPC = character.isNPC || false
+        const { count } = await supabase
+          .from("characters")
+          .select("id", { count: "exact", head: true })
+          .eq("is_npc", isNPC)
+        const sequenceNumber = (count ?? 0) + 1
+        const baseSlug = generateCharacterSlug(character.name, sequenceNumber, isNPC)
+        characterSlug = await resolveUniqueSlug(baseSlug, 'characters', supabase)
+      } catch (slugError) {
+        console.warn("Failed to generate character slug:", slugError)
+      }
+    }
+
     const saveData: any = {
       id: characterId, // Use the UUID instead of character.id
+      ...(characterSlug ? { slug: characterSlug } : {}),
       name: character.name,
       class_name: character.class,
       class_id: character.class_id,
@@ -827,8 +846,25 @@ export const saveCharacterAsGuest = async (
       characterId = globalThis.crypto.randomUUID()
     }
 
+    // Generate slug for new guest characters
+    let guestCharacterSlug: string | undefined
+    try {
+      const { generateCharacterSlug, resolveUniqueSlug } = await import('./slug-utils')
+      const isNPC = character.isNPC || false
+      const { count } = await supabase
+        .from("characters")
+        .select("id", { count: "exact", head: true })
+        .eq("is_npc", isNPC)
+      const sequenceNumber = (count ?? 0) + 1
+      const baseSlug = generateCharacterSlug(character.name, sequenceNumber, isNPC)
+      guestCharacterSlug = await resolveUniqueSlug(baseSlug, 'characters', supabase)
+    } catch (slugError) {
+      console.warn("Failed to generate guest character slug:", slugError)
+    }
+
     const saveData: any = {
       id: characterId,
+      ...(guestCharacterSlug ? { slug: guestCharacterSlug } : {}),
       name: character.name,
       class_name: character.class,
       class_id: character.class_id,
@@ -1082,6 +1118,7 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
 
     const tempCharacter: CharacterData = {
       id: data.id,
+      slug: data.slug || undefined,
       name: data.name,
       class: data.class_name, // Fixed: class_name -> class
       class_id: data.class_id,
@@ -1897,6 +1934,7 @@ export const loadCharactersMinimal = async (): Promise<{ characters?: CharacterD
       .from("characters")
       .select(`
         id,
+        slug,
         name,
         class_name,
         subclass,
@@ -1920,6 +1958,7 @@ export const loadCharactersMinimal = async (): Promise<{ characters?: CharacterD
     // Convert to minimal CharacterData format
     const minimalCharacters: CharacterData[] = data.map((row) => ({
       id: row.id,
+      slug: row.slug || undefined,
       name: row.name,
       class: row.class_name,
       subclass: row.subclass,
@@ -1989,6 +2028,7 @@ export const loadCharactersProgressive = async (
       .from("characters")
       .select(`
         id,
+        slug,
         name,
         class_name,
         subclass,
@@ -2017,6 +2057,7 @@ export const loadCharactersProgressive = async (
     // Full data will be loaded on-demand when characters are viewed
     const minimalCharacters: CharacterData[] = allData.map((row) => ({
       id: row.id,
+      slug: row.slug || undefined,
       name: row.name,
       class: row.class_name,
       subclass: row.subclass,
@@ -3699,11 +3740,23 @@ export const createCampaign = async (campaign: Campaign): Promise<{ success: boo
       const { error: unsetError } = await supabase
         .from("campaigns")
         .update({ is_default: false })
-      
+
       if (unsetError) {
         console.error("Error unsetting other default campaigns:", unsetError)
         return { success: false, error: unsetError.message }
       }
+    }
+
+    // Generate slug for the new campaign
+    let slug: string | null = null
+    try {
+      const { generateCampaignSlug, resolveUniqueSlug } = await import('./slug-utils')
+      const { count } = await supabase.from("campaigns").select("id", { count: "exact", head: true })
+      const sequenceNumber = (count ?? 0) + 1
+      const baseSlug = generateCampaignSlug(campaign.name, sequenceNumber)
+      slug = await resolveUniqueSlug(baseSlug, 'campaigns', supabase)
+    } catch (slugError) {
+      console.warn("Failed to generate campaign slug:", slugError)
     }
 
     const { error } = await supabase
@@ -3711,6 +3764,7 @@ export const createCampaign = async (campaign: Campaign): Promise<{ success: boo
       .insert([{
         id: campaign.id,
         name: campaign.name,
+        slug,
         description: campaign.description,
         created_at: campaign.created_at,
         updated_at: campaign.updated_at,
@@ -3758,6 +3812,7 @@ export const loadAllCampaigns = async (useServiceRole = false, guestMode = false
     let query = client
       .from("campaigns")
       .select("*")
+      .order("is_active", { ascending: false })
       .order("created_at", { ascending: false })
 
     // Guests only see public campaigns
@@ -3775,6 +3830,7 @@ export const loadAllCampaigns = async (useServiceRole = false, guestMode = false
     const campaigns = (data || []).map((row: any) => ({
       id: row.id,
       name: row.name,
+      slug: row.slug || undefined,
       description: row.description,
       created_at: row.created_at,
       updated_at: row.updated_at,
@@ -3796,10 +3852,114 @@ export const loadAllCampaigns = async (useServiceRole = false, guestMode = false
       allowGuestCharacters: row.allow_guest_characters || false,
     }))
 
+    // In guest mode, the campaigns table's `characters` column is not maintained —
+    // characters reference campaigns via campaign_id. Fetch counts from characters table.
+    if (guestMode && campaigns.length > 0) {
+      const campaignIds = campaigns.map(c => c.id)
+      const { data: charData } = await client
+        .from("characters")
+        .select("id, campaign_id")
+        .in("campaign_id", campaignIds)
+
+      if (charData) {
+        const charsByCampaign: Record<string, string[]> = {}
+        for (const char of charData) {
+          if (char.campaign_id) {
+            if (!charsByCampaign[char.campaign_id]) charsByCampaign[char.campaign_id] = []
+            charsByCampaign[char.campaign_id].push(char.id)
+          }
+        }
+        for (const campaign of campaigns) {
+          campaign.characters = charsByCampaign[campaign.id] || []
+        }
+      }
+    }
+
     return { campaigns }
   } catch (error) {
     console.error("Error loading campaigns:", error)
     return { error: "Failed to load campaigns" }
+  }
+}
+
+export const loadCampaignBySlug = async (slug: string, client?: typeof supabase): Promise<{ campaign?: Campaign; error?: string }> => {
+  try {
+    const { data, error } = await (client ?? supabase)
+      .from("campaigns")
+      .select("*")
+      .eq("slug", slug)
+      .maybeSingle()
+
+    if (error) return { error: error.message }
+    if (!data) return { error: "Campaign not found" }
+
+    return {
+      campaign: {
+        id: data.id,
+        name: data.name,
+        slug: data.slug || undefined,
+        description: data.description,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        characters: data.characters || [],
+        isActive: data.is_active || false,
+        dungeonMasterId: data.dungeon_master_id || undefined,
+        levelUpModeEnabled: data.level_up_mode_enabled || false,
+        nextSessionDate: data.next_session_date || undefined,
+        nextSessionTime: data.next_session_time || undefined,
+        nextSessionTimezone: data.next_session_timezone || undefined,
+        nextSessionNumber: data.next_session_number || undefined,
+        discordWebhookUrl: data.discord_webhook_url || undefined,
+        discordNotificationsEnabled: data.discord_notifications_enabled || false,
+        discordReminderSent: data.discord_reminder_sent || false,
+        logoLightUrl: data.logo_light_url || undefined,
+        logoDarkUrl: data.logo_dark_url || undefined,
+        isDefault: data.is_default || false,
+        isPublic: data.is_public || false,
+        allowGuestCharacters: data.allow_guest_characters || false,
+      }
+    }
+  } catch (error) {
+    console.error("Error loading campaign by slug:", error)
+    return { error: "Failed to load campaign" }
+  }
+}
+
+export const loadCharacterBySlug = async (slug: string, client?: typeof supabase): Promise<{ character?: { id: string; slug: string; name: string; campaignId?: string }; error?: string }> => {
+  try {
+    const { data, error } = await (client ?? supabase)
+      .from("characters")
+      .select("id, slug, name, campaign_id")
+      .eq("slug", slug)
+      .maybeSingle()
+
+    if (error) return { error: error.message }
+    if (!data) return { error: "Character not found" }
+
+    return {
+      character: {
+        id: data.id,
+        slug: data.slug,
+        name: data.name,
+        campaignId: data.campaign_id || undefined,
+      }
+    }
+  } catch (error) {
+    console.error("Error loading character by slug:", error)
+    return { error: "Failed to load character" }
+  }
+}
+
+export const loadCampaignSlugById = async (campaignId: string, client?: typeof supabase): Promise<string | null> => {
+  try {
+    const { data } = await (client ?? supabase)
+      .from("campaigns")
+      .select("slug")
+      .eq("id", campaignId)
+      .maybeSingle()
+    return data?.slug || null
+  } catch {
+    return null
   }
 }
 

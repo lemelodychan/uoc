@@ -23,6 +23,7 @@ export interface CharacterClass {
 export interface Campaign {
   id: string
   name: string
+  slug?: string // Human-readable URL slug, e.g. "c1-ravenholm"
   description?: string
   created_at: string
   updated_at: string
@@ -49,8 +50,9 @@ export interface Campaign {
 }
 
 export interface CharacterData {
-  
+
   id: string
+  slug?: string // Human-readable URL slug, e.g. "u1-beni-fizzlebang" or "npc1-theron"
   name: string
   // Legacy single class support (for backward compatibility)
   class: string

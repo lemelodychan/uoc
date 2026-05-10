@@ -1,29 +1,16 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import dynamic from "next/dynamic"
+import { useSearchParams, useRouter } from "next/navigation"
+import { ROUTES } from "@/config/routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Icon } from "@iconify/react"
 import { CharacterSidebar } from "@/components/character-sidebar"
-import { CampaignManagementModal } from "@/components/edit-modals/campaign-management-modal"
-import { ManagementInterface } from "@/components/management-interface"
-import { CampaignCreationModal } from "@/components/edit-modals/campaign-creation-modal"
-import { BasicInfoModal } from "@/components/edit-modals/basic-info-modal"
-import { CharacterCreationModal } from "@/components/edit-modals/character-creation-modal"
 import { createDefaultSkills, createDefaultSavingThrowProficiencies, createClassBasedSavingThrowProficiencies, createClassBasedSkills, calculatePassivePerception, calculatePassiveInsight, calculateSavingThrowBonus, calculateSpellSaveDC, calculateSpellAttackBonus, getSpellsKnown, getArtificerInfusionsKnown, getArtificerMaxInfusedItems, getTotalAdditionalSpells, getDivineSenseData, getLayOnHandsData, getChannelDivinityData, getCleansingTouchData, getWarlockInvocationsKnown, type Campaign, createCampaign } from "@/lib/character-data"
-import { AbilitiesModal } from "@/components/edit-modals/abilities-modal"
-import { CombatModal } from "@/components/edit-modals/combat-modal"
-import { WeaponsModal } from "@/components/edit-modals/weapons-modal"
-import { ArmorModal } from "@/components/edit-modals/armor-modal"
-import { DefensesModal } from "@/components/edit-modals/defenses-modal"
-import { InnateSpellsModal } from "@/components/edit-modals/innate-spells-modal"
-import { InfusionsModal } from "@/components/edit-modals/infusions-modal"
-import { FeaturesModal } from "@/components/edit-modals/features-modal"
-import { EquipmentModal } from "@/components/edit-modals/equipment-modal"
-import { LanguagesModal } from "@/components/edit-modals/languages-modal"
 import { CharacterHeader } from "@/components/character-sheet/CharacterHeader"
 import { AestheticImages } from "@/components/character-sheet/AestheticImages"
 import { AbilityScores } from "@/components/character-sheet/AbilityScores"
@@ -43,22 +30,7 @@ import { Infusions } from "@/components/character-sheet/Infusions"
 import { EldritchInvocations } from "@/components/character-sheet/EldritchInvocations"
 import { Metamagic } from "@/components/character-sheet/Metamagic"
 import { EldritchCannon as EldritchCannonComponent } from "@/components/character-sheet/EldritchCannon"
-import { MoneyModal } from "@/components/edit-modals/money-modal"
-import { FeatsModal } from "@/components/edit-modals/feats-modal"
-import { SpellModal } from "@/components/edit-modals/spell-modal"
-import { SpellListModal } from "@/components/edit-modals/spell-list-modal"
-import { SpellCreationModal } from "@/components/edit-modals/spell-creation-modal"
-import { DiceRollModal } from "@/components/edit-modals/dice-roll-modal"
-import { CharacterDetailsModal } from "@/components/edit-modals/character-details-modal"
-import { CharacterDetailsContentModal } from "@/components/edit-modals/character-details-content-modal"
-import { LongRestModal } from "@/components/edit-modals/long-rest-modal"
-import { LongRestResultsModal } from "@/components/edit-modals/long-rest-results-modal"
-import { EldritchCannonModal } from "@/components/edit-modals/eldritch-cannon-modal"
-import { EldritchInvocationsModal } from "@/components/edit-modals/eldritch-invocations-modal"
-import { MetamagicModal } from "@/components/edit-modals/metamagic-modal"
 import { SpellLibraryModal, type SpellLibraryModalRef } from "@/components/edit-modals/spell-library-modal"
-import { LevelUpModal } from "@/components/edit-modals/level-up-modal"
-import { FeatureUsageMigrationModal } from "@/components/feature-usage-migration-modal"
 import { 
   useFeatureSlot, 
   restoreFeatureSlot, 
@@ -70,16 +42,14 @@ import {
   getFeatureUsage,
   initializeFeatureUsage,
   updateFeatureUsage as updateFeatureUsageData,
-  resetAllFeatureUsage,
-  type FeatureUsageData
 } from "@/lib/feature-usage-tracker"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { calculateArmorClass } from "@/lib/passive-bonus-utils"
+import { applyLongRestToCharacters, type LongRestResult } from "@/lib/long-rest-utils"
 import { useToast } from "@/hooks/use-toast"
 import { AppHeader } from "@/components/app-header"
 import { AccessDeniedOverlay } from "@/components/access-denied-overlay"
-import { WikiPage } from "@/components/wiki-page"
 import { useUser } from "@/lib/user-context"
 import {
   sampleCharacters,
@@ -97,6 +67,7 @@ import { saveCharacter, saveCharacterAsGuest, patchCharacter, loadCharacter, loa
 import type { UserProfile } from "@/lib/user-profiles"
 import { useClassFeaturesPreloader } from "@/hooks/use-class-features"
 import { subscribeToLongRestEvents, broadcastLongRestEvent, confirmLongRestEvent, type LongRestEvent, type LongRestEventData } from "@/lib/realtime"
+import { pageCache } from "@/lib/page-cache"
 import { getBardicInspirationData, getSongOfRestData } from "@/lib/class-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { CampaignHomepage } from "@/components/campaign-homepage"
@@ -113,26 +84,72 @@ import {
   downloadFile,
   sanitizeFilename,
 } from "@/lib/character-export"
+import { createCharacter, type CharacterCreationData } from "@/lib/character-creation-utils"
 
 const formatModifier = (mod: number): string => {
   return mod >= 0 ? `+${mod}` : `${mod}`
 }
 
-function CharacterSheetContent() {
-  const [characters, setCharacters] = useState<CharacterData[]>([])
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [users, setUsers] = useState<any[]>([])
+// --- Lazily-loaded modals (deferred from initial bundle) ---
+const CampaignManagementModal = dynamic(() => import('@/components/edit-modals/campaign-management-modal').then(m => m.CampaignManagementModal), { ssr: false, loading: () => null })
+const CampaignCreationModal = dynamic(() => import('@/components/edit-modals/campaign-creation-modal').then(m => m.CampaignCreationModal), { ssr: false, loading: () => null })
+const BasicInfoModal = dynamic(() => import('@/components/edit-modals/basic-info-modal').then(m => m.BasicInfoModal), { ssr: false, loading: () => null })
+const CharacterCreationModal = dynamic(() => import('@/components/edit-modals/character-creation-modal').then(m => m.CharacterCreationModal), { ssr: false, loading: () => null })
+const AbilitiesModal = dynamic(() => import('@/components/edit-modals/abilities-modal').then(m => m.AbilitiesModal), { ssr: false, loading: () => null })
+const CombatModal = dynamic(() => import('@/components/edit-modals/combat-modal').then(m => m.CombatModal), { ssr: false, loading: () => null })
+const WeaponsModal = dynamic(() => import('@/components/edit-modals/weapons-modal').then(m => m.WeaponsModal), { ssr: false, loading: () => null })
+const ArmorModal = dynamic(() => import('@/components/edit-modals/armor-modal').then(m => m.ArmorModal), { ssr: false, loading: () => null })
+const DefensesModal = dynamic(() => import('@/components/edit-modals/defenses-modal').then(m => m.DefensesModal), { ssr: false, loading: () => null })
+const InnateSpellsModal = dynamic(() => import('@/components/edit-modals/innate-spells-modal').then(m => m.InnateSpellsModal), { ssr: false, loading: () => null })
+const InfusionsModal = dynamic(() => import('@/components/edit-modals/infusions-modal').then(m => m.InfusionsModal), { ssr: false, loading: () => null })
+const FeaturesModal = dynamic(() => import('@/components/edit-modals/features-modal').then(m => m.FeaturesModal), { ssr: false, loading: () => null })
+const EquipmentModal = dynamic(() => import('@/components/edit-modals/equipment-modal').then(m => m.EquipmentModal), { ssr: false, loading: () => null })
+const LanguagesModal = dynamic(() => import('@/components/edit-modals/languages-modal').then(m => m.LanguagesModal), { ssr: false, loading: () => null })
+const MoneyModal = dynamic(() => import('@/components/edit-modals/money-modal').then(m => m.MoneyModal), { ssr: false, loading: () => null })
+const FeatsModal = dynamic(() => import('@/components/edit-modals/feats-modal').then(m => m.FeatsModal), { ssr: false, loading: () => null })
+const SpellModal = dynamic(() => import('@/components/edit-modals/spell-modal').then(m => m.SpellModal), { ssr: false, loading: () => null })
+const SpellListModal = dynamic(() => import('@/components/edit-modals/spell-list-modal').then(m => m.SpellListModal), { ssr: false, loading: () => null })
+const SpellCreationModal = dynamic(() => import('@/components/edit-modals/spell-creation-modal').then(m => m.SpellCreationModal), { ssr: false, loading: () => null })
+const DiceRollModal = dynamic(() => import('@/components/edit-modals/dice-roll-modal').then(m => m.DiceRollModal), { ssr: false, loading: () => null })
+const CharacterDetailsModal = dynamic(() => import('@/components/edit-modals/character-details-modal').then(m => m.CharacterDetailsModal), { ssr: false, loading: () => null })
+const CharacterDetailsContentModal = dynamic(() => import('@/components/edit-modals/character-details-content-modal').then(m => m.CharacterDetailsContentModal), { ssr: false, loading: () => null })
+const LongRestModal = dynamic(() => import('@/components/edit-modals/long-rest-modal').then(m => m.LongRestModal), { ssr: false, loading: () => null })
+const LongRestResultsModal = dynamic(() => import('@/components/edit-modals/long-rest-results-modal').then(m => m.LongRestResultsModal), { ssr: false, loading: () => null })
+const EldritchCannonModal = dynamic(() => import('@/components/edit-modals/eldritch-cannon-modal').then(m => m.EldritchCannonModal), { ssr: false, loading: () => null })
+const EldritchInvocationsModal = dynamic(() => import('@/components/edit-modals/eldritch-invocations-modal').then(m => m.EldritchInvocationsModal), { ssr: false, loading: () => null })
+const MetamagicModal = dynamic(() => import('@/components/edit-modals/metamagic-modal').then(m => m.MetamagicModal), { ssr: false, loading: () => null })
+const LevelUpModal = dynamic(() => import('@/components/edit-modals/level-up-modal').then(m => m.LevelUpModal), { ssr: false, loading: () => null })
+const FeatureUsageMigrationModal = dynamic(() => import('@/components/feature-usage-migration-modal').then(m => m.FeatureUsageMigrationModal), { ssr: false, loading: () => null })
+// --- End lazy modals ---
+
+export function CharacterSheetContent({ initialCharacterId }: { initialCharacterId?: string } = {}) {
+  // Seed from cache for instant render on revisit
+  const _cachedChars = pageCache.getAllCharacters()
+  const _cachedCamps = pageCache.getCampaigns()
+  const _hasCache = !!(_cachedChars && _cachedCamps)
+  // When arriving at a character slug page with cached data, resolve the character's campaign
+  const _cachedInitChar = _hasCache && initialCharacterId ? _cachedChars!.find(c => c.id === initialCharacterId) : null
+
+  const [characters, setCharacters] = useState<CharacterData[]>(_cachedChars ?? [])
+  const [campaigns, setCampaigns] = useState<Campaign[]>(_cachedCamps ?? [])
+  const [users, setUsers] = useState<any[]>(pageCache.getUsers() ?? [])
   const [resources, setResources] = useState<CampaignResource[]>([])
   const [links, setLinks] = useState<CampaignLink[]>([])
-  
+
   // Class features preloader
   const { preloadForCharacters } = useClassFeaturesPreloader()
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all")
-  const [activeCharacterId, setActiveCharacterId] = useState<string>("")
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>(
+    _cachedInitChar?.campaignId ?? "all"
+  )
+  const [activeCharacterId, setActiveCharacterId] = useState<string>(
+    _hasCache && initialCharacterId ? (initialCharacterId) : ""
+  )
   const [superadminOverride, setSuperadminOverride] = useState(false)
-  const [currentView, setCurrentView] = useState<'character' | 'campaign' | 'management'>('campaign')
-  const [appView, setAppView] = useState<'campaign' | 'wiki' | 'management'>('campaign')
-  
+  const [currentView, setCurrentView] = useState<'character' | 'campaign'>(
+    _hasCache && initialCharacterId ? 'character' : 'campaign'
+  )
+  const router = useRouter()
+
   // Ref for the main scrollable container
   const mainRef = useRef<HTMLElement>(null)
   
@@ -171,7 +188,7 @@ function CharacterSheetContent() {
   const [characterCreationModalOpen, setCharacterCreationModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [isInitialLoading, setIsInitialLoading] = useState(!_hasCache)
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
   const multiclassDataChangedRef = useRef<boolean>(false)
   const importCharacterFileInputRef = useRef<HTMLInputElement>(null)
@@ -204,43 +221,7 @@ function CharacterSheetContent() {
   const [campaignManagementModalOpen, setCampaignManagementModalOpen] = useState(false)
   const [campaignCreationModalOpen, setCampaignCreationModalOpen] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
-  const [longRestResults, setLongRestResults] = useState<{
-    characterId: string;
-    characterName: string;
-    hpRestored: number;
-    exhaustionReduced: number;
-    magicItemReplenishments: {
-      itemName: string;
-      chargesReplenished: number;
-      diceRoll?: number;
-      maxCharges: number;
-    }[];
-    featureReplenishments: {
-      featureName: string;
-      usesReplenished: number;
-      diceRoll?: number;
-      maxUses: number;
-    }[];
-    spellSlotReplenishments: {
-      level: number;
-      slotsRestored: number;
-    }[];
-    classAbilityReplenishments: {
-      abilityName: string;
-      usesRestored: number;
-      maxUses: number;
-    }[];
-    featSpellReplenishments: {
-      featName: string;
-      usesRestored: number;
-      maxUses: number;
-    }[];
-    hitDiceReplenishments: {
-      diceRestored: number;
-      maxDice: number;
-      dieType: string;
-    };
-  }[] | null>(null)
+  const [longRestResults, setLongRestResults] = useState<LongRestResult[] | null>(null)
   const [longRestResultsModalOpen, setLongRestResultsModalOpen] = useState(false)
   const [skillSortMode, setSkillSortMode] = useState<'alpha' | 'ability'>('ability')
   const spellLibraryRef = useRef<SpellLibraryModalRef>(null)
@@ -704,16 +685,44 @@ function CharacterSheetContent() {
   }
 
   useEffect(() => {
-    // Only load characters after user context is loaded
     if (!userLoading) {
-      loadFromDatabaseFirst()
+      if (_hasCache && !!_cachedInitChar) {
+        // Cache is warm and the target character exists in it — skip full reload
+        loadActiveCharacterIfNeeded()
+      } else {
+        loadFromDatabaseFirst()
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userLoading])
 
   // Spell slots are now calculated during initial character load, no need for async updates
 
+  // Loads only the active character's full data when navigating with cache already populated.
+  // Skips only when both the flag is set AND the cached character actually has full data.
+  const loadActiveCharacterIfNeeded = async () => {
+    const charId = initialCharacterId
+    if (!charId) return
+    const cachedChar = pageCache.getAllCharacters()?.find(c => c.id === charId)
+    const hasFullData = !!(cachedChar?.skills && cachedChar.skills.length > 0)
+    if (pageCache.isCharacterFullyLoaded(charId) && hasFullData) return
+    const { character } = await loadCharacter(charId)
+    if (!character) {
+      // loadCharacter failed — show an error so the skeleton doesn't hang silently
+      toast({ title: "Error", description: "Failed to load character data. Please refresh.", variant: "destructive" })
+      return
+    }
+    pageCache.markCharacterFullyLoaded(charId)
+    const existing = pageCache.getAllCharacters() ?? []
+    const updatedChars = existing.find(c => c.id === charId)
+      ? existing.map(c => c.id === charId ? character : c)
+      : [...existing, character]
+    pageCache.setAllCharacters(updatedChars)
+    setCharacters(updatedChars)
+  }
+
   const loadFromDatabaseFirst = async () => {
-    setIsInitialLoading(true)
+    if (!pageCache.hasAllCharacters()) setIsInitialLoading(true)
 
     // Step 1: Load campaigns first (needed to determine active campaign for progressive loading)
     // Guests use getAllUsers() directly (anon Supabase client, RLS-filtered to public campaign users).
@@ -755,6 +764,8 @@ function CharacterSheetContent() {
     // Set campaigns and users immediately
     setCampaigns(dbCampaigns || [])
     setUsers(dbUsers || [])
+    if (dbCampaigns) pageCache.setCampaigns(dbCampaigns)
+    if (dbUsers) pageCache.setUsers(dbUsers)
 
     // Step 2: Determine active campaign for progressive loading
     const defaultCampaign = (dbCampaigns || []).find(c => c.isDefault)
@@ -810,9 +821,15 @@ function CharacterSheetContent() {
 
     // Determine valid character ID
     let validCharacterId: string | null = null
-    
+    let forcedByProp = false
+
+    // Priority 0: Prop-supplied character ID (from slug route)
+    if (initialCharacterId && dbCharacters.find((c) => c.id === initialCharacterId)) {
+      validCharacterId = initialCharacterId
+      forcedByProp = true
+    }
     // Priority 1: Character from URL parameter
-    if (characterFromUrl && dbCharacters.find((c) => c.id === characterFromUrl)) {
+    else if (characterFromUrl && dbCharacters.find((c) => c.id === characterFromUrl)) {
       validCharacterId = characterFromUrl
     }
     // Priority 2: Saved character from localStorage
@@ -821,87 +838,39 @@ function CharacterSheetContent() {
     }
 
     // If no valid character found or character is not in the filtered campaign, select first character from filtered list
-    if (!validCharacterId || !filteredCharacters.find(c => c.id === validCharacterId)) {
+    // Skip this override if the character was forced via prop (slug route)
+    if (!forcedByProp && (!validCharacterId || !filteredCharacters.find(c => c.id === validCharacterId))) {
       validCharacterId = filteredCharacters.length > 0 ? filteredCharacters[0].id : dbCharacters[0]?.id
     }
 
     // Set minimal characters immediately for fast initial render
     setCharacters(dbCharacters)
-    setActiveCharacterId(validCharacterId)
-    saveActiveCharacterToLocalStorage(validCharacterId)
+    pageCache.setAllCharacters(dbCharacters)
+    setActiveCharacterId(validCharacterId ?? "")
+    saveActiveCharacterToLocalStorage(validCharacterId ?? "")
+
+    // When navigating directly to a character (from slug route), open character sheet immediately
+    if (forcedByProp && validCharacterId) {
+      setCurrentView('character')
+      const forcedChar = dbCharacters.find(c => c.id === validCharacterId)
+      if (forcedChar?.campaignId) {
+        setSelectedCampaignId(forcedChar.campaignId)
+      }
+    }
 
     // Mark loading as complete - UI can now render with minimal data
     setIsInitialLoading(false)
 
-    // Step 4: Load full data ONLY for the active character (critical path)
-    // This ensures the character sheet works immediately
+    // Step 4: Load full data for the active character
     if (validCharacterId) {
       const { character: activeCharacter } = await loadCharacter(validCharacterId)
       if (activeCharacter) {
-        setCharacters(prev => 
-          prev.map(c => c.id === validCharacterId ? activeCharacter : c)
-        )
+        pageCache.markCharacterFullyLoaded(validCharacterId)
+        const updatedChars = dbCharacters.map(c => c.id === validCharacterId ? activeCharacter : c)
+        pageCache.setAllCharacters(updatedChars)
+        setCharacters(updatedChars)
       }
     }
-
-    // Step 5: Load full data for other active characters in background (non-blocking)
-    // Priority: active characters from active campaign, then other active characters
-    setTimeout(async () => {
-      const charactersToLoad: string[] = []
-      
-      // Active characters from active campaign (if any)
-      if (activeCampaignId) {
-        const activeFromCampaign = dbCharacters
-          .filter(char => 
-            char.campaignId === activeCampaignId && 
-            char.partyStatus === 'active' &&
-            char.id !== validCharacterId &&
-            (!char.skills || char.skills.length === 0)
-          )
-          .slice(0, 5) // Limit to 5 to avoid too much processing
-        charactersToLoad.push(...activeFromCampaign.map(c => c.id))
-      }
-      
-      // Other active characters (limit to 5 more)
-      const otherActive = dbCharacters
-        .filter(char => 
-          char.partyStatus === 'active' &&
-          !charactersToLoad.includes(char.id) &&
-          char.id !== validCharacterId &&
-          (!char.skills || char.skills.length === 0)
-        )
-        .slice(0, 5)
-      charactersToLoad.push(...otherActive.map(c => c.id))
-      
-      if (charactersToLoad.length > 0) {
-        const fullResults = await Promise.all(
-          charactersToLoad.map(id => loadCharacter(id))
-        )
-        
-        setCharacters(prev => {
-          const updated = [...prev]
-          fullResults.forEach(result => {
-            if (result.character) {
-              const index = updated.findIndex(c => c.id === result.character!.id)
-              if (index >= 0) {
-                updated[index] = result.character
-              }
-            }
-          })
-          return updated
-        })
-      }
-
-      // Preload class features for loaded characters in the background (non-blocking)
-      const loadedCharacters = dbCharacters.filter(c => 
-        c.id === validCharacterId || charactersToLoad.includes(c.id)
-      )
-      if (loadedCharacters.length > 0) {
-        preloadForCharacters(loadedCharacters).catch(error => {
-          console.warn("Failed to preload class features:", error)
-        })
-      }
-    }, 100) // Small delay to let initial render complete
 
     // Show success toast (non-blocking)
     toast({
@@ -1437,51 +1406,8 @@ function CharacterSheetContent() {
 
   const applyLongRestEffects = useCallback(async (selectedCharacterIds: string[], eventId?: string) => {
     try {
-      const longRestResults: {
-        characterId: string;
-        characterName: string;
-        hpRestored: number;
-        exhaustionReduced: number;
-        magicItemReplenishments: {
-          itemName: string;
-          chargesReplenished: number;
-          diceRoll?: number;
-          maxCharges: number;
-        }[];
-        featureReplenishments: {
-          featureName: string;
-          usesReplenished: number;
-          diceRoll?: number;
-          maxUses: number;
-        }[];
-        spellSlotReplenishments: {
-          level: number;
-          slotsRestored: number;
-        }[];
-        classAbilityReplenishments: {
-          abilityName: string;
-          usesRestored: number;
-          maxUses: number;
-        }[];
-        featSpellReplenishments: {
-          featName: string;
-          usesRestored: number;
-          maxUses: number;
-        }[];
-        hitDiceReplenishments: {
-          diceRestored: number;
-          maxDice: number;
-          dieType: string;
-        };
-      }[] = []
-
-      // CRITICAL: Fetch fresh character data from database before applying long rest effects
-      // This ensures we're working with the most up-to-date data and don't overwrite
-      // any changes that were made since the modal was opened (by this user or others)
-      const freshCharacterPromises = selectedCharacterIds.map(id => loadCharacter(id))
-      const freshCharacterResults = await Promise.all(freshCharacterPromises)
-      
-      // Create a map of fresh character data
+      // Fetch fresh character data from database before applying long rest effects
+      const freshCharacterResults = await Promise.all(selectedCharacterIds.map(id => loadCharacter(id)))
       const freshCharactersMap = new Map<string, CharacterData>()
       freshCharacterResults.forEach((result: { character?: CharacterData; error?: string }) => {
         if (result.character) {
@@ -1490,356 +1416,12 @@ function CharacterSheetContent() {
           console.error('[Long Rest] Failed to load character:', result.error)
         }
       })
-      
       // Merge fresh data with existing characters state
-      // Use fresh data for selected characters, keep existing data for others
-      const charactersToProcess = characters.map(character => {
-        if (freshCharactersMap.has(character.id)) {
-          return freshCharactersMap.get(character.id)!
-        }
-        return character
-      })
+      const charactersToProcess = characters.map(character =>
+        freshCharactersMap.has(character.id) ? freshCharactersMap.get(character.id)! : character
+      )
 
-
-      // Update all selected characters to restore their hit points and replenish magic items
-      const updatedCharacters = charactersToProcess.map(character => {
-        if (selectedCharacterIds.includes(character.id)) {
-          const hpRestored = character.maxHitPoints - character.currentHitPoints
-          const exhaustionReduced = Math.min(1, character.exhaustion || 0) // Reduce by 1, but not below 0
-          const magicItemReplenishments: {
-            itemName: string;
-            chargesReplenished: number;
-            diceRoll?: number;
-            maxCharges: number;
-          }[] = []
-
-          const featureReplenishments: {
-            featureName: string;
-            usesReplenished: number;
-            diceRoll?: number;
-            maxUses: number;
-          }[] = []
-
-          const spellSlotReplenishments: {
-            level: number;
-            slotsRestored: number;
-          }[] = []
-
-          const classAbilityReplenishments: {
-            abilityName: string;
-            usesRestored: number;
-            maxUses: number;
-          }[] = []
-
-          const featSpellReplenishments: {
-            featName: string;
-            usesRestored: number;
-            maxUses: number;
-          }[] = []
-
-          const hitDiceReplenishments: {
-            diceRestored: number;
-            maxDice: number;
-            dieType: string;
-          } = {
-            diceRestored: 0,
-            maxDice: 0,
-            dieType: "d8"
-          }
-
-          // Replenish magic item charges
-          const updatedMagicItems = character.magicItems.map(item => {
-            if (item.maxUses && item.maxUses > 0 && item.dailyRecharge) {
-              let chargesReplenished = 0
-              let diceRoll: number | undefined
-
-              if (item.dailyRecharge.toLowerCase() === 'all') {
-                // Replenish all charges
-                chargesReplenished = item.maxUses - (item.currentUses || 0)
-              } else if (item.dailyRecharge.includes('d')) {
-                // Roll dice for replenishment (e.g., "1d3", "1d4+1")
-                const diceMatch = item.dailyRecharge.match(/(\d+)d(\d+)([+-]\d+)?/)
-                if (diceMatch) {
-                  const numDice = parseInt(diceMatch[1])
-                  const diceSize = parseInt(diceMatch[2])
-                  const modifier = diceMatch[3] ? parseInt(diceMatch[3]) : 0
-                  
-                  // Roll the dice
-                  let totalRoll = 0
-                  for (let i = 0; i < numDice; i++) {
-                    totalRoll += Math.floor(Math.random() * diceSize) + 1
-                  }
-                  totalRoll += modifier
-                  
-                  diceRoll = totalRoll
-                  const maxPossibleReplenishment = item.maxUses - (item.currentUses || 0)
-                  chargesReplenished = Math.min(totalRoll, maxPossibleReplenishment)
-                }
-              }
-
-              if (chargesReplenished > 0) {
-                magicItemReplenishments.push({
-                  itemName: item.name || "Unnamed Magic Item",
-                  chargesReplenished,
-                  diceRoll,
-                  maxCharges: item.maxUses
-                })
-              }
-
-              return {
-                ...item,
-                currentUses: Math.min(item.maxUses, (item.currentUses || 0) + chargesReplenished)
-              }
-            }
-            return item
-          })
-
-          // Replenish feature uses
-          const updatedFeatures = character.features.map(feature => {
-            if (feature.refuelingDie && feature.usesPerLongRest) {
-              const actualUsesPerLongRest = getFeatureUsesPerLongRest(feature)
-              const currentUses = Math.min(actualUsesPerLongRest, Math.max(0, feature.currentUses ?? actualUsesPerLongRest))
-              const maxPossibleReplenishment = actualUsesPerLongRest - currentUses
-              
-              if (maxPossibleReplenishment > 0) {
-                let usesReplenished = 0
-                let diceRoll: number | undefined
-
-                if (feature.refuelingDie.toLowerCase() === 'all') {
-                  // Replenish all uses
-                  usesReplenished = maxPossibleReplenishment
-                } else if (feature.refuelingDie.includes('d')) {
-                  // Roll dice for replenishment (e.g., "1d3", "1d4+1")
-                  const diceMatch = feature.refuelingDie.match(/(\d+)d(\d+)([+-]\d+)?/)
-                  if (diceMatch) {
-                    const numDice = parseInt(diceMatch[1])
-                    const diceSize = parseInt(diceMatch[2])
-                    const modifier = diceMatch[3] ? parseInt(diceMatch[3]) : 0
-                    
-                    // Roll the dice
-                    let totalRoll = 0
-                    for (let i = 0; i < numDice; i++) {
-                      totalRoll += Math.floor(Math.random() * diceSize) + 1
-                    }
-                    totalRoll += modifier
-                    
-                    diceRoll = totalRoll
-                    usesReplenished = Math.min(totalRoll, maxPossibleReplenishment)
-                  }
-                }
-
-                if (usesReplenished > 0) {
-                  featureReplenishments.push({
-                    featureName: feature.name,
-                    usesReplenished,
-                    diceRoll,
-                    maxUses: actualUsesPerLongRest
-                  })
-                }
-
-                return {
-                  ...feature,
-                  currentUses: Math.min(actualUsesPerLongRest, currentUses + usesReplenished)
-                }
-              }
-            }
-            return feature
-          })
-
-          // Replenish spell slots
-          const updatedSpellSlots = character.spellData.spellSlots.map(slot => {
-            const slotsRestored = slot.used
-            if (slotsRestored > 0) {
-              spellSlotReplenishments.push({
-                level: slot.level,
-                slotsRestored
-              })
-            }
-            return {
-              ...slot,
-              used: 0 // Reset all used spell slots
-            }
-          })
-
-          // Replenish class-specific abilities
-          const updatedSpellData = { ...character.spellData, spellSlots: updatedSpellSlots }
-
-          // LEGACY REST RESET - COMMENTED OUT
-          // Bardic Inspiration and Flash of Genius are now managed via database class_features system
-          // Rest resets are handled by resetAllFeatureUsage() which resets classFeatureSkillsUsage entries
-          // if (character.spellData.bardicInspirationSlot) { ... }
-          // if (character.spellData.flashOfGeniusSlot) { ... }
-
-          // LEGACY REST RESET - COMMENTED OUT
-          // Divine Sense and Channel Divinity are now managed via database class_features system
-          // Rest resets are handled by resetAllFeatureUsage() which resets classFeatureSkillsUsage entries
-          // if (character.spellData.divineSenseSlot) {
-          //   const divineSlot = character.spellData.divineSenseSlot
-          //   const usesRestored = divineSlot.usesPerRest - divineSlot.currentUses
-          //   if (usesRestored > 0) {
-          //     classAbilityReplenishments.push({ abilityName: "Divine Sense", usesRestored, maxUses: divineSlot.usesPerRest })
-          //   }
-          //   updatedSpellData.divineSenseSlot = { ...divineSlot, currentUses: divineSlot.usesPerRest }
-          // }
-
-          // if (character.spellData.channelDivinitySlot) {
-          //   const channelSlot = character.spellData.channelDivinitySlot
-          //   const usesRestored = channelSlot.usesPerRest - channelSlot.currentUses
-          //   if (usesRestored > 0) {
-          //     classAbilityReplenishments.push({ abilityName: "Channel Divinity", usesRestored, maxUses: channelSlot.usesPerRest })
-          //   }
-          //   updatedSpellData.channelDivinitySlot = { ...channelSlot, currentUses: channelSlot.usesPerRest }
-          // }
-
-          // Cleansing Touch (Paladin)
-          if (character.spellData.cleansingTouchSlot) {
-            const cleansingSlot = character.spellData.cleansingTouchSlot
-            const usesRestored = cleansingSlot.usesPerRest - cleansingSlot.currentUses
-            if (usesRestored > 0) {
-              classAbilityReplenishments.push({
-                abilityName: "Cleansing Touch",
-                usesRestored,
-                maxUses: cleansingSlot.usesPerRest
-              })
-            }
-            updatedSpellData.cleansingTouchSlot = {
-              ...cleansingSlot,
-              currentUses: cleansingSlot.usesPerRest
-            }
-          }
-
-          // Legacy Warlock columns have been dropped - using unified system only
-
-          // LEGACY: Song of Rest now managed via database class_features system
-          // if (character.spellData.songOfRest) { ... }
-
-          // Replenish feat spell slots
-          const updatedFeatSpellSlots = character.spellData.featSpellSlots.map(feat => {
-            const usesRestored = feat.usesPerLongRest - feat.currentUses
-            if (usesRestored > 0) {
-              featSpellReplenishments.push({
-                featName: feat.featName,
-                usesRestored,
-                maxUses: feat.usesPerLongRest
-              })
-            }
-            return {
-              ...feat,
-              currentUses: feat.usesPerLongRest // Reset to full uses
-            }
-          })
-
-          updatedSpellData.featSpellSlots = updatedFeatSpellSlots
-
-          // Replenish all unified class feature skills usage (new system)
-          // This handles all features tracked in classFeatureSkillsUsage: slots, points pools, availability toggles
-          const updatedClassFeatureSkillsUsage = resetAllFeatureUsage(character, 'long_rest')
-          
-          // Track class feature replenishments from unified system for results display
-          if (updatedClassFeatureSkillsUsage) {
-            Object.entries(updatedClassFeatureSkillsUsage).forEach(([featureId, featureData]: [string, FeatureUsageData[string]]) => {
-              // Track slots-based features
-              if (featureData.featureType === 'slots' && featureData.maxUses) {
-                const currentUsage = character.classFeatureSkillsUsage?.[featureId]
-                const previousUses = currentUsage?.currentUses ?? featureData.maxUses
-                const usesRestored = featureData.maxUses - previousUses
-                
-                if (usesRestored > 0) {
-                  classAbilityReplenishments.push({
-                    abilityName: featureData.featureName || featureId,
-                    usesRestored,
-                    maxUses: featureData.maxUses
-                  })
-                }
-              }
-              
-              // Track points pool features
-              if (featureData.featureType === 'points_pool' && featureData.maxPoints) {
-                const currentUsage = character.classFeatureSkillsUsage?.[featureId]
-                const previousPoints = currentUsage?.currentPoints ?? featureData.maxPoints
-                const pointsRestored = featureData.maxPoints - previousPoints
-                
-                if (pointsRestored > 0) {
-                  classAbilityReplenishments.push({
-                    abilityName: featureData.featureName || featureId,
-                    usesRestored: pointsRestored,
-                    maxUses: featureData.maxPoints
-                  })
-                }
-              }
-              
-              // Track availability toggle features
-              if (featureData.featureType === 'availability_toggle') {
-                const currentUsage = character.classFeatureSkillsUsage?.[featureId]
-                const wasAvailable = currentUsage?.isAvailable ?? true
-                
-                if (!wasAvailable && featureData.isAvailable) {
-                  classAbilityReplenishments.push({
-                    abilityName: featureData.featureName || featureId,
-                    usesRestored: 1,
-                    maxUses: 1
-                  })
-                }
-              }
-            })
-          }
-
-          // Replenish hit dice (restore up to half of total hit dice, minimum 1)
-          let updatedHitDice = character.hitDice
-          if (character.hitDice) {
-            const diceToRestore = Math.max(1, Math.floor(character.hitDice.total / 2))
-            const maxPossibleRestore = character.hitDice.used // Number of used dice that can be restored
-            const actualRestore = Math.min(diceToRestore, maxPossibleRestore)
-            
-            
-            if (actualRestore > 0) {
-              hitDiceReplenishments.diceRestored = actualRestore
-              hitDiceReplenishments.maxDice = character.hitDice.total
-              hitDiceReplenishments.dieType = character.hitDice.dieType
-              
-              updatedHitDice = {
-                ...character.hitDice,
-                used: Math.max(0, character.hitDice.used - actualRestore)
-              }
-              
-            }
-          }
-
-          // Reset innate spells uses on long rest (skip short_rest-only spells)
-          const updatedInnateSpells = (character.innateSpells ?? []).map(spell =>
-            spell.usesPerDay !== 'at_will' && spell.resetOn !== 'short_rest'
-              ? { ...spell, currentUses: typeof spell.usesPerDay === 'number' ? spell.usesPerDay : spell.currentUses }
-              : spell
-          )
-
-          longRestResults.push({
-            characterId: character.id,
-            characterName: character.name,
-            hpRestored,
-            exhaustionReduced,
-            magicItemReplenishments,
-            featureReplenishments,
-            spellSlotReplenishments,
-            classAbilityReplenishments,
-            featSpellReplenishments,
-            hitDiceReplenishments
-          })
-
-          return {
-            ...character,
-            currentHitPoints: character.maxHitPoints,
-            magicItems: updatedMagicItems,
-            features: updatedFeatures,
-            spellData: updatedSpellData,
-            hitDice: updatedHitDice,
-            classFeatureSkillsUsage: updatedClassFeatureSkillsUsage,
-            innateSpells: updatedInnateSpells,
-            exhaustion: Math.max(0, (character.exhaustion || 0) - 1), // Reduce exhaustion by 1 (minimum 0)
-            deathSaves: { successes: 0, failures: 0 }, // Reset death saves on long rest
-          }
-        }
-        return character
-      })
+      const { updatedCharacters, results: restResults } = applyLongRestToCharacters(charactersToProcess, selectedCharacterIds)
 
       setCharacters(updatedCharacters)
 
@@ -1856,11 +1438,11 @@ function CharacterSheetContent() {
         return { characterId, success: false, error: "Character not found" }
       })
 
-      const results = await Promise.all(savePromises)
-      const failedSaves = results.filter(r => !r.success)
+      const saveResults = await Promise.all(savePromises)
+      const failedSaves = saveResults.filter(r => !r.success)
 
       // Store the long rest results for the results modal
-      setLongRestResults(longRestResults)
+      setLongRestResults(restResults)
 
       // Note: Event completion is now handled by confirmLongRestEvent
 
@@ -2507,405 +2089,39 @@ function CharacterSheetContent() {
     setCharacterCreationModalOpen(true)
   }
 
-  const handleCreateCharacter = async (characterData: {
-    name: string
-    class: string
-    subclass: string
-    classId: string
-    level: number
-    classes?: Array<{name: string, subclass?: string, class_id?: string, level: number, selectedSkillProficiencies?: string[]}>
-    background: string
-    backgroundId?: string
-    backgroundData?: {
-      defining_events?: Array<{ number: number; text: string }>
-      personality_traits?: Array<{ number: number; text: string }>
-      ideals?: Array<{ number: number; text: string }>
-      bonds?: Array<{ number: number; text: string }>
-      flaws?: Array<{ number: number; text: string }>
-    }
-    race: string
-    raceIds?: Array<{id: string, isMain: boolean}>
-    alignment: string
-    isNPC?: boolean
-    campaignId?: string
-    selectedFeatures?: string[]
-    abilityScores?: {
-      strength: number
-      dexterity: number
-      constitution: number
-      intelligence: number
-      wisdom: number
-      charisma: number
-    }
-    skills?: Array<{name: string, ability: string, proficiency: 'none' | 'proficient' | 'expertise'}>
-    savingThrowProficiencies?: Array<{ability: string, proficient: boolean}>
-    maxHitPoints?: number
-    currentHitPoints?: number
-    speed?: number
-    armorClass?: number
-    initiative?: number
-    features?: Array<{name: string, description: string, usesPerLongRest?: number | string, currentUses?: number, refuelingDie?: string}>
-    feats?: Array<{name: string, description: string}>
-    languages?: string
-    imageUrl?: string
-    toolsProficiencies?: Array<{name: string, proficiency: 'none' | 'proficient' | 'expertise'}>
-    equipment?: string
-    money?: { gold: number; silver: number; copper: number }
-    equipmentProficiencies?: {
-      lightArmor: boolean
-      mediumArmor: boolean
-      heavyArmor: boolean
-      shields: boolean
-      simpleWeapons: boolean
-      martialWeapons: boolean
-      firearms: boolean
-      handCrossbows: boolean
-      longswords: boolean
-      rapiers: boolean
-      shortswords: boolean
-      scimitars: boolean
-      lightCrossbows: boolean
-      darts: boolean
-      slings: boolean
-      quarterstaffs: boolean
-    }
-  }) => {
-    const newId = (characters.length + 1).toString()
-    
-    // Get current user for ownership (guests have no session — user will be null)
-    const { user, error: userError } = await getCurrentUser()
-    if (userError && !isReadOnly) {
-      toast({
-        title: "Error",
-        description: `Failed to get user information: ${userError}`,
-        variant: "destructive",
-      })
+  const handleCreateCharacter = async (formData: CharacterCreationData) => {
+    const tempId = (characters.length + 1).toString()
+
+    const result = await createCharacter(formData, {
+      existingCharacterCount: characters.length,
+      isGuest: isReadOnly,
+      currentCampaign,
+    })
+
+    if (result.error) {
+      toast({ title: "Error", description: result.error, variant: "destructive" })
       return
     }
-    
-    // For NPCs, use DM as owner if available, otherwise current user
-    const ownerId = characterData.isNPC && currentCampaign?.dungeonMasterId 
-      ? currentCampaign.dungeonMasterId 
-      : user?.id
-    
-    // Use multiclass data if available, otherwise use single class
-    const classesToUse = characterData.classes && characterData.classes.length > 0 
-      ? characterData.classes 
-      : [{
-          name: characterData.class,
-          subclass: characterData.subclass,
-          class_id: characterData.classId,
-          level: characterData.level
-        }]
-    
-    // Load class data for the first class to get primary ability for spell calculations
-    const { classData } = await loadClassData(characterData.class, characterData.subclass)
-    const proficiencyBonus = calculateProficiencyBonus(characterData.level)
-    
-    // Load class features from database for all selected features
-    let classFeatures: Array<{name: string, description: string, source: string, level: number}> = []
-    if (characterData.selectedFeatures && characterData.selectedFeatures.length > 0) {
-      // Load features for all classes if multiclassing
-      for (const charClass of classesToUse) {
-        if (charClass.class_id) {
-          const { features, error: featuresError } = await loadClassFeatures(
-            charClass.class_id, 
-            charClass.level,
-            charClass.subclass,
-            true // includeHidden to get ASI features
-          )
-          if (!featuresError && features) {
-            // Only include selected features
-            const selectedForThisClass = features.filter(f => 
-              characterData.selectedFeatures?.includes(f.id)
-            )
-            classFeatures.push(...selectedForThisClass.map(f => ({
-              name: f.name || f.title || '',
-              description: f.description || '',
-              source: f.source || charClass.name,
-              level: f.level || 1
-            })))
-          }
-        }
-      }
-    } else if (classData?.id) {
-      // Fallback: load all features if no specific selection
-      const { features, error: featuresError } = await loadClassFeatures(classData.id, characterData.level, characterData.subclass)
-      if (featuresError) {
-        console.error("Error loading class features:", featuresError)
-      } else {
-        classFeatures = features || []
-      }
-    }
-    
-    // Use passed ability scores, or default to 10
-    const abilityScores = characterData.abilityScores || {
-      strength: 10,
-      dexterity: 10,
-      constitution: 10,
-      intelligence: 10,
-      wisdom: 10,
-      charisma: 10,
-    }
-    
-    // Use passed skills or create from class data
-    const skills = characterData.skills || (classData?.skill_proficiencies 
-      ? createClassBasedSkills(classData.skill_proficiencies) as any 
-      : createDefaultSkills())
-    
-    // Use passed saving throw proficiencies or create from class
-    const savingThrowProficiencies: Array<{ability: 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma', proficient: boolean}> = 
-      characterData.savingThrowProficiencies?.map(st => ({
-        ability: st.ability as 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma',
-        proficient: st.proficient
-      })) || createClassBasedSavingThrowProficiencies(characterData.class)
-    
-    // Calculate hit dice for multiclassing
-    const hitDieTypes: Record<string, number> = {
-      'barbarian': 12, 'fighter': 10, 'paladin': 10, 'ranger': 10,
-      'artificer': 8, 'bard': 8, 'cleric': 8, 'druid': 8, 'monk': 8,
-      'rogue': 8, 'warlock': 8, 'wizard': 6, 'sorcerer': 6
-    }
-    
-    const hitDiceByClass = classesToUse.map(charClass => ({
-      className: charClass.name,
-      dieType: `d${hitDieTypes[charClass.name.toLowerCase()] || 8}`,
-      total: charClass.level,
-      used: 0
-    }))
-    
-    // Calculate total hit dice
-    const totalHitDice = classesToUse.reduce((sum, c) => sum + c.level, 0)
-    
-    // Create a temporary character object for calculations
-    const tempCharacter: CharacterData = {
-      id: newId,
-      name: characterData.name,
-      class: characterData.class, // Legacy field
-      subclass: characterData.subclass, // Legacy field
-      class_id: characterData.classId, // Legacy field
-      level: characterData.level,
-      classes: classesToUse, // Multiclass support
-      background: characterData.background,
-      backgroundId: characterData.backgroundId,
-      backgroundData: characterData.backgroundData,
-      race: characterData.raceIds && characterData.raceIds.length > 0
-        ? (characterData.raceIds.find(r => r.isMain)?.id || characterData.raceIds[0]?.id || characterData.race)
-        : characterData.race, // Legacy field
-      raceIds: characterData.raceIds, // New field
-      alignment: characterData.alignment,
-      userId: ownerId,
-      visibility: characterData.isNPC ? 'private' : 'public',
-      isNPC: characterData.isNPC || false,
-      // Use the campaignId from characterData if provided (from campaign homepage), otherwise undefined
-      campaignId: characterData.campaignId || undefined,
-      strength: abilityScores.strength,
-      dexterity: abilityScores.dexterity,
-      constitution: abilityScores.constitution,
-      intelligence: abilityScores.intelligence,
-      wisdom: abilityScores.wisdom,
-      charisma: abilityScores.charisma,
-      armorClass: characterData.armorClass || 10,
-      initiative: characterData.initiative || 0,
-      speed: characterData.speed || 30,
-      currentHitPoints: characterData.currentHitPoints || 8,
-      maxHitPoints: characterData.maxHitPoints || 8,
-      exhaustion: 0,
-      hitDice: {
-        total: totalHitDice,
-        used: 0,
-        dieType: classData?.hit_die ? `d${classData.hit_die}` : "d8", // Use actual class hit die
-      },
-      hitDiceByClass: hitDiceByClass,
-      weapons: [],
-      weaponNotes: "",
-      features: characterData.features || [], // Race-based features
-      savingThrowProficiencies: savingThrowProficiencies as any, // Type assertion needed for passed data
-      skills: skills,
-      spellData: {
-        spellAttackBonus: 0,
-        spellSaveDC: 8,
-        cantripsKnown: 0,
-        spellsKnown: 0,
-        spellSlots: [],
-        spellNotes: "",
-        // LEGACY: bardicInspirationSlot, songOfRest now managed by database class_features
-        featSpellSlots: [],
-        spells: [],
-      },
-      classFeatures: classFeatures.map(feature => ({
-        id: `feature-${Date.now()}-${Math.random()}`,
-        class_id: characterData.classId,
-        level: feature.level,
-        title: feature.name,
-        description: feature.description,
-        feature_type: 'class_feature',
-        name: feature.name,
-        source: feature.source,
-        className: characterData.class
-      })),
-      toolsProficiencies: characterData.toolsProficiencies || [],
-      feats: characterData.feats || [],
-      equipment: characterData.equipment || "",
-      magicItems: [],
-      languages: characterData.languages || "",
-      otherTools: "",
-      money: characterData.money || {
-        gold: 0,
-        silver: 0,
-        copper: 0,
-      },
-      equipmentProficiencies: {
-        lightArmor: false, mediumArmor: false, heavyArmor: false, shields: false,
-        simpleWeapons: false, martialWeapons: false, firearms: false,
-        handCrossbows: false, longswords: false, rapiers: false, shortswords: false,
-        scimitars: false, lightCrossbows: false, longbows: false, shortbows: false,
-        darts: false, slings: false, quarterstaffs: false,
-        warhammers: false, battleaxes: false, handaxes: false, lightHammers: false,
-        ...(characterData.equipmentProficiencies || {}),
-      } as any,
-      personalityTraits: "",
-      ideals: "",
-      bonds: "",
-      flaws: "",
-      backstory: "",
-      notes: "",
-      // Initialize spell slots used to 0 for new characters
-      spellSlotsUsed: {
-        1: 0,
-        2: 0,
-        3: 0,
-        4: 0,
-        5: 0,
-        6: 0,
-        7: 0,
-        8: 0,
-        9: 0,
-      }
-    }
-    
-    // Calculate spell slots immediately during character creation
-    let calculatedSpellSlots: any[] = []
-    if (classData) {
-      // Warlocks use a different spell slot system (Pact Magic)
-      if (characterData.class.toLowerCase() === "warlock") {
-        const { getWarlockSpellSlots } = await import('../lib/character-data')
-        calculatedSpellSlots = getWarlockSpellSlots(characterData.level)
-      } else {
-        // Import the spell slot calculation function for other classes
-        const { calculateSpellSlotsFromClass } = await import('../lib/spell-slot-calculator')
-        const newSpellSlots = calculateSpellSlotsFromClass(classData, characterData.level)
-        calculatedSpellSlots = newSpellSlots.map((newSlot: any) => {
-          // For new characters, all slots start unused (used = 0)
-          return { ...newSlot, used: 0 }
-        })
-      }
+
+    const newCharacter = result.character!
+
+    setCharacters(prev => [...prev, { ...newCharacter, id: tempId }])
+    setActiveCharacterId(tempId)
+
+    if (newCharacter.id !== tempId) {
+      setCharacters(prev => prev.map(c => c.id === tempId ? { ...c, id: newCharacter.id } : c))
+      setActiveCharacterId(newCharacter.id)
     }
 
-    // Now calculate spell values using the temporary character
-    const newCharacter: CharacterData = {
-      ...tempCharacter,
-      spellData: {
-        ...tempCharacter.spellData,
-        spellAttackBonus: calculateSpellAttackBonus(tempCharacter, classData, proficiencyBonus),
-        spellSaveDC: calculateSpellSaveDC(tempCharacter, classData, proficiencyBonus),
-        cantripsKnown: characterData.class.toLowerCase() === "warlock" 
-          ? (() => {
-              const { getWarlockCantripsKnown } = require('../lib/character-data')
-              return getWarlockCantripsKnown(characterData.level)
-            })()
-          : 0, // Will be calculated from class data for other classes
-        spellsKnown: characterData.class.toLowerCase() === "warlock"
-          ? (() => {
-              const { getWarlockSpellsKnown } = require('../lib/character-data')
-              return getWarlockSpellsKnown(characterData.level)
-            })()
-          : getSpellsKnown(tempCharacter, classData, undefined),
-        spellSlots: calculatedSpellSlots, // Populate immediately
-        // LEGACY: All class feature slots now managed by database class_features system
-        // bardicInspirationSlot, songOfRest, flashOfGeniusSlot,
-        // divineSenseSlot, layOnHands, channelDivinitySlot
-        cleansingTouchSlot: getCleansingTouchData(tempCharacter),
-        // Legacy Warlock columns have been dropped - using unified system only
-        // Add Raven Queen Warlock-specific features
-        ...(tempCharacter.class.toLowerCase() === "warlock" && tempCharacter.subclass?.toLowerCase() === "the raven queen" ? {
-          sentinelRaven: (() => {
-            const { createSentinelRaven } = require('../lib/character-data')
-            return createSentinelRaven()
-          })(),
-          soulOfTheRaven: (() => {
-            const { createSoulOfTheRaven } = require('../lib/character-data')
-            return createSoulOfTheRaven(tempCharacter.level)
-          })(),
-          ravensShield: (() => {
-            const { createRavensShield } = require('../lib/character-data')
-            return createRavensShield(tempCharacter.level)
-          })(),
-          queensRightHand: (() => {
-            const { createQueensRightHand } = require('../lib/character-data')
-            return createQueensRightHand(tempCharacter.level)
-          })(),
-        } : {}),
-      },
-    }
-    
-    // Add character to local state first
-    setCharacters((prev) => [...prev, newCharacter])
-    setActiveCharacterId(newId)
-    
-    // Save character to database
-    try {
-      const { success, error, characterId } = isReadOnly && characterData.campaignId
-        ? await saveCharacterAsGuest(newCharacter, characterData.campaignId)
-        : await saveCharacter(newCharacter)
-      if (success) {
-        const finalCharacterId = characterId || newId
+    await reloadCharacterFromDatabase(newCharacter.id)
 
-        // If the DB assigned a real UUID (different from the temp newId), update the characters
-        // array and activeCharacterId in the same React batch — prevents a render where
-        // activeCharacterId points to an ID that doesn't exist in the array yet (which would
-        // cause the || characters[0] fallback to flash the wrong character).
-        if (characterId && characterId !== newId) {
-          setCharacters(prev => prev.map(char => char.id === newId ? { ...char, id: characterId } : char))
-          setActiveCharacterId(characterId)
-          saveActiveCharacterToLocalStorage(characterId)
-        } else {
-          saveActiveCharacterToLocalStorage(newId)
-        }
-
-        // Reload character from database to get the latest data (backgroundData, etc.)
-        // Done after the ID swap so reloadCharacterFromDatabase can find the record by its real UUID.
-        await reloadCharacterFromDatabase(finalCharacterId)
-        
-        // Get the campaign name for the toast message
-        const addedCampaign = characterData.campaignId 
-          ? campaigns.find(c => c.id === characterData.campaignId)
-          : null
-        
-        // Show success toast
-        toast({
-          title: "Success",
-          description: addedCampaign
-            ? `${characterData.name} created and added to ${addedCampaign.name}!`
-            : `${characterData.name} created successfully!`,
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: `Failed to save character: ${error}`,
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error saving new character:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save character to database",
-        variant: "destructive",
-      })
-    }
-    
-    // Spell slots are now calculated during initial load
+    const addedCampaign = formData.campaignId ? campaigns.find(c => c.id === formData.campaignId) : null
+    toast({
+      title: "Success",
+      description: addedCampaign
+        ? `${formData.name} created and added to ${addedCampaign.name}!`
+        : `${formData.name} created successfully!`,
+    })
   }
 
   const strengthMod = activeCharacter ? calculateModifier(activeCharacter.strength) : 0
@@ -3398,7 +2614,7 @@ function CharacterSheetContent() {
   }
 
 
-  if (userLoading || isInitialLoading) {
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -3427,18 +2643,7 @@ function CharacterSheetContent() {
 
   return (
     <div className="h-screen bg-background flex flex-col">
-      <AppHeader 
-        currentView={appView}
-        onViewChange={(view) => {
-          setAppView(view)
-          if (view === 'campaign') {
-            setCurrentView('campaign')
-          } else if (view === 'wiki') {
-            // Wiki view doesn't need to set currentView
-          } else {
-            setCurrentView('management')
-          }
-        }}
+      <AppHeader
         campaigns={campaigns}
         selectedCampaignId={selectedCampaignId}
         onCampaignSelect={(campaignId) => {
@@ -3452,7 +2657,7 @@ function CharacterSheetContent() {
         }}
       />
       <div className="flex flex-1 overflow-hidden">
-        {appView === 'campaign' && !(isReadOnly && selectedCampaignId === 'all') && (
+        {characters.length > 0 && (
           <CharacterSidebar
             characters={characters}
             campaigns={campaigns}
@@ -3463,21 +2668,25 @@ function CharacterSheetContent() {
                 setCurrentView('campaign')
               } else {
                 setCurrentView('character')
-                // Scroll to top when switching to character view
                 scrollToTop()
               }
             }}
             activeCharacterId={activeCharacterId}
             onSelectCharacter={(id) => {
-              setActiveCharacterIdWithStorage(id)
-              setCurrentView('character')
-              // Scroll to top when opening a character sheet
-              scrollToTop()
+              const char = characters.find(c => c.id === id)
+              const camp = campaigns.find(c => c.id === char?.campaignId)
+              if (char?.slug && camp?.slug) {
+                router.push(ROUTES.character(camp.slug, char.slug))
+              } else {
+                setActiveCharacterIdWithStorage(id)
+                setCurrentView('character')
+                scrollToTop()
+              }
             }}
             onCreateCharacter={createNewCharacter}
             onStartLongRest={handleStartLongRest}
             onOpenDiceRoll={handleOpenDiceRoll}
-            onOpenManagement={() => setCurrentView('management')}
+            onOpenManagement={() => router.push(ROUTES.settings.root)}
             onOpenSpellLibrary={handleOpenSpellLibrary}
             currentUserId={currentUser?.id}
             currentView={currentView}
@@ -3487,29 +2696,20 @@ function CharacterSheetContent() {
           />
         )}
 
-        <main ref={mainRef} className={`flex-1 ${appView !== 'management' && appView !== 'wiki' && !(isReadOnly && selectedCampaignId === 'all') ? 'p-6' : ''} relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
-          {isReadOnly && selectedCampaignId === 'all' ? (
+        <main ref={mainRef} className={`flex-1 p-6 relative ${currentView === 'character' && !canViewActiveCharacter ? 'overflow-hidden' : 'overflow-auto'}`}>
+          {isReadOnly && selectedCampaignId === 'all' && !initialCharacterId ? (
             <GuestHomepage
               campaigns={campaigns}
               onSelectCampaign={(campaignId) => {
-                setSelectedCampaignId(campaignId)
-                setCurrentView('campaign')
+                const camp = campaigns.find(c => c.id === campaignId)
+                if (camp?.slug) {
+                  router.push(ROUTES.campaign(camp.slug))
+                } else {
+                  setSelectedCampaignId(campaignId)
+                  setCurrentView('campaign')
+                }
               }}
-              onViewWiki={() => setAppView('wiki')}
-            />
-          ) : appView === 'wiki' ? (
-            <WikiPage />
-          ) : appView === 'management' ? (
-            <ManagementInterface
-              campaigns={campaigns}
-              characters={characters}
-              users={users}
-              onCreateCampaign={handleCreateCampaign}
-              onUpdateCampaign={handleUpdateCampaign}
-              onDeleteCampaign={(campaign) => handleDeleteCampaign(campaign.id)}
-              onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
-              onRemoveCharacterFromCampaign={(characterId) => handleRemoveCharacterFromCampaign(characterId, selectedCampaignId)}
-              onSetActiveCampaign={handleSetActiveCampaign}
+              onViewWiki={() => router.push(ROUTES.wiki.classes)}
             />
           ) : currentView === 'character' ? (
             <>
@@ -3517,7 +2717,10 @@ function CharacterSheetContent() {
               <div className="mb-4 flex items-center justify-between gap-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setCurrentView('campaign')}
+                    onClick={() => {
+                      if (currentCampaign?.slug) router.push(ROUTES.campaign(currentCampaign.slug))
+                      else setCurrentView('campaign')
+                    }}
                     className="hover:text-primary transition-colors hover:cursor-pointer"
                   >
                     {currentCampaign?.name || 'Campaign'}
@@ -3841,14 +3044,17 @@ function CharacterSheetContent() {
               resources={resources}
               links={links}
               onSelectCharacter={(id) => {
-                setActiveCharacterIdWithStorage(id)
-                setCurrentView('character')
-                // Scroll to top when opening a character sheet
-                scrollToTop()
+                const char = characters.find(c => c.id === id)
+                if (char?.slug && currentCampaign?.slug) {
+                  router.push(ROUTES.character(currentCampaign.slug, char.slug))
+                } else {
+                  setActiveCharacterIdWithStorage(id)
+                  setCurrentView('character')
+                  scrollToTop()
+                }
               }}
               onBackToCharacters={() => {
                 setCurrentView('character')
-                // Scroll to top when going back to characters
                 scrollToTop()
               }}
               onEditCampaign={handleEditCampaign}
@@ -4478,10 +3684,111 @@ function CharacterSheetContent() {
   )
 }
 
-export default function CharacterSheet() {
+function HomePageContent() {
+  const { user, isLoading: userLoading } = useUser()
+  const cached = pageCache.getCampaigns()
+  const [campaigns, setCampaigns] = useState<Campaign[]>(cached ?? [])
+  const [dataLoading, setDataLoading] = useState(!cached)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (cached) return // Already loaded this session — use cache
+
+    loadAllCampaigns(false, true).then(({ campaigns: data }) => {
+      if (data) {
+        setCampaigns(data)
+        pageCache.setCampaigns(data)
+      }
+      setDataLoading(false)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Redirect authenticated users to their active campaign
+  useEffect(() => {
+    if (!userLoading && !dataLoading && user && campaigns.length > 0) {
+      const activeCampaign = campaigns.find(c => c.isActive)
+      if (activeCampaign?.slug) {
+        router.push(ROUTES.campaign(activeCampaign.slug))
+      }
+    }
+  }, [userLoading, dataLoading, user, campaigns, router])
+
+  if (userLoading || dataLoading) {
+    return (
+      <div className="h-screen bg-background flex items-center justify-center">
+        <Icon icon="lucide:refresh-cw" className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="h-screen bg-background flex flex-col">
+        <AppHeader campaigns={campaigns} />
+        <main className="flex-1 overflow-auto">
+          <GuestHomepage
+            campaigns={campaigns}
+            onSelectCampaign={(campaignId) => {
+              const camp = campaigns.find(c => c.id === campaignId)
+              if (camp?.slug) router.push(ROUTES.campaign(camp.slug))
+            }}
+            onViewWiki={() => router.push(ROUTES.wiki.classes)}
+          />
+        </main>
+      </div>
+    )
+  }
+
+  // Authenticated user — find active campaign to redirect, or show campaigns list
+  const activeCampaign = campaigns.find(c => c.isActive)
+  if (activeCampaign?.slug) {
+    // Redirect in progress (useEffect handles it), show spinner
+    return (
+      <div className="h-screen bg-background flex items-center justify-center">
+        <Icon icon="lucide:refresh-cw" className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <CharacterSheetContent />
+    <div className="h-screen bg-background flex flex-col">
+      <AppHeader campaigns={campaigns} />
+      <main className="flex-1 overflow-auto p-6">
+        {campaigns.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-4 text-muted-foreground">
+            <Icon icon="iconoir:hexagon-dice" className="h-16 w-16 opacity-20" />
+            <p>No campaigns yet. Go to Settings to create one.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {campaigns.map(camp => (
+              <button
+                key={camp.id}
+                onClick={() => camp.slug && router.push(ROUTES.campaign(camp.slug))}
+                className="p-4 border rounded-lg text-left hover:border-primary transition-colors"
+              >
+                <h3 className="font-semibold">{camp.name}</h3>
+                {camp.description && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{camp.description}</p>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen bg-background flex items-center justify-center">
+        <Icon icon="lucide:refresh-cw" className="h-8 w-8 animate-spin" />
+      </div>
+    }>
+      <HomePageContent />
     </Suspense>
   )
 }

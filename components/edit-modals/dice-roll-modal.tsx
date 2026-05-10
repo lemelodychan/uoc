@@ -14,8 +14,8 @@ import { calculateModifier, calculateProficiencyBonus, calculateSavingThrowBonus
 interface DiceRollModalProps {
   isOpen: boolean
   onClose: () => void
-  character: CharacterData
-  onUpdateHP: (newHP: number) => void
+  character?: CharacterData | null
+  onUpdateHP?: (newHP: number) => void
   canEdit?: boolean
 }
 
@@ -184,7 +184,7 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP, canEdit 
 
   // Auto-calculate modifier when roll type, saving throw type, or skill type changes
   useEffect(() => {
-    if (isOpen && rollType !== "other" && !(rollType === "ability-check" && skillType === "other")) {
+    if (isOpen && character && rollType !== "other" && !(rollType === "ability-check" && skillType === "other")) {
       const autoModifier = calculateAutoModifier(character, rollType, savingThrowType, skillType)
       setModifier(autoModifier)
     }
@@ -216,8 +216,8 @@ export function DiceRollModal({ isOpen, onClose, character, onUpdateHP, canEdit 
   }
 
   const handleHPChange = (operation: 'add' | 'subtract') => {
-    if (!result) return
-    
+    if (!result || !character || !onUpdateHP) return
+
     const hpChange = operation === 'add' ? result.finalTotal : -result.finalTotal
     const newHP = Math.max(0, character.currentHitPoints + hpChange)
     onUpdateHP(newHP)

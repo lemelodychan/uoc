@@ -17,7 +17,7 @@ import { RichTextDisplay } from "@/components/ui/rich-text-display"
 interface SpellLibraryModalProps {
   isOpen: boolean
   onClose: () => void
-  character: CharacterData
+  character?: CharacterData | null
   characters?: CharacterData[]
   campaigns?: Campaign[]
   selectedCampaignId?: string
@@ -262,7 +262,7 @@ export const SpellLibraryModal = forwardRef<SpellLibraryModalRef, SpellLibraryMo
   const getAvailableCharacters = (): CharacterData[] => {
     // If no characters array provided, just return the current character
     if (!characters || characters.length === 0) {
-      return [character]
+      return character ? [character] : []
     }
 
     // Superadmins can see all characters

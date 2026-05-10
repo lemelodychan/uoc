@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 export const updateSession = async (request: NextRequest) => {
   let supabaseResponse = NextResponse.next({
     request,
@@ -40,6 +42,34 @@ export const updateSession = async (request: NextRequest) => {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
+  }
+
+  // Backward compat: ?character=UUID → /{campaignSlug}/{characterSlug}
+  const charParam = request.nextUrl.searchParams.get('character')
+  if (charParam && UUID_REGEX.test(charParam) && request.nextUrl.pathname === '/') {
+    try {
+      const { data } = await supabase
+        .from('characters')
+        .select('slug, campaigns:campaign_id(slug)')
+        .eq('id', charParam)
+        .maybeSingle()
+
+      if (data?.slug) {
+        const campaignSlug = (data.campaigns as any)?.slug
+        const newPath = campaignSlug
+          ? `/${campaignSlug}/${data.slug}`
+          : `/${data.slug}`
+        const redirectUrl = new URL(newPath, request.url)
+        const redirectResponse = NextResponse.redirect(redirectUrl, { status: 301 })
+        // Preserve auth cookies
+        supabaseResponse.cookies.getAll().forEach(cookie => {
+          redirectResponse.cookies.set(cookie.name, cookie.value)
+        })
+        return redirectResponse
+      }
+    } catch (err) {
+      console.error('Error resolving ?character redirect:', err)
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're

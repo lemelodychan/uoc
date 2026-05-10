@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { createClient } from "@/lib/supabase"
 import { updateLastLogin } from "@/lib/database"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -23,7 +23,7 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [authMethod, setAuthMethod] = useState<"magic-link" | "password" | null>(null)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
-  const supabase = createClient()
+  const supabase = useRef(createClient()).current
 
   const resetForm = () => {
     setEmail("")

@@ -1,7 +1,7 @@
 /**
  * Wiki Content Cache
- * Caches classes, races, and backgrounds data for the wiki page
- * Spells are not cached as they change more frequently
+ * Caches all wiki reference data for the session.
+ * Classes/races/backgrounds/feats/spells are loaded once and kept for the session.
  */
 
 interface CachedWikiData<T> {
@@ -14,8 +14,9 @@ class WikiCache {
   private racesCache: CachedWikiData<any> | null = null
   private backgroundsCache: CachedWikiData<any> | null = null
   private featsCache: CachedWikiData<any> | null = null
+  private spellsCache: CachedWikiData<any[]> | null = null
   private classFeaturesCache: Map<string, CachedWikiData<any[]>> = new Map()
-  
+
   // Cache duration: 5 minutes (300000ms)
   private readonly CACHE_DURATION = 5 * 60 * 1000
 
@@ -134,12 +135,30 @@ class WikiCache {
     }
   }
 
+  // Spells cache
+  getSpells(): any[] | null {
+    if (this.isValid(this.spellsCache)) {
+      return this.spellsCache!.data
+    }
+    this.spellsCache = null
+    return null
+  }
+
+  setSpells(spells: any[]): void {
+    this.spellsCache = { data: spells, timestamp: Date.now() }
+  }
+
+  invalidateSpells(): void {
+    this.spellsCache = null
+  }
+
   // Clear all caches
   clear(): void {
     this.classesCache = null
     this.racesCache = null
     this.backgroundsCache = null
     this.featsCache = null
+    this.spellsCache = null
     this.classFeaturesCache.clear()
   }
 }

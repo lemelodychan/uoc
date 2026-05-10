@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,8 @@ import type { Spell, CharacterData } from "@/lib/character-data"
 import { SPELL_SCHOOL_COLORS, getCastingTimeColor } from "@/lib/color-mapping"
 import { SpellSlotsGrid } from "@/components/ui/spell-slots-grid"
 import { wikiCache } from "@/lib/wiki-cache"
+import { AppHeader } from "@/components/app-header"
+import { ROUTES } from "@/config/routes"
 
 interface LibrarySpell {
   id: string
@@ -69,13 +72,26 @@ const SPELL_CLASSES = [
   "Barbarian"
 ]
 
-export function WikiPage() {
-  const [activeTab, setActiveTab] = useState<string>("classes")
-  const [classes, setClasses] = useState<ClassData[]>([])
-  const [races, setRaces] = useState<RaceData[]>([])
-  const [backgrounds, setBackgrounds] = useState<BackgroundData[]>([])
-  const [feats, setFeats] = useState<FeatData[]>([])
-  const [spells, setSpells] = useState<LibrarySpell[]>([])
+interface WikiPageProps {
+  activeTab?: string
+}
+
+export function WikiPage({ activeTab: initialTab }: WikiPageProps = {}) {
+  const [activeTab, setActiveTab] = useState<string>(initialTab || "classes")
+  const router = useRouter()
+
+  // Sync activeTab when navigating between wiki routes
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab])
+  const [classes, setClasses] = useState<ClassData[]>((wikiCache.getClasses() as unknown as ClassData[]) ?? [])
+  const [races, setRaces] = useState<RaceData[]>(wikiCache.getRaces() ?? [])
+  const [backgrounds, setBackgrounds] = useState<BackgroundData[]>(wikiCache.getBackgrounds() ?? [])
+  const [feats, setFeats] = useState<FeatData[]>(wikiCache.getFeats() ?? [])
+  const [spells, setSpells] = useState<LibrarySpell[]>((wikiCache.getSpells() as LibrarySpell[]) ?? [])
   const [filteredSpells, setFilteredSpells] = useState<LibrarySpell[]>([])
   const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>({})
   const [expandedRaces, setExpandedRaces] = useState<Record<string, boolean>>({})
@@ -109,11 +125,13 @@ export function WikiPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    loadClasses()
-    loadRaces()
-    loadBackgrounds()
-    loadFeats()
-    loadSpells()
+    // Skip if state was already seeded from wikiCache at init
+    if (classes.length === 0) loadClasses()
+    if (races.length === 0) loadRaces()
+    if (backgrounds.length === 0) loadBackgrounds()
+    if (feats.length === 0) loadFeats()
+    if (spells.length === 0) loadSpells()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Filter spells based on search and filters
@@ -288,10 +306,16 @@ export function WikiPage() {
 
   const loadSpells = async () => {
     try {
+      const cached = wikiCache.getSpells()
+      if (cached) {
+        setSpells(cached)
+        return
+      }
       const response = await fetch('/api/spells')
       if (response.ok) {
         const data = await response.json()
         setSpells(data)
+        wikiCache.setSpells(data)
       }
     } catch (error) {
       console.error('Error fetching spells:', error)
@@ -533,14 +557,16 @@ export function WikiPage() {
   })
 
   return (
-    <div className="relative flex flex-row gap-6 h-full">
+    <div className="h-screen bg-background flex flex-col">
+    <AppHeader />
+    <div className="relative flex flex-row gap-6 flex-1">
       {/* Sidebar Navigation */}
       <div className="w-72 bg-card flex flex-col gap-1 py-4 flex-shrink-0 border-r border-t fixed left-[0px] top-[64px] h-[calc(100vh-64px)]">
         <div className="text-lg font-bold font-display px-4">Wiki</div>
         <nav className="flex flex-col gap-0 px-4">
           <Button
             variant="outline"
-            onClick={() => setActiveTab('classes')}
+            onClick={() => router.push(ROUTES.wiki.classes)}
             className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'classes' ? 'text-primary' : ''
             }`}
@@ -553,7 +579,7 @@ export function WikiPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => setActiveTab('races')}
+            onClick={() => router.push(ROUTES.wiki.races)}
             className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'races' ? 'text-primary' : ''
             }`}
@@ -566,7 +592,7 @@ export function WikiPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => setActiveTab('backgrounds')}
+            onClick={() => router.push(ROUTES.wiki.backgrounds)}
             className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'backgrounds' ? 'text-primary' : ''
             }`}
@@ -579,7 +605,7 @@ export function WikiPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => setActiveTab('feats')}
+            onClick={() => router.push(ROUTES.wiki.feats)}
             className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'feats' ? 'text-primary' : ''
             }`}
@@ -592,7 +618,7 @@ export function WikiPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => setActiveTab('spells')}
+            onClick={() => router.push(ROUTES.wiki.spells)}
             className={`rounded-none border-0 w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'spells' ? 'text-primary' : ''
             }`}
@@ -1973,6 +1999,7 @@ export function WikiPage() {
           libraryOnly={true}
         />
       )}
+    </div>
     </div>
   )
 }

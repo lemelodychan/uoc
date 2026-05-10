@@ -1,16 +1,33 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import { ROUTES } from "@/config/routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Icon } from "@iconify/react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { CharacterData, Campaign } from "@/lib/character-data"
 import { calculateTotalLevel } from "@/lib/character-data"
-import { canViewCharacter } from "@/lib/database"
+
+const STATUS_CONFIG = {
+  active: { label: 'Active Party', icon: 'lucide:users', color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700' },
+  away: { label: 'Away', icon: 'lucide:user-x', color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700' },
+  deceased: { label: 'Deceased', icon: 'lucide:skull', color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700' }
+}
+
+const STATUS_ORDER = ['active', 'away', 'deceased'] as const
+
+function getCharacterLevelDisplay(character: CharacterData): string {
+  if (character.classes && character.classes.length > 1) {
+    const totalLevel = calculateTotalLevel(character.classes)
+    const classDisplay = character.classes.map(cls => cls.name).join('/')
+    return `Level ${totalLevel} ${classDisplay}`
+  }
+  return `Level ${calculateTotalLevel(character.classes)} ${character.class}`
+}
 
 interface CharacterSidebarProps {
   characters: CharacterData[]
@@ -22,11 +39,11 @@ interface CharacterSidebarProps {
   onCreateCharacter: () => void
   onStartLongRest: () => void
   onOpenDiceRoll: () => void
-  onOpenManagement: () => void
+  onOpenManagement?: () => void
   onOpenSpellLibrary: () => void
   currentUserId?: string
-  currentView?: 'character' | 'campaign' | 'management'
-  onViewChange?: (view: 'character' | 'campaign' | 'management') => void
+  currentView?: 'character' | 'campaign'
+  onViewChange?: (view: 'character' | 'campaign') => void
   canEdit?: boolean
   isReadOnly?: boolean
 }
@@ -50,100 +67,60 @@ export function CharacterSidebar({
   isReadOnly = false,
 }: CharacterSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const router = useRouter()
 
-  // Show all characters in sidebar except NPCs, but we'll handle access control in the main view
-  const visibleCharacters = characters.filter(character => !character.isNPC)
+  const visibleCharacters = useMemo(
+    () => characters.filter(character => !character.isNPC),
+    [characters]
+  )
 
-  // Helper function to format character level and class display
-  const getCharacterLevelDisplay = (character: CharacterData): string => {
-    // Treat as multiclass ONLY when there are 2+ classes.
-    // For single-class characters (including when classes has a single entry),
-    // always use the top-level level/class coming from the database.
-    if (character.classes && character.classes.length > 1) {
-      const totalLevel = calculateTotalLevel(character.classes)
-      const classDisplay = character.classes.map(cls => cls.name).join('/')
-      return `Level ${totalLevel} ${classDisplay}`
-    }
-
-    return `Level ${calculateTotalLevel(character.classes)} ${character.class}`
-  }
-
-  // Filter characters based on selected campaign
-  const filteredCharacters = selectedCampaignId === "all" 
-    ? visibleCharacters 
-    : visibleCharacters.filter(character => {
-        if (selectedCampaignId === "no-campaign") {
-          return !character.campaignId
-        }
-        return character.campaignId === selectedCampaignId
-      })
-
-	// Global status groups for "All Campaigns" view
-	const globalStatusGroups = filteredCharacters.reduce((groups, character) => {
-		const status = character.partyStatus || 'active'
-		if (!groups[status]) {
-			groups[status] = []
-		}
-		groups[status].push(character)
-		return groups
-	}, {} as Record<string, CharacterData[]>)
-
-	// Sort characters in global groups alphabetically
-	Object.keys(globalStatusGroups).forEach(status => {
-		globalStatusGroups[status].sort((a, b) => a.name.localeCompare(b.name))
-	})
-
-  // Group filtered characters by campaign, then by status
-  const groupedByCampaign = filteredCharacters.reduce((groups, character) => {
-    const campaignId = character.campaignId || 'no-campaign'
-    if (!groups[campaignId]) {
-      groups[campaignId] = {
-        campaign: (campaigns || []).find(c => c.id === campaignId) || null,
-        characters: [] as CharacterData[]
-      }
-    }
-    groups[campaignId].characters.push(character)
-    return groups
-  }, {} as Record<string, { campaign: Campaign | null, characters: CharacterData[] }>)
-
-	// Count characters per campaign for campaign selector labels
-	const characterCountByCampaign = visibleCharacters.reduce((counts, character) => {
-		const campaignId = character.campaignId || 'no-campaign'
-		counts[campaignId] = (counts[campaignId] || 0) + 1
-		return counts
-	}, {} as Record<string, number>)
-
-  // Sort characters within each campaign by status, then alphabetically
-  Object.keys(groupedByCampaign).forEach(campaignId => {
-    const campaignData = groupedByCampaign[campaignId]
-    const statusGroups = campaignData.characters.reduce((groups, character) => {
-      const status = character.partyStatus || 'active'
-      if (!groups[status]) {
-        groups[status] = []
-      }
-      groups[status].push(character)
-      return groups
-    }, {} as Record<string, CharacterData[]>)
-
-    // Sort characters alphabetically within each status group
-    Object.keys(statusGroups).forEach(status => {
-      statusGroups[status].sort((a, b) => a.name.localeCompare(b.name))
+  const filteredCharacters = useMemo(() => {
+    if (selectedCampaignId === "all") return visibleCharacters
+    return visibleCharacters.filter(character => {
+      if (selectedCampaignId === "no-campaign") return !character.campaignId
+      return character.campaignId === selectedCampaignId
     })
+  }, [visibleCharacters, selectedCampaignId])
 
-    groupedByCampaign[campaignId] = {
-      ...campaignData,
-      characters: statusGroups as any
+  const globalStatusGroups = useMemo(() => {
+    const groups: Record<string, CharacterData[]> = {}
+    for (const character of filteredCharacters) {
+      const status = character.partyStatus || 'active'
+      if (!groups[status]) groups[status] = []
+      groups[status].push(character)
     }
-  })
+    for (const status of Object.keys(groups)) {
+      groups[status].sort((a, b) => a.name.localeCompare(b.name))
+    }
+    return groups
+  }, [filteredCharacters])
 
-  // Define status order and labels
-  const statusConfig = {
-    active: { label: 'Active Party', icon: 'lucide:users', color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700' },
-    away: { label: 'Away', icon: 'lucide:user-x', color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700' },
-    deceased: { label: 'Deceased', icon: 'lucide:skull', color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700' }
-  }
-
-  const statusOrder = ['active', 'away', 'deceased'] as const
+  const groupedByCampaign = useMemo(() => {
+    const groups: Record<string, { campaign: Campaign | null, characters: any }> = {}
+    for (const character of filteredCharacters) {
+      const campaignId = character.campaignId || 'no-campaign'
+      if (!groups[campaignId]) {
+        groups[campaignId] = {
+          campaign: (campaigns || []).find(c => c.id === campaignId) || null,
+          characters: [] as CharacterData[]
+        }
+      }
+      (groups[campaignId].characters as CharacterData[]).push(character)
+    }
+    for (const campaignId of Object.keys(groups)) {
+      const statusGroups: Record<string, CharacterData[]> = {}
+      for (const character of groups[campaignId].characters as CharacterData[]) {
+        const status = character.partyStatus || 'active'
+        if (!statusGroups[status]) statusGroups[status] = []
+        statusGroups[status].push(character)
+      }
+      for (const status of Object.keys(statusGroups)) {
+        statusGroups[status].sort((a, b) => a.name.localeCompare(b.name))
+      }
+      groups[campaignId] = { ...groups[campaignId], characters: statusGroups }
+    }
+    return groups
+  }, [filteredCharacters, campaigns])
 
   return (
     <div
@@ -151,65 +128,17 @@ export function CharacterSidebar({
         isCollapsed ? "w-18" : "w-72"
       }`}
     >
-{/*       <div className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="text-sidebar-foreground hover:bg-sidebar-accent"
-          >
-            {isCollapsed ? <Icon icon="lucide:chevron-right" className="w-4 h-4" /> : <Icon icon="lucide:chevron-left" className="w-4 h-4" />}
-          </Button>
-        </div>
-      </div> */}
-
       <div className={`flex flex-col gap-0 flex-1 min-h-0 w-full ${isCollapsed ? "p-2" : "p-0"}`}>
         {(() => {
           const selectedCampaign = selectedCampaignId && selectedCampaignId !== "all" && selectedCampaignId !== "no-campaign"
             ? campaigns?.find(c => c.id === selectedCampaignId)
             : null
-          return selectedCampaign ? (
-            <h1 className="text-xs uppercase font-base text-muted-foreground tracking-wide font-bold px-4 pt-4">{selectedCampaign.name}</h1>
-          ) : (
-            <h1 className="text-xs uppercase font-base text-muted-foreground tracking-wide font-bold px-4 pt-4">All Campaigns</h1>
+          return (
+            <h1 className="text-xs uppercase font-base text-muted-foreground tracking-wide font-bold px-4 pt-4">
+              {selectedCampaign ? selectedCampaign.name : 'All Campaigns'}
+            </h1>
           )
         })()}
-
-        {/* Campaign Selector */}
-{/*         <div className="flex items-center gap-2 p-4 pb-2">
-          {!isCollapsed && (campaigns || []).length > 0 && (
-              <Select value={selectedCampaignId} onValueChange={onCampaignChange}>
-              <SelectTrigger className="w-full text-md font-medium pl-8 relative">
-                <Icon icon="lucide:book-open" className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" />
-                <SelectValue placeholder="Select campaign" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Campaigns</SelectItem>
-                {(campaigns || []).map((campaign) => {
-                  const count = characterCountByCampaign[campaign.id] || 0
-                  return (
-                    <SelectItem key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </SelectItem>
-                  )
-                })}
-              </SelectContent>
-            </Select>
-          )}
-        </div> */}
-
-{/*         <div className="flex gap-2 px-4">
-          <Button
-            onClick={onCreateCharacter}
-            className={`flex-1 bg-sidebar-primary hover:bg-sidebar-primary/90 text-sidebar-primary-foreground ${
-              isCollapsed ? "px-0 h-12" : ""
-            }`}
-          >
-            <Icon icon="lucide:user-round-plus" className={`${isCollapsed ? "w-6 h-6" : "w-4 h-4"}`} />
-            {!isCollapsed && <span>New Character</span>}
-          </Button>
-        </div> */}
 
         {/* Campaign Homepage Link */}
         <div className="px-4 w-full pt-2">
@@ -217,11 +146,12 @@ export function CharacterSidebar({
           <div className="border-b pb-2 pt-1">
           <Button
             variant="outline"
-            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary ${
-              currentView === 'campaign' ? 'text-primary' : ''
-            }`}
+            className={`w-full border-0 rounded-md justify-start bg-transparent shadow-none text-sm !px-1 !py-2 hover:text-primary`}
             onClick={() => {
-              if (currentView !== 'campaign') {
+              const campaign = campaigns?.find(c => c.id === selectedCampaignId)
+              if (campaign?.slug) {
+                router.push(ROUTES.campaign(campaign.slug))
+              } else {
                 onViewChange?.('campaign')
               }
             }}
@@ -239,11 +169,11 @@ export function CharacterSidebar({
 			{selectedCampaignId === 'all' ? (
 				// Single unified status grouping for All Campaigns
 				<div className="flex flex-col gap-2">
-					{statusOrder.map((status) => {
-						const charactersInStatus = (globalStatusGroups as unknown as Record<string, CharacterData[]>)[status] || []
+					{STATUS_ORDER.map((status) => {
+						const charactersInStatus = globalStatusGroups[status] || []
 						if (charactersInStatus.length === 0) return null
 
-						const config = statusConfig[status]
+						const config = STATUS_CONFIG[status]
 
 						return (
 							<div key={`all-${status}`} className="flex flex-col gap-3 mt-2">
@@ -324,18 +254,18 @@ export function CharacterSidebar({
 				</div>
 			) : (
 				Object.entries(groupedByCampaign).map(([campaignId, { campaign, characters: statusGroups }]) => {
-              const hasCharacters = Object.values(statusGroups as unknown as Record<string, CharacterData[]>).some(chars => chars.length > 0)
+              const hasCharacters = Object.values(statusGroups as Record<string, CharacterData[]>).some(chars => chars.length > 0)
               if (!hasCharacters) return null
 
               return (
                 <div key={campaignId} className="flex flex-col gap-0 pt-2">
 						{/* Campaign name header removed as requested */}
                   
-                  {statusOrder.map((status) => {
-                    const charactersInStatus = (statusGroups as unknown as Record<string, CharacterData[]>)[status] || []
+                  {STATUS_ORDER.map((status) => {
+                    const charactersInStatus = (statusGroups as Record<string, CharacterData[]>)[status] || []
                     if (charactersInStatus.length === 0) return null
 
-                    const config = statusConfig[status]
+                    const config = STATUS_CONFIG[status]
 
                     return (
                       <div key={`${campaignId}-${status}`} className="flex flex-col gap-3 mt-0 mb-4">

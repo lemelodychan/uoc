@@ -3,6 +3,32 @@
 
 /* Fonts are loaded via Next.js font optimization in layout.tsx */
 
+/* Skeleton shimmer — translateX on ::before is GPU-composited (no repaint) */
+@keyframes skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
+.animate-skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--muted);
+}
+
+.animate-skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--muted), white 5%) 50%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  will-change: transform;
+}
+
 /* Line clamp utility */
 .line-clamp-3 {
   display: -webkit-box;

@@ -18,25 +18,21 @@ import type { Campaign } from "@/lib/character-data"
 import { loadAllCampaigns } from "@/lib/database"
 import { cn, getCampaignLogoUrl } from "@/lib/utils"
 import { LoginModal } from "@/components/login-modal"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
+import { ROUTES } from "@/config/routes"
 
 interface AppHeaderProps {
-  currentView?: 'campaign' | 'wiki' | 'management'
-  onViewChange?: (view: 'campaign' | 'wiki' | 'management') => void
   campaigns?: Campaign[]
   selectedCampaignId?: string
   onCampaignSelect?: (campaignId: string) => void
 }
 
-export function AppHeader({ 
-  currentView = 'campaign', 
-  onViewChange,
+export function AppHeader({
   campaigns: campaignsProp,
   selectedCampaignId,
   onCampaignSelect
 }: AppHeaderProps) {
-  const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [displayName, setDisplayName] = useState("")
+  const [editDisplayName, setEditDisplayName] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [showPasswordChange, setShowPasswordChange] = useState(false)
@@ -50,13 +46,18 @@ export function AppHeader({
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
+  const supabaseRef = useRef(createClient())
+  const supabase = supabaseRef.current
   const router = useRouter()
+  const pathname = usePathname()
+  const activeView = pathname.startsWith('/wiki') ? 'wiki' : pathname.startsWith('/settings') ? 'management' : 'campaign'
   const menuRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   const { resolvedTheme } = useTheme()
-  const { isSuperadmin, userProfile } = useUser()
+  const { isSuperadmin, userProfile, user: contextUser } = useUser()
+  const user = contextUser as SupabaseUser | null
+  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
   const isAdmin = isSuperadmin || userProfile?.permissionLevel === 'admin'
-  const supabase = createClient()
 
   // Load campaigns when menu opens if not provided as prop
   useEffect(() => {
@@ -131,40 +132,13 @@ export function AppHeader({
     }
   }, [isCampaignsMenuOpen])
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      if (user) {
-        // Get display name from user metadata or use email
-        const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User'
-        setDisplayName(name)
-      }
-    }
-
-    getUser()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        const name = session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'User'
-        setDisplayName(name)
-      } else {
-        setUser(null)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [supabase.auth])
-
   const handleUpdateProfile = async () => {
-    if (!user || !displayName.trim()) return
+    if (!user || !editDisplayName.trim()) return
 
     setIsLoading(true)
     try {
       const { error } = await supabase.auth.updateUser({
-        data: { display_name: displayName.trim() }
+        data: { display_name: editDisplayName.trim() }
       })
 
       if (error) {
@@ -281,10 +255,7 @@ export function AppHeader({
         <div
           onClick={() => {
             setIsCampaignsMenuOpen(false)
-            if (selectedCampaignId && selectedCampaignId !== "all" && selectedCampaignId !== "no-campaign") {
-              onCampaignSelect?.(selectedCampaignId)
-              onViewChange?.('campaign')
-            }
+            router.push(ROUTES.home)
           }}
           className="cursor-pointer"
         >
@@ -294,7 +265,7 @@ export function AppHeader({
         {/* Navigation Menu */}
         <nav className="flex items-center gap-4">
           <Button
-            variant={currentView === 'campaign' || isCampaignsMenuOpen ? 'default' : 'ghost'}
+            variant={activeView === 'campaign' || isCampaignsMenuOpen ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setIsCampaignsMenuOpen(!isCampaignsMenuOpen)}
             className="flex items-center gap-2"
@@ -304,11 +275,11 @@ export function AppHeader({
             <Icon icon="lucide:chevron-down" className="w-4 h-4" />
           </Button>
           <Button
-            variant={currentView === 'wiki' ? 'default' : 'ghost'}
+            variant={activeView === 'wiki' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => {
               setIsCampaignsMenuOpen(false)
-              onViewChange?.('wiki')
+              router.push(ROUTES.wiki.classes)
             }}
             className="flex items-center gap-2"
           >
@@ -320,11 +291,11 @@ export function AppHeader({
           </Button>
           {isAdmin && (
             <Button
-              variant={currentView === 'management' ? 'default' : 'ghost'}
+              variant={activeView === 'management' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => {
                 setIsCampaignsMenuOpen(false)
-                onViewChange?.('management')
+                router.push(ROUTES.settings.root)
               }}
               className="flex items-center gap-2"
             >
@@ -361,7 +332,10 @@ export function AppHeader({
           
           <Dialog open={isProfileOpen} onOpenChange={(open) => {
             setIsProfileOpen(open)
-            if (open) setIsCampaignsMenuOpen(false)
+            if (open) {
+              setIsCampaignsMenuOpen(false)
+              setEditDisplayName(displayName)
+            }
           }}>
             <DialogTrigger asChild>
               <Button 
@@ -400,8 +374,8 @@ export function AppHeader({
                   <Input
                     id="displayName"
                     type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
+                    value={editDisplayName}
+                    onChange={(e) => setEditDisplayName(e.target.value)}
                     placeholder="Enter your display name"
                   />
                 </div>
@@ -483,7 +457,7 @@ export function AppHeader({
                 </Button>
                 <Button
                   onClick={handleUpdateProfile}
-                  disabled={isLoading || !displayName.trim()}
+                  disabled={isLoading || !editDisplayName.trim()}
                 >
                   {isLoading ? "Saving..." : "Save Changes"}
                 </Button>
@@ -566,9 +540,12 @@ export function AppHeader({
                           <button
                             key={campaign.id}
                             onClick={() => {
-                              onCampaignSelect?.(campaign.id)
-                              onViewChange?.('campaign')
                               setIsCampaignsMenuOpen(false)
+                              if (campaign.slug) {
+                                router.push(ROUTES.campaign(campaign.slug))
+                              } else {
+                                onCampaignSelect?.(campaign.id)
+                              }
                             }}
                             className={cn(
                               "relative p-4 rounded-lg border-2 text-left transition-all hover:shadow-md",
@@ -643,9 +620,12 @@ export function AppHeader({
                         <button
                           key={campaign.id}
                           onClick={() => {
-                            onCampaignSelect?.(campaign.id)
-                            onViewChange?.('campaign')
                             setIsCampaignsMenuOpen(false)
+                            if (campaign.slug) {
+                              router.push(ROUTES.campaign(campaign.slug))
+                            } else {
+                              onCampaignSelect?.(campaign.id)
+                            }
                           }}
                           className={cn(
                             "relative text-left transition-all hover:cursor-pointer",

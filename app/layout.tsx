@@ -31,7 +31,10 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "🎲 UOC DND 5e",
+  title: {
+    default: "UOC DND Campaign Manager",
+    template: "%s | UOC DND Campaign Manager",
+  },
   description: "Fiches DND 5e du girl gang ✌️",
   icons: {
     icon: '/favicon.png',

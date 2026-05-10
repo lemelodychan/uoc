@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +10,7 @@ import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
 import type { UserProfile, PermissionLevel } from "@/lib/user-profiles"
 import { useUser } from "@/lib/user-context"
+import { ROUTES } from "@/config/routes"
 import { loadClassesWithDetails, loadFeaturesForBaseWithSubclasses, upsertClass as dbUpsertClass, deleteClass as dbDeleteClass, upsertClassFeature, deleteClassFeature, loadAllClasses, loadClassById, duplicateClass, getCustomClasses, canEditClass, updateUserProfileByAdmin, deleteUserProfileByAdmin, loadRacesWithDetails, upsertRace as dbUpsertRace, deleteRace as dbDeleteRace, loadRaceDetails, loadBackgroundsWithDetails, upsertBackground as dbUpsertBackground, deleteBackground as dbDeleteBackground, loadBackgroundDetails, loadFeatsWithDetails, upsertFeat as dbUpsertFeat, deleteFeat as dbDeleteFeat, loadFeatDetails } from "@/lib/database"
 import type { RaceData, BackgroundData, FeatData } from "@/lib/database"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -38,6 +40,7 @@ interface ManagementInterfaceProps {
   onAssignCharacterToCampaign: (characterId: string, campaignId: string) => void
   onRemoveCharacterFromCampaign: (characterId: string) => void
   onSetActiveCampaign: (campaignId: string) => void
+  defaultTab?: string
 }
 
 export function ManagementInterface({
@@ -49,9 +52,19 @@ export function ManagementInterface({
   onDeleteCampaign,
   onAssignCharacterToCampaign,
   onRemoveCharacterFromCampaign,
-  onSetActiveCampaign
+  onSetActiveCampaign,
+  defaultTab,
 }: ManagementInterfaceProps) {
-  const [activeTab, setActiveTab] = useState<string>("campaigns")
+  const [activeTab, setActiveTab] = useState<string>(defaultTab || "campaigns")
+  const router = useRouter()
+
+  // Sync activeTab when navigating between settings routes
+  useEffect(() => {
+    if (defaultTab && defaultTab !== activeTab) {
+      setActiveTab(defaultTab)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultTab])
   const [classes, setClasses] = useState<ClassData[]>([])
   const [editingClass, setEditingClass] = useState<ClassData | null>(null)
   const [lastEditedClassId, setLastEditedClassId] = useState<string | null>(null)
@@ -92,23 +105,11 @@ export function ManagementInterface({
   const classListTopRef = useRef<HTMLDivElement>(null)
   const classCardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
-  // Load classes on mount
+  // Load all reference data on mount
   useEffect(() => {
     loadClasses()
-  }, [])
-
-  // Load races on mount
-  useEffect(() => {
     loadRaces()
-  }, [])
-
-  // Load backgrounds on mount
-  useEffect(() => {
     loadBackgrounds()
-  }, [])
-
-  // Load feats on mount
-  useEffect(() => {
     loadFeats()
   }, [])
 
@@ -380,7 +381,7 @@ export function ManagementInterface({
         <nav className="flex flex-col gap-0 px-4">
           <Button
             variant="outline"
-            onClick={() => setActiveTab('campaigns')}
+            onClick={() => router.push(ROUTES.settings.campaigns)}
             className={`rounded-none border-0 border-b w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
               activeTab === 'campaigns' ? 'text-primary' : ''
             }`}
@@ -455,7 +456,7 @@ export function ManagementInterface({
           {isSuperadmin && (
             <Button
               variant="outline"
-              onClick={() => setActiveTab('users')}
+              onClick={() => router.push(ROUTES.settings.users)}
               className={`rounded-none border-0 w-full justify-start bg-transparent shadow-none text-sm !px-1 !py-4 h-fit hover:text-primary ${
                 activeTab === 'users' ? 'text-primary' : ''
               }`}
