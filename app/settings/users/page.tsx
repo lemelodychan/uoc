@@ -17,8 +17,11 @@ export default function SettingsUsersPage() {
     }
   }, [isAdmin, isLoading, router])
 
-  if (isLoading) return null
-  if (!isAdmin) return null
+  // While loading, render the SettingsPageClient anyway — it owns the navbar
+  // and shows its own skeleton, so the user sees a continuous shell instead
+  // of a blank page. If the user turns out not to be admin, the effect above
+  // redirects them away.
+  if (!isLoading && !isAdmin) return null
 
   return <SettingsPageClient defaultTab="users" />
 }

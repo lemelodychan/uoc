@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { ManagementInterface } from "@/components/management-interface"
 import { AppHeader } from "@/components/app-header"
+import { Skeleton } from "@/components/ui/skeleton"
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { UserProfile } from "@/lib/user-profiles"
 import {
@@ -133,31 +134,49 @@ export function SettingsPageClient({ defaultTab }: SettingsPageClientProps) {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <span className="text-muted-foreground">Loading settings…</span>
-      </div>
-    )
-  }
-
   return (
     <div className="h-screen bg-background flex flex-col">
       <AppHeader campaigns={campaigns} />
       <main className="flex-1 overflow-auto">
-        <ManagementInterface
-          campaigns={campaigns}
-          characters={characters}
-          users={users}
-          onCreateCampaign={handleCreateCampaign}
-          onUpdateCampaign={handleUpdateCampaign}
-          onDeleteCampaign={handleDeleteCampaign}
-          onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
-          onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
-          onSetActiveCampaign={handleSetActiveCampaign}
-          defaultTab={defaultTab}
-        />
+        {isLoading ? (
+          <SettingsSkeleton />
+        ) : (
+          <ManagementInterface
+            campaigns={campaigns}
+            characters={characters}
+            users={users}
+            onCreateCampaign={handleCreateCampaign}
+            onUpdateCampaign={handleUpdateCampaign}
+            onDeleteCampaign={handleDeleteCampaign}
+            onAssignCharacterToCampaign={handleAssignCharacterToCampaign}
+            onRemoveCharacterFromCampaign={handleRemoveCharacterFromCampaign}
+            onSetActiveCampaign={handleSetActiveCampaign}
+            defaultTab={defaultTab}
+          />
+        )}
       </main>
+    </div>
+  )
+}
+
+function SettingsSkeleton() {
+  return (
+    <div className="flex h-full">
+      <div className="w-72 border-r border-border p-4 flex flex-col gap-3 flex-shrink-0">
+        <Skeleton className="h-3 w-20 mb-2" />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-full" />
+        ))}
+      </div>
+      <div className="flex-1 p-6 space-y-4">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-full max-w-md" />
+        <div className="grid grid-cols-1 gap-3 mt-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
