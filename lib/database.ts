@@ -2592,6 +2592,16 @@ export const loadRacesWithDetails = async (): Promise<{
   }
 }
 
+// Returns true when the given user has admin or superadmin permission in user_profiles.
+const hasCatalogEditPermission = async (userId: string): Promise<boolean> => {
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("permission_level")
+    .eq("user_id", userId)
+    .maybeSingle()
+  return profile?.permission_level === 'admin' || profile?.permission_level === 'superadmin'
+}
+
 export const upsertRace = async (race: Partial<RaceData> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> => {
   try {
     const { data: { user } } = await supabase.auth.getUser()
@@ -2599,9 +2609,8 @@ export const upsertRace = async (race: Partial<RaceData> & { id?: string }): Pro
       return { success: false, error: "Not authenticated" }
     }
 
-    const isSuperadminUser = await isSuperadmin(user.id)
-    if (!isSuperadminUser) {
-      return { success: false, error: "Only superadmins can edit races" }
+    if (!(await hasCatalogEditPermission(user.id))) {
+      return { success: false, error: "Only admins can edit races" }
     }
 
     const payload: any = {
@@ -2675,9 +2684,8 @@ export const deleteRace = async (raceId: string): Promise<{ success: boolean; er
       return { success: false, error: "Not authenticated" }
     }
 
-    const isSuperadminUser = await isSuperadmin(user.id)
-    if (!isSuperadminUser) {
-      return { success: false, error: "Only superadmins can delete races" }
+    if (!(await hasCatalogEditPermission(user.id))) {
+      return { success: false, error: "Only admins can delete races" }
     }
 
     const { error } = await supabase
@@ -2777,9 +2785,8 @@ export const upsertBackground = async (background: Partial<BackgroundData> & { i
       return { success: false, error: "Not authenticated" }
     }
 
-    const isSuperadminUser = await isSuperadmin(user.id)
-    if (!isSuperadminUser) {
-      return { success: false, error: "Only superadmins can edit backgrounds" }
+    if (!(await hasCatalogEditPermission(user.id))) {
+      return { success: false, error: "Only admins can edit backgrounds" }
     }
 
     const payload: any = {
@@ -2847,9 +2854,8 @@ export const deleteBackground = async (backgroundId: string): Promise<{ success:
       return { success: false, error: "Not authenticated" }
     }
 
-    const isSuperadminUser = await isSuperadmin(user.id)
-    if (!isSuperadminUser) {
-      return { success: false, error: "Only superadmins can delete backgrounds" }
+    if (!(await hasCatalogEditPermission(user.id))) {
+      return { success: false, error: "Only admins can delete backgrounds" }
     }
 
     const { error } = await supabase
@@ -2953,9 +2959,8 @@ export const upsertFeat = async (feat: Partial<FeatData> & { id?: string }): Pro
       return { success: false, error: "Not authenticated" }
     }
 
-    const isSuperadminUser = await isSuperadmin(user.id)
-    if (!isSuperadminUser) {
-      return { success: false, error: "Only superadmins can edit feats" }
+    if (!(await hasCatalogEditPermission(user.id))) {
+      return { success: false, error: "Only admins can edit feats" }
     }
 
     const payload: any = {
@@ -3018,9 +3023,8 @@ export const deleteFeat = async (featId: string): Promise<{ success: boolean; er
       return { success: false, error: "Not authenticated" }
     }
 
-    const isSuperadminUser = await isSuperadmin(user.id)
-    if (!isSuperadminUser) {
-      return { success: false, error: "Only superadmins can delete feats" }
+    if (!(await hasCatalogEditPermission(user.id))) {
+      return { success: false, error: "Only admins can delete feats" }
     }
 
     const { error } = await supabase
@@ -3587,8 +3591,8 @@ export const upsertClassFeature = async (feature: {
         .eq("user_id", user.id)
         .maybeSingle()
       
-      const isSuperadmin = profile?.permission_level === 'superadmin'
-      if (!isSuperadmin) {
+      const canEditCatalog = profile?.permission_level === 'admin' || profile?.permission_level === 'superadmin'
+      if (!canEditCatalog) {
         return { success: false, error: "You don't have permission to update this class" }
       }
     }
@@ -5139,8 +5143,8 @@ export const updateClassFeatureSkills = async (
         .eq("user_id", user.id)
         .maybeSingle()
       
-      const isSuperadmin = profile?.permission_level === 'superadmin'
-      if (!isSuperadmin) {
+      const canEditCatalog = profile?.permission_level === 'admin' || profile?.permission_level === 'superadmin'
+      if (!canEditCatalog) {
         return { success: false, error: "You don't have permission to update this class" }
       }
     }
