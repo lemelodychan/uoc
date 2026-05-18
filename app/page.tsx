@@ -739,11 +739,39 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
         }).catch((e: any) => ({ users: undefined, error: e?.message || 'Failed to load users' }))
       : getAllUsers()
 
-    const [connectionTest, campaignsPromise, usersPromise] = await Promise.allSettled([
+    // When arriving via a character slug URL, the character id is known up-front.
+    // Fire the full character load in the same parallel batch so the sheet can
+    // render the moment that promise resolves — independent of the campaigns
+    // list and the progressive character roster.
+    const activeCharLoader = initialCharacterId
+      ? loadCharacter(initialCharacterId)
+      : Promise.resolve({ character: undefined as any })
+
+    const [connectionTest, campaignsPromise, usersPromise, activeCharSettled] = await Promise.allSettled([
       testConnection(),
       loadAllCampaigns(false, !currentUser),
       usersLoader,
+      activeCharLoader,
     ])
+
+    const preloadedActiveCharacter = activeCharSettled.status === 'fulfilled'
+      ? (activeCharSettled.value as any)?.character
+      : undefined
+
+    // Render the sheet immediately when we have the active character + slug context.
+    // The sidebar/character list will populate when loadCharactersProgressive completes below.
+    if (initialCharacterId && preloadedActiveCharacter) {
+      pageCache.markCharacterFullyLoaded(initialCharacterId)
+      setCharacters([preloadedActiveCharacter])
+      pageCache.setAllCharacters([preloadedActiveCharacter])
+      setActiveCharacterId(initialCharacterId)
+      saveActiveCharacterToLocalStorage(initialCharacterId)
+      setCurrentView('character')
+      if (preloadedActiveCharacter.campaignId) {
+        setSelectedCampaignId(preloadedActiveCharacter.campaignId)
+      }
+      setIsInitialLoading(false)
+    }
 
     // Handle connection test result
     const connectionResult = connectionTest.status === 'fulfilled' ? connectionTest.value : { success: false, error: 'Connection test failed' }
@@ -843,9 +871,17 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
       validCharacterId = filteredCharacters.length > 0 ? filteredCharacters[0].id : dbCharacters[0]?.id
     }
 
-    // Set minimal characters immediately for fast initial render
-    setCharacters(dbCharacters)
-    pageCache.setAllCharacters(dbCharacters)
+    // Set minimal characters immediately for fast initial render.
+    // If we already fetched the full active character in the parallel batch above,
+    // preserve it here so the sheet doesn't briefly downgrade to the minimal record
+    // (which would trigger isCharacterDataLoading skeletons).
+    const charactersForRender = (initialCharacterId && preloadedActiveCharacter)
+      ? (dbCharacters.some(c => c.id === initialCharacterId)
+          ? dbCharacters.map(c => c.id === initialCharacterId ? preloadedActiveCharacter : c)
+          : [preloadedActiveCharacter, ...dbCharacters])
+      : dbCharacters
+    setCharacters(charactersForRender)
+    pageCache.setAllCharacters(charactersForRender)
     setActiveCharacterId(validCharacterId ?? "")
     saveActiveCharacterToLocalStorage(validCharacterId ?? "")
 
@@ -863,7 +899,10 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
 
     // Step 4: Load full data for the active character
     if (validCharacterId) {
-      const { character: activeCharacter } = await loadCharacter(validCharacterId)
+      // Reuse the parallel-fetched character when it matches; only re-query for a different id.
+      const activeCharacter = (validCharacterId === initialCharacterId && preloadedActiveCharacter)
+        ? preloadedActiveCharacter
+        : (await loadCharacter(validCharacterId)).character
       if (activeCharacter) {
         pageCache.markCharacterFullyLoaded(validCharacterId)
         const updatedChars = dbCharacters.map(c => c.id === validCharacterId ? activeCharacter : c)

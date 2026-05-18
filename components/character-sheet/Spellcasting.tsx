@@ -13,7 +13,7 @@ import { getFeatureUsage, getFeatureCustomDescription, getFeatureMaxUses } from 
 import { calculateUsesFromFormula, resolveDescriptionSegments } from "@/lib/class-feature-templates"
 import type { DescriptionSegment } from "@/lib/class-feature-templates"
 import type { ClassFeatureSkill } from "@/lib/class-feature-types"
-import { loadClassFeatureSkills, loadClassData } from "@/lib/database"
+import { loadClassData } from "@/lib/database"
 import { useState, useEffect } from "react"
 import { SectionCardSkeleton } from "./character-sheet-skeletons"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -119,8 +119,9 @@ export function Spellcasting({
   onInnateSpellsEdit,
   isLoading = false
 }: SpellcastingProps) {
-  const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
-  const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
+  // Feature skills are hydrated on the character itself by loadCharacter,
+  // so no mount-time fetch is needed here.
+  const classFeatureSkills: ClassFeatureSkill[] = character.classFeatureSkills || []
   const [monkClassData, setMonkClassData] = useState<any>(null)
   const [barbarianClassData, setBarbarianClassData] = useState<any>(null)
   // Calculate cantrips and spells known from classes table data
@@ -137,23 +138,6 @@ export function Spellcasting({
   const raceInnateSpells = allInnate.filter(({ spell }) => !spell.source || spell.source === 'race' || spell.source === 'class_feature')
   const featInnateSpells = allInnate.filter(({ spell }) => spell.source === 'feat')
   const otherInnateSpells = allInnate.filter(({ spell }) => spell.source === 'other')
-
-  // Load class feature skills
-  useEffect(() => {
-    const loadFeatures = async () => {
-      setIsLoadingFeatures(true)
-      try {
-        const { featureSkills } = await loadClassFeatureSkills(character)
-        setClassFeatureSkills(featureSkills || [])
-      } catch (error) {
-        setClassFeatureSkills([])
-      } finally {
-        setIsLoadingFeatures(false)
-      }
-    }
-
-    loadFeatures()
-  }, [character.id, character.level, character.classes])
 
   // Load monk class data if character is a monk
   useEffect(() => {
@@ -454,15 +438,6 @@ export function Spellcasting({
 
   // Render unified class features (excluding special UX)
   const renderUnifiedClassFeatures = () => {
-    if (isLoadingFeatures) {
-      return (
-        <div className="flex items-center justify-center p-4 text-muted-foreground">
-          <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin mr-2" />
-          Loading class features...
-        </div>
-      )
-    }
-
     // Combine features from database and character's existing usage data
     const allFeatures: ClassFeatureSkill[] = [...(classFeatureSkills || [])]
     

@@ -10,12 +10,10 @@ import { getClassLevel, calculateProficiencyBonus } from "@/lib/character-data"
 import { getInitiativeBonus } from "@/lib/passive-bonus-utils"
 import { getFeatureUsage, getFeatureCustomDescription } from "@/lib/feature-usage-tracker"
 import { getCombatColor, getClassFeatureColors, DEFENSE_COLORS } from "@/lib/color-mapping"
-import { loadClassFeatureSkills } from "@/lib/database"
 import { calculateUsesFromFormula, resolveDescriptionSegments } from "@/lib/class-feature-templates"
 import type { DescriptionSegment } from "@/lib/class-feature-templates"
 import { getFeatureMaxUses } from "@/lib/feature-usage-tracker"
 import type { ClassFeatureSkill } from "@/lib/class-feature-types"
-import { useState, useEffect } from "react"
 import { CombatStatsSkeleton } from "./character-sheet-skeletons"
 
 interface CombatStatsProps {
@@ -34,25 +32,9 @@ const formatModifier = (mod: number): string => {
 }
 
 export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSave, onUpdateFeatureUsage, onDefensesEdit, canEdit = true, isLoading = false }: CombatStatsProps) {
-  const [classFeatureSkills, setClassFeatureSkills] = useState<ClassFeatureSkill[]>([])
-  const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
-
-  // Load class feature skills
-  useEffect(() => {
-    const loadFeatures = async () => {
-      setIsLoadingFeatures(true)
-      try {
-        const { featureSkills } = await loadClassFeatureSkills(character)
-        setClassFeatureSkills(featureSkills || [])
-      } catch (error) {
-        setClassFeatureSkills([])
-      } finally {
-        setIsLoadingFeatures(false)
-      }
-    }
-
-    loadFeatures()
-  }, [character.id, character.level, character.classes])
+  // Feature skills are hydrated on the character itself by loadCharacter,
+  // so no mount-time fetch is needed here.
+  const classFeatureSkills: ClassFeatureSkill[] = character.classFeatureSkills || []
 
   if (isLoading) return <CombatStatsSkeleton />
 

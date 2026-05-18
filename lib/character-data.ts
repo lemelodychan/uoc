@@ -146,6 +146,10 @@ export interface CharacterData {
     refuelingDie?: string
   }>
   spellData: SpellData
+  // Hydrated from loadClassFeatureSkills during loadCharacter; lets consumer
+  // components (Spellcasting, CombatStats) read synchronously instead of
+  // refetching on every mount.
+  classFeatureSkills?: import('./class-feature-types').ClassFeatureSkill[]
   classFeatures: Array<{
     id: string
     class_id: string

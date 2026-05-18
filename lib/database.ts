@@ -1097,8 +1097,6 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
   // No longer loading class features here to avoid legacy system interference
   let classFeatures: Array<{name: string, description: string, source: string, level: number}> = []
 
-    // Load class data for automatic spell calculations
-    const { classData } = await loadClassData(data.class_name, data.subclass)
     const proficiencyBonus = calculateProficiencyBonus(data.level)
     
     // Create temporary character for calculations
@@ -1237,29 +1235,55 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
       armor: data.armor ?? [],
     }
 
-    // Hydrate classData cache for each class entry
-    // This loads class metadata once so downstream functions can read from it
+    // Parallel fan-out: dedupe per-class loadClassData calls, run them with
+    // loadClassFeatureSkills concurrently. Primary classData (used later for
+    // spell calcs) is read from the same result map.
+    const classKey = (name: string, subclass?: string | null) => `${name}|${subclass || ''}`
+    const uniqueClasses: Array<{ name: string; subclass?: string }> = []
+    const seenClassKeys = new Set<string>()
+    const primaryKey = classKey(data.class_name, data.subclass)
+    seenClassKeys.add(primaryKey)
+    uniqueClasses.push({ name: data.class_name, subclass: data.subclass || undefined })
+    for (const c of tempCharacter.classes || []) {
+      const key = classKey(c.name, c.subclass)
+      if (!seenClassKeys.has(key)) {
+        seenClassKeys.add(key)
+        uniqueClasses.push({ name: c.name, subclass: c.subclass || undefined })
+      }
+    }
+
+    const [classDataResults, { featureSkills }] = await Promise.all([
+      Promise.all(uniqueClasses.map(c => loadClassData(c.name, c.subclass).catch(() => ({ classData: null })))),
+      (async () => {
+        const { loadClassFeatureSkills } = await import('./database')
+        return loadClassFeatureSkills(tempCharacter)
+      })(),
+    ])
+
+    const classDataMap = new Map<string, any>()
+    uniqueClasses.forEach((c, i) => {
+      classDataMap.set(classKey(c.name, c.subclass), classDataResults[i]?.classData ?? null)
+    })
+    const classData = classDataMap.get(primaryKey) || null
+
+    // Hydrate classData cache for each class entry from the prefetched map
     if (tempCharacter.classes && tempCharacter.classes.length > 0) {
       for (const charClass of tempCharacter.classes) {
-        try {
-          const { classData: loadedClassData } = await loadClassData(charClass.name, charClass.subclass || undefined)
-          if (loadedClassData) {
-            charClass.classData = {
-              spellcasting_ability: loadedClassData.spellcasting_ability || null,
-              is_prepared_caster: loadedClassData.is_prepared_caster || false,
-              caster_type: loadedClassData.caster_type || null,
-              slots_replenish_on: loadedClassData.slots_replenish_on || 'long_rest',
-              hit_die: loadedClassData.hit_die,
-              saving_throw_proficiencies: loadedClassData.saving_throw_proficiencies,
-              equipment_proficiencies: loadedClassData.equipment_proficiencies,
-              invocations_known: loadedClassData.invocations_known || null,
-              infusions_known: loadedClassData.infusions_known || null,
-              spells_known: loadedClassData.spells_known || null,
-              cantrips_known: loadedClassData.cantrips_known || null,
-            }
+        const loadedClassData = classDataMap.get(classKey(charClass.name, charClass.subclass))
+        if (loadedClassData) {
+          charClass.classData = {
+            spellcasting_ability: loadedClassData.spellcasting_ability || null,
+            is_prepared_caster: loadedClassData.is_prepared_caster || false,
+            caster_type: loadedClassData.caster_type || null,
+            slots_replenish_on: loadedClassData.slots_replenish_on || 'long_rest',
+            hit_die: loadedClassData.hit_die,
+            saving_throw_proficiencies: loadedClassData.saving_throw_proficiencies,
+            equipment_proficiencies: loadedClassData.equipment_proficiencies,
+            invocations_known: loadedClassData.invocations_known || null,
+            infusions_known: loadedClassData.infusions_known || null,
+            spells_known: loadedClassData.spells_known || null,
+            cantrips_known: loadedClassData.cantrips_known || null,
           }
-        } catch (e) {
-          // Silently continue - classData is optional, functions have hardcoded fallbacks
         }
       }
     }
@@ -1268,10 +1292,6 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         // This is class-agnostic and works for any combination of classes
         const { addSingleFeature, getFeatureMaxUses } = await import('./feature-usage-tracker')
         let updatedUsage = tempCharacter.classFeatureSkillsUsage || {}
-        
-        // Load all available features for this character's classes and levels
-        const { loadClassFeatureSkills } = await import('./database')
-        const { featureSkills } = await loadClassFeatureSkills(tempCharacter)
     
     // Initialize usage data for any features that don't have it yet
     // Also update maxUses/maxPoints for existing features with formulas (they may be stale)
@@ -1418,6 +1438,9 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
     const character: CharacterData = {
       ...tempCharacter,
       classFeatures: classFeatures, // Add the loaded class features
+      // Carry the already-fetched feature skills with the character so
+      // consumer components don't refetch on every mount.
+      classFeatureSkills: featureSkills || [],
       spellData: {
         ...tempCharacter.spellData,
         spellAttackBonus: data.spell_attack_bonus || calculateSpellAttackBonus(tempCharacter, classData, proficiencyBonus),
@@ -4499,72 +4522,126 @@ import type { ClassFeatureSkill, FeatureSkillUsage } from './class-feature-types
 import { FEATURE_TEMPLATES } from './class-feature-templates'
 import { getFeaturesForClass } from './class-feature-mapping'
 
+// Per-character feature-skills cache. Dedupes concurrent callers (Spellcasting,
+// CombatStats, and loadCharacter all request the same data on mount) so the
+// 2 DB queries inside this function fire once per character/level/class shape.
+type FeatureSkillsResult = { featureSkills?: ClassFeatureSkill[]; error?: string }
+const featureSkillsCache = new Map<string, FeatureSkillsResult>()
+const featureSkillsInflight = new Map<string, Promise<FeatureSkillsResult>>()
+
+const featureSkillsCacheKey = (character: CharacterData): string => {
+  const classesShape = (character.classes || [])
+    .map(c => `${c.name}:${c.subclass || ''}:${c.level}`)
+    .join('|')
+  return `${character.id || 'anon'}|${character.level}|${classesShape}`
+}
+
+export const invalidateClassFeatureSkillsCache = (characterId?: string) => {
+  if (!characterId) {
+    featureSkillsCache.clear()
+    featureSkillsInflight.clear()
+    return
+  }
+  for (const key of featureSkillsCache.keys()) {
+    if (key.startsWith(`${characterId}|`)) featureSkillsCache.delete(key)
+  }
+  for (const key of featureSkillsInflight.keys()) {
+    if (key.startsWith(`${characterId}|`)) featureSkillsInflight.delete(key)
+  }
+}
+
 /**
  * Load class feature skills for a character based on their classes and levels
  */
-export const loadClassFeatureSkills = async (character: CharacterData): Promise<{
-  featureSkills?: ClassFeatureSkill[]
-  error?: string
-}> => {
+export const loadClassFeatureSkills = async (character: CharacterData): Promise<FeatureSkillsResult> => {
+  const cacheKey = featureSkillsCacheKey(character)
+  const cached = featureSkillsCache.get(cacheKey)
+  if (cached) return cached
+  const inflight = featureSkillsInflight.get(cacheKey)
+  if (inflight) return inflight
+
+  const promise = (async (): Promise<FeatureSkillsResult> => {
   try {
     const featureSkills: ClassFeatureSkill[] = []
+    const classes = character.classes || []
+
+    // Prefetch phase: 2 batched queries replace 4N per-class round-trips.
+    //   1. one classes query covers every base class + subclass id lookup
+    //   2. one class_features query covers every feature row we'll need
+    const baseClassIdByName = new Map<string, string>()
+    const subclassIdByPair = new Map<string, string>()
+    const featuresByClassId = new Map<string, any[]>()
+
+    if (classes.length > 0) {
+      const uniqueClassNames = Array.from(new Set(classes.map(c => c.name)))
+      const { data: classRows } = await supabase
+        .from('classes')
+        .select('id, name, subclass')
+        .in('name', uniqueClassNames)
+
+      for (const row of classRows || []) {
+        if (!row.subclass) {
+          baseClassIdByName.set(row.name, row.id)
+        } else {
+          subclassIdByPair.set(`${row.name}|${row.subclass}`, row.id)
+        }
+      }
+
+      const allClassIds = new Set<string>()
+      let maxLevel = 0
+      for (const c of classes) {
+        const baseId = baseClassIdByName.get(c.name)
+        if (baseId) allClassIds.add(baseId)
+        if (c.subclass) {
+          const subId = subclassIdByPair.get(`${c.name}|${c.subclass}`)
+          if (subId) allClassIds.add(subId)
+        }
+        if (c.level > maxLevel) maxLevel = c.level
+      }
+
+      if (allClassIds.size > 0) {
+        const { data: allFeatures } = await supabase
+          .from('class_features')
+          .select('id, class_id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type, passive_bonuses')
+          .in('class_id', Array.from(allClassIds))
+          .lte('level', maxLevel)
+
+        for (const f of allFeatures || []) {
+          const arr = featuresByClassId.get(f.class_id) || []
+          arr.push(f)
+          featuresByClassId.set(f.class_id, arr)
+        }
+      }
+    }
 
     // Load feature skills for each class the character has
-    for (const charClass of character.classes || []) {
-      
+    for (const charClass of classes) {
+
       // First try to load from templates/mapping
       const classFeatures = getFeaturesForClass(charClass.name, charClass.level, charClass.subclass)
-      
+
       // Ensure each feature has the correct className property
       const featuresWithClassName = classFeatures.map(feature => ({
         ...feature,
         className: charClass.name
       }))
       featureSkills.push(...featuresWithClassName)
-      
+
       // Also try to load from database as fallback/supplement
       try {
-        // Get base class ID and subclass class ID separately for proper filtering
-        let baseClassId: string | null = null
-        let subclassClassId: string | null = null
-        
-        // Get base class ID
-        const { data: baseClassData } = await supabase
-          .from('classes')
-          .select('id')
-          .eq('name', charClass.name)
-          .is('subclass', null)
-          .maybeSingle()
-
-        if (baseClassData) {
-          baseClassId = baseClassData.id
-        }
-        
-        // Get subclass class ID if subclass is set
-        if (charClass.subclass) {
-          const { data: subclassData } = await supabase
-            .from('classes')
-            .select('id')
-            .eq('name', charClass.name)
-            .eq('subclass', charClass.subclass)
-            .maybeSingle()
-          
-          if (subclassData) {
-            subclassClassId = subclassData.id
-          }
-        }
+        const baseClassId = baseClassIdByName.get(charClass.name) || null
+        const subclassClassId = charClass.subclass
+          ? (subclassIdByPair.get(`${charClass.name}|${charClass.subclass}`) || null)
+          : null
 
         // Load base class features - ONLY those without a subclass_id (shared class features)
         const allDbFeatures: any[] = []
-        
+
         if (baseClassId) {
-          const { data: baseFeatures } = await supabase
-            .from('class_features')
-            .select('id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type, passive_bonuses')
-            .eq('class_id', baseClassId)
-            .lte('level', charClass.level)
-          
-          for (const feature of baseFeatures || []) {
+          const baseFeatures = (featuresByClassId.get(baseClassId) || [])
+            .filter(f => f.level <= charClass.level)
+
+          for (const feature of baseFeatures) {
             // For base class features: only include those with NO subclass_id
             // Features with a subclass_id belong to a specific subclass and should
             // only be loaded when that subclass matches the character's subclass
@@ -4580,16 +4657,13 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
             }
           }
         }
-        
+
         // Load subclass-specific features (stored under the subclass class_id)
         if (subclassClassId && subclassClassId !== baseClassId) {
-          const { data: subFeatures } = await supabase
-            .from('class_features')
-            .select('id, level, title, feature_skill_type, class_features_skills, is_hidden, subclass_id, feature_type, passive_bonuses')
-            .eq('class_id', subclassClassId)
-            .lte('level', charClass.level)
-          
-          for (const feature of subFeatures || []) {
+          const subFeatures = (featuresByClassId.get(subclassClassId) || [])
+            .filter(f => f.level <= charClass.level)
+
+          for (const feature of subFeatures) {
             // Avoid duplicates (features already loaded from base class query)
             if (!allDbFeatures.some(f => f.id === feature.id)) {
               allDbFeatures.push({ ...feature, _isSubclassFeature: true })
@@ -4841,6 +4915,16 @@ export const loadClassFeatureSkills = async (character: CharacterData): Promise<
   } catch (error) {
     console.error("Error loading class feature skills:", error)
     return { error: "Failed to load class feature skills" }
+  }
+  })()
+
+  featureSkillsInflight.set(cacheKey, promise)
+  try {
+    const result = await promise
+    if (!result.error) featureSkillsCache.set(cacheKey, result)
+    return result
+  } finally {
+    featureSkillsInflight.delete(cacheKey)
   }
 }
 
