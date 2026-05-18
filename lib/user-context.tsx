@@ -17,11 +17,48 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
+const USER_PROFILE_CACHE_KEY = 'uoc:userProfile'
+
+// Read cached profile synchronously on first render so role-gated UI (settings nav,
+// users menu item) appears immediately on refresh instead of after the network
+// roundtrip in loadUserData. Falls back to null on the server / when no cache exists.
+function readCachedProfile(): UserProfile | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(USER_PROFILE_CACHE_KEY)
+    return raw ? (JSON.parse(raw) as UserProfile) : null
+  } catch {
+    return null
+  }
+}
+
+function writeCachedProfile(profile: UserProfile | null) {
+  if (typeof window === 'undefined') return
+  try {
+    if (profile) window.sessionStorage.setItem(USER_PROFILE_CACHE_KEY, JSON.stringify(profile))
+    else window.sessionStorage.removeItem(USER_PROFILE_CACHE_KEY)
+  } catch {}
+}
+
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null)
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  // Initialize null so server and first client render match. We hydrate from
+  // sessionStorage in an effect below — one frame later, still effectively instant.
+  const [userProfile, setUserProfileState] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const setUserProfile = useCallback((p: UserProfile | null) => {
+    setUserProfileState(p)
+    writeCachedProfile(p)
+  }, [])
+
+  // Hydrate from sessionStorage cache on mount so role-gated nav appears
+  // immediately on refresh, before the network roundtrip in loadUserData.
+  useEffect(() => {
+    const cached = readCachedProfile()
+    if (cached) setUserProfileState(cached)
+  }, [])
 
   const loadUserData = useCallback(async () => {
     try {
@@ -101,6 +138,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setUserProfile(null)
+        writeCachedProfile(null)
         setIsLoading(false)
       }
     })

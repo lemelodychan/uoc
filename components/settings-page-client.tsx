@@ -34,14 +34,15 @@ export function SettingsPageClient({ defaultTab }: SettingsPageClientProps) {
   const { toast } = useToast()
 
   useEffect(() => {
-    if (cachedCampaigns && cachedChars) return // Already loaded this session — use cache
-
+    // Users are not cached, so always fetch them. Campaigns/characters skip the network
+    // if already cached this session.
     const loadData = async () => {
-      setIsLoading(true)
+      const needCampaignsChars = !(cachedCampaigns && cachedChars)
+      if (needCampaignsChars) setIsLoading(true)
       try {
         const [campaignsResult, charactersResult, usersResult] = await Promise.all([
-          loadAllCampaigns(),
-          loadCharactersProgressive(),
+          needCampaignsChars ? loadAllCampaigns() : Promise.resolve({ campaigns: undefined }),
+          needCampaignsChars ? loadCharactersProgressive() : Promise.resolve({ characters: undefined }),
           getAllUsers(),
         ])
         if (campaignsResult.campaigns) {

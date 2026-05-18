@@ -80,7 +80,9 @@ export function ManagementInterface({
   const [selectedClassForFeatures, setSelectedClassForFeatures] = useState<ClassData | null>(null)
   const { toast } = useToast()
   const [localUsers, setLocalUsers] = useState<UserProfile[]>(users)
+  useEffect(() => { setLocalUsers(users) }, [users])
   const { userProfile, isSuperadmin } = useUser()
+  const isAdminOrSuper = isSuperadmin || userProfile?.permissionLevel === 'admin'
   const canEdit = userProfile?.permissionLevel !== 'viewer'
   
   // Race management state
@@ -453,7 +455,7 @@ export function ManagementInterface({
               Beta
             </Badge>
           </Button>
-          {isSuperadmin && (
+          {isAdminOrSuper && (
             <Button
               variant="outline"
               onClick={() => router.push(ROUTES.settings.users)}
@@ -1014,7 +1016,7 @@ export function ManagementInterface({
           </div>
         )}
 
-        {activeTab === 'users' && isSuperadmin && (
+        {activeTab === 'users' && isAdminOrSuper && (
           <div className="flex-1 min-h-0 flex flex-col gap-0">
             <UserManagement
               users={localUsers}
