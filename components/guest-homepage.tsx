@@ -1,12 +1,14 @@
 "use client"
 
 import { useState } from "react"
+import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import type { Campaign } from "@/lib/character-data"
 import { LoginModal } from "@/components/login-modal"
+import { getCampaignLogoUrl } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 
@@ -19,6 +21,8 @@ interface GuestHomepageProps {
 export function GuestHomepage({ campaigns, onSelectCampaign, onViewWiki }: GuestHomepageProps) {
   const [loginModalOpen, setLoginModalOpen] = useState(false)
   const router = useRouter()
+  const { resolvedTheme } = useTheme()
+  const theme = resolvedTheme === 'dark' ? 'dark' : 'light'
 
   return (
     <div className="min-h-screen bg-background flex flex-col gap-6">
@@ -40,7 +44,9 @@ export function GuestHomepage({ campaigns, onSelectCampaign, onViewWiki }: Guest
           </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {campaigns.map((campaign) => (
+              {campaigns.map((campaign) => {
+                const logoUrl = getCampaignLogoUrl(campaign, theme)
+                return (
                 <Card
                   key={campaign.id}
                   className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all flex flex-col gap-2"
@@ -48,8 +54,8 @@ export function GuestHomepage({ campaigns, onSelectCampaign, onViewWiki }: Guest
                 >
                   <CardHeader className="flex items-center justify-center">
                     <div className="w-full h-20 flex items-center justify-center overflow-hidden bg-muted/50 p-3 rounded-lg w-full">
-                    {campaign.logoDarkUrl || campaign.logoLightUrl ? (
-                      <Image src={campaign.logoDarkUrl || campaign.logoLightUrl || ""} alt={campaign.name} width={100} height={100} className="w-full h-full object-contain" />
+                    {logoUrl ? (
+                      <Image src={logoUrl} alt={campaign.name} width={100} height={100} className="w-full h-full object-contain" />
                       ) : (
                       <CardTitle className="text-lg font-bold flex flex-col justify-between gap-2 w-full h-full">
                         {campaign.allowGuestCharacters && (
@@ -78,7 +84,8 @@ export function GuestHomepage({ campaigns, onSelectCampaign, onViewWiki }: Guest
                     </Button>
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
