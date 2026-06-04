@@ -27,6 +27,9 @@ import { Spellcasting } from "@/components/character-sheet/Spellcasting"
 import { ToolsProficiencies } from "@/components/character-sheet/ToolsProficiencies"
 import { ClassFeatures } from "@/components/character-sheet/ClassFeatures"
 import { Infusions } from "@/components/character-sheet/Infusions"
+import { BloodCurses } from "@/components/character-sheet/BloodCurses"
+import { Mutagens } from "@/components/character-sheet/Mutagens"
+import { OtherworldlyPatron } from "@/components/character-sheet/OtherworldlyPatron"
 import { EldritchInvocations } from "@/components/character-sheet/EldritchInvocations"
 import { Metamagic } from "@/components/character-sheet/Metamagic"
 import { EldritchCannon as EldritchCannonComponent } from "@/components/character-sheet/EldritchCannon"
@@ -102,6 +105,9 @@ const ArmorModal = dynamic(() => import('@/components/edit-modals/armor-modal').
 const DefensesModal = dynamic(() => import('@/components/edit-modals/defenses-modal').then(m => m.DefensesModal), { ssr: false, loading: () => null })
 const InnateSpellsModal = dynamic(() => import('@/components/edit-modals/innate-spells-modal').then(m => m.InnateSpellsModal), { ssr: false, loading: () => null })
 const InfusionsModal = dynamic(() => import('@/components/edit-modals/infusions-modal').then(m => m.InfusionsModal), { ssr: false, loading: () => null })
+const BloodCursesModal = dynamic(() => import('@/components/edit-modals/blood-curses-modal').then(m => m.BloodCursesModal), { ssr: false, loading: () => null })
+const MutagensModal = dynamic(() => import('@/components/edit-modals/mutagens-modal').then(m => m.MutagensModal), { ssr: false, loading: () => null })
+const OtherworldlyPatronModal = dynamic(() => import('@/components/edit-modals/otherworldly-patron-modal').then(m => m.OtherworldlyPatronModal), { ssr: false, loading: () => null })
 const FeaturesModal = dynamic(() => import('@/components/edit-modals/features-modal').then(m => m.FeaturesModal), { ssr: false, loading: () => null })
 const EquipmentModal = dynamic(() => import('@/components/edit-modals/equipment-modal').then(m => m.EquipmentModal), { ssr: false, loading: () => null })
 const LanguagesModal = dynamic(() => import('@/components/edit-modals/languages-modal').then(m => m.LanguagesModal), { ssr: false, loading: () => null })
@@ -174,6 +180,9 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
   const [weaponsModalOpen, setWeaponsModalOpen] = useState(false)
   const [armorModalOpen, setArmorModalOpen] = useState(false)
   const [infusionsModalOpen, setInfusionsModalOpen] = useState(false)
+  const [bloodCursesModalOpen, setBloodCursesModalOpen] = useState(false)
+  const [mutagensModalOpen, setMutagensModalOpen] = useState(false)
+  const [otherworldlyPatronModalOpen, setOtherworldlyPatronModalOpen] = useState(false)
   const [featuresModalOpen, setFeaturesModalOpen] = useState(false)
   const [equipmentModalOpen, setEquipmentModalOpen] = useState(false)
   const [languagesModalOpen, setLanguagesModalOpen] = useState(false)
@@ -3050,6 +3059,39 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
               isLoading={isCharacterDataLoading}
             />
 
+            <BloodCurses
+              character={activeCharacter}
+              onEdit={() => setBloodCursesModalOpen(true)}
+              onOpenFeatureModal={(content) => {
+                setFeatureModalContent(content)
+                setFeatureModalOpen(true)
+              }}
+              canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
+            />
+
+            <Mutagens
+              character={activeCharacter}
+              onEdit={() => setMutagensModalOpen(true)}
+              onOpenFeatureModal={(content) => {
+                setFeatureModalContent(content)
+                setFeatureModalOpen(true)
+              }}
+              canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
+            />
+
+            <OtherworldlyPatron
+              character={activeCharacter}
+              onEdit={() => setOtherworldlyPatronModalOpen(true)}
+              onOpenFeatureModal={(content) => {
+                setFeatureModalContent(content)
+                setFeatureModalOpen(true)
+              }}
+              canEdit={canEditActiveCharacter}
+              isLoading={isCharacterDataLoading}
+            />
+
             <EldritchInvocations
               character={activeCharacter}
               onEdit={() => setEldritchInvocationsModalOpen(true)}
@@ -3187,6 +3229,24 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
       <InfusionsModal
         isOpen={infusionsModalOpen}
         onClose={() => setInfusionsModalOpen(false)}
+        character={activeCharacter}
+        onSave={updateCharacter}
+      />
+      <BloodCursesModal
+        isOpen={bloodCursesModalOpen}
+        onClose={() => setBloodCursesModalOpen(false)}
+        character={activeCharacter}
+        onSave={updateCharacter}
+      />
+      <MutagensModal
+        isOpen={mutagensModalOpen}
+        onClose={() => setMutagensModalOpen(false)}
+        character={activeCharacter}
+        onSave={updateCharacter}
+      />
+      <OtherworldlyPatronModal
+        isOpen={otherworldlyPatronModalOpen}
+        onClose={() => setOtherworldlyPatronModalOpen(false)}
         character={activeCharacter}
         onSave={updateCharacter}
       />

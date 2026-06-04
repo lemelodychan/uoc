@@ -7,7 +7,9 @@ import { Icon } from "@iconify/react"
 import { RichTextDisplay } from "@/components/ui/rich-text-display"
 import type { CharacterData } from "@/lib/character-data"
 import { getClassLevel, calculateProficiencyBonus } from "@/lib/character-data"
+import { getHemocraftDie } from "@/lib/class-utils"
 import { getInitiativeBonus } from "@/lib/passive-bonus-utils"
+import { getSpeedFeatureBonus } from "@/lib/class-feature-config"
 import { getFeatureUsage, getFeatureCustomDescription } from "@/lib/feature-usage-tracker"
 import { getCombatColor, getClassFeatureColors, DEFENSE_COLORS } from "@/lib/color-mapping"
 import { calculateUsesFromFormula, resolveDescriptionSegments } from "@/lib/class-feature-templates"
@@ -370,9 +372,10 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
               })()}`}>
                 {(() => {
                   const exhaustion = character.exhaustion || 0
+                  const totalSpeed = character.speed + getSpeedFeatureBonus(character)
                   if (exhaustion >= 5) return "0 ft"
-                  if (exhaustion >= 2) return `${Math.floor(character.speed / 2)} ft`
-                  return `${character.speed} ft`
+                  if (exhaustion >= 2) return `${Math.floor(totalSpeed / 2)} ft`
+                  return `${totalSpeed} ft`
                 })()}
               </div>
             </div>
@@ -578,6 +581,24 @@ export function CombatStats({ character, onEdit, onToggleHitDie, onToggleDeathSa
                   <div className="text-sm text-muted-foreground">Sneak Attack</div>
                   <div className="flex items-center gap-2">
                     <span className="text-xl font-bold font-mono">{maxDice}d6</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Blood Hunter Hemocraft die (level-scaled display) */}
+          {(() => {
+            const bloodHunterLevel = getClassLevel(character.classes || [], 'Blood Hunter') || (character.class?.toLowerCase() === 'blood hunter' ? character.level : 0)
+            if (bloodHunterLevel < 1) return null
+
+            return (
+              <div className="flex items-start gap-3 col-span-2 mb-0">
+                <Icon icon="lucide:droplet" className={`w-5 h-10 py-2.5 ${getCombatColor('featureAvailable')}`} />
+                <div className="flex flex-col gap-1">
+                  <div className="text-sm text-muted-foreground">Hemocraft Die</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold font-mono">1{getHemocraftDie(bloodHunterLevel)}</span>
                   </div>
                 </div>
               </div>

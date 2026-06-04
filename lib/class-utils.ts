@@ -173,6 +173,16 @@ export function getBardicInspirationData(
   }
 }
 
+// Get the Blood Hunter's Hemocraft die for a given level.
+// Mirrors getBardicInspirationData's die-scaling pattern:
+// d4 (1-4), d6 (5-10), d8 (11-16), d10 (17-20).
+export function getHemocraftDie(level: number): string {
+  if (level >= 17) return "d10"
+  if (level >= 11) return "d8"
+  if (level >= 5) return "d6"
+  return "d4"
+}
+
 // Get song of rest data for bards
 export function getSongOfRestData(level: number, classData?: ClassData): SongOfRest | null {
   // For multiclassing, we might not have classData, so we assume it's for a Bard
@@ -263,6 +273,11 @@ export function getMulticlassCantripsKnown(character: any): number {
   for (const charClass of spellcastingClasses) {
     if (charClass.name.toLowerCase() === "warlock") {
       totalCantripsKnown += getWarlockCantripsKnown(charClass.level)
+    } else if (charClass.classData?.cantrips_known && Array.isArray(charClass.classData.cantrips_known)) {
+      // Data-driven: read from the hydrated class/subclass row
+      // (e.g. Blood Hunter — Order of the Profane Soul)
+      const idx = Math.min(charClass.level - 1, charClass.classData.cantrips_known.length - 1)
+      if (idx >= 0) totalCantripsKnown += charClass.classData.cantrips_known[idx] || 0
     } else {
       // For other spellcasting classes, use a simplified calculation
       // In practice, you'd want to load class data for each class

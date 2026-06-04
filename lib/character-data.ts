@@ -841,12 +841,16 @@ export const calculateSavingThrowBonus = (
 ): number => {
   const abilityModifier = calculateModifier(character[ability])
   const savingThrowProficiency = character.savingThrowProficiencies.find(st => st.ability === ability)
-  
+
   let bonus = abilityModifier
   if (savingThrowProficiency?.proficient) {
     bonus += proficiencyBonus
   }
-  
+
+  // Add saving-throw bonuses from class features (e.g. Blood Hunter Dark Augmentation)
+  const { calculateSavingThrowFeatureBonus } = require('./class-feature-config')
+  bonus += calculateSavingThrowFeatureBonus(character, ability, proficiencyBonus)
+
   return bonus
 }
 
@@ -938,14 +942,19 @@ export const calculateSpellSaveDC = (
     const abilityModifier = getMulticlassSpellcastingAbilityModifier(character)
     return 8 + abilityModifier + profBonus
   } else {
+    // Blood Hunter (Profane Soul): pact magic uses the Hemocraft modifier (higher of Int/Wis)
+    if (character.class?.toLowerCase() === "blood hunter") {
+      return 8 + getHemocraftModifier(character) + profBonus
+    }
+
     // Single class - use the primary class's spellcasting ability
     if (!classData?.primary_ability || !Array.isArray(classData.primary_ability) || classData.primary_ability.length === 0) {
       return 8 // Default DC if no spellcasting ability
     }
-    
+
     const spellcastingAbility = classData.primary_ability[0].toLowerCase()
     const abilityModifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
-    
+
     return 8 + abilityModifier + profBonus
   }
 }
@@ -963,14 +972,19 @@ export const calculateSpellAttackBonus = (
     const abilityModifier = getMulticlassSpellcastingAbilityModifier(character)
     return abilityModifier + profBonus
   } else {
+    // Blood Hunter (Profane Soul): pact magic uses the Hemocraft modifier (higher of Int/Wis)
+    if (character.class?.toLowerCase() === "blood hunter") {
+      return getHemocraftModifier(character) + profBonus
+    }
+
     // Single class - use the primary class's spellcasting ability
     if (!classData?.primary_ability || !Array.isArray(classData.primary_ability) || classData.primary_ability.length === 0) {
       return 0 // No spell attack bonus if no spellcasting ability
     }
-    
+
     const spellcastingAbility = classData.primary_ability[0].toLowerCase()
     const abilityModifier = calculateModifier(character[spellcastingAbility as keyof CharacterData] as number)
-    
+
     return abilityModifier + profBonus
   }
 }
@@ -1110,6 +1124,78 @@ export const getArtificerInfusionsKnown = (level: number, classData?: CharacterC
   const infusionsKnown = [0, 0, 4, 4, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8, 10, 10, 10, 10, 12, 12, 12]
   const levelIndex = Math.min(level - 1, infusionsKnown.length - 1)
   return infusionsKnown[levelIndex] || 0
+}
+
+// Blood Hunter — Blood Maledict uses per rest.
+// 1 use, then 2 at 6th, 3 at 13th, 4 at 17th.
+export const getBloodMaledictUses = (level: number): number => {
+  if (level >= 17) return 4
+  if (level >= 13) return 3
+  if (level >= 6) return 2
+  return 1
+}
+
+// Blood Hunter — number of Blood Curses known.
+// 1 known, +1 at 6th, 10th, 14th, and 18th level.
+export const getBloodHunterCursesKnown = (level: number): number => {
+  if (level >= 18) return 5
+  if (level >= 14) return 4
+  if (level >= 10) return 3
+  if (level >= 6) return 2
+  return 1
+}
+
+// Blood Hunter — order-granted blood curses ("doesn't count against your number
+// of blood curses known"). Curse names match the blood_curses seeds (script 104).
+const BLOOD_HUNTER_ORDER_FREE_CURSES: Array<{ order: string; curse: string; level: number }> = [
+  { order: "Ghostslayer", curse: "Blood Curse of the Exorcist", level: 15 },
+  { order: "Mutant", curse: "Blood Curse of Corrosion", level: 15 },
+  { order: "Lycan", curse: "Blood Curse of the Howl", level: 18 },
+  { order: "Profane Soul", curse: "Blood Curse of the Soul Eater", level: 18 },
+]
+
+// Returns the name of the blood curse auto-granted by the character's Blood Hunter
+// order at the given level, or null if none applies yet.
+export const getBloodHunterFreeCurse = (subclass: string | undefined, level: number): string | null => {
+  if (!subclass) return null
+  const entry = BLOOD_HUNTER_ORDER_FREE_CURSES.find((e) => subclass.includes(e.order))
+  return entry && level >= entry.level ? entry.curse : null
+}
+
+// Blood Hunter (Ghostslayer) — Aether Walk uses per rest. 1 use, 2 at 15th.
+export const getAetherWalkUses = (level: number): number => {
+  return level >= 15 ? 2 : 1
+}
+
+// Blood Hunter (Lycan) — Hybrid Transformation uses per rest.
+// 1 use, 2 at 11th. Unlimited at 18th (conveyed descriptively; tracker stays at 2).
+export const getHybridTransformationUses = (level: number): number => {
+  return level >= 11 ? 2 : 1
+}
+
+// Blood Hunter (Mutant) — mutagens concocted per rest. 1, 2 at 7th, 3 at 15th.
+export const getMutagensCreated = (level: number): number => {
+  if (level >= 15) return 3
+  if (level >= 7) return 2
+  return 1
+}
+
+// Blood Hunter (Mutant) — mutagen formulas known. 4, +1 at 7th/11th/15th/18th.
+export const getMutagenFormulasKnown = (level: number): number => {
+  if (level >= 18) return 8
+  if (level >= 15) return 7
+  if (level >= 11) return 6
+  if (level >= 7) return 5
+  return 4
+}
+
+// Blood Hunter — Hemocraft modifier (Intelligence or Wisdom, chosen at creation;
+// the app uses the higher of the two). Minimum of 1 per the class rules
+// (Brand of Castigation / Dark Augmentation specify "minimum of 1").
+export const getHemocraftModifier = (character: CharacterData): number => {
+  const intMod = calculateModifier(character.intelligence)
+  const wisMod = calculateModifier(character.wisdom)
+  return Math.max(1, intMod, wisMod)
 }
 
 export const getArtificerMaxInfusedItems = (character: CharacterData): number => {
@@ -1378,6 +1464,11 @@ export const getMulticlassSpellsKnown = (character: CharacterData): number => {
       // Create a temporary character with just this class for calculation
       const tempCharacter = { ...character, class: charClass.name, level: charClass.level }
       totalSpellsKnown += calculatePaladinSpellsKnown(tempCharacter)
+    } else if (charClass.classData?.spells_known && Array.isArray(charClass.classData.spells_known)) {
+      // Data-driven: read from the hydrated class/subclass row
+      // (e.g. Blood Hunter — Order of the Profane Soul)
+      const idx = Math.min(charClass.level - 1, charClass.classData.spells_known.length - 1)
+      if (idx >= 0) totalSpellsKnown += charClass.classData.spells_known[idx] || 0
     } else {
       // For other classes, use a simplified calculation based on level
       // This is a rough approximation - in practice, you'd want to load class data
@@ -1946,7 +2037,15 @@ export const getMulticlassSpellSlots = (classes: CharacterClass[]): SpellSlot[] 
 
   // Add Pact Magic slots separately (Warlock or any class with short rest recovery)
   if (pactMagicClasses.length > 0) {
-    const totalPactLevel = pactMagicClasses.reduce((total, charClass) => total + charClass.level, 0)
+    const totalPactLevel = pactMagicClasses.reduce((total, charClass) => {
+      // Blood Hunter (Profane Soul) is a third-rate pact caster: contributes
+      // floor(level / 3) to the pooled pact level (approximation when mixed
+      // with full-pact classes like Warlock).
+      if (charClass.name.toLowerCase() === "blood hunter") {
+        return total + Math.floor(charClass.level / 3)
+      }
+      return total + charClass.level
+    }, 0)
     const pactSlots = getWarlockSpellSlots(totalPactLevel)
     // Mark pact magic slots to distinguish them in the UI
     const markedPactSlots = pactSlots.map(slot => ({ ...slot, isWarlockSlot: true }))

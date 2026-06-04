@@ -135,7 +135,7 @@ export function CharacterHeader({
                       `${charClass.name}${charClass.subclass ? `・${charClass.subclass}` : ''} ${charClass.level}` 
                     ).join(' / ')
                   ) : (
-                    `${character.class}・${character.subclass}`
+                    `${character.class}${character.subclass ? `・${character.subclass}` : ''}`
                   )}
                 </Badge>
               </div>

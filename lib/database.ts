@@ -2552,6 +2552,66 @@ export const loadAllRaces = async (): Promise<{ races?: Array<{id: string, name:
   }
 }
 
+export interface BloodCurse {
+  id: string
+  name: string
+  description: string
+  amplified_effect: string | null
+  prerequisite?: string | null
+  sort_order: number
+}
+
+// Load the seeded list of Blood Hunter blood curses (for the Blood Curse picker).
+export const loadBloodCurses = async (): Promise<{ curses?: BloodCurse[]; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("blood_curses")
+      .select("id, name, description, amplified_effect, prerequisite, sort_order")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true })
+
+    if (error) {
+      console.error("Error loading blood curses:", error)
+      return { error: error.message }
+    }
+
+    return { curses: data || [] }
+  } catch (error) {
+    console.error("Error loading blood curses:", error)
+    return { error: "Failed to load blood curses" }
+  }
+}
+
+export interface Mutagen {
+  id: string
+  name: string
+  description: string
+  side_effect: string | null
+  prerequisite?: string | null
+  sort_order: number
+}
+
+// Load the seeded list of Blood Hunter mutagens (for the Mutagen Formulas picker).
+export const loadMutagens = async (): Promise<{ mutagens?: Mutagen[]; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("mutagens")
+      .select("id, name, description, side_effect, prerequisite, sort_order")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true })
+
+    if (error) {
+      console.error("Error loading mutagens:", error)
+      return { error: error.message }
+    }
+
+    return { mutagens: data || [] }
+  } catch (error) {
+    console.error("Error loading mutagens:", error)
+    return { error: "Failed to load mutagens" }
+  }
+}
+
 export interface RaceData {
   id: string
   name: string

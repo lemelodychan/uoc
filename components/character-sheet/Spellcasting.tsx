@@ -279,6 +279,9 @@ export function Spellcasting({
       return wisdomMod
     } else if (className === "bard") {
       return charismaMod
+    } else if (className === "blood hunter") {
+      // Profane Soul pact magic uses the Hemocraft ability (higher of Int/Wis)
+      return Math.max(intelligenceMod, wisdomMod)
     }
     return intelligenceMod // fallback
   }

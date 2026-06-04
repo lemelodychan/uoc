@@ -129,6 +129,7 @@ export interface FormulaContext {
   wisdom: number
   charisma: number
   proficiencyBonus: number
+  subclass?: string  // Subclass of the class being evaluated (e.g. 'Order of the Ghostslayer')
 }
 
 /**

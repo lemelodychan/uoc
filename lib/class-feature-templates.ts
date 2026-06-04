@@ -193,16 +193,20 @@ export function calculateUsesFromFormula(formula: string, character: CharacterDa
 function createFormulaContext(character: CharacterData, className?: string): FormulaContext {
   // For multiclassed characters, use the specific class level if provided
   let effectiveLevel = character.level
-  if (className && character.classes && character.classes.length > 1) {
+  let subclass: string | undefined = character.subclass
+  if (className && character.classes && character.classes.length > 0) {
     const classData = character.classes.find(c => c.name.toLowerCase() === className.toLowerCase())
     if (classData) {
-      effectiveLevel = classData.level
+      if (character.classes.length > 1) {
+        effectiveLevel = classData.level
+      }
+      subclass = classData.subclass || subclass
     }
   }
-  
+
   // Use character's proficiencyBonus if available, otherwise calculate from total level
   const profBonus = character.proficiencyBonus ?? calculateProficiencyBonus(character.level)
-  
+
   return {
     level: effectiveLevel,
     strength: character.strength,
@@ -211,7 +215,8 @@ function createFormulaContext(character: CharacterData, className?: string): For
     intelligence: character.intelligence,
     wisdom: character.wisdom,
     charisma: character.charisma,
-    proficiencyBonus: profBonus
+    proficiencyBonus: profBonus,
+    subclass
   }
 }
 
@@ -272,6 +277,36 @@ function evaluateFormula(formula: string, context: FormulaContext): number {
 
   if (formula === 'artificer_infusions_known') {
     return getArtificerInfusionsKnown(context.level)
+  }
+
+  if (formula === 'blood_maledict_uses') {
+    // Ghostslayer's Curse Specialist (L3) grants an additional use
+    const curseSpecialistBonus = context.subclass?.includes('Ghostslayer') ? 1 : 0
+    return getBloodMaledictUses(context.level) + curseSpecialistBonus
+  }
+
+  if (formula === 'blood_hunter_curses_known') {
+    return getBloodHunterCursesKnown(context.level)
+  }
+
+  if (formula === 'hemocraft_modifier') {
+    return getHemocraftModifierFromScores(context.intelligence, context.wisdom)
+  }
+
+  if (formula === 'aether_walk_uses') {
+    return getBloodHunterHelper('getAetherWalkUses', context.level)
+  }
+
+  if (formula === 'hybrid_transformation_uses') {
+    return getBloodHunterHelper('getHybridTransformationUses', context.level)
+  }
+
+  if (formula === 'mutagens_created') {
+    return getBloodHunterHelper('getMutagensCreated', context.level)
+  }
+
+  if (formula === 'mutagen_formulas_known') {
+    return getBloodHunterHelper('getMutagenFormulasKnown', context.level)
   }
 
   // Handle expressions with ability modifiers or proficiency bonus
@@ -339,6 +374,52 @@ function getArtificerInfusionsKnown(level: number): number {
   // Import dynamically to avoid circular dependency
   const { getArtificerInfusionsKnown: getFromCharData } = require('./character-data')
   return getFromCharData(level)
+}
+
+/**
+ * Get Blood Hunter Blood Maledict uses by level
+ * Delegates to character-data.ts to avoid circular dependency
+ */
+function getBloodMaledictUses(level: number): number {
+  const { getBloodMaledictUses: getFromCharData } = require('./character-data')
+  return getFromCharData(level)
+}
+
+/**
+ * Get Blood Hunter Blood Curses known by level
+ * Delegates to character-data.ts to avoid circular dependency
+ */
+function getBloodHunterCursesKnown(level: number): number {
+  const { getBloodHunterCursesKnown: getFromCharData } = require('./character-data')
+  return getFromCharData(level)
+}
+
+/**
+ * Generic delegate for Blood Hunter level-based helpers in character-data.ts
+ * (getAetherWalkUses, getHybridTransformationUses, getMutagensCreated,
+ * getMutagenFormulasKnown). Avoids circular dependency.
+ */
+function getBloodHunterHelper(fnName: string, level: number): number {
+  const charData = require('./character-data')
+  return charData[fnName](level)
+}
+
+/**
+ * Get the Blood Hunter Hemocraft die for a level (d4/d6/d8/d10)
+ * Delegates to class-utils.ts to avoid circular dependency
+ */
+function getHemocraftDieForLevel(level: number): string {
+  const { getHemocraftDie } = require('./class-utils')
+  return getHemocraftDie(level)
+}
+
+/**
+ * Hemocraft modifier from raw Int/Wis scores (higher of the two, minimum 1)
+ */
+function getHemocraftModifierFromScores(intelligence: number, wisdom: number): number {
+  const intMod = Math.floor((intelligence - 10) / 2)
+  const wisMod = Math.floor((wisdom - 10) / 2)
+  return Math.max(1, intMod, wisMod)
 }
 
 /**
@@ -559,6 +640,9 @@ function buildVariableLookup(
     'proficiency_bonus': String(context.proficiencyBonus),
     'proficiency': String(context.proficiencyBonus),
     'level': String(context.level),
+    // Blood Hunter hemocraft tokens (die scales with class level; modifier = higher of Int/Wis, min 1)
+    'hemocraft_die': getHemocraftDieForLevel(context.level),
+    'hemocraft_modifier': String(getHemocraftModifierFromScores(context.intelligence, context.wisdom)),
   }
 
   if (config?.override && typeof config.override === 'object') {

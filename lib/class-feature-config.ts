@@ -276,6 +276,104 @@ function evaluateModifierFormula(formula: string, proficiencyBonus: number): num
 }
 
 /**
+ * Check whether a feature skill applies to the character (subclass gating).
+ * Mirrors the filter in ClassFeatureSkills.tsx.
+ */
+function featureSkillApplies(character: CharacterData, skill: any): boolean {
+  if (!skill.enabledBySubclass) return true
+  const className = skill.className || character.class
+  const selectedSubclass = character.classes?.find(
+    c => c.name.toLowerCase() === String(className).toLowerCase()
+  )?.subclass || (character as any).subclass
+  if (!selectedSubclass) return false
+  return String(selectedSubclass).toLowerCase() === String(skill.enabledBySubclass).toLowerCase()
+}
+
+/**
+ * Evaluate a saving-throw/skill modifier formula against character data.
+ * Supports: hemocraft_modifier, proficiency_bonus, half_proficiency_bonus,
+ * <ability>_modifier, and plain integers.
+ */
+function evaluateFeatureModifierFormula(
+  formula: string,
+  character: CharacterData,
+  proficiencyBonus: number
+): number {
+  if (!formula || typeof formula !== 'string') return 0
+
+  if (formula === 'hemocraft_modifier') {
+    const { getHemocraftModifier } = require('./character-data')
+    return getHemocraftModifier(character)
+  }
+  if (formula === 'proficiency_bonus' || formula === 'proficiency') {
+    return proficiencyBonus
+  }
+  if (formula === 'half_proficiency_bonus') {
+    return Math.floor(proficiencyBonus / 2)
+  }
+
+  const abilityMatch = formula.match(/^(\w+)_modifier$/)
+  if (abilityMatch) {
+    const score = (character as any)[abilityMatch[1]]
+    if (typeof score === 'number') {
+      return Math.floor((score - 10) / 2)
+    }
+  }
+
+  const num = parseInt(formula)
+  return isNaN(num) ? 0 : num
+}
+
+/**
+ * Calculate the total saving-throw bonus granted by class features
+ * (feature_skill_type 'skill_modifier' with modifierType 'saving_throw'),
+ * e.g. Blood Hunter Dark Augmentation (Str/Dex/Con saves + hemocraft modifier).
+ * Reads the classFeatureSkills hydrated onto the character by loadCharacter.
+ */
+export function calculateSavingThrowFeatureBonus(
+  character: CharacterData,
+  ability: string,
+  proficiencyBonus?: number
+): number {
+  const skills = character.classFeatureSkills || []
+  if (skills.length === 0) return 0
+
+  const { calculateProficiencyBonus } = require('./character-data')
+  const profBonus = proficiencyBonus ?? character.proficiencyBonus ?? calculateProficiencyBonus(character.level || 1)
+
+  let totalBonus = 0
+  for (const skill of skills) {
+    if (skill.featureType !== 'skill_modifier') continue
+    const config = skill.config as any
+    if (!config || config.modifierType !== 'saving_throw') continue
+    if (!featureSkillApplies(character, skill)) continue
+
+    const targets: string[] = config.targetSkills || []
+    if (targets.length > 0 && !targets.map(t => t.toLowerCase()).includes(ability.toLowerCase())) continue
+
+    totalBonus += evaluateFeatureModifierFormula(config.modifierFormula, character, profBonus)
+  }
+
+  return totalBonus
+}
+
+/**
+ * Calculate the total walking-speed bonus granted by class features.
+ * Any feature whose config carries a numeric `speedBonus` contributes,
+ * e.g. Blood Hunter Dark Augmentation (+5 ft).
+ */
+export function getSpeedFeatureBonus(character: CharacterData): number {
+  let totalBonus = 0
+  for (const skill of character.classFeatureSkills || []) {
+    const config = skill.config as any
+    if (typeof config?.speedBonus !== 'number') continue
+    if (!featureSkillApplies(character, skill)) continue
+    totalBonus += config.speedBonus
+  }
+  return totalBonus
+}
+
+/**
  * Get all active skill modifier features for a character
  */
 export function getActiveSkillModifierFeatures(character: CharacterData): Array<{

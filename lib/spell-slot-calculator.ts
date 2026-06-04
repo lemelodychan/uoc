@@ -135,8 +135,9 @@ export const getMulticlassCantripsKnownFromClasses = async (character: any): Pro
   
   for (const charClass of spellcastingClasses) {
     try {
-      // Fetch base class data (no subclass) for spell slots matrix
-      const classData = await fetchClassData(charClass.name, undefined)
+      // Fetch base class data (no subclass) for spell slots matrix; fall back to the
+      // subclass row for subclass-granted spellcasting (e.g. BH Order of the Profane Soul)
+      const classData = await fetchClassDataWithSubclassFallback(charClass.name, charClass.subclass)
       if (classData) {
         // Only include cantrips from classes that show spells known
         if (classData.show_spells_known) {
@@ -171,8 +172,9 @@ export const getMulticlassSpellsKnownFromClasses = async (character: any): Promi
   
   for (const charClass of spellcastingClasses) {
     try {
-      // Fetch base class data (no subclass) for spell slots matrix
-      const classData = await fetchClassData(charClass.name, undefined)
+      // Fetch base class data (no subclass) for spell slots matrix; fall back to the
+      // subclass row for subclass-granted spellcasting (e.g. BH Order of the Profane Soul)
+      const classData = await fetchClassDataWithSubclassFallback(charClass.name, charClass.subclass)
       if (classData) {
         // Only include spells from classes that show spells known
         if (classData.show_spells_known) {
@@ -199,7 +201,7 @@ export const hasAnyClassShowSpellsKnown = async (character: any): Promise<boolea
   // For single-class characters, check the specific class
   if (!character.classes || character.classes.length === 0) {
     try {
-      const classData = await fetchClassData(character.class, undefined)
+      const classData = await fetchClassDataWithSubclassFallback(character.class, character.subclass)
       return classData?.show_spells_known || false
     } catch (error) {
       console.error(`Error loading class data for ${character.class}:`, error)
@@ -209,11 +211,12 @@ export const hasAnyClassShowSpellsKnown = async (character: any): Promise<boolea
 
   const { getSpellcastingClasses } = require('./character-data')
   const spellcastingClasses = getSpellcastingClasses(character.classes)
-  
+
   for (const charClass of spellcastingClasses) {
     try {
-      // Fetch base class data (no subclass) for spell slots matrix
-      const classData = await fetchClassData(charClass.name, undefined)
+      // Fetch base class data (no subclass) for spell slots matrix; fall back to the
+      // subclass row for subclass-granted spellcasting (e.g. BH Order of the Profane Soul)
+      const classData = await fetchClassDataWithSubclassFallback(charClass.name, charClass.subclass)
       if (classData && classData.show_spells_known) {
         return true
       }
@@ -221,8 +224,25 @@ export const hasAnyClassShowSpellsKnown = async (character: any): Promise<boolea
       console.error(`Error loading class data for ${charClass.name}:`, error)
     }
   }
-  
+
   return false
+}
+
+// Fetch base class data, falling back to the subclass row when the base class
+// isn't a known-spells caster but the subclass grants spellcasting
+// (e.g. Blood Hunter — Order of the Profane Soul).
+const fetchClassDataWithSubclassFallback = async (
+  className: string,
+  subclass?: string,
+): Promise<ClassSpellData | null> => {
+  let classData = await fetchClassData(className, undefined)
+  if ((!classData || !classData.show_spells_known) && subclass) {
+    const subclassData = await fetchClassData(className, subclass)
+    if (subclassData?.show_spells_known) {
+      classData = subclassData
+    }
+  }
+  return classData
 }
 
 export const fetchClassDataById = async (classId: string): Promise<ClassSpellData | null> => {
