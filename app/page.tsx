@@ -712,6 +712,11 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
   const loadActiveCharacterIfNeeded = async () => {
     const charId = initialCharacterId
     if (!charId) return
+    // This warm-cache path skips loadFromDatabaseFirst, which is normally where
+    // dbConnected gets set. Without setting it here, dbConnected stays null and
+    // debouncedAutoSave silently no-ops on every edit (and the realtime
+    // subscription never starts). Fire in parallel; don't block character load.
+    testConnection().then(({ success }) => setDbConnected(success))
     const cachedChar = pageCache.getAllCharacters()?.find(c => c.id === charId)
     const hasFullData = !!(cachedChar?.skills && cachedChar.skills.length > 0)
     if (pageCache.isCharacterFullyLoaded(charId) && hasFullData) return
