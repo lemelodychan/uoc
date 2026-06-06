@@ -2583,13 +2583,23 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
     if (success) {
       const remaining = characters.filter(c => c.id !== activeCharacterId)
       setCharacters(remaining)
-      const nextId: string = remaining.length > 0 ? remaining[0].id : ""
-      setActiveCharacterId(nextId)
-      saveActiveCharacterToLocalStorage(nextId)
+      pageCache.setAllCharacters(remaining)
+      if (activeCharacter.campaignId) {
+        pageCache.invalidateCampaignPage(activeCharacter.campaignId)
+      }
+      setActiveCharacterId("")
+      saveActiveCharacterToLocalStorage("")
       toast({
         title: "Character deleted",
         description: `${activeCharacter.name} has been permanently deleted.`,
       })
+      // Redirect to the deleted character's home campaign page
+      const homeCampaignSlug = characterCampaign?.slug || currentCampaign?.slug
+      if (homeCampaignSlug) {
+        router.push(ROUTES.campaign(homeCampaignSlug))
+      } else {
+        setCurrentView('campaign')
+      }
     } else {
       toast({
         title: "Delete failed",
