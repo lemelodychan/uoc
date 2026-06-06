@@ -2146,6 +2146,44 @@ export const loadCharactersProgressive = async (
 
 export const deleteCharacter = async (characterId: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error("Authentication error in deleteCharacter:", authError?.message || "No authenticated user")
+      return { success: false, error: authError?.message || "Not authenticated" }
+    }
+
+    // Verify user has permission to delete this character (owner or superadmin)
+    const { data: existingCharacter, error: fetchError } = await supabase
+      .from("characters")
+      .select("user_id")
+      .eq("id", characterId)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error("Error fetching character for permission check:", fetchError)
+      return { success: false, error: fetchError.message }
+    }
+
+    if (!existingCharacter) {
+      return { success: false, error: "Character not found" }
+    }
+
+    const isOwner = existingCharacter.user_id === user.id
+
+    if (!isOwner) {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("permission_level")
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      const isSuperadmin = profile?.permission_level === 'superadmin'
+
+      if (!isSuperadmin) {
+        return { success: false, error: "You don't have permission to delete this character" }
+      }
+    }
+
     const { error } = await supabase.from("characters").delete().eq("id", characterId)
 
     if (error) {

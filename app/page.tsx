@@ -2822,7 +2822,7 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                    {isUserSuperadmin && (
+                    {(isUserSuperadmin || (!!currentUser && activeCharacter.userId === currentUser.id)) && (
                       <Button
                         variant="outline"
                         size="sm"
