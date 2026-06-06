@@ -318,8 +318,11 @@ export function CampaignPageClient({ campaign }: CampaignPageClientProps) {
               onBackToCharacters={() => router.push(ROUTES.home)}
               onEditCampaign={() => setEditCampaignModalOpen(true)}
               onCreateCharacter={() => setCharacterCreationModalOpen(true)}
+              currentUserId={user?.id}
               onStartLongRest={() => setLongRestModalOpen(true)}
               onToggleLevelUpMode={handleToggleLevelUpMode}
+              levelUpModeEnabled={currentCampaign.levelUpModeEnabled || false}
+              isReadOnly={!user}
               onUpdateCampaign={handleUpdateCampaign}
               onCreateNote={handleCreateNote}
               onUpdateNote={handleUpdateNote}

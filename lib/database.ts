@@ -4272,6 +4272,13 @@ export const getCampaignNotes = async (campaignId: string): Promise<{ notes?: Ca
 
 export const createCampaignNote = async (note: Omit<CampaignNote, 'id' | 'created_at' | 'updated_at'>): Promise<{ note?: CampaignNote; error?: string }> => {
   try {
+    if (!note.campaign_id) {
+      return { error: "Missing campaign ID" }
+    }
+    if (!note.author_id) {
+      return { error: "You must be signed in to create a note" }
+    }
+
     const { data, error } = await supabase
       .from("campaign_notes")
       .insert([note])
