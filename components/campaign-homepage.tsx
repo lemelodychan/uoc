@@ -359,6 +359,8 @@ export function CampaignHomepage({
   const handleDeleteNote = async (noteId: string) => {
     if (confirm("Are you sure you want to delete this note?")) {
       await onDeleteNote?.(noteId)
+      // Refresh notes so the deleted note disappears immediately
+      await refreshNotes()
     }
   }
 

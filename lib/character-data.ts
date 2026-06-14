@@ -1,5 +1,6 @@
 export interface CharacterClassData {
   spellcasting_ability?: string | null
+  show_spells_known?: boolean
   is_prepared_caster?: boolean
   caster_type?: 'full' | 'half' | 'third' | 'pact' | null
   slots_replenish_on?: 'short_rest' | 'long_rest'

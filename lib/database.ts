@@ -1035,6 +1035,11 @@ export const patchCharacter = async (
       return { success: false, error: authError?.message || "Not authenticated" }
     }
 
+    const permission = await canModifyCharacter(characterId, user.id)
+    if (!permission.allowed) {
+      return { success: false, error: permission.error || "Permission denied" }
+    }
+
     const payload: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
@@ -1273,6 +1278,7 @@ export const loadCharacter = async (characterId: string): Promise<{ character?: 
         if (loadedClassData) {
           charClass.classData = {
             spellcasting_ability: loadedClassData.spellcasting_ability || null,
+            show_spells_known: loadedClassData.show_spells_known ?? false,
             is_prepared_caster: loadedClassData.is_prepared_caster || false,
             caster_type: loadedClassData.caster_type || null,
             slots_replenish_on: loadedClassData.slots_replenish_on || 'long_rest',
@@ -2723,6 +2729,72 @@ const hasCatalogEditPermission = async (userId: string): Promise<boolean> => {
   return profile?.permission_level === 'admin' || profile?.permission_level === 'superadmin'
 }
 
+// Returns the authenticated user, or null when not signed in.
+const getAuthUser = async () => {
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
+
+// Returns true when the given user has superadmin permission in user_profiles.
+const isSuperadminUser = async (userId: string): Promise<boolean> => {
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("permission_level")
+    .eq("user_id", userId)
+    .maybeSingle()
+  return profile?.permission_level === 'superadmin'
+}
+
+// True when the user is the campaign's DM, or has admin/superadmin permission.
+const canManageCampaign = async (campaignId: string, userId: string): Promise<boolean> => {
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .select("dungeon_master_id")
+    .eq("id", campaignId)
+    .maybeSingle()
+  if (campaign?.dungeon_master_id === userId) return true
+  return hasCatalogEditPermission(userId)
+}
+
+// True when the user owns the character, is a superadmin, or is DM of the character's campaign.
+// Mirrors the permission logic in saveCharacter.
+const canModifyCharacter = async (characterId: string, userId: string): Promise<{ allowed: boolean; error?: string }> => {
+  const { data: character, error } = await supabase
+    .from("characters")
+    .select("user_id, campaign_id")
+    .eq("id", characterId)
+    .maybeSingle()
+  if (error) return { allowed: false, error: error.message }
+  if (!character) return { allowed: false, error: "Character not found" }
+  if (character.user_id === userId) return { allowed: true }
+  if (await isSuperadminUser(userId)) return { allowed: true }
+  if (character.campaign_id) {
+    const { data: campaign } = await supabase
+      .from("campaigns")
+      .select("dungeon_master_id")
+      .eq("id", character.campaign_id)
+      .maybeSingle()
+    if (campaign?.dungeon_master_id === userId) return { allowed: true }
+  }
+  return { allowed: false, error: "You don't have permission to modify this character" }
+}
+
+// True when the user can edit the given class: owner of a custom class, or admin/superadmin.
+// Mirrors the permission logic in upsertClassFeature.
+// (Distinct from the exported canEditClass, which is a UI-facing check for the current user.)
+const canEditClassRow = async (classId: string, userId: string): Promise<{ allowed: boolean; error?: string }> => {
+  const { data: classData, error } = await supabase
+    .from('classes')
+    .select('created_by, is_custom')
+    .eq('id', classId)
+    .maybeSingle()
+  if (error) return { allowed: false, error: error.message }
+  if (!classData) return { allowed: false, error: "Class not found" }
+  if (classData.is_custom && classData.created_by === userId) return { allowed: true }
+  if (await hasCatalogEditPermission(userId)) return { allowed: true }
+  return { allowed: false, error: "You don't have permission to edit this class" }
+}
+
 export const upsertRace = async (race: Partial<RaceData> & { id?: string }): Promise<{ success: boolean; id?: string; error?: string }> => {
   try {
     const { data: { user } } = await supabase.auth.getUser()
@@ -3300,6 +3372,25 @@ export const upsertClass = async (cls: Partial<ClassData> & { id?: string }): Pr
       if (!arr) return null
       return arr.map((s) => s.length ? s[0].toUpperCase() + s.slice(1).toLowerCase() : s)
     }
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+    // Updating an existing class requires class-edit permission (custom-class owner or admin).
+    // Creating official (non-custom) class data requires catalog edit permission;
+    // any signed-in user may create custom classes/subclasses.
+    const existingId = cls.id && cls.id.length > 0
+      ? (await supabase.from("classes").select("id").eq("id", cls.id).maybeSingle()).data?.id
+      : undefined
+    if (existingId) {
+      const permission = await canEditClassRow(existingId, user.id)
+      if (!permission.allowed) {
+        return { success: false, error: permission.error || "Permission denied" }
+      }
+    } else if ((cls as any).is_custom === false && !(await hasCatalogEditPermission(user.id))) {
+      return { success: false, error: "Only admins can create official classes" }
+    }
+
     const id = cls.id && cls.id.length > 0 ? cls.id : globalThis.crypto.randomUUID()
     // Start with minimal payload and only include fields that are likely to exist in the database
     const payload: any = {
@@ -3495,6 +3586,15 @@ export const loadBaseClassByName = async (name: string): Promise<{ klass?: any; 
 
 export const deleteClass = async (classId: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+    const permission = await canEditClassRow(classId, user.id)
+    if (!permission.allowed) {
+      return { success: false, error: permission.error || "Permission denied" }
+    }
+
     // Delete features for this class id
     const { error: featError } = await supabase.from("class_features").delete().eq("class_id", classId)
     if (featError) {
@@ -3838,7 +3938,17 @@ export const deleteClassFeature = async (featureId: string): Promise<{ success: 
       console.error("Error fetching class feature for deletion:", fetchError)
       return { success: false, error: fetchError.message }
     }
-    
+
+    // Same permission rules as upsertClassFeature: custom-class owner or admin
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+    const permission = await canEditClassRow(feature.class_id, user.id)
+    if (!permission.allowed) {
+      return { success: false, error: permission.error || "Permission denied" }
+    }
+
     const { error } = await supabase.from("class_features").delete().eq("id", featureId)
     if (error) {
       console.error("Error deleting class feature:", error)
@@ -3860,6 +3970,11 @@ export const deleteClassFeature = async (featureId: string): Promise<{ success: 
 // Campaign management functions
 export const createCampaign = async (campaign: Campaign): Promise<{ success: boolean; error?: string }> => {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "You must be signed in to create a campaign" }
+    }
+
     // If setting this campaign as default, unset all other campaigns as default
     if (campaign.isDefault) {
       const { error: unsetError } = await supabase
@@ -4090,6 +4205,14 @@ export const loadCampaignSlugById = async (campaignId: string, client?: typeof s
 
 export const updateCampaign = async (campaign: Campaign): Promise<{ success: boolean; error?: string }> => {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "You must be signed in to update a campaign" }
+    }
+    if (!(await canManageCampaign(campaign.id, user.id))) {
+      return { success: false, error: "Only the campaign's DM or an admin can update this campaign" }
+    }
+
     // If setting this campaign as default, unset all other campaigns as default
     if (campaign.isDefault) {
       const { error: unsetError } = await supabase
@@ -4152,6 +4275,14 @@ export const updateCampaign = async (campaign: Campaign): Promise<{ success: boo
 
 export const setActiveCampaign = async (campaignId: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "You must be signed in to set the active campaign" }
+    }
+    if (!(await canManageCampaign(campaignId, user.id))) {
+      return { success: false, error: "Only the campaign's DM or an admin can set the active campaign" }
+    }
+
     // First, deactivate all campaigns
     const { error: deactivateError } = await supabase
       .from("campaigns")
@@ -4182,6 +4313,14 @@ export const setActiveCampaign = async (campaignId: string): Promise<{ success: 
 
 export const deleteCampaign = async (campaignId: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "You must be signed in to delete a campaign" }
+    }
+    if (!(await canManageCampaign(campaignId, user.id))) {
+      return { success: false, error: "Only the campaign's DM or an admin can delete this campaign" }
+    }
+
     // First, remove campaign association from all characters
     const { error: updateError } = await supabase
       .from("characters")
@@ -4213,6 +4352,16 @@ export const deleteCampaign = async (campaignId: string): Promise<{ success: boo
 
 export const assignCharacterToCampaign = async (characterId: string, campaignId: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+    // Owner/superadmin/current-campaign DM — or the DM/admin of the target campaign
+    const permission = await canModifyCharacter(characterId, user.id)
+    if (!permission.allowed && !(await canManageCampaign(campaignId, user.id))) {
+      return { success: false, error: permission.error || "Permission denied" }
+    }
+
     const { error } = await supabase
       .from("characters")
       .update({ campaign_id: campaignId })
@@ -4232,6 +4381,15 @@ export const assignCharacterToCampaign = async (characterId: string, campaignId:
 
 export const removeCharacterFromCampaign = async (characterId: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+    const permission = await canModifyCharacter(characterId, user.id)
+    if (!permission.allowed) {
+      return { success: false, error: permission.error || "Permission denied" }
+    }
+
     const { error } = await supabase
       .from("characters")
       .update({ campaign_id: null })
@@ -4275,8 +4433,12 @@ export const createCampaignNote = async (note: Omit<CampaignNote, 'id' | 'create
     if (!note.campaign_id) {
       return { error: "Missing campaign ID" }
     }
-    if (!note.author_id) {
+    const user = await getAuthUser()
+    if (!user) {
       return { error: "You must be signed in to create a note" }
+    }
+    if (note.author_id !== user.id) {
+      return { error: "Note author must match the signed-in user" }
     }
 
     const { data, error } = await supabase
@@ -4328,6 +4490,15 @@ export const updateCampaignNote = async (id: string, updates: Partial<Pick<Campa
     if (!existingNote) {
       console.error(`Note with id ${id} not found in database`)
       return { error: `Note not found (ID: ${id})` }
+    }
+
+    // Only the note's author, the campaign's DM, or an admin can update it
+    const user = await getAuthUser()
+    if (!user) {
+      return { error: "You must be signed in to update a note" }
+    }
+    if (existingNote.author_id !== user.id && !(await canManageCampaign(existingNote.campaign_id, user.id))) {
+      return { error: "You don't have permission to update this note" }
     }
 
     const { error: updateError } = await supabase
@@ -4396,6 +4567,29 @@ export const updateCampaignNote = async (id: string, updates: Partial<Pick<Campa
 
 export const deleteCampaignNote = async (id: string, campaignId?: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    // Only the note's author, the campaign's DM, or an admin can delete it
+    const { data: existingNote, error: fetchError } = await supabase
+      .from("campaign_notes")
+      .select("author_id, campaign_id")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error("Error fetching note for permission check:", fetchError)
+      return { success: false, error: fetchError.message }
+    }
+    if (!existingNote) {
+      return { success: false, error: "Note not found" }
+    }
+
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "You must be signed in to delete a note" }
+    }
+    if (existingNote.author_id !== user.id && !(await canManageCampaign(existingNote.campaign_id, user.id))) {
+      return { success: false, error: "You don't have permission to delete this note" }
+    }
+
     const { error } = await supabase
       .from("campaign_notes")
       .delete()
@@ -4446,6 +4640,17 @@ export const getCampaignResources = async (campaignId: string): Promise<{ resour
 
 export const createCampaignResource = async (resource: Omit<CampaignResource, 'id' | 'created_at' | 'updated_at'>): Promise<{ resource?: CampaignResource; error?: string }> => {
   try {
+    if (!resource.campaign_id) {
+      return { error: "Missing campaign ID" }
+    }
+    const user = await getAuthUser()
+    if (!user) {
+      return { error: "You must be signed in to create a resource" }
+    }
+    if (resource.author_id !== user.id) {
+      return { error: "Resource author must match the signed-in user" }
+    }
+
     const { data, error } = await supabase
       .from("campaign_resources")
       .insert([resource])
@@ -4486,6 +4691,15 @@ export const updateCampaignResource = async (id: string, updates: Partial<Pick<C
     if (!existingResource) {
       console.error(`Resource with id ${id} not found in database`)
       return { error: `Resource not found (ID: ${id})` }
+    }
+
+    // Only the resource's author, the campaign's DM, or an admin can update it
+    const user = await getAuthUser()
+    if (!user) {
+      return { error: "You must be signed in to update a resource" }
+    }
+    if (existingResource.author_id !== user.id && !(await canManageCampaign(existingResource.campaign_id, user.id))) {
+      return { error: "You don't have permission to update this resource" }
     }
 
     const { error: updateError } = await supabase
@@ -4542,6 +4756,29 @@ export const updateCampaignResource = async (id: string, updates: Partial<Pick<C
 
 export const deleteCampaignResource = async (id: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    // Only the resource's author, the campaign's DM, or an admin can delete it
+    const { data: existingResource, error: fetchError } = await supabase
+      .from("campaign_resources")
+      .select("author_id, campaign_id")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error("Error fetching resource for permission check:", fetchError)
+      return { success: false, error: fetchError.message }
+    }
+    if (!existingResource) {
+      return { success: false, error: "Resource not found" }
+    }
+
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "You must be signed in to delete a resource" }
+    }
+    if (existingResource.author_id !== user.id && !(await canManageCampaign(existingResource.campaign_id, user.id))) {
+      return { success: false, error: "You don't have permission to delete this resource" }
+    }
+
     const { error } = await supabase
       .from("campaign_resources")
       .delete()
@@ -4582,6 +4819,14 @@ export const getCampaignLinks = async (campaignId: string): Promise<{ links?: Ca
 
 export const createCampaignLink = async (link: Omit<CampaignLink, 'id' | 'created_at' | 'updated_at'>): Promise<{ link?: CampaignLink; error?: string }> => {
   try {
+    if (!link.campaign_id) {
+      return { error: "Missing campaign ID" }
+    }
+    const user = await getAuthUser()
+    if (!user) {
+      return { error: "You must be signed in to add a link" }
+    }
+
     const { data, error } = await supabase
       .from("campaign_links")
       .insert([link])
@@ -4602,6 +4847,12 @@ export const createCampaignLink = async (link: Omit<CampaignLink, 'id' | 'create
 
 export const deleteCampaignLink = async (id: string): Promise<{ success: boolean; error?: string }> => {
   try {
+    // Links carry no author; require sign-in (any campaign member can manage links)
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "You must be signed in to remove a link" }
+    }
+
     const { error } = await supabase
       .from("campaign_links")
       .delete()
@@ -5128,11 +5379,17 @@ export const createCustomClass = async (classData: Partial<ClassData>): Promise<
   error?: string
 }> => {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+
     const { data, error } = await supabase
       .from('classes')
       .insert([{
         ...classData,
         is_custom: true,
+        created_by: (classData as any).created_by ?? user.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])
@@ -5181,7 +5438,10 @@ export const duplicateClass = async (
 
     // Get current user ID
     const { data: { user } } = await supabase.auth.getUser()
-    const currentUserId = user?.id
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+    const currentUserId = user.id
 
     // Create the new class
     const { data: newClass, error: createError } = await supabase

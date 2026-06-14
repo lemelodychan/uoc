@@ -209,7 +209,7 @@ export function Spellcasting({
 
             // Spells Known: for non-prepared casters that have spells_known data
             const isPrepared = isPreparedCaster(charClass)
-            if (!isPrepared && SPELLS_KNOWN_CLASSES.includes(charClass.name.toLowerCase())) {
+            if (!isPrepared && (classData.show_spells_known || SPELLS_KNOWN_CLASSES.includes(charClass.name.toLowerCase()))) {
               const value = getSpellsKnownFromClass(classData, charClass.level)
               knownList.push({ className: charClass.name, value })
             }

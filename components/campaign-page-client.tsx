@@ -158,11 +158,17 @@ export function CampaignPageClient({ campaign }: CampaignPageClientProps) {
   }
 
   const handleUpdateNote = async (id: string, updates: Partial<Pick<CampaignNote, 'title' | 'content' | 'session_date' | 'members_attending'>>) => {
-    await updateCampaignNote(id, updates)
+    const result = await updateCampaignNote(id, updates)
+    if (!result.note) {
+      toast({ title: "Error", description: result.error || "Failed to update note", variant: "destructive" })
+    }
   }
 
   const handleDeleteNote = async (id: string) => {
-    await deleteCampaignNote(id)
+    const result = await deleteCampaignNote(id, currentCampaign.id)
+    if (!result.success) {
+      toast({ title: "Error", description: result.error || "Failed to delete note", variant: "destructive" })
+    }
   }
 
   const handleCreateResource = async (resource: Omit<CampaignResource, 'id' | 'created_at' | 'updated_at'>) => {
@@ -178,6 +184,8 @@ export function CampaignPageClient({ campaign }: CampaignPageClientProps) {
     const result = await updateCampaignResource(id, updates)
     if (result.resource) {
       setResources(prev => prev.map(r => r.id === id ? result.resource! : r))
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to update resource", variant: "destructive" })
     }
   }
 
@@ -185,6 +193,8 @@ export function CampaignPageClient({ campaign }: CampaignPageClientProps) {
     const result = await deleteCampaignResource(id)
     if (result.success) {
       setResources(prev => prev.filter(r => r.id !== id))
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to delete resource", variant: "destructive" })
     }
   }
 
@@ -192,6 +202,8 @@ export function CampaignPageClient({ campaign }: CampaignPageClientProps) {
     const result = await createCampaignLink(link)
     if (result.link) {
       setLinks(prev => [...prev, result.link!])
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to create link", variant: "destructive" })
     }
   }
 
@@ -199,6 +211,8 @@ export function CampaignPageClient({ campaign }: CampaignPageClientProps) {
     const result = await deleteCampaignLink(id)
     if (result.success) {
       setLinks(prev => prev.filter(l => l.id !== id))
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to delete link", variant: "destructive" })
     }
   }
 

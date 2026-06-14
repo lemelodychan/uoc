@@ -249,7 +249,13 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
       return character.classes.some(charClass => {
         const className = charClass.name.toLowerCase()
         const subclassName = charClass.subclass?.toLowerCase() || ''
-        
+
+        // Data-driven: a class with "Spells Known" checked is a spellcaster
+        // (covers custom classes; standard non-casters do not set this flag)
+        if (charClass.classData?.show_spells_known === true) {
+          return true
+        }
+
         // Check if it's a full spellcasting class
         if (fullSpellcastingClasses.includes(className)) {
           return true
@@ -1043,6 +1049,8 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
       if (!error && updated) {
         setResources(prev => prev.map(r => r.id === id ? updated : r))
         toast({ title: "Success", description: "Resource updated." })
+      } else {
+        toast({ title: "Error", description: error || "Failed to update resource.", variant: "destructive" })
       }
     } catch (error) {
       console.error("Error updating resource:", error)
@@ -1051,10 +1059,12 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
 
   const handleDeleteResource = async (id: string) => {
     try {
-      const { success } = await deleteCampaignResource(id)
+      const { success, error } = await deleteCampaignResource(id)
       if (success) {
         setResources(prev => prev.filter(r => r.id !== id))
         toast({ title: "Success", description: "Resource deleted." })
+      } else {
+        toast({ title: "Error", description: error || "Failed to delete resource.", variant: "destructive" })
       }
     } catch (error) {
       console.error("Error deleting resource:", error)
@@ -1076,10 +1086,12 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
 
   const handleDeleteLink = async (id: string) => {
     try {
-      const { success } = await deleteCampaignLink(id)
+      const { success, error } = await deleteCampaignLink(id)
       if (success) {
         setLinks(prev => prev.filter(l => l.id !== id))
         toast({ title: "Success", description: "Link removed." })
+      } else {
+        toast({ title: "Error", description: error || "Failed to remove link.", variant: "destructive" })
       }
     } catch (error) {
       console.error("Error deleting link:", error)
