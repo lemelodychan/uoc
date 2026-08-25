@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import type { UserProfile } from './user-profiles'
 import { getCurrentUser, getCurrentUserProfile, createUserProfile, syncCurrentUserProfileFromAuth, updateLastLogin } from './database'
 import { createClient } from './supabase'
@@ -41,6 +42,8 @@ function writeCachedProfile(profile: UserProfile | null) {
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
   const [user, setUser] = useState<any | null>(null)
   // Initialize null so server and first client render match. We hydrate from
   // sessionStorage in an effect below — one frame later, still effectively instant.
@@ -165,6 +168,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [loadUserData])
+
+  // New-signup guard: a user who has not yet set a password (needs_password flag
+  // set by the signup flow) must finish on /set-password before using the app.
+  // Existing users never carry this flag, so they are never redirected.
+  useEffect(() => {
+    if (!user) return
+    const needsPassword = user.user_metadata?.needs_password === true
+    if (!needsPassword) return
+    const exempt =
+      pathname === '/set-password' ||
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname.startsWith('/auth')
+    if (!exempt) {
+      router.replace('/set-password')
+    }
+  }, [user, pathname, router])
 
   // Determine if user is superadmin (combine both new and legacy checks)
   const isUserSuperadmin = isSuperadmin(userProfile?.permissionLevel) || isSuperadminLegacy(user?.id)

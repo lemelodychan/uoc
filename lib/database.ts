@@ -288,19 +288,50 @@ export const syncCurrentUserProfileFromAuth = async (): Promise<{ success: boole
     const meta: any = user.user_metadata || {}
     const displayName = meta.display_name || meta.full_name || meta.name || user.email?.split('@')[0] || 'User'
 
-    const { error } = await supabase
+    // IMPORTANT: preserve permission_level for existing profiles. This function
+    // runs on every magic-link login (via app/auth/callback), so a blanket upsert
+    // of permission_level:'viewer' would silently downgrade any editor/admin who
+    // signs in with a magic link. We only set permission_level on first insert;
+    // on update we touch display_name / last_login only. Admin role changes go
+    // through the service-role /api/users/* path.
+    const { data: existing, error: existingError } = await supabase
       .from('user_profiles')
-      .upsert({
-        user_id: user.id,
-        display_name: displayName,
-        permission_level: 'viewer',
-        updated_at: new Date().toISOString(),
-        last_login: new Date().toISOString(),
-      }, { onConflict: 'user_id' })
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
 
-    if (error) {
-      console.error('Error syncing user profile:', error)
-      return { success: false, error: error.message }
+    if (existingError) {
+      console.error('Error checking user profile:', existingError)
+      return { success: false, error: existingError.message }
+    }
+
+    if (existing) {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          display_name: displayName,
+          updated_at: new Date().toISOString(),
+          last_login: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+      if (error) {
+        console.error('Error syncing user profile:', error)
+        return { success: false, error: error.message }
+      }
+    } else {
+      const { error } = await supabase
+        .from('user_profiles')
+        .insert({
+          user_id: user.id,
+          display_name: displayName,
+          permission_level: 'viewer',
+          updated_at: new Date().toISOString(),
+          last_login: new Date().toISOString(),
+        })
+      if (error) {
+        console.error('Error syncing user profile:', error)
+        return { success: false, error: error.message }
+      }
     }
     return { success: true }
   } catch (e) {
@@ -4092,9 +4123,10 @@ export const loadAllCampaigns = async (useServiceRole = false, guestMode = false
       allowGuestCharacters: row.allow_guest_characters || false,
     }))
 
-    // In guest mode, the campaigns table's `characters` column is not maintained —
-    // characters reference campaigns via campaign_id. Fetch counts from characters table.
-    if (guestMode && campaigns.length > 0) {
+    // The campaigns table's `characters` column is not maintained — characters
+    // reference campaigns via campaign_id. Fetch the id lists from the characters
+    // table so counts are accurate (RLS scopes them to what the caller can see).
+    if (campaigns.length > 0) {
       const campaignIds = campaigns.map(c => c.id)
       const { data: charData } = await client
         .from("characters")

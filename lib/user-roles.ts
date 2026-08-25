@@ -92,3 +92,19 @@ export function canEditCharacterInCampaign(
 export function isDungeonMaster(campaignDmId?: string, currentUserId?: string): boolean {
   return campaignDmId === currentUserId
 }
+
+/**
+ * Check if a user can manage (edit / delete / configure) a campaign.
+ * Superadmins and admins can manage any campaign; a DM can manage their own.
+ * Plain editors and viewers who are not the DM cannot.
+ * Mirrors the server-side `canManageCampaign` gate in lib/database.ts.
+ */
+export function canManageCampaign(
+  campaignDmId?: string,
+  currentUserId?: string,
+  permissionLevel?: 'superadmin' | 'admin' | 'editor' | 'viewer'
+): boolean {
+  if (!currentUserId) return false
+  if (permissionLevel === 'superadmin' || permissionLevel === 'admin') return true
+  return !!campaignDmId && campaignDmId === currentUserId
+}

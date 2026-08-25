@@ -1,6 +1,8 @@
 export const ROUTES = {
   home: '/',
   login: '/login',
+  signup: '/signup',
+  setPassword: '/set-password',
   wiki: {
     root: '/wiki',
     classes: '/wiki/classes',

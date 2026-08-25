@@ -59,6 +59,33 @@ export function CampaignCreationModal({
   const { isSuperadmin } = useUser()
   const [testStatus, setTestStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
   const testTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [signupLinkCopied, setSignupLinkCopied] = useState(false)
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Per-campaign signup invite link. Points new players at /signup with this
+  // campaign pre-selected, so after they finish signing up they're guided
+  // straight to it. Only meaningful for an existing (saved) campaign with a slug.
+  const signupLink =
+    editingCampaign?.slug && typeof window !== "undefined"
+      ? `${window.location.origin}/signup?campaign=${editingCampaign.slug}`
+      : ""
+
+  const handleCopySignupLink = async () => {
+    if (!signupLink) return
+    try {
+      await navigator.clipboard.writeText(signupLink)
+      setSignupLinkCopied(true)
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      copyTimeoutRef.current = setTimeout(() => setSignupLinkCopied(false), 2000)
+      toast({ title: "Copied!", description: "Signup link copied to clipboard." })
+    } catch {
+      toast({
+        title: "Couldn't copy",
+        description: "Select the link and copy it manually.",
+        variant: "destructive",
+      })
+    }
+  }
 
   // Update form state when editingCampaign changes
   useEffect(() => {
@@ -261,6 +288,7 @@ export function CampaignCreationModal({
   useEffect(() => {
     return () => {
       if (testTimeoutRef.current) clearTimeout(testTimeoutRef.current)
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
     }
   }, [])
 
@@ -316,6 +344,39 @@ export function CampaignCreationModal({
                 </Select>
               </div>
             </div>
+
+            {/* Signup invite link — only for an existing, saved campaign. */}
+            {signupLink && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="campaign-signup-link">Signup link</Label>
+                <div className="flex flex-row gap-2">
+                  <Input
+                    id="campaign-signup-link"
+                    value={signupLink}
+                    readOnly
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCopySignupLink}
+                    className="shrink-0"
+                  >
+                    <Icon
+                      icon={signupLinkCopied ? "lucide:check" : "lucide:copy"}
+                      className="mr-2 h-4 w-4"
+                    />
+                    {signupLinkCopied ? "Copied" : "Copy"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Share this with new players. After they sign up, they&apos;ll be pointed
+                  straight to this campaign to create their character. Requires new-user
+                  registration to be enabled in Settings → Users.
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="campaign-description">Description</Label>

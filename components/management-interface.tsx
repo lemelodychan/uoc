@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Icon } from "@iconify/react"
 import type { Campaign, CharacterData } from "@/lib/character-data"
 import type { ClassData, SubclassData } from "@/lib/class-utils"
@@ -1142,9 +1143,13 @@ function CampaignManagement({
   onEditCampaign: (campaign: Campaign) => void
   onDeleteCampaign: (campaign: Campaign) => void
 }) {
-  const { userProfile } = useUser()
-  const canEdit = userProfile?.permissionLevel !== 'viewer'
-  
+  const { user, userProfile, isSuperadmin } = useUser()
+  // Only admins/superadmins may create/delete campaigns or manage ones they don't
+  // run; a DM may manage their own. Plain editors get no campaign-management controls.
+  const isAdmin = isSuperadmin || userProfile?.permissionLevel === 'admin'
+  const canManage = (campaign: Campaign) =>
+    isAdmin || (!!campaign.dungeonMasterId && campaign.dungeonMasterId === user?.id)
+
   // Split campaigns into active and inactive groups, prioritizing default campaign
   const { activeCampaigns, inactiveCampaigns } = useMemo(() => {
     const active = campaigns.filter(c => c.isActive).sort((a, b) => {
@@ -1169,7 +1174,7 @@ function CampaignManagement({
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 {campaign.name}
-                {canEdit && (
+                {canManage(campaign) && (
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => onEditCampaign(campaign)}>
                       <Icon icon="lucide:edit" className="w-4 h-4" />
@@ -1253,7 +1258,7 @@ function CampaignManagement({
     <div className="flex flex-col gap-6">
       <div className="flex flex-row gap-4 items-start justify-between">
         <h2 className="text-3xl font-display font-bold">Campaigns</h2>
-        {canEdit && (
+        {isAdmin && (
           <Button onClick={onCreateCampaign}>
             <Icon icon="lucide:plus" className="w-4 h-4" />
             Create Campaign
@@ -2309,6 +2314,41 @@ function UserManagement({
   const [editDisplayName, setEditDisplayName] = useState<string>("")
   const [editPermissionLevel, setEditPermissionLevel] = useState<PermissionLevel>("editor")
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [registrationEnabled, setRegistrationEnabled] = useState<boolean | null>(null)
+  const [savingRegistration, setSavingRegistration] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/settings/registration')
+      .then(res => res.json())
+      .then(body => { if (!cancelled) setRegistrationEnabled(body?.enabled === true) })
+      .catch(() => { if (!cancelled) setRegistrationEnabled(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const handleToggleRegistration = async (next: boolean) => {
+    if (!isSuperadmin) return
+    setSavingRegistration(true)
+    const prev = registrationEnabled
+    setRegistrationEnabled(next) // optimistic
+    try {
+      const res = await fetch('/api/settings/registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || 'Failed to update setting')
+      }
+      toast({ title: 'Saved', description: `New user registration ${next ? 'enabled' : 'disabled'}.` })
+    } catch (e: any) {
+      setRegistrationEnabled(prev ?? false)
+      toast({ title: 'Error', description: e?.message || 'Failed to update setting', variant: 'destructive' })
+    } finally {
+      setSavingRegistration(false)
+    }
+  }
 
   useEffect(() => {
     const next: Record<string, { displayName?: string; permissionLevel: PermissionLevel }> = {}
@@ -2393,6 +2433,26 @@ function UserManagement({
     <div className="flex flex-col gap-6">
       <div className="flex flex-row gap-4 items-start justify-between">
         <h2 className="text-3xl font-display font-bold">User Management</h2>
+      </div>
+
+      <div className="flex flex-row items-center justify-between gap-4 border rounded-lg bg-card px-4 py-3">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium">New user registration</span>
+          <span className="text-xs text-muted-foreground">
+            {isSuperadmin
+              ? 'When on, new visitors can create an account at /signup and set a password.'
+              : 'Only superadmins can change this setting.'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {savingRegistration && <Icon icon="lucide:loader-2" className="w-4 h-4 animate-spin text-muted-foreground" />}
+          <Switch
+            checked={registrationEnabled === true}
+            onCheckedChange={handleToggleRegistration}
+            disabled={!isSuperadmin || registrationEnabled === null || savingRegistration}
+            aria-label="Toggle new user registration"
+          />
+        </div>
       </div>
 
       <div className="overflow-x-aut flex flex-col gap-1">

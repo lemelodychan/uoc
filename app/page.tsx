@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "react"
 import dynamic from "next/dynamic"
 import { useSearchParams, useRouter } from "next/navigation"
 import { ROUTES } from "@/config/routes"
@@ -395,8 +395,8 @@ export function CharacterSheetContent({ initialCharacterId }: { initialCharacter
     currentUser?.id,
     currentCampaign?.dungeonMasterId,
     selectedCampaignId,
-    currentUserProfile?.permissionLevel
-  ) : false)
+    currentUserProfile?.permissionLevel as 'superadmin' | 'editor' | 'viewer'
+  ) : false) as boolean
 
   
   // Reset superadmin override when switching to a different character
@@ -3816,11 +3816,41 @@ function HomePageContent() {
   const [campaigns, setCampaigns] = useState<Campaign[]>(cached ?? [])
   const [dataLoading, setDataLoading] = useState(!cached)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // First-time signups arrive with ?welcome=1 and should see the full campaigns
+  // list to choose from, rather than being auto-redirected to the active campaign.
+  const showCampaignsList = searchParams.get("welcome") === "1"
+  // Show a one-time onboarding modal for those first-time signups (dismissable).
+  const [welcomeOpen, setWelcomeOpen] = useState(showCampaignsList)
+  // If they signed up via a DM's invite link, we carried the target campaign slug
+  // on their auth metadata — resolve it to point them straight there.
+  const signupCampaignSlug = (user?.user_metadata as any)?.signup_campaign as string | undefined
+  const targetCampaign = signupCampaignSlug
+    ? campaigns.find((c) => c.slug === signupCampaignSlug)
+    : undefined
+
+  // Order campaigns identically to the AppHeader mega menu: within each group the
+  // default campaign leads, then oldest-created. Active and inactive are split so
+  // logged-in users get big active cards + a compact inactive section below.
+  const { activeCampaigns, inactiveCampaigns, orderedCampaigns } = useMemo(() => {
+    const byGroup = (a: Campaign, b: Campaign) => {
+      if (a.isDefault && !b.isDefault) return -1
+      if (!a.isDefault && b.isDefault) return 1
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    }
+    const active = campaigns.filter((c) => c.isActive).sort(byGroup)
+    const inactive = campaigns.filter((c) => !c.isActive).sort(byGroup)
+    return { activeCampaigns: active, inactiveCampaigns: inactive, orderedCampaigns: [...active, ...inactive] }
+  }, [campaigns])
 
   useEffect(() => {
-    if (cached) return // Already loaded this session — use cache
-
-    loadAllCampaigns(false, true).then(({ campaigns: data }) => {
+    if (userLoading) return // Wait until we know guest vs. logged-in
+    if (cached) {
+      setDataLoading(false) // Already loaded this session — use cache
+      return
+    }
+    // Guests see public campaigns only; logged-in users see all (incl. non-public).
+    loadAllCampaigns(false, !user).then(({ campaigns: data }) => {
       if (data) {
         setCampaigns(data)
         pageCache.setCampaigns(data)
@@ -3828,17 +3858,19 @@ function HomePageContent() {
       setDataLoading(false)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [userLoading])
 
-  // Redirect authenticated users to their active campaign
+  // Redirect authenticated users to their active campaign (unless they just
+  // signed up — those land on the campaigns list to choose where to go).
   useEffect(() => {
+    if (showCampaignsList) return
     if (!userLoading && !dataLoading && user && campaigns.length > 0) {
       const activeCampaign = campaigns.find(c => c.isActive)
       if (activeCampaign?.slug) {
         router.push(ROUTES.campaign(activeCampaign.slug))
       }
     }
-  }, [userLoading, dataLoading, user, campaigns, router])
+  }, [showCampaignsList, userLoading, dataLoading, user, campaigns, router])
 
   if (userLoading || dataLoading) {
     return (
@@ -3854,7 +3886,7 @@ function HomePageContent() {
         <AppHeader campaigns={campaigns} />
         <main className="flex-1 overflow-auto">
           <GuestHomepage
-            campaigns={campaigns}
+            campaigns={orderedCampaigns}
             onSelectCampaign={(campaignId) => {
               const camp = campaigns.find(c => c.id === campaignId)
               if (camp?.slug) router.push(ROUTES.campaign(camp.slug))
@@ -3868,7 +3900,7 @@ function HomePageContent() {
 
   // Authenticated user — find active campaign to redirect, or show campaigns list
   const activeCampaign = campaigns.find(c => c.isActive)
-  if (activeCampaign?.slug) {
+  if (activeCampaign?.slug && !showCampaignsList) {
     // Redirect in progress (useEffect handles it), show spinner
     return (
       <div className="h-screen bg-background flex items-center justify-center">
@@ -3880,29 +3912,76 @@ function HomePageContent() {
   return (
     <div className="h-screen bg-background flex flex-col">
       <AppHeader campaigns={campaigns} />
-      <main className="flex-1 overflow-auto p-6">
-        {campaigns.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-4 text-muted-foreground">
-            <Icon icon="iconoir:hexagon-dice" className="h-16 w-16 opacity-20" />
-            <p>No campaigns yet. Go to Settings to create one.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {campaigns.map(camp => (
-              <button
-                key={camp.id}
-                onClick={() => camp.slug && router.push(ROUTES.campaign(camp.slug))}
-                className="p-4 border rounded-lg text-left hover:border-primary transition-colors"
-              >
-                <h3 className="font-semibold">{camp.name}</h3>
-                {camp.description && (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{camp.description}</p>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+      <main className="flex-1 overflow-auto">
+        {/* Same campaign-card UI as guests see, but logged-in users get all
+            campaigns (incl. non-public) and no sign-in prompt. */}
+        <GuestHomepage
+          campaigns={activeCampaigns}
+          secondaryCampaigns={inactiveCampaigns}
+          secondaryHeading="Inactive Campaigns"
+          onSelectCampaign={(campaignId) => {
+            const camp = campaigns.find(c => c.id === campaignId)
+            if (camp?.slug) router.push(ROUTES.campaign(camp.slug))
+          }}
+          onViewWiki={() => router.push(ROUTES.wiki.classes)}
+          heading="Active Campaigns"
+          emptyMessage="No campaigns yet. Go to Settings to create one."
+          showSignInCta={false}
+        />
       </main>
+
+      {/* First-time signup onboarding — skippable. */}
+      <Dialog open={welcomeOpen} onOpenChange={setWelcomeOpen}>
+        <DialogContent className="sm:max-w-md bg-card">
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full">
+              <Icon icon="lucide:party-popper" className="h-6 w-6 text-primary" />
+            </div>
+            <DialogTitle className="text-center">Welcome aboard!</DialogTitle>
+            <DialogDescription className="text-center">
+              Your account is all set. Here's how to get started.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ol className="space-y-3 py-2">
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs bg-primary/10 font-semibold text-primary">1</span>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Find your campaign.</span>{" "}
+                {targetCampaign ? (
+                  <>You've been invited to <span className="font-medium text-foreground">{targetCampaign.name}</span>.</>
+                ) : (
+                  <>Pick the one your Dungeon Master invited you to from the list below.</>
+                )}
+              </p>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs bg-primary/10 font-semibold text-primary">2</span>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Create your character sheet.</span>{" "}
+                Inside the campaign, add a new character to start playing.
+              </p>
+            </li>
+          </ol>
+
+          <DialogFooter className="gap-2 sm:justify-center">
+            <Button variant="outline" onClick={() => setWelcomeOpen(false)}>
+              {targetCampaign ? "Browse all campaigns" : "Skip for now"}
+            </Button>
+            {targetCampaign?.slug ? (
+              <Button onClick={() => router.push(ROUTES.campaign(targetCampaign.slug!))}>
+                <Icon icon="lucide:arrow-right" className="h-4 w-4" />
+                Go to {targetCampaign.name}
+              </Button>
+            ) : (
+              <Button onClick={() => setWelcomeOpen(false)}>
+                <Icon icon="lucide:compass" className="h-4 w-4" />
+                Browse campaigns
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

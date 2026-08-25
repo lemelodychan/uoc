@@ -2,8 +2,11 @@
 
 import { useState, Suspense, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 import { updateLastLogin } from "@/lib/database"
+import { getRegistrationEnabled } from "@/lib/app-settings"
+import { ROUTES } from "@/config/routes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,7 +23,8 @@ function LoginForm() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(true) // Start with true to show loading immediately
   const [isInitialCheck, setIsInitialCheck] = useState(true) // Track if we've done initial auth check
-  
+  const [registrationEnabled, setRegistrationEnabled] = useState(false)
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -98,6 +102,7 @@ function LoginForm() {
     }
     
     checkAuthState()
+    getRegistrationEnabled().then(setRegistrationEnabled).catch(() => {})
 
     return () => {
       if (subscription) {
@@ -119,15 +124,23 @@ function LoginForm() {
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          // Login is for existing accounts only. New users go through /signup.
+          shouldCreateUser: false,
         },
       })
 
       if (error) {
-        setMessage({ type: "error", text: error.message })
+        const isNotFound = error.message.toLowerCase().includes("user") || error.status === 422 || error.status === 400
+        setMessage({
+          type: "error",
+          text: isNotFound
+            ? "No account found for that email. If you're new, create an account instead."
+            : error.message,
+        })
       } else {
-        setMessage({ 
-          type: "success", 
-          text: "Check your email for the magic link!" 
+        setMessage({
+          type: "success",
+          text: "Check your email for the magic link!"
         })
       }
     } catch (error) {
@@ -173,6 +186,29 @@ function LoginForm() {
     await supabase.auth.signOut()
     router.push("/login")
     router.refresh()
+  }
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setMessage({ type: "error", text: "Enter your email above first." })
+      return
+    }
+    setIsLoading(true)
+    setMessage(null)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/set-password`,
+      })
+      if (error) {
+        setMessage({ type: "error", text: error.message })
+      } else {
+        setMessage({ type: "success", text: "Check your email for a link to set a new password." })
+      }
+    } catch {
+      setMessage({ type: "error", text: "An unexpected error occurred. Please try again." })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Show loading state when authenticating or during initial check
@@ -251,6 +287,15 @@ function LoginForm() {
                   Sign in with Password
                 </Button>
               </div>
+
+              {registrationEnabled && (
+                <p className="text-sm text-center text-muted-foreground">
+                  New here?{" "}
+                  <Link href={ROUTES.signup} className="font-medium text-primary hover:underline">
+                    Create an account
+                  </Link>
+                </p>
+              )}
             </div>
           ) : authMethod === "magic-link" ? (
             <form onSubmit={handleMagicLink} className="space-y-4">
@@ -337,6 +382,15 @@ function LoginForm() {
                   Sign In
                 </Button>
               </div>
+
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={isLoading}
+                className="w-full text-sm text-center text-muted-foreground hover:text-primary hover:underline disabled:opacity-50"
+              >
+                Forgot / set a password?
+              </button>
             </form>
           )}
         </CardContent>

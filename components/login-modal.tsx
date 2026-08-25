@@ -1,8 +1,11 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { updateLastLogin } from "@/lib/database"
+import { getRegistrationEnabled } from "@/lib/app-settings"
+import { ROUTES } from "@/config/routes"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,7 +26,13 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [authMethod, setAuthMethod] = useState<"magic-link" | "password" | null>(null)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [registrationEnabled, setRegistrationEnabled] = useState(false)
   const supabase = useRef(createClient()).current
+  const router = useRouter()
+
+  useEffect(() => {
+    if (open) getRegistrationEnabled().then(setRegistrationEnabled).catch(() => {})
+  }, [open])
 
   const resetForm = () => {
     setEmail("")
@@ -135,6 +144,22 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
                   Sign in with Password
                 </Button>
               </div>
+
+              {registrationEnabled && (
+                <p className="text-sm text-center text-muted-foreground">
+                  New here?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleOpenChange(false)
+                      router.push(ROUTES.signup)
+                    }}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Create an account
+                  </button>
+                </p>
+              )}
             </div>
           ) : authMethod === "magic-link" ? (
             <form onSubmit={handleMagicLink} className="space-y-4">

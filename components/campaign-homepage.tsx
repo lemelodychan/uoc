@@ -255,6 +255,11 @@ export function CampaignHomepage({
   
   // Check if user can manage session (superadmin or dungeon master)
   const canManageSession = isSuperadmin || isDungeonMaster
+
+  // Editing campaign settings is DM-or-admin only. Plain editors who aren't the
+  // DM of this campaign must not see the Edit Campaign control (matches the
+  // server-side canManageCampaign gate — the button would fail for them anyway).
+  const canManageCampaign = isSuperadmin || userProfile?.permissionLevel === 'admin' || isDungeonMaster
   
 
   // Helper functions for notes
@@ -774,7 +779,7 @@ export function CampaignHomepage({
             </div>
           </div>
           <div className="flex self-start justify-start content-start gap-2">
-            {canEdit && !isReadOnly && (
+            {canManageCampaign && !isReadOnly && (
               <Button
                 variant="outline"
                 size="sm"
